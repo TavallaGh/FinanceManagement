@@ -20,14 +20,25 @@
       </header>
       <section class="grid">
         <article class="card small">
-          <h2>CQRS Rules (MediatR)</h2>
+          <h2>CQRS Rules (Handlers)</h2>
           <ul>
             <li>Command = تغییر حالت</li>
             <li>Query = فقط خواندن</li>
-            <li>Handler = orchestration</li>
-            <li>Logic = Services/Domain</li>
+            <li>Handler = Facade/Orchestrator برای یک Use Case</li>
+            <li>Logic = Rich Domain + Services</li>
           </ul>
-          <p>Endpoint → MediatR → Service</p>
+          <p>Minimal API Endpoint -> Handler -> Service(s) -> Repository</p>
+        </article>
+
+        <article class="card small">
+          <h2>Folder Responsibilities</h2>
+          <ul class="list-compact">
+            <li>Handlers/: محل Handlerهای Facade</li>
+            <li>Services/: منطق اصلی کسب‌وکار</li>
+            <li>Infrastructure/Contexts/: محل DbContext</li>
+            <li>Infrastructure/Repositories/: دسترسی داده</li>
+            <li>Frameworks/: Result/Option Patternهای مشترک</li>
+          </ul>
         </article>
 
         <article class="card small">
@@ -44,7 +55,7 @@
           <ul class="list-compact">
             <li>با جداسازی Command/Query، نوشتن و خواندن هر ماژول مستقل می‌ماند و مالکیت داده حفظ می‌شود.</li>
             <li>Query Modelهای اختصاصی، نیاز به Join مستقیم بین ماژول‌ها را کم می‌کند و وابستگی را کاهش می‌دهد.</li>
-            <li>Handlerهای نازک، منطق را در Domain/Service نگه می‌دارند و از نشت قواعد یک ماژول به ماژول دیگر جلوگیری می‌کنند.</li>
+            <li>Handlerهای Facade می‌توانند چند سرویس مستقل را هماهنگ کنند، بدون انتقال منطق دامنه به Endpoint.</li>
             <li>در ماژولار مونولیت، این الگو هم‌زمان سرعت MVP را حفظ می‌کند و مسیر مقیاس‌پذیری آینده را هموار می‌سازد.</li>
           </ul>
         </article>

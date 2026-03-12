@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 27 — General Engineering & Review Rules</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>General Engineering & Review Rules</h1>
+          <p class="subtitle">قوانین اجباری برای تولید و بازبینی کد در سیستم‌های مالی/ERP</p>
+        </div>
+        <span class="badge">Slide 27</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Core Principles</h2>
+          <div class="chip-row">
+            <span class="kpi ok">DRY</span>
+            <span class="kpi ok">SOLID</span>
+            <span class="kpi ok">KISS</span>
+            <span class="kpi ok">DDD</span>
+            <span class="kpi ok">Clean Architecture</span>
+            <span class="kpi ok">Async-first</span>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>EF Query Rules</h3>
+          <ul class="list-compact">
+            <li>()Read query = AsNoTracking</li>
+            <li>Read APIs = DTO/ViewModel projection only</li>
+            <li>Pagination اجباری با Skip/Take</li>
+            <li>Avoid large Include graphs</li>
+            <li>No lazy loading</li>
+            <li>Compiled query برای مسیرهای پرتکرار</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>EF Write Rules</h3>
+          <ul class="list-compact">
+            <li>Tracked entities for CUD</li>
+            <li>One SaveChangesAsync per logical transaction</li>
+            <li>No SaveChangesAsync inside loops</li>
+            <li>Use AddRange / bulk operations</li>
+            <li>Use ExecuteUpdateAsync / ExecuteDeleteAsync for bulk mutations</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Financial Safety</h3>
+          <ul class="list-compact">
+            <li>Money type = decimal (مثلا decimal(18,2))</li>
+            <li>Timestamps = UTC (DateTime.UtcNow)</li>
+            <li>Important entities = optimistic concurrency (RowVersion)</li>
+            <li>Financial writes must run in DB transaction</li>
+            <li>Domain validation before persistence (Debit = Credit)</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Application Layer Rules</h3>
+          <ul class="list-compact">
+            <li>Controllers/Endpoints handler-routing only</li>
+            <li>No business logic in controller/endpoint</li>
+            <li>Never expose entities from APIs</li>
+            <li>DB access must be explicit and predictable</li>
+            <li>Index-friendly queries only</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Operations</h3>
+          <ul class="list-compact">
+            <li>Enable DB query logging in development</li>
+            <li>Heavy jobs in background workers</li>
+            <li>Optimize for maintainability and performance</li>
+            <li>Always target production-grade ERP quality</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 26 — Frontend Structure Standard</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .frontend-layout {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .frontend-col {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(2, 6, 23, .34);
+      padding: 12px;
+    }
+
+    .frontend-col h3 {
+      margin: 0 0 8px;
+      font-size: .98rem;
+      color: #dbeafe;
+    }
+
+    .frontend-path {
+      margin: 0 0 8px;
+      padding: 8px 10px;
+      border: 1px solid rgba(34, 211, 238, .35);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, .55);
+      color: #a5f3fc;
+      font-size: .88rem;
+      direction: ltr;
+      text-align: left;
+      white-space: nowrap;
+      overflow-x: auto;
+    }
+
+    .frontend-col ul {
+      margin: 0;
+      padding-right: 18px;
+    }
+
+    .frontend-col li {
+      margin-bottom: 4px;
+    }
+
+    @media (max-width: 900px) {
+      .frontend-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Frontend Structure Standard (Blazor)</h1>
+          <p class="subtitle">استاندارد Concrete فرانت‌اند با تفکیک Pages / Clients / Models / Components / Bootstrappers</p>
+        </div>
+        <span class="badge">Slide 26</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Frontend Template (Required)</h2>
+          <div class="frontend-layout">
+            <div class="frontend-col">
+              <h3>Blazor Root</h3>
+              <p class="frontend-path">src/Accounting.Blazor/</p>
+              <ul class="list-compact">
+                <li>Layout/</li>
+                <li>Components/ (dynamic reusable)</li>
+                <li>Models/&lt;Module&gt;/Request|Response/</li>
+                <li>Pages/&lt;Module&gt;/&lt;Page&gt;/</li>
+                <li>Clients/&lt;Module&gt;/</li>
+                <li>Bootstrappers/</li>
+              </ul>
+            </div>
+
+            <div class="frontend-col">
+              <h3>Page + Client Rule</h3>
+              <p class="frontend-path">Pages/&lt;Module&gt;/&lt;Page&gt;/</p>
+              <ul class="list-compact">
+                <li>&lt;Page&gt;.razor (markup only)</li>
+                <li>&lt;Page&gt;PageComponent.cs (C# logic)</li>
+                <li>Clients/&lt;Module&gt;/&lt;Page&gt;ApiClient.cs</li>
+                <li>one ApiClient per razor page</li>
+              </ul>
+            </div>
+
+            <div class="frontend-col">
+              <h3>Responsibilities</h3>
+              <ul class="list-compact">
+                <li>.razor فقط Markup و Binding</li>
+                <li>Page component کلاس شبه‌سرویس با منطق C#</li>
+                <li>Api call فقط در ApiClientهای concrete</li>
+                <li>DI فقط در Bootstrappers</li>
+                <li>DI registration با Reflection (ترجیحی)</li>
+              </ul>
+            </div>
+          </div>
+          <p>این ساختار باعث می‌شود منطق UI، قراردادها و تماس با API جدا بمانند و توسعه Featureهای جدید سریع‌تر و امن‌تر انجام شود.</p>
+        </article>
+
+        <article class="card small">
+          <h3>Rule Check</h3>
+          <div class="chip-row">
+            <span class="kpi ok">Concrete-only classes</span>
+            <span class="kpi ok">One page = one ApiClient</span>
+            <span class="kpi ok">RequestModel/ResponseModel</span>
+            <span class="kpi ok">Bootstrapper + Reflection DI</span>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>Migration Note</h3>
+          <ul class="list-compact">
+            <li>لایه Service و Interface در فرانت حذف شود</li>
+            <li>Request/Response به Models/&lt;Module&gt;/Request|Response منتقل شود</li>
+            <li>API call مستقیم داخل .razor یا component class مجاز نیست</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

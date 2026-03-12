@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 25 — Backend Structure Standard</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .folder-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .folder-col {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(2, 6, 23, .34);
+      padding: 12px;
+    }
+
+    .folder-col h3 {
+      margin: 0 0 8px;
+      font-size: .98rem;
+      color: #dbeafe;
+    }
+
+    .folder-path {
+      margin: 0 0 8px;
+      padding: 8px 10px;
+      border: 1px solid rgba(34, 211, 238, .35);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, .55);
+      color: #a5f3fc;
+      font-size: .88rem;
+      direction: ltr;
+      text-align: left;
+      white-space: nowrap;
+      overflow-x: auto;
+    }
+
+    .folder-col ul {
+      margin: 0;
+      padding-right: 18px;
+    }
+
+    .folder-col li {
+      margin-bottom: 4px;
+    }
+
+    @media (max-width: 900px) {
+      .folder-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Backend Structure Standard (Modules)</h1>
+          <p class="subtitle">استاندارد جدید ساختار بک‌اند برای Domain و Commons در تمام ماژول‌ها</p>
+        </div>
+        <span class="badge">Slide 25</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Module Template (Required)</h2>
+          <div class="folder-layout">
+            <div class="folder-col">
+              <h3>Root Module</h3>
+              <p class="folder-path">src/Modules/&lt;ModuleName&gt;/</p>
+              <ul class="list-compact">
+                <li>Commons/</li>
+                <li>Handlers/</li>
+                <li>Domain/</li>
+                <li>Features/</li>
+                <li>Infrastructure/</li>
+                <li>Services/</li>
+              </ul>
+            </div>
+
+            <div class="folder-col">
+              <h3>Commons Structure</h3>
+              <p class="folder-path">Commons/</p>
+              <ul class="list-compact">
+                <li>Helpers/</li>
+                <li>Extensions/</li>
+              </ul>
+              <h3 style="margin-top: 12px;">Infrastructure Structure</h3>
+              <p class="folder-path">Infrastructure/</p>
+              <ul class="list-compact">
+                <li>Contexts/ (DbContext)</li>
+                <li>Repositories/</li>
+              </ul>
+            </div>
+
+            <div class="folder-col">
+              <h3>Domain Entity Root</h3>
+              <p class="folder-path">Domain/&lt;EntityName&gt;/</p>
+              <ul class="list-compact">
+                <li>Entities/</li>
+                <li>Enums/</li>
+                <li>Aggregates/</li>
+                <li>Contracts/</li>
+                <li>Partials: Entity + Behavior + Construction</li>
+              </ul>
+            </div>
+          </div>
+          <p>هر ماژول باید همین الگو را رعایت کند تا مرزبندی دامنه، توسعه Featureها و نگهداری کد در مقیاس بزرگ پایدار بماند.</p>
+        </article>
+
+        <article class="card small">
+          <h3>Handlers Rule</h3>
+          <ul class="list-compact">
+            <li>Handler یک Facade برای جریان Use Case است</li>
+            <li>Handler می‌تواند چند سرویس مستقل را هماهنگ کند</li>
+            <li>Endpointهای Minimal فقط Request را به Handlers پاس می‌دهند</li>
+            <li>منطق دامنه باید در Rich Domain باقی بماند</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Domain Rule</h3>
+          <ul class="list-compact">
+            <li>ریشه دامنه بر اساس موجودیت کسب‌وکار تعریف می‌شود</li>
+            <li>تفکیک واضح بین Entities / Enums / Aggregates</li>
+            <li>عدم قرار دادن منطق دامنه در Handler یا Endpoint</li>
+            <li>برای ساخت پیچیده از Builder/Factory استفاده شود</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Frameworks Rule</h3>
+          <ul class="list-compact">
+            <li>Result Pattern به‌صورت سراسری الزامی است</li>
+            <li>Result/Option در src/Frameworks نگهداری می‌شود</li>
+            <li>Failure باید شامل ErrorCode + MessageKey باشد</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Commons Rule</h3>
+          <ul class="list-compact">
+            <li>Helpers فقط برای utilityهای داخلی همان ماژول</li>
+            <li>Extensions فقط برای extension methodهای همان ماژول</li>
+            <li>منع اشتراک‌گذاری منطق business بین ماژول‌ها</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Benefits</h3>
+          <div class="chip-row">
+            <span class="kpi ok">Clear Ownership</span>
+            <span class="kpi ok">Faster Onboarding</span>
+            <span class="kpi ok">Safer Refactoring</span>
+            <span class="kpi">Traceable Tests</span>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>Current Project Alignment</h2>
+          <ul class="list-compact">
+            <li>GeneralLedger, Treasury, SystemSettings, Identity (IDP) modules covered</li>
+            <li>Commons/Helpers and Commons/Extensions scaffolded for each module</li>
+            <li>Handlers and Repositories folders scaffolded for each module</li>
+            <li>Frameworks/Accounting.Frameworks baseline added for Result/Option</li>
+            <li>Rule source documented in architecture and solution layer docs</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

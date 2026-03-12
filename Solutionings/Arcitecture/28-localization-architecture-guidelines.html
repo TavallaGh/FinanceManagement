@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 28 — Localization Architecture and Engineering Guidelines</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Localization Architecture and Engineering Guidelines</h1>
+          <p class="subtitle">راهنمای کامل معماری و مهندسی Localization برای Backend، SPA و فرآیند تولید/ریویو کد</p>
+        </div>
+        <span class="badge">Slide 28</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Scope (End-to-End)</h2>
+          <div class="chip-row">
+            <span class="kpi ok">Backend APIs</span>
+            <span class="kpi ok">Frontend SPA</span>
+            <span class="kpi ok">Error/Validation</span>
+            <span class="kpi ok">Page Titles</span>
+            <span class="kpi ok">UI Text</span>
+            <span class="kpi ok">Notifications</span>
+          </div>
+          <p>تمام متن‌های قابل مشاهده کاربر باید Localization شوند. هیچ متن hard-coded کاربرمحور مجاز نیست.</p>
+        </article>
+
+        <article class="card small">
+          <h3>Mandatory Rules</h3>
+          <ul class="list-compact">
+            <li>Localization کاملا key-based</li>
+            <li>Backend متن ترجمه‌شده برنمی‌گرداند</li>
+            <li>API فقط messageKey برمی‌گرداند</li>
+            <li>Frontend مسئول Resolve و Render ترجمه</li>
+            <li>Entities/Exceptions با متن خام ممنوع</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Key Strategy (Strongly Typed)</h3>
+          <ul class="list-compact">
+            <li>کلیدها در static classes</li>
+            <li>UiKeys / ErrorKeys / ValidationKeys</li>
+            <li>PageKeys / NotificationKeys</li>
+            <li>Compile-time safety + refactor safety</li>
+            <li>Consistency across modules</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Naming Convention</h3>
+          <ul class="list-compact">
+            <li>UI_LOGIN_FORM</li>
+            <li>ERROR_USER_NOT_FOUND</li>
+            <li>VALIDATION_REQUIRED_FIELD</li>
+            <li>PAGE_LOGIN_TITLE</li>
+            <li>NOTIFICATION_PASSWORD_RESET_SUCCESS</li>
+          </ul>
+        </article>
+
+        <article class="card full">
+          <h2>Runtime Flow (SPA)</h2>
+          <div class="diagram">
+            <svg viewBox="0 0 980 170" role="img" aria-label="Localization flow">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)"></polygon>
+                </marker>
+              </defs>
+              <rect class="node" x="40" y="42" width="240" height="84" rx="12"></rect>
+              <text x="160" y="75" text-anchor="middle">Backend API</text>
+              <text x="160" y="97" text-anchor="middle">returns messageKey</text>
+
+              <line class="arrow" x1="280" y1="84" x2="470" y2="84"></line>
+
+              <rect class="node soft" x="470" y="42" width="240" height="84" rx="12"></rect>
+              <text x="590" y="75" text-anchor="middle">Localization Service</text>
+              <text x="590" y="97" text-anchor="middle">resolves key by language</text>
+
+              <line class="arrow" x1="710" y1="84" x2="900" y2="84"></line>
+
+              <rect class="node" x="900" y="42" width="40" height="84" rx="12"></rect>
+              <text x="920" y="75" text-anchor="middle">UI</text>
+              <text x="920" y="97" text-anchor="middle">text</text>
+            </svg>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>Language Resolution Order</h3>
+          <ol>
+            <li>User preference</li>
+            <li>Tenant configuration</li>
+            <li>Browser language</li>
+            <li>Default system language</li>
+          </ol>
+        </article>
+
+        <article class="card small">
+          <h3>Storage Options</h3>
+          <ul class="list-compact">
+            <li>Option 1 (SPA): JSON files</li>
+            <li>localization/en.json</li>
+            <li>localization/fa.json</li>
+            <li>localization/tr.json</li>
+            <li>Option 2: DB for multi-tenant overrides</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Review Enforcement</h3>
+          <ul class="list-compact">
+            <li>No hard-coded UI strings</li>
+            <li>No hard-coded error/validation text</li>
+            <li>All user text must use keys</li>
+            <li>Backend must return keys only</li>
+            <li>AI generation/review must enforce this</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>
