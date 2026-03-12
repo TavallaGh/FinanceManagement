@@ -24,7 +24,11 @@
     { file: "21-summary-decisions.html", title: "Summary / Decisions" },
     { file: "22-zachman-framework.html", title: "Zachman Framework" },
     { file: "23-rag-architecture-diagram.html", title: "RAG Architecture Diagram" },
-    { file: "24-agent-workflow-diagram.html", title: "Agent Workflow Diagram" }
+    { file: "24-agent-workflow-diagram.html", title: "Agent Workflow Diagram" },
+    { file: "25-backend-structure-standard.html", title: "Backend Structure Standard" },
+    { file: "26-frontend-structure-standard.html", title: "Frontend Structure Standard" },
+    { file: "27-general-engineering-review-rules.html", title: "General Engineering & Review Rules" },
+    { file: "28-localization-architecture-guidelines.html", title: "Localization Architecture Guidelines" }
   ];
 
   const current = location.pathname.split("/").pop() || "index.html";
