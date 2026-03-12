@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three Core Flows</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .tab-shell {
+      border: 0;
+      background: transparent;
+      padding: 0;
+    }
+
+    .tab-header {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: rgba(15, 23, 42, .56);
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .tab-btn.active {
+      border-color: rgba(34,211,238,.75);
+      color: #dbeafe;
+      background: rgba(30,41,59,.75);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .tab-panel .diagram {
+      min-height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tab-panel .diagram svg {
+      max-height: 305px;
+    }
+
+    .flow-item {
+      opacity: 0;
+      transform: translateY(10px) scale(.985);
+      transition: opacity .42s ease, transform .42s ease;
+    }
+
+    .flow-item.in {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>سه فلو کلیدی پایلوت در یک اسلاید</h1>
+        </div>
+        <span class="badge">Core Operating Flows</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <div class="tab-shell" aria-label="Three flow tabs">
+            <div class="tab-header" role="tablist" aria-label="Flow tabs">
+              <button class="tab-btn active" type="button" role="tab" aria-selected="true" data-tab="flow-01">Prototype تا معماری</button>
+              <button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="flow-03">مدل کاری AI + SDD</button>
+              <button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="flow-05">گیت های کیفیت و تایید Product</button>
+            </div>
+
+          <article class="tab-panel active" id="flow-01" role="tabpanel">
+          <div class="diagram">
+            <svg viewBox="0 0 980 280" role="img" aria-label="Prototype to architecture timeline">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)"></polygon>
+                </marker>
+              </defs>
+              <rect class="node flow-item" x="30" y="90" width="180" height="90" rx="12"></rect>
+              <text class="flow-item" x="120" y="125" text-anchor="middle">Vibe Coding</text>
+              <text class="flow-item" x="120" y="148" text-anchor="middle">Prototype by PM</text>
+
+              <rect class="node soft flow-item" x="245" y="90" width="210" height="90" rx="12"></rect>
+              <text class="flow-item" x="350" y="125" text-anchor="middle">Requirement Analysis</text>
+              <text class="flow-item" x="350" y="148" text-anchor="middle">MVP Scope Definition</text>
+
+              <rect class="node flow-item" x="495" y="90" width="220" height="90" rx="12"></rect>
+              <text class="flow-item" x="605" y="125" text-anchor="middle">Architecture Decision</text>
+              <text class="flow-item" x="605" y="148" text-anchor="middle">Modular Monolith + VS</text>
+
+              <rect class="node soft flow-item" x="755" y="90" width="190" height="90" rx="12"></rect>
+              <text class="flow-item" x="850" y="125" text-anchor="middle">System Design</text>
+              <text class="flow-item" x="850" y="148" text-anchor="middle">In Preparation</text>
+
+              <line class="arrow flow-item" x1="210" y1="135" x2="245" y2="135"></line>
+              <line class="arrow flow-item" x1="455" y1="135" x2="495" y2="135"></line>
+              <line class="arrow flow-item" x1="715" y1="135" x2="755" y2="135"></line>
+            </svg>
+          </div>
+          </article>
+
+          <article class="tab-panel" id="flow-03" role="tabpanel">
+          <div class="diagram">
+            <svg viewBox="0 0 1120 250" role="img" aria-label="Operating model flow">
+              <defs>
+                <marker id="arrowhead-flow03" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)"></polygon>
+                </marker>
+              </defs>
+              <rect class="node flow-item" x="25" y="82" width="150" height="86" rx="12"></rect>
+              <text class="flow-item" x="100" y="116" text-anchor="middle">MVP Need</text>
+              <text class="flow-item" x="100" y="138" text-anchor="middle">by Product</text>
+
+              <rect class="node soft flow-item" x="205" y="82" width="160" height="86" rx="12"></rect>
+              <text class="flow-item" x="285" y="116" text-anchor="middle">Auto Task</text>
+              <text class="flow-item" x="285" y="138" text-anchor="middle">Creation</text>
+
+              <rect class="node flow-item" x="395" y="82" width="160" height="86" rx="12"></rect>
+              <text class="flow-item" x="475" y="116" text-anchor="middle">Git Flow</text>
+              <text class="flow-item" x="475" y="138" text-anchor="middle">Guardrails</text>
+
+              <rect class="node soft flow-item" x="585" y="82" width="170" height="86" rx="12"></rect>
+              <text class="flow-item" x="670" y="116" text-anchor="middle">Agent Dev</text>
+              <text class="flow-item" x="670" y="138" text-anchor="middle">with SDD</text>
+
+              <rect class="node flow-item" x="785" y="82" width="155" height="86" rx="12"></rect>
+              <text class="flow-item" x="862" y="116" text-anchor="middle">Product Review</text>
+              <text class="flow-item" x="862" y="138" text-anchor="middle">+ Test Gate</text>
+
+              <rect class="node soft flow-item" x="970" y="82" width="130" height="86" rx="12"></rect>
+              <text class="flow-item" x="1035" y="116" text-anchor="middle">Product</text>
+              <text class="flow-item" x="1035" y="138" text-anchor="middle">Approve + Launch</text>
+
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow03)" x1="175" y1="125" x2="205" y2="125"></line>
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow03)" x1="365" y1="125" x2="395" y2="125"></line>
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow03)" x1="555" y1="125" x2="585" y2="125"></line>
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow03)" x1="755" y1="125" x2="785" y2="125"></line>
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow03)" x1="940" y1="125" x2="970" y2="125"></line>
+            </svg>
+          </div>
+          </article>
+
+          <article class="tab-panel" id="flow-05" role="tabpanel">
+          <div class="diagram">
+            <svg viewBox="0 0 1020 250" role="img" aria-label="Quality gate workflow">
+              <defs>
+                <marker id="arrowhead-flow05" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)"></polygon>
+                </marker>
+              </defs>
+              <rect class="node flow-item" x="40" y="85" width="160" height="80" rx="12"></rect>
+              <text class="flow-item" x="120" y="120" text-anchor="middle">Agent Dev</text>
+              <text class="flow-item" x="120" y="142" text-anchor="middle">(SDD)</text>
+
+              <rect class="node soft flow-item" x="235" y="85" width="170" height="80" rx="12"></rect>
+              <text class="flow-item" x="320" y="120" text-anchor="middle">Coding Structure</text>
+              <text class="flow-item" x="320" y="142" text-anchor="middle">Compliance</text>
+
+              <rect class="node flow-item" x="440" y="85" width="150" height="80" rx="12"></rect>
+              <text class="flow-item" x="515" y="120" text-anchor="middle">Test Gate</text>
+              <text class="flow-item" x="515" y="142" text-anchor="middle">TDD / BDD / Integration</text>
+
+              <rect class="node soft flow-item" x="625" y="85" width="160" height="80" rx="12"></rect>
+              <text class="flow-item" x="705" y="120" text-anchor="middle">Product Review</text>
+              <text class="flow-item" x="705" y="142" text-anchor="middle">Git Flow Rules</text>
+
+              <rect class="node flow-item" x="820" y="85" width="160" height="80" rx="12"></rect>
+              <text class="flow-item" x="900" y="120" text-anchor="middle">Product</text>
+              <text class="flow-item" x="900" y="142" text-anchor="middle">Approval + Launch</text>
+
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow05)" x1="200" y1="125" x2="235" y2="125"></line>
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow05)" x1="405" y1="125" x2="440" y2="125"></line>
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow05)" x1="590" y1="125" x2="625" y2="125"></line>
+              <line class="arrow flow-item" style="marker-end:url(#arrowhead-flow05)" x1="785" y1="125" x2="820" y2="125"></line>
+            </svg>
+          </div>
+            </article>
+          </div>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+  <script>
+    (function () {
+      const buttons = document.querySelectorAll('.tab-btn');
+      const panels = document.querySelectorAll('.tab-panel');
+
+      function animatePanel(panel) {
+        const items = panel.querySelectorAll('.flow-item');
+        items.forEach((item) => item.classList.remove('in'));
+        items.forEach((item, index) => {
+          setTimeout(() => item.classList.add('in'), 45 * index);
+        });
+      }
+
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-tab');
+          buttons.forEach((b) => {
+            const active = b === btn;
+            b.classList.toggle('active', active);
+            b.setAttribute('aria-selected', active ? 'true' : 'false');
+          });
+          panels.forEach((p) => {
+            const active = p.id === id;
+            p.classList.toggle('active', active);
+            if (active) animatePanel(p);
+          });
+        });
+      });
+
+      const defaultPanel = document.querySelector('.tab-panel.active');
+      if (defaultPanel) animatePanel(defaultPanel);
+    })();
+  </script>
+</body>
+</html>

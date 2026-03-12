@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Section - Vibe Prototype</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body {
+      color: #ffedd5;
+      background: radial-gradient(circle at 18% 15%, #9a3412 0%, transparent 35%),
+                  radial-gradient(circle at 80% 20%, #92400e 0%, transparent 30%),
+                  radial-gradient(circle at 68% 80%, #7c2d12 0%, transparent 35%),
+                  #1c1917;
+    }
+    .slide-header { background: linear-gradient(120deg, rgba(67,20,7,.92), rgba(120,53,15,.84)); border-color: rgba(251,146,60,.35); }
+    .card { background: rgba(67,20,7,.74); border-color: rgba(251,146,60,.3); }
+    .subtitle, .card p, .card li { color: #fed7aa; }
+    .badge { color: #ffedd5; border-color: rgba(251,146,60,.5); background: rgba(120,53,15,.7); }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>سکشن Product: نقطه شروع با Vibe Coding</h1>
+          <p class="subtitle">در مدل تیم ما، Product Manager کل Prototype اولیه را با Vibe Coding آماده می کند.</p>
+        </div>
+        <span class="badge">Product Section Start</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>جایگاه PM در فاز Product Discovery تا Prototype</h2>
+          <ul class="list-compact">
+            <li>PM نیازمندی های کسب وکار را به سناریوهای قابل اجرا تبدیل می کند.</li>
+            <li>Prototype اولیه به صورت end-to-end و متصل به دیتابیس به کمک Vibe Coding آماده می شود.</li>
+            <li>Prototype صرفا UI نیست؛ جریان واقعی کار، فرم ها، و رفتارهای کلیدی هم در آن دیده می شود.</li>
+            <li>این خروجی مبنای تصمیم گیری سریع برای Scope MVP و اولویت های تحویل است.</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>ورودی های PM</h3>
+          <ul class="list-compact">
+            <li>Business pain points</li>
+            <li>Policy constraints</li>
+            <li>Operational scenarios</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی Prototype</h3>
+          <ul class="list-compact">
+            <li>Flowهای اصلی قابل مشاهده</li>
+            <li>فرم ها و فیلدهای بحرانی</li>
+            <li>Baseline اولیه UX</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>نتیجه مدیریتی</h3>
+          <p>به جای انتظار برای تحلیل طولانی، ذی نفعان از روزهای اول نسخه قابل لمس محصول را می بینند.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

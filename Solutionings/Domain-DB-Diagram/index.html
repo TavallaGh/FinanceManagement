@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accounting Domain DB Diagram (Hypothetical)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./assets/css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+  <script type="module" src="./assets/js/app.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <h1>دیاگرام فرضی مدل دیتابیس دامنه حسابداری</h1>
+      <p class="sub">
+        ساختار صفحه ماژولار شده است: استایل در فایل جدا، منطق در فایل جاوااسکریپت جدا، و منابع دیاگرام/DBML در فایل های مستقل برای توسعه تیمی.
+      </p>
+      <div class="legend">
+        <span class="chip"><b>PK</b> کلید اصلی</span>
+        <span class="chip"><b>FK</b> کلید خارجی</span>
+        <span class="chip"><b>UK</b> کلید یکتا</span>
+        <span class="chip"><b>NN</b> not null</span>
+        <span class="chip"><b>NULL</b> nullable</span>
+      </div>
+    </section>
+
+    <section class="panel diagram">
+      <div class="diagram-tools">
+        <button id="zoomInBtn" type="button">Zoom +</button>
+        <button id="zoomOutBtn" type="button">Zoom -</button>
+        <button id="resetViewBtn" type="button">Reset View</button>
+        <button id="fitViewBtn" type="button">Fit</button>
+        <select id="focusPreset" aria-label="Focus preset">
+          <option value="all">نمایش همه</option>
+          <option value="core">Core Setup</option>
+          <option value="security">Users & Roles</option>
+          <option value="masters">Master Data</option>
+          <option value="transactions">Transactions</option>
+        </select>
+        <button id="applyFocusBtn" type="button">فوکوس بخش</button>
+        <button id="clearFocusBtn" type="button">حذف فوکوس</button>
+        <button id="downloadSvgBtn" class="primary" type="button">دانلود SVG</button>
+        <button id="downloadPngBtn" class="primary" type="button">دانلود PNG</button>
+        <button id="presentationBtn" type="button">Presentation Mode</button>
+      </div>
+      <div id="diagramPanel" class="diagram-canvas">
+        <div class="mermaid" id="domainDiagram"></div>
+      </div>
+      <p class="note">
+        متن ERD از فایل <code>assets/data/domain-erd.mmd</code> بارگذاری می شود.
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>DBML (ساختار دقیق برای DB-Diagram)</h2>
+      <pre id="dbmlContent"></pre>
+      <p class="note">
+        متن DBML از فایل <code>assets/data/domain-schema.dbml</code> بارگذاری می شود.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

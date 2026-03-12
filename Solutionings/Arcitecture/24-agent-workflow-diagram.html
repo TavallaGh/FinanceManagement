@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 25 — Agent Workflow Diagram</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Agent Workflow Diagram</h1>
+          <p class="subtitle">گردش کار عامل هوشمند از دریافت درخواست تا اجرای ابزار و بازخورد نهایی</p>
+        </div>
+        <span class="badge">Slide 25</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Agent Orchestration Flow</h2>
+          <div class="diagram" role="img" aria-label="Agent workflow diagram">
+            <svg viewBox="0 0 1080 420" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <rect class="node" x="40" y="170" rx="12" ry="12" width="160" height="56" />
+              <text x="120" y="204" text-anchor="middle">User Request</text>
+
+              <rect class="node" x="240" y="170" rx="12" ry="12" width="170" height="56" />
+              <text x="325" y="204" text-anchor="middle">Intent Parsing</text>
+
+              <rect class="node pulse" x="450" y="140" rx="12" ry="12" width="210" height="116" />
+              <text x="555" y="180" text-anchor="middle">Planner Agent</text>
+              <text x="555" y="206" text-anchor="middle">Task Decomposition</text>
+
+              <rect class="node" x="700" y="70" rx="12" ry="12" width="170" height="56" />
+              <text x="785" y="104" text-anchor="middle">Tool Router</text>
+
+              <rect class="node" x="700" y="150" rx="12" ry="12" width="170" height="56" />
+              <text x="785" y="184" text-anchor="middle">Code Executor</text>
+
+              <rect class="node" x="700" y="230" rx="12" ry="12" width="170" height="56" />
+              <text x="785" y="264" text-anchor="middle">Knowledge Retrieval</text>
+
+              <rect class="node soft" x="910" y="150" rx="12" ry="12" width="150" height="56" />
+              <text x="985" y="184" text-anchor="middle">State / Memory</text>
+
+              <rect class="node soft" x="910" y="280" rx="12" ry="12" width="150" height="56" />
+              <text x="985" y="314" text-anchor="middle">Final Response</text>
+
+              <line class="arrow" x1="200" y1="198" x2="240" y2="198" />
+              <line class="arrow" x1="410" y1="198" x2="450" y2="198" />
+
+              <line class="arrow" x1="660" y1="168" x2="700" y2="98" />
+              <line class="arrow" x1="660" y1="198" x2="700" y2="178" />
+              <line class="arrow" x1="660" y1="228" x2="700" y2="258" />
+
+              <line class="arrow" x1="870" y1="178" x2="910" y2="178" />
+              <line class="arrow" x1="985" y1="206" x2="985" y2="280" />
+              <line class="arrow" x1="870" y1="258" x2="910" y2="308" />
+            </svg>
+          </div>
+          <p class="subtitle">
+            این گردش‌کار نشان می‌دهد عامل هوشمند چگونه درخواست کاربر را به کارهای کوچک‌تر می‌شکند،
+            ابزار مناسب را اجرا می‌کند، دانش لازم را بازیابی می‌کند و در نهایت با اتکا به وضعیت/حافظه،
+            یک پاسخ نهایی منسجم و قابل استفاده برمی‌گرداند.
+          </p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+[submodule "projects/Accounting-Prototype"]
+	path = projects/Accounting-Prototype
+	url = https://gitlab.com/next-top-tech/accounting/accounting-prototype.git
+[submodule "projects/Accounting-Project"]
+	path = projects/Accounting-Project
+	url = https://gitlab.com/next-top-tech/accounting/accounting-project.git

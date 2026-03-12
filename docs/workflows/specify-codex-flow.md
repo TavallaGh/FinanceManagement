@@ -1,0 +1,142 @@
+# Specify Codex Flow
+
+This document describes the current SpecKit workflow for Codex based on files in `.codex/prompts` and `.specify/scripts`.
+
+## End-to-End Flow
+
+```mermaid
+flowchart TD
+    A[/speckit.constitution/] --> B[/speckit.specify/]
+    B --> C[/speckit.clarify/]
+    B --> D[/speckit.plan/]
+    C --> D
+    D --> E[/speckit.tasks/]
+    D --> F[/speckit.checklist/]
+    E --> G[/speckit.analyze/]
+    E --> H[/speckit.implement/]
+    E --> I[/speckit.taskstoissues/]
+    H --> J[/speckit.taskclose/]
+```
+
+## Command Responsibilities
+
+- `/speckit.specify`
+  - Creates or updates feature specification from natural language.
+  - Creates a numbered feature branch and initializes `specs/<branch>/spec.md`.
+  - Produces a requirements checklist under `specs/<branch>/checklists/`.
+- `/speckit.clarify`
+  - Resolves high-impact ambiguities in `spec.md`.
+  - Can hand off to `/speckit.plan`.
+- `/speckit.plan`
+  - Runs planning workflow and generates design artifacts.
+  - Uses `.specify/scripts/*/setup-plan.*` and updates agent context via `update-agent-context.*`.
+  - Produces `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`.
+- `/speckit.tasks`
+  - Generates dependency-ordered `tasks.md` grouped by user story.
+  - Can hand off to `/speckit.analyze` and `/speckit.implement`.
+- `/speckit.analyze`
+  - Performs cross-artifact consistency checks (`spec.md`, `plan.md`, `tasks.md`).
+- `/speckit.implement`
+  - Executes the implementation plan according to generated tasks.
+- `/speckit.taskstoissues`
+  - Executes Jira/GitLab task workflow (not only generation).
+  - Updates Jira status and performs GitLab operations using loaded tokens.
+- `/speckit.taskclose`
+  - Documents completed task execution with full references and timestamps.
+  - Updates story/standalone execution folders based on GitFlow task type.
+  - Updates Postman collection artifacts for API-related tasks.
+  - Updates module `README`/`CHANGELOG` when module docs exist.
+  - Ensures commit is created after each logical change batch using `wip` prefix/suffix convention.
+
+## Artifact Flow
+
+```mermaid
+flowchart LR
+    U[User feature input] --> S[spec.md]
+    S --> C1[clarified spec.md]
+    S --> P[plan.md]
+    C1 --> P
+    P --> R[research.md]
+    P --> D[data-model.md]
+    P --> K[contracts/*]
+    P --> Q[quickstart.md]
+    P --> T[tasks.md]
+    T --> A[analysis report]
+    T --> I[implementation changes]
+    T --> GH[issue-ready tasks]
+```
+
+  ## Task Prompt Operational Contract (Mandatory)
+
+  For every task-oriented prompt execution (especially `/speckit.taskstoissues`):
+
+  1. Load secrets from `.secrets/credentials.local`.
+  2. Validate Jira and GitLab credentials before proceeding.
+  3. Update Jira task status according to workflow stage (minimum: move to `In Progress` at start).
+  4. Perform required GitLab operations via token-authenticated API (issue/MR/branch/linking).
+  5. Maintain bi-directional traceability between Jira and GitLab artifacts.
+  6. Ensure mandatory Jira metadata is present (`AoC`, `DoD`, `Test Cases`, `Fix Version`, `Epic`, labels).
+  7. Enforce MVP Fix Version `V 0.1 (MVP)` for story/task items in this phase.
+  8. Ensure GitLab issue exists for each story and standalone task, and connect MR to that issue.
+  9. Ensure release-level GitLab milestone exists and is used for release artifacts.
+  10. Return a summary containing:
+     - Jira task URL + status
+     - GitLab issue URL
+     - GitLab MR URL
+     - Source branch
+     - Target branch
+
+  This workspace uses operational mode by default. Dry-run mode must be explicitly requested.
+
+  ## Task Completion Artifacts (Mandatory)
+
+  Completion prompt outputs are stored in deterministic locations:
+
+  - Story task record: `docs/work-items/implementation/stories/<STORY-KEY>/tasks/<TASK-KEY>.md`
+  - Story summary: `docs/work-items/implementation/stories/<STORY-KEY>/story-summary.md`
+  - Standalone task record: `docs/work-items/implementation/standalone/<type>/<TASK-KEY>.md`
+  - API collection updates: `docs/work-items/implementation/**/postman/*.postman_collection.json`
+  - Module docs: `docs/work-items/implementation/**/module/README.md` and `docs/work-items/implementation/**/module/CHANGELOG.md`
+
+  Each task record includes:
+
+  - Start datetime / end datetime
+  - Jira info and links
+  - Git branch and MR info
+  - Commit references
+  - Validation notes and rollback notes
+
+  ## Commit Policy in Operational Flow
+
+  - Agent should create a commit after each logical change set.
+  - Interim commit messages must contain `wip` as prefix or suffix.
+  - Suggested patterns:
+    - `wip: <scope> - <summary>`
+    - `<scope>: <summary> [wip]`
+  - Finalization stage may squash or replace `wip` commits per branch promotion policy.
+
+  ## Git Workflow Alignment (v1.2)
+
+  - Branch hierarchy: `main ← stage ← test ← develop ← task branches`.
+  - Task development happens under `develop` using `features/*`, `bugs/*`, `technicals/*`.
+  - Promotion to `test` is only through `story/*` branches assembled from `develop` commits.
+  - Promotion to `stage` is only through `sprint/*` branches.
+  - `hotfix/*` starts from `main` and merges directly to `main`.
+  - Sync direction follows direct-child rule only.
+
+## Jira Board Status Mapping
+
+- `Backlog` → planning pool (stories start here)
+- `To Do` → queued and not started (WIP cap `16` tasks)
+- `In Progress` → active implementation (story enters when first task starts)
+- `In Review` → technical review and merge stage
+- `PO Review` → product acceptance of integrated story output
+- `Done` → final approved completion
+
+## Required Execution Rules
+
+- Always run in the current feature branch format: `NNN-short-name` for SpecKit feature planning artifacts.
+- All paths are treated as absolute by the scripts.
+- `plan.md` is required before task generation.
+- `tasks.md` is required before implementation mode.
+- Branch creation and spec bootstrap must run once per feature request.

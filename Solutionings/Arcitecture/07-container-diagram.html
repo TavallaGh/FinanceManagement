@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 8 — Container Diagram</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Container Diagram (C4-L2)</h1>
+          <p class="subtitle">چیدمان ستونی برای توضیح ساده‌تر: ستون 1 UI (Blazor)، ستون 2 API Host، ستون 3 ماژول‌ها + Identity، ستون 4 زیرساخت داده و مانیتورینگ</p>
+        </div>
+        <span class="badge">Slide 8</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Accounting Containers</h2>
+          <div class="diagram" role="img" aria-label="Container diagram for accounting system">
+            <svg viewBox="0 0 1060 500" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <rect class="node soft" x="24" y="16" rx="10" ry="10" width="180" height="38" />
+              <text x="114" y="40" text-anchor="middle">ستون 1: Blazor UI</text>
+
+              <rect class="node soft" x="244" y="16" rx="10" ry="10" width="220" height="38" />
+              <text x="354" y="40" text-anchor="middle">ستون 2: API Host</text>
+
+              <rect class="node soft" x="504" y="16" rx="10" ry="10" width="240" height="38" />
+              <text x="624" y="40" text-anchor="middle">ستون 3: Modules + Identity</text>
+
+              <rect class="node soft" x="804" y="16" rx="10" ry="10" width="232" height="38" />
+              <text x="920" y="40" text-anchor="middle">ستون 4: DB / Cache / Ops</text>
+
+              <rect class="node" x="34" y="210" rx="12" ry="12" width="160" height="62" />
+              <text x="114" y="247" text-anchor="middle">Blazor WASM UI</text>
+
+              <rect class="node pulse" x="244" y="170" rx="12" ry="12" width="220" height="142" />
+              <text x="354" y="205" text-anchor="middle">API Host (Minimal API)</text>
+              <text x="354" y="230" text-anchor="middle">AuthN/AuthZ + Endpoints</text>
+              <text x="354" y="255" text-anchor="middle">Validation + Logging</text>
+
+              <rect class="node" x="524" y="70" rx="12" ry="12" width="200" height="52" />
+              <text x="624" y="102" text-anchor="middle">دفتر کل Module</text>
+
+              <rect class="node" x="524" y="136" rx="12" ry="12" width="200" height="52" />
+              <text x="624" y="168" text-anchor="middle">خزانه‌داری Module</text>
+
+              <rect class="node" x="524" y="202" rx="12" ry="12" width="200" height="52" />
+              <text x="624" y="234" text-anchor="middle">IDP (Access Control) Module</text>
+
+              <rect class="node" x="524" y="268" rx="12" ry="12" width="200" height="52" />
+              <text x="624" y="300" text-anchor="middle">تنظیمات سیستم Module</text>
+
+              <rect class="node soft" x="812" y="70" rx="12" ry="12" width="220" height="52" />
+              <text x="922" y="102" text-anchor="middle">SQL Server (Main DB)</text>
+
+              <rect class="node soft" x="812" y="136" rx="12" ry="12" width="220" height="52" />
+              <text x="922" y="168" text-anchor="middle">Redis (Read Cache)</text>
+
+              <rect class="node soft" x="812" y="202" rx="12" ry="12" width="220" height="52" />
+              <text x="922" y="234" text-anchor="middle">ELK + Health/Metrics</text>
+
+              <rect class="node soft" x="812" y="268" rx="12" ry="12" width="220" height="52" />
+              <text x="922" y="300" text-anchor="middle">External Integrations</text>
+
+              <line class="arrow" x1="194" y1="241" x2="244" y2="241" />
+
+              <line class="arrow" x1="464" y1="205" x2="524" y2="96" />
+              <line class="arrow" x1="464" y1="220" x2="524" y2="162" />
+              <line class="arrow" x1="464" y1="235" x2="524" y2="228" />
+              <line class="arrow" x1="464" y1="250" x2="524" y2="294" />
+
+              <line class="arrow" x1="724" y1="96" x2="812" y2="96" />
+              <line class="arrow" x1="724" y1="96" x2="812" y2="162" />
+              <line class="arrow" x1="724" y1="96" x2="812" y2="228" />
+              <line class="arrow" x1="724" y1="96" x2="812" y2="294" />
+
+              <line class="arrow" x1="724" y1="162" x2="812" y2="96" />
+              <line class="arrow" x1="724" y1="162" x2="812" y2="162" />
+              <line class="arrow" x1="724" y1="162" x2="812" y2="228" />
+              <line class="arrow" x1="724" y1="162" x2="812" y2="294" />
+
+              <line class="arrow" x1="724" y1="228" x2="812" y2="96" />
+              <line class="arrow" x1="724" y1="228" x2="812" y2="162" />
+              <line class="arrow" x1="724" y1="228" x2="812" y2="228" />
+              <line class="arrow" x1="724" y1="228" x2="812" y2="294" />
+
+              <line class="arrow" x1="724" y1="294" x2="812" y2="96" />
+              <line class="arrow" x1="724" y1="294" x2="812" y2="162" />
+              <line class="arrow" x1="724" y1="294" x2="812" y2="228" />
+              <line class="arrow" x1="724" y1="294" x2="812" y2="294" />
+
+            </svg>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>Communication Rules</h3>
+          <ul class="list-compact">
+            <li>UI فقط با API Host صحبت می‌کند</li>
+            <li>دسترسی به داده از مسیر Moduleها انجام می‌شود</li>
+            <li>Cross-cuttingها در Host اعمال می‌شوند</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Container Outcomes</h3>
+          <div class="chip-row">
+            <span class="kpi">Isolation</span>
+            <span class="kpi">Scalability</span>
+            <span class="kpi">Traceability</span>
+            <span class="kpi">Security</span>
+          </div>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

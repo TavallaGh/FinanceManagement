@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 16 — Observability</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Observability &amp; Reliability</h1>
+          <p class="subtitle">نمای گرافیکی پایش سرویس + واژه‌نامه کاربردی برای تیم فنی و محصول</p>
+        </div>
+        <span class="badge">Slide 16</span>
+      </header>
+      <section class="grid">
+        <article class="card full">
+          <h2>Observability Pipeline</h2>
+          <div class="diagram" role="img" aria-label="Observability pipeline for accounting platform">
+            <svg viewBox="0 0 1060 330" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <rect class="node" x="30" y="118" rx="12" ry="12" width="170" height="56" />
+              <text x="115" y="152" text-anchor="middle">API / Modules</text>
+
+              <rect class="node" x="240" y="118" rx="12" ry="12" width="200" height="56" />
+              <text x="340" y="152" text-anchor="middle">Structured Logging</text>
+
+              <rect class="node" x="480" y="118" rx="12" ry="12" width="200" height="56" />
+              <text x="580" y="152" text-anchor="middle">Tracing + CorrelationId</text>
+
+              <rect class="node soft" x="720" y="80" rx="12" ry="12" width="140" height="56" />
+              <text x="790" y="114" text-anchor="middle">ELK</text>
+
+              <rect class="node soft" x="720" y="154" rx="12" ry="12" width="140" height="56" />
+              <text x="790" y="188" text-anchor="middle">Metrics</text>
+
+              <rect class="node soft" x="720" y="228" rx="12" ry="12" width="140" height="56" />
+              <text x="790" y="262" text-anchor="middle">HealthChecks</text>
+
+              <rect class="node pulse" x="900" y="118" rx="12" ry="12" width="130" height="56" />
+              <text x="965" y="152" text-anchor="middle">Alerts</text>
+
+              <line class="arrow" x1="200" y1="146" x2="240" y2="146" />
+              <line class="arrow" x1="440" y1="146" x2="480" y2="146" />
+              <line class="arrow" x1="680" y1="128" x2="720" y2="108" />
+              <line class="arrow" x1="680" y1="146" x2="720" y2="182" />
+              <line class="arrow" x1="680" y1="164" x2="720" y2="256" />
+              <line class="arrow" x1="860" y1="108" x2="900" y2="136" />
+              <line class="arrow" x1="860" y1="182" x2="900" y2="146" />
+              <line class="arrow" x1="860" y1="256" x2="900" y2="156" />
+            </svg>
+          </div>
+        </article>
+
+        <article class="card small"><h3>Logging</h3><p>Serilog → ELK + الگوی Structured Log برای تحلیل دقیق‌تر رخدادها</p></article>
+        <article class="card small"><h3>Tracing</h3><p>CorrelationId در کل زنجیره درخواست برای ردیابی End-to-End</p></article>
+        <article class="card small"><h3>Health</h3><p>Liveness/Readiness + Dependency Checks برای SQL/Redis/Identity</p></article>
+        <article class="card full"><h3>Metrics</h3><p>latency p95/p99, error rate, throughput, cache hit/miss + Error Budget برای پایش پایداری</p></article>
+
+        <article class="card full">
+          <h3>واژه‌نامه کلیدی (عمومی + اختصاصی پروژه)</h3>
+          <ul class="list-compact">
+            <li><strong>CorrelationId</strong> — عمومی: شناسه یکتا برای ردیابی یک درخواست بین سرویس‌ها | پروژه: روی تمام لاگ‌های API/Module ثبت می‌شود تا مسیر کامل یک سند مالی قابل ردیابی باشد.</li>
+            <li><strong>Structured Logging</strong> — عمومی: ثبت لاگ به‌صورت فیلددار (JSON) | پروژه: فیلدهای کلیدی مثل Module, UserId, FiscalPeriod, DocumentType استاندارد می‌شوند.</li>
+            <li><strong>Liveness / Readiness</strong> — عمومی: سلامت سرویس و آمادگی پاسخ‌گویی | پروژه: برای SQL Server، Redis و Identity Check اختصاصی تعریف می‌شود.</li>
+            <li><strong>p95 / p99 Latency</strong> — عمومی: تاخیر پاسخ در صدک‌های بحرانی | پروژه: برای APIهای پرترافیک گرید و گزارش به‌عنوان KPI عملیاتی پایش می‌شود.</li>
+            <li><strong>Error Budget</strong> — عمومی: میزان خطای قابل‌قبول نسبت به SLA | پروژه: مبنای تصمیم برای Freeze ویژگی جدید و تمرکز روی پایداری خواهد بود.</li>
+          </ul>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

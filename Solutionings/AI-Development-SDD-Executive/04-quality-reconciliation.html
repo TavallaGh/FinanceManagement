@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quality Reconciliation Matrix</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>جدول یکپارچه کیفیت (Quality)</h1>
+          <p class="subtitle">ارزیابی فرضی کیفیت در مدل Traditional در برابر AI + SDD با جزئیات عملیاتی مشابه اسلاید 09</p>
+        </div>
+        <span class="badge">Quality Consolidated Matrix</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Unified Quality Matrix: Metrics, Impact, Controls, and Management Notes</h2>
+          <div class="zachman-wrap">
+            <table class="zachman-matrix">
+              <thead>
+                <tr>
+                  <th>ردیف</th>
+                  <th>شاخص کیفیت</th>
+                  <th>Traditional</th>
+                  <th>AI + SDD</th>
+                  <th>Improvement%</th>
+                  <th>Multiplier</th>
+                  <th>با کمک چه چیزی</th>
+                  <th>توضیح تحلیلی</th>
+                  <th>یادداشت مدیریتی</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>1</th>
+                  <th>Defect Leakage (Production)</th>
+                  <td>16%</td>
+                  <td>9%</td>
+                  <td>43.8%</td>
+                  <td>1.78x بهتر</td>
+                  <td>Shift-left Testing + PR Gates</td>
+                  <td>کاهش خطاهای نشت کرده به محیط واقعی</td>
+                  <td>کاهش هزینه خطای پس از انتشار و افزایش اعتماد ذی نفعان</td>
+                </tr>
+                <tr>
+                  <th>2</th>
+                  <th>Rework Rate</th>
+                  <td>28%</td>
+                  <td>16%</td>
+                  <td>42.9%</td>
+                  <td>1.75x بهتر</td>
+                  <td>Spec Traceability + Acceptance Criteria</td>
+                  <td>بازکاری به دلیل ابهام نیاز کمتر می شود</td>
+                  <td>ظرفیت تیم از اصلاحات تکراری به توسعه ارزش منتقل می شود</td>
+                </tr>
+                <tr>
+                  <th>3</th>
+                  <th>Test Coverage (Critical Paths)</th>
+                  <td>52%</td>
+                  <td>78%</td>
+                  <td>50.0%</td>
+                  <td>1.50x بهتر</td>
+                  <td>TDD/BDD + Integration Checklist</td>
+                  <td>پوشش تست مسیرهای حساس افزایش می یابد</td>
+                  <td>ریسک Regression در انتشارهای بعدی کمتر می شود</td>
+                </tr>
+                <tr>
+                  <th>4</th>
+                  <th>Escaped Critical Bugs / Sprint</th>
+                  <td>5</td>
+                  <td>2</td>
+                  <td>60.0%</td>
+                  <td>2.50x بهتر</td>
+                  <td>Quality Gate + Structured Review</td>
+                  <td>با کنترل کیفیت مرحله ای، باگ بحرانی کمتر عبور می کند</td>
+                  <td>پایداری سرویس در MVP قابل اتکا تر می شود</td>
+                </tr>
+                <tr>
+                  <th>5</th>
+                  <th>Requirement Ambiguity Incidents</th>
+                  <td>12</td>
+                  <td>5</td>
+                  <td>58.3%</td>
+                  <td>2.40x بهتر</td>
+                  <td>Discovery/Clarify Prompts + Structured Specs</td>
+                  <td>نرخ برداشت های متناقض از نیاز کاهش می یابد</td>
+                  <td>چرخه تصمیم گیری Product-Engineering سریع تر و دقیق تر می شود</td>
+                </tr>
+                <tr>
+                  <th>6</th>
+                  <th>MTTR for Hotfixes (hours)</th>
+                  <td>8</td>
+                  <td>4</td>
+                  <td>50.0%</td>
+                  <td>2.00x بهتر</td>
+                  <td>Issue Linkage + Repro Steps Standardization</td>
+                  <td>تشخیص و بازیابی از خطا سریع تر انجام می شود</td>
+                  <td>SLA داخلی تیم توسعه بهبود پیدا می کند</td>
+                </tr>
+                <tr>
+                  <th>7</th>
+                  <th>Quality Composite Score (0-100)</th>
+                  <td></td>
+                  <td></td>
+                  <td>32.0%</td>
+                  <td>1.32x بهتر</td>
+                  <td>Weighted KPI Aggregation</td>
+                  <td>تجمیع شاخص ها یک تصویر یکپارچه از وضعیت کیفیت می دهد</td>
+                  <td>مرجع تصمیم مدیریتی برای Go/No-Go در اسپرینت بعد</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>فرمول های کیفیت</h3>
+          <ul class="list-compact">
+            <li>Improvement% = (Traditional - AI) / Traditional * 100</li>
+            <li>Multiplier = Traditional / AI (برای شاخص های کاهشی)</li>
+            <li>برای Test Coverage: Improvement% = (AI - Traditional) / Traditional * 100</li>
+            <li>برای شاخص های افزایشی: Multiplier = AI / Traditional</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>فرض های سناریو</h3>
+          <ul class="list-compact">
+            <li>نمونه ها مربوط به یک تیم MVP با 2 اسپرینت پایلوت هستند.</li>
+            <li>اعداد کیفیت به صورت فرضی اما منطبق با الگوی تیم های کوچک محصول محور تنظیم شده اند.</li>
+            <li>برای نسخه نهایی باید با داده واقعی Jira/Test Report جایگزین شوند.</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی مورد انتظار مدیریت</h3>
+          <ul class="list-compact">
+            <li>کاهش خطای بحرانی و بازکاری، شاخص اصلی بلوغ پایلوت است.</li>
+            <li>اگر Quality Composite بالای 75 پایدار بماند، مقیاس پذیری توصیه می شود.</li>
+            <li>در غیر این صورت تمرکز روی Discovery و Test Gate تقویت شود.</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

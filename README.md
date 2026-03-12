@@ -1,5 +1,30 @@
 # Accounting-Workspace
 
+## Documentation
+
+- [Documentation Index](docs/README.md)
+- [Git Workflow Flows](docs/workflows/git-workflow-flows.md)
+- [Specify Codex Flow](docs/workflows/specify-codex-flow.md)
+- [Specify Memory Flow](docs/workflows/specify-memory-flow.md)
+- [Specify Branching Template](docs/workflows/specify-branching-template.md)
+- [Jira and GitLab Secrets Integration](docs/integrations/jira-gitlab-secrets-integration.md)
+- [Prompt Usage: Jira to GitLab](docs/integrations/prompt-usage-jira-gitlab.md)
+- [Operational Workflow Summary](docs/operations/WORKFLOW.md)
+- [Daily Runbook](docs/operations/RUNBOOK.md)
+- [Repository Routing](docs/operations/REPO-ROUTING.md)
+- [Work Items Tree](docs/work-items/README.md)
+- [SpecKit Prompts Guide (FA/EN)](SPECKIT-PROMPTS-FA-EN.md)
+- [Execution Docs Structure](docs/work-items/implementation/README.md)
+- [Developer Guide](docs/guides/developer-guide.md)
+- [User Guide](docs/guides/user-guide.md)
+
+## Agent Onboarding (Task Prompts)
+
+- Task prompts are operational by default: the agent updates Jira status and executes required GitLab operations.
+- Credentials are loaded from `.secrets/credentials.local`.
+- Workflow hierarchy must follow `main ← stage ← test ← develop ← task branches`.
+- For workflow details, start with `docs/workflows/git-workflow-flows.md` and `docs/workflows/specify-codex-flow.md`.
+
 
 
 ## Getting started

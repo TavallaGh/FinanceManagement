@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Section - Phase Flow</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #ffedd5; background: radial-gradient(circle at 16% 20%, #9a3412 0%, transparent 35%), radial-gradient(circle at 78% 18%, #92400e 0%, transparent 28%), radial-gradient(circle at 72% 82%, #7c2d12 0%, transparent 34%), #1c1917; }
+    .slide-header { background: linear-gradient(120deg, rgba(67,20,7,.92), rgba(120,53,15,.84)); border-color: rgba(251,146,60,.35); }
+    .card { background: rgba(67,20,7,.74); border-color: rgba(251,146,60,.3); }
+    .subtitle, .card p, .card li { color: #fed7aa; }
+    .badge { color: #ffedd5; border-color: rgba(251,146,60,.5); background: rgba(120,53,15,.7); }
+
+    .phase-flow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .phase {
+      position: relative;
+      border: 1px solid rgba(251,146,60,.35);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(41, 24, 16, .55);
+      animation: fadeInUp .6s ease both;
+    }
+
+    .phase:nth-child(2) { animation-delay: .08s; }
+    .phase:nth-child(3) { animation-delay: .16s; }
+    .phase:nth-child(4) { animation-delay: .24s; }
+
+    .phase::after {
+      content: "";
+      position: absolute;
+      left: -10px;
+      top: 50%;
+      width: 10px;
+      height: 2px;
+      background: rgba(251,146,60,.55);
+    }
+
+    .phase:last-child::after { display: none; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 900px) {
+      .phase-flow { grid-template-columns: 1fr; }
+      .phase::after { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>فلو فازهای Product</h1>
+          <p class="subtitle">نمای فلو فازهای Product قبل از ورود به جزئیات نیازمندی های MVP</p>
+        </div>
+        <span class="badge">Product Phases Flow</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Phase Flow (A to D)</h2>
+          <div class="phase-flow">
+            <div class="phase">
+              <span class="step-badge">Phase A</span>
+              <h3>هسته پایه</h3>
+              <p>تعریف داده های پایه، دسترسی ها، دفتر کل و شروع جریان درخواست های مالی.</p>
+            </div>
+            <div class="phase">
+              <span class="step-badge">Phase B</span>
+              <h3>یکپارچگی نقدینگی</h3>
+              <p>تکمیل جریان خزانه و اتصال های داخلی برای حذف عملیات دستی و مغایرت های تکراری.</p>
+            </div>
+            <div class="phase">
+              <span class="step-badge">Phase C</span>
+              <h3>هوشمندی تجاری</h3>
+              <p>داشبوردهای مدیریتی، تحلیل های تصمیم ساز و پشتیبانی از عملیات پایان سال.</p>
+            </div>
+            <div class="phase">
+              <span class="step-badge">Phase D</span>
+              <h3>یکپارچگی بیرونی</h3>
+              <p>اتصال به سرویس های بیرونی (بانک/سامانه ها) و رسیدن به خودمختاری عملیاتی بالاتر.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>تعریف Phase A</h3>
+          <p>ساخت فونداسیون محصول: داده های مرجع، دسترسی ها و چرخه پایه اسناد/درخواست ها.</p>
+        </article>
+
+        <article class="card small">
+          <h3>تعریف Phase B</h3>
+          <p>تمرکز بر جریان پول: کاهش کار دستی تیم مالی از طریق یکپارچگی و گزارش های دقیق تر.</p>
+        </article>
+
+        <article class="card small">
+          <h3>تعریف Phase C</h3>
+          <p>تبدیل داده عملیاتی به تصمیم مدیریتی: KPI، Dashboard و سناریوهای پایان سال.</p>
+        </article>
+
+        <article class="card small">
+          <h3>تعریف Phase D</h3>
+          <p>بستن حلقه بیرونی: ارتباط با سیستم های خارج سازمان و افزایش مقیاس پذیری محصول.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

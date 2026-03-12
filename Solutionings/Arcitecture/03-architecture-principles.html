@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 4 — اصول معماری و تصمیم کلان</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>اصول معماری (به شدت توصیه شده)</h1>
+          <p class="subtitle">قواعد پایه MVP به همراه تصمیم کلان مسیر معماری</p>
+        </div>
+        <span class="badge">Slide 4</span>
+      </header>
+
+      <section class="grid">
+        <article class="card small">
+          <h2>قواعد معماری</h2>
+          <ol>
+            <li>No Shared Business Domain (فقط SharedKernel حداقلی)</li>
+            <li>Presentation مشترک در Host</li>
+            <li>Endpoint داخل ماژول‌ها، Host فقط Register</li>
+            <li>Single DB در MVP + مالکیت داده</li>
+            <li>CQRS with Thin Handlers</li>
+            <li>TDD + BDD اجباری</li>
+          </ol>
+        </article>
+
+        <article class="card small">
+          <h2>تصمیم کلان MVP</h2>
+          <ul class="list-compact">
+            <li>MVP = Modular Monolith + Vertical Slice</li>
+            <li>Next = SoA (Extract gradually)</li>
+          </ul>
+          <div class="chip-row">
+            <span class="kpi">MVP</span>
+            <span class="kpi">Evolution</span>
+            <span class="kpi">SoA</span>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h2>نتیجه اجرایی</h2>
+          <p>در فاز MVP تمرکز روی سرعت تحویل، مرزبندی ماژول‌ها و کیفیت تست است؛ استخراج سرویس‌ها به‌صورت تدریجی در فازهای بعدی انجام می‌شود.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

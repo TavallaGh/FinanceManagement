@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 12 — Read Performance + Redis Strategy</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Read Performance + Redis Caching</h1>
+          <p class="subtitle">لَدر بهینه‌سازی خواندن و استفاده هدفمند از Redis برای سرعت بالاتر</p>
+        </div>
+        <span class="badge">Slide 12</span>
+      </header>
+      <section class="grid">
+        <article class="card small"><h3>Simple</h3><p>EF Projection برای read ساده</p></article>
+        <article class="card small"><h3>Heavy Grid</h3><p>Dapper/View/SP برای grid سنگین</p></article>
+        <article class="card small"><h3>Aggregate</h3><p>Read Model برای گزارش‌های تجمیعی</p></article>
+
+        <article class="card small">
+          <h3>Redis Use Cases</h3>
+          <ul class="list-compact">
+            <li>Reference Data</li>
+            <li>Permission/Policy cache</li>
+            <li>Cached query results برای صفحات پرتکرار</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Redis Rules</h3>
+          <ul class="list-compact">
+            <li>TTL</li>
+            <li>Versioned keys</li>
+            <li>Invalidation policy</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>نتیجه عملی</h3>
+          <p>در سناریوهای پرتکرار خواندن، ترکیب Query Model + Redis باعث کاهش latency، کاهش بار SQL Server و پایداری بهتر تجربه کاربر می‌شود.</p>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

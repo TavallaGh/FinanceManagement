@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 11 — CQRS + Data Strategy</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>CQRS + Data Strategy (Modular Monolith)</h1>
+          <p class="subtitle">تفکیک Command/Query در کنار قواعد مالکیت داده برای حفظ مرز ماژول‌ها</p>
+        </div>
+        <span class="badge">Slide 11</span>
+      </header>
+      <section class="grid">
+        <article class="card small">
+          <h2>CQRS Rules (MediatR)</h2>
+          <ul>
+            <li>Command = تغییر حالت</li>
+            <li>Query = فقط خواندن</li>
+            <li>Handler = orchestration</li>
+            <li>Logic = Services/Domain</li>
+          </ul>
+          <p>Endpoint → MediatR → Service</p>
+        </article>
+
+        <article class="card small">
+          <h2>Data Strategy</h2>
+          <ul class="list-compact">
+            <li>هر ماژول مالک جدول‌های خودش</li>
+            <li>Cross-module join ممنوع</li>
+            <li>Read سنگین از مسیر رسمی (Query layer / views / projections)</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h2>نتیجه‌گیری: CQRS چگونه به Data Strategy کمک می‌کند؟</h2>
+          <ul class="list-compact">
+            <li>با جداسازی Command/Query، نوشتن و خواندن هر ماژول مستقل می‌ماند و مالکیت داده حفظ می‌شود.</li>
+            <li>Query Modelهای اختصاصی، نیاز به Join مستقیم بین ماژول‌ها را کم می‌کند و وابستگی را کاهش می‌دهد.</li>
+            <li>Handlerهای نازک، منطق را در Domain/Service نگه می‌دارند و از نشت قواعد یک ماژول به ماژول دیگر جلوگیری می‌کنند.</li>
+            <li>در ماژولار مونولیت، این الگو هم‌زمان سرعت MVP را حفظ می‌کند و مسیر مقیاس‌پذیری آینده را هموار می‌سازد.</li>
+          </ul>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

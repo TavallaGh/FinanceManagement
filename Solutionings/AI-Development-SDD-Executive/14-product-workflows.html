@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Section - Workflows</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #ffedd5; background: radial-gradient(circle at 16% 20%, #9a3412 0%, transparent 35%), radial-gradient(circle at 78% 18%, #92400e 0%, transparent 28%), radial-gradient(circle at 72% 82%, #7c2d12 0%, transparent 34%), #1c1917; }
+    .slide-header { background: linear-gradient(120deg, rgba(67,20,7,.92), rgba(120,53,15,.84)); border-color: rgba(251,146,60,.35); }
+    .card { background: rgba(67,20,7,.74); border-color: rgba(251,146,60,.3); }
+    .subtitle, .card p, .card li { color: #fed7aa; }
+    .badge { color: #ffedd5; border-color: rgba(251,146,60,.5); background: rgba(120,53,15,.7); }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Workflowهای محصول در MVP</h1>
+          <p class="subtitle">تمرکز روی جایگزینی عملیات دستی با جریان های قابل ردیابی در سیستم</p>
+        </div>
+        <span class="badge">Product Workflows</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Top Workflows from Proposal</h2>
+          <div class="timeline-grid">
+            <div class="timeline-step">
+              <span class="step-badge">Flow 1</span>
+              <h3>کنترل دسترسی</h3>
+              <p>سطح فرم + عملیات + داده برای هر نقش</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Flow 2</span>
+              <h3>مدیریت داده پایه</h3>
+              <p>تعریف اشخاص/شعب/ارز/پروژه به عنوان مرجع یکتا</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Flow 3</span>
+              <h3>ثبت سند حسابداری</h3>
+              <p>ثبت اولیه -> بررسی -> قطعی سازی -> گزارش گیری</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Flow 4</span>
+              <h3>درخواست پرداخت</h3>
+              <p>ایجاد درخواست -> تایید -> تبدیل به سند مالی -> پیگیری وضعیت</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>چرا این Workflowها اولویت 1 هستند؟</h2>
+          <ul class="list-compact">
+            <li>بیشترین زمان تیم مالی روی همین جریان ها مصرف می شود.</li>
+            <li>بیشترین احتمال خطای انسانی در همین نقاط اتفاق می افتد.</li>
+            <li>اثر مستقیم روی شفافیت، سرعت تصمیم و کنترل مالی دارند.</li>
+            <li>به عنوان پایه و هسته اولیه یک سیستم حسابداری هستند.</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>KPI مورد انتظار</h3>
+          <p>کاهش مغایرت گیری دستی و کاهش زمان ثبت/تایید اسناد در چرخه روزانه.</p>
+        </article>
+
+        <article class="card small">
+          <h3>تعریف Done محصول</h3>
+          <p>هر Workflow باید از دید PM قابل دمو، قابل تست، و قابل پذیرش باشد.</p>
+        </article>
+
+        <article class="card small">
+          <h3>وابستگی کلیدی</h3>
+          <p>کیفیت داده های پایه شرط لازم برای پایداری Workflowها است.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

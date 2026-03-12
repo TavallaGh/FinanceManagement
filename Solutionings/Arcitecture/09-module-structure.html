@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 10 — ساختار ماژول + Presentation Rule</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Modular Template + Presentation Rule</h1>
+          <p class="subtitle">چرایی انتخاب معماری و الگوی اجرای استاندارد ماژول‌ها در MVP</p>
+        </div>
+        <span class="badge">Slide 10</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>چرا Modular Monolith + Vertical Slice انتخاب مناسبی است؟</h2>
+          <ul class="list-compact">
+            <li>تحویل سریع MVP با استقرار یکپارچه و پیچیدگی عملیاتی کمتر</li>
+            <li>مرزبندی شفاف ماژول‌ها (Data Ownership + Contracts) بدون درهم‌ریختگی دامنه</li>
+            <li>قابلیت توسعه تدریجی هر Feature به‌صورت مستقل در قالب Vertical Slice</li>
+            <li>آمادگی برای استخراج سرویس‌ها در آینده، بدون بازنویسی گسترده</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>ساختار ماژول (Template)</h2>
+          <ul>
+            <li>Features/</li>
+            <li>Domain/</li>
+            <li>Services/</li>
+            <li>Infrastructure/</li>
+            <li>Module.cs (Add/Map)</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Presentation Rule</h2>
+          <p>در Host فقط ثبت ماژول‌ها انجام می‌شود و endpoint داخل خود ماژول می‌ماند.</p>
+          <div class="chip-row">
+            <span class="kpi ok">✅ AddModule()</span>
+            <span class="kpi ok">✅ MapModuleEndpoints()</span>
+            <span class="kpi warn">❌ Endpoint در Host</span>
+          </div>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

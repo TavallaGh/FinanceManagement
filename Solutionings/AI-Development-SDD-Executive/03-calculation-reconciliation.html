@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculation Reconciliation</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>جدول یکپارچه تصمیم گیری مدیریتی</h1>
+          <p class="subtitle">مرجع تجمیعی زمان، فرمول ها و نکات مدیریتی برای تصمیم Scale</p>
+        </div>
+        <span class="badge">Executive Consolidated Matrix</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Unified Matrix: Metrics, Formulas, Assumptions, and Management Notes</h2>
+          <div class="zachman-wrap">
+            <table class="zachman-matrix">
+              <thead>
+                <tr>
+                  <th>ردیف</th>
+                  <th>بخش عملیاتی / شاخص</th>
+                  <th>Traditional (min)</th>
+                  <th>AI + SDD (min)</th>
+                  <th>Time Reduction%</th>
+                  <th>Speed Multiplier</th>
+                  <th>با کمک چه چیزی</th>
+                  <th>دلیل کوتاه / تحلیل</th>
+                  <th>یادداشت مدیریتی / خروجی</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>1</th>
+                  <th>تحلیل نیاز و شکاف / Spec Readiness</th>
+                  <td>240</td>
+                  <td>312</td>
+                  <td>-30%</td>
+                  <td>0.77x</td>
+                  <td>Prompt Template + Requirement Summarization</td>
+                  <td>مستندسازی عمیق تر زمان را بیشتر می کند اما کیفیت ورودی توسعه بالاتر می رود</td>
+                  <td>این بخش مبنای تحلیل ریسک است و باید با Baseline واقعی انسانی بازتنظیم شود</td>
+                </tr>
+                <tr>
+                  <th>2</th>
+                  <th>Need to Task (Jira)</th>
+                  <td>30</td>
+                  <td>3</td>
+                  <td>90%</td>
+                  <td>10x</td>
+                  <td>Jira Integration + Auto Transition</td>
+                  <td>ساخت خودکار Task سرعت بالا ایجاد می کند؛ کیفیت وابسته به شفافیت نیاز است</td>
+                  <td>Automation ROI سریع در شروع جریان کار</td>
+                </tr>
+                <tr>
+                  <th>3</th>
+                  <th>Task to Dev Start (Git Flow)</th>
+                  <td>30</td>
+                  <td>3</td>
+                  <td>90%</td>
+                  <td>10x</td>
+                  <td>Git Flow Guardrails + Branch Templates</td>
+                  <td>تاخیر دستی شروع توسعه حذف می شود</td>
+                  <td>کنترل فرایند و کاهش خطای عملیاتی</td>
+                </tr>
+                <tr>
+                  <th>4</th>
+                  <th>Dev + Test</th>
+                  <td>2520</td>
+                  <td>720</td>
+                  <td>71.4%</td>
+                  <td>3.5x</td>
+                  <td>AI Coding + Spec-driven Delivery + Test Automation</td>
+                  <td>بزرگ ترین صرفه جویی زمانی در این فاز رخ می دهد</td>
+                  <td>بیشترین leverage برای Scale در این لایه است</td>
+                </tr>
+                <tr>
+                  <th>5</th>
+                  <th>Approval</th>
+                  <td>480</td>
+                  <td>300</td>
+                  <td>37.5%</td>
+                  <td>1.6x</td>
+                  <td>Traceability + Structured Review Context</td>
+                  <td>تصمیم گیری سریع تر می شود چون شواهد از قبل آماده است</td>
+                  <td>کاهش زمان انتظار تایید Product</td>
+                </tr>
+                <tr>
+                  <th>6</th>
+                  <th>Launch</th>
+                  <td>60</td>
+                  <td>20</td>
+                  <td>66.7%</td>
+                  <td>3.0x</td>
+                  <td>Release Checklist + Linked MR/Issue Artifacts</td>
+                  <td>آماده سازی لانچ با چک لیست و لینک ها سریع تر است</td>
+                  <td>کاهش ریسک خطای لانچ</td>
+                </tr>
+                <tr>
+                  <th>7</th>
+                  <th>سناریوی کامل (تحلیل تا تحویل)</th>
+                  <td>3360</td>
+                  <td>1358</td>
+                  <td>59.6%</td>
+                  <td>2.47x</td>
+                  <td>Weighted End-to-End Flow</td>
+                  <td>میانگین ساده نیست؛ وزن فازها نتیجه کل را تعیین می کند</td>
+                  <td>Baseline نهایی تصمیم مدیریتی برای Scale</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>فرمول های زمان</h3>
+          <ul class="list-compact">
+            <li>Time Reduction% = (Traditional - AI) / Traditional * 100</li>
+            <li>Speed Multiplier = Traditional / AI</li>
+            <li>Overall Reduction = (3360 - 1358) / 3360 = 59.6%</li>
+            <li>Overall Multiplier = 3360 / 1358 = 2.47x</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>فرض های سناریو</h3>
+          <ul class="list-compact">
+            <li>اعداد این اسلاید سناریویی هستند و باید با Baseline انسانی واقعی جایگزین شوند.</li>
+            <li>وزن فازها در نتیجه نهایی اثر مستقیم دارد؛ میانگین ساده ملاک نیست.</li>
+            <li>فرض اصلی: تیم انسانی بدون اتوماسیون کامل و با محدودیت های عملیاتی.</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی مورد انتظار مدیریت</h3>
+          <ul class="list-compact">
+            <li>مرجع زمانی فعلی: Speed +60% و Overall 2.47x سریع تر.</li>
+            <li>مرجع هزینه فعلی: Cost Improvement = +36.6% (Net Saving = 4,100$).</li>
+            <li>برای تصمیم Scale، داده واقعی Lead Time و Approval Cycle جمع آوری شود.</li>
+            <li>پس از واقعی سازی داده، KPI Dashboard نهایی برای هیئت تصمیم تهیه شود.</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

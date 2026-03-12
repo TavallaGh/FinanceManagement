@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Section - Before/After Decision Timeline</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #ffedd5; background: radial-gradient(circle at 16% 20%, #9a3412 0%, transparent 35%), radial-gradient(circle at 78% 18%, #92400e 0%, transparent 28%), radial-gradient(circle at 72% 82%, #7c2d12 0%, transparent 34%), #1c1917; }
+    .slide-header { background: linear-gradient(120deg, rgba(67,20,7,.92), rgba(120,53,15,.84)); border-color: rgba(251,146,60,.35); }
+    .card { background: rgba(67,20,7,.74); border-color: rgba(251,146,60,.3); }
+    .subtitle, .card p, .card li { color: #fed7aa; }
+    .badge { color: #ffedd5; border-color: rgba(251,146,60,.5); background: rgba(120,53,15,.7); }
+
+    .timeline-shell {
+      border: 1px solid rgba(251,146,60,.26);
+      border-radius: 12px;
+      background: rgba(28,25,23,.46);
+      padding: 10px;
+      overflow-x: auto;
+    }
+
+    .timeline-shell svg {
+      width: 100%;
+      min-width: 980px;
+      height: auto;
+      display: block;
+    }
+
+    .month { fill: #fdba74; font-size: 13px; font-weight: 700; }
+    .task { fill: rgba(148,163,184,.55); stroke: rgba(203,213,225,.45); stroke-width: 1; }
+    .task-new { fill: rgba(99,102,241,.38); stroke: rgba(129,140,248,.7); }
+    .axis { stroke: rgba(148,163,184,.35); stroke-width: 1; }
+    .label { fill: #ffedd5; font-size: 12px; font-family: "Segoe UI", Tahoma, sans-serif; }
+    .caption { fill: #fdba74; font-size: 14px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>تایملاین قبل و بعد از تصمیم AI-Development</h1>
+          <p class="subtitle">مقایسه برنامه زمانی قبل از تصمیم و بعد از تصمیم پایلوت، به صورت دو تایملاین هم ساختار</p>
+        </div>
+        <span class="badge">Before / After Timeline</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Traditional-Timeline</h2>
+          <div class="timeline-shell">
+            <svg viewBox="0 0 1140 320" role="img" aria-label="Timeline before AI-development decision">
+              <line class="axis" x1="60" y1="60" x2="1060" y2="60"></line>
+              <line class="axis" x1="60" y1="105" x2="1060" y2="105"></line>
+              <line class="axis" x1="60" y1="150" x2="1060" y2="150"></line>
+              <line class="axis" x1="60" y1="195" x2="1060" y2="195"></line>
+              <line class="axis" x1="60" y1="240" x2="1060" y2="240"></line>
+              <line class="axis" x1="60" y1="285" x2="1060" y2="285"></line>
+
+
+              <text class="month" x="120" y="36">JAN 2026</text>
+              <text class="month" x="245" y="36">FEB 2026</text>
+              <text class="month" x="370" y="36">MAR 2026</text>
+              <text class="month" x="495" y="36">APR 2026</text>
+              <text class="month" x="620" y="36">MAY 2026</text>
+              <text class="month" x="745" y="36">JUN 2026</text>
+              <text class="month" x="870" y="36">JUL 2026</text>
+              <text class="month" x="995" y="36">AUG 2026</text>
+
+              <line class="axis" x1="60" y1="60" x2="60" y2="285"></line>
+              <line class="axis" x1="185" y1="60" x2="185" y2="285"></line>
+              <line class="axis" x1="310" y1="60" x2="310" y2="285"></line>
+              <line class="axis" x1="435" y1="60" x2="435" y2="285"></line>
+              <line class="axis" x1="560" y1="60" x2="560" y2="285"></line>
+              <line class="axis" x1="685" y1="60" x2="685" y2="285"></line>
+              <line class="axis" x1="810" y1="60" x2="810" y2="285"></line>
+              <line class="axis" x1="935" y1="60" x2="935" y2="285"></line>
+              <line class="axis" x1="1060" y1="60" x2="1060" y2="285"></line>
+
+
+              <rect class="task" x="97" y="77" width="173" height="26" rx="6"></rect>
+              <text class="label" x="183" y="95" text-anchor="middle">شناخت محصول</text>
+
+              <rect class="task" x="270" y="122" width="95" height="26" rx="6"></rect>
+              <text class="label" x="317" y="140" text-anchor="middle">تهیه مستندات</text>
+
+              <rect class="task" x="365" y="167" width="189" height="26" rx="6"></rect>
+              <text class="label" x="460" y="185" text-anchor="middle">ارائه Prototype</text>
+
+              <rect class="task" x="513" y="212" width="419" height="26" rx="6"></rect>
+              <text class="label" x="723" y="230" text-anchor="middle">فاز اول توسعه محصول</text>
+
+              <rect class="task" x="936" y="257" width="124" height="26" rx="6"></rect>
+              <text class="label" x="998" y="275" text-anchor="middle">عرضه و استقرار MVP</text>
+
+              <text class="caption" x="760" y="310" text-anchor="end">Traditional-Timeline (Jan 2026 to Aug 2026)</text>
+            </svg>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>بعد از تصمیم پایلوت AI-Development</h2>
+          <div class="timeline-shell">
+            <svg viewBox="0 0 1140 280" role="img" aria-label="Timeline after pilot decision">
+              <line class="axis" x1="60" y1="60" x2="1060" y2="60"></line>
+              <line class="axis" x1="60" y1="105" x2="1060" y2="105"></line>
+              <line class="axis" x1="60" y1="150" x2="1060" y2="150"></line>
+              <line class="axis" x1="60" y1="195" x2="1060" y2="195"></line>
+              <line class="axis" x1="60" y1="240" x2="1060" y2="240"></line>
+
+              <text class="month" x="217" y="36">FEB 2026</text>
+              <text class="month" x="549" y="36">MAR 2026</text>
+              <text class="month" x="891" y="36">APR 2026</text>
+
+              <line class="axis" x1="60" y1="60" x2="60" y2="240"></line>
+              <line class="axis" x1="375" y1="60" x2="375" y2="240"></line>
+              <line class="axis" x1="723" y1="60" x2="723" y2="240"></line>
+              <line class="axis" x1="1060" y1="60" x2="1060" y2="240"></line>
+
+              <rect class="task-new" x="217" y="77" width="315" height="26" rx="6"></rect>
+              <text class="label" x="374" y="95" text-anchor="middle">فاز شناخت محصول</text>
+
+              <rect class="task-new" x="296" y="122" width="371" height="26" rx="6"></rect>
+              <text class="label" x="482" y="140" text-anchor="middle">ارائه پروتوتایپ</text>
+
+              <rect class="task-new" x="375" y="167" width="618" height="26" rx="6"></rect>
+              <text class="label" x="684" y="185" text-anchor="middle">فاز اول توسعه</text>
+
+              <rect class="task-new" x="824" y="212" width="225" height="26" rx="6"></rect>
+              <text class="label" x="936" y="230" text-anchor="middle">عرضه و استقرار MVP</text>
+
+              <text class="caption" x="760" y="270" text-anchor="end">Pilot Timeline (Feb 2026 to Apr 2026)</text>
+            </svg>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>برداشت محصول</h3>
+          <p>پایلوت باعث شد مسیر تولید نمونه و مستندسازی همپوشانی بیشتری بگیرد و شروع توسعه سریع تر شود.</p>
+        </article>
+
+        <article class="card small">
+          <h3>اثر مدیریتی</h3>
+          <p>به جای صف خطی طولانی، فازها با همپوشانی کنترل شده اجرا می شوند و زمان تصمیم گیری کمتر می شود.</p>
+        </article>
+
+        <article class="card small">
+          <h3>کاربرد در ارائه</h3>
+          <p>این اسلاید برای توضیح چرایی تغییر برنامه زمانی قبل از ورود به فلو فازهای Product استفاده می شود.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

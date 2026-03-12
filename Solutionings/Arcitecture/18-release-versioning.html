@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 19 — Release & Versioning</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Release &amp; Versioning + Change Communication</h1>
+          <p class="subtitle">انتشار کنترل‌شده، نسخه‌بندی شفاف و اطلاع‌رسانی قابل‌اعتماد برای کاهش ریسک عملیاتی</p>
+        </div>
+        <span class="badge">Slide 19</span>
+      </header>
+      <section class="grid">
+        <article class="card full">
+          <h2>Release Flow</h2>
+          <div class="diagram" role="img" aria-label="Release and versioning flow">
+            <svg viewBox="0 0 1060 240" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <rect class="node" x="30" y="92" rx="12" ry="12" width="170" height="56" />
+              <text x="115" y="126" text-anchor="middle">Build &amp; Test</text>
+
+              <rect class="node" x="230" y="92" rx="12" ry="12" width="170" height="56" />
+              <text x="315" y="126" text-anchor="middle">Version Tag</text>
+
+              <rect class="node" x="430" y="92" rx="12" ry="12" width="190" height="56" />
+              <text x="525" y="126" text-anchor="middle">Release Notes</text>
+
+              <rect class="node soft" x="650" y="92" rx="12" ry="12" width="180" height="56" />
+              <text x="740" y="126" text-anchor="middle">Communication</text>
+
+              <rect class="node pulse" x="860" y="92" rx="12" ry="12" width="170" height="56" />
+              <text x="945" y="126" text-anchor="middle">Deploy / Rollback</text>
+
+              <line class="arrow" x1="200" y1="120" x2="230" y2="120" />
+              <line class="arrow" x1="400" y1="120" x2="430" y2="120" />
+              <line class="arrow" x1="620" y1="120" x2="650" y2="120" />
+              <line class="arrow" x1="830" y1="120" x2="860" y2="120" />
+            </svg>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>Release Notes</h3>
+          <ul class="list-compact">
+            <li>Featureها، Bug fixها و Breaking changeها</li>
+            <li>اثر تغییر روی کاربران و تیم عملیات</li>
+            <li>Version قابل ردیابی برای هر انتشار</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>اطلاع‌رسانی تغییرات</h3>
+          <ul class="list-compact">
+            <li>اعلام زمان انتشار و دامنه اثر</li>
+            <li>راهنمای استفاده از تغییرات جدید</li>
+            <li>کانال مشخص برای بازخورد و Incident</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Rollback (در صورت نیاز)</h3>
+          <ul class="list-compact">
+            <li>Triggerهای مشخص برای بازگشت نسخه</li>
+            <li>Playbook آماده برای تیم عملیات</li>
+            <li>بازگشت سریع با کمترین اختلال سرویس</li>
+          </ul>
+        </article>
+
+        <article class="card full">
+          <h2>پیام کلیدی اسلاید</h2>
+          <div class="chip-row">
+            <span class="kpi ok">Predictable Releases</span>
+            <span class="kpi ok">Clear Communication</span>
+            <span class="kpi ok">Operational Safety</span>
+            <span class="kpi">Controlled Rollback</span>
+          </div>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

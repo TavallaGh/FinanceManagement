@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 18 — Folder Structure</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Folder Structure: src / tests Mirror</h1>
+          <p class="subtitle">ساختار پوشه‌ها فقط چیدمان نیست؛ نقشه‌ی فهم پروژه، سرعت onboarding و کیفیت تست‌هاست</p>
+        </div>
+        <span class="badge">Slide 18</span>
+      </header>
+      <section class="grid">
+        <article class="card full">
+          <h2>Mirror Structure (Code ↔ Test)</h2>
+          <ul class="list-compact">
+            <li><strong>/src/Modules/Ledgers/Features/CreateVoucher/...</strong></li>
+            <li><strong>/tests/Modules/Ledgers/Features/CreateVoucher/...</strong></li>
+          </ul>
+          <p>هر Feature در کد باید مسیر معادل خود را در تست داشته باشد تا پیدا کردن منطق و سناریوهای اعتبارسنجی سریع و قابل ردیابی بماند.</p>
+        </article>
+
+        <article class="card small">
+          <h3>چرا این ساختار مهم است؟</h3>
+          <ul class="list-compact">
+            <li>Onboarding سریع‌تر اعضای جدید تیم</li>
+            <li>کاهش زمان یافتن فایل مرتبط با Bug/Feature</li>
+            <li>یکپارچگی استاندارد توسعه بین ماژول‌ها</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>قواعد عملی تیم</h3>
+          <ul class="list-compact">
+            <li>هر Feature جدید = مسیر تست متناظر</li>
+            <li>نام‌گذاری پوشه‌ها همسو با زبان دامنه</li>
+            <li>عدم ایجاد پوشه‌های عمومیِ مبهم و غیرقابل‌مالکیت</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی قابل اندازه‌گیری</h3>
+          <div class="chip-row">
+            <span class="kpi ok">Traceability</span>
+            <span class="kpi ok">Maintainability</span>
+            <span class="kpi ok">Test Coverage Mapping</span>
+            <span class="kpi">Faster Debugging</span>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>پیام کلیدی</h2>
+          <p>در Modular Monolith + Vertical Slice، ساختار پوشه درست کمک می‌کند مرز ماژول‌ها حفظ شود، تست‌ها از کد عقب نمانند و تیم با سرعت بالاتر اما کنترل‌شده توسعه دهد.</p>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

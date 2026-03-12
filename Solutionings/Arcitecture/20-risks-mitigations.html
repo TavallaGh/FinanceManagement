@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 21 — Risks & Mitigations</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Risks &amp; Mitigations</h1>
+          <p class="subtitle">نمای تصمیم‌پذیر ریسک‌ها: شدت اثر، احتمال وقوع و اقدامات کاهش ریسک</p>
+        </div>
+        <span class="badge">Slide 21</span>
+      </header>
+      <section class="grid">
+        <article class="card full">
+          <h2>Risk Overview Matrix</h2>
+          <div class="chip-row">
+            <span class="kpi warn">DB Coupling — Impact: High / Likelihood: Medium</span>
+            <span class="kpi warn">Grid Performance — Impact: High / Likelihood: High</span>
+            <span class="kpi">Auth Complexity — Impact: Medium / Likelihood: Medium</span>
+            <span class="kpi">AI Code Drift — Impact: Medium / Likelihood: Medium</span>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>Risk #1 — DB Coupling</h3>
+          <ul class="list-compact">
+            <li>ریشه: وابستگی مستقیم بین جداول ماژول‌ها</li>
+            <li>اثر: شکست مرز ماژول و افت توسعه‌پذیری</li>
+            <li>کاهش: Ownership صریح + ممنوعیت Join بین ماژولی</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Risk #2 — Grid Performance</h3>
+          <ul class="list-compact">
+            <li>ریشه: کوئری‌های سنگین در صفحات پرترافیک</li>
+            <li>اثر: افزایش latency و نارضایتی کاربر</li>
+            <li>کاهش: Query Layer + Read Model + Redis Caching</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Risk #3 — Auth Complexity</h3>
+          <ul class="list-compact">
+            <li>ریشه: ترکیب قوانین نقش، سند و وضعیت</li>
+            <li>اثر: خطای دسترسی یا over-permission</li>
+            <li>کاهش: Policy استاندارد + Integration Tests</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Risk #4 — AI-Driven Code Drift</h3>
+          <ul class="list-compact">
+            <li>ریشه: تولید کد ناسازگار با استاندارد تیم</li>
+            <li>اثر: افزایش هزینه نگهداشت و خطای معماری</li>
+            <li>کاهش: Template ثابت + PR Gates + TDD/BDD</li>
+          </ul>
+        </article>
+
+        <article class="card full">
+          <h2>Decision Message</h2>
+          <p>این ریسک‌ها قابل مدیریت‌اند اگر کنترل‌ها از ابتدا در فرآیند توسعه نهادینه شوند؛ یعنی مرزبندی داده، مسیر رسمی Read، سیاست‌های دسترسی و Quality Gate باید بخشی از Definition of Done هر Feature باشند.</p>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>
