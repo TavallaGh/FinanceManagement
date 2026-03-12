@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 22 — Summary</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Summary / Decisions Snapshot</h1>
+          <p class="subtitle">تصویر نهایی تصمیم‌های تاییدشده برای شروع اجرای کنترل‌شده MVP</p>
+        </div>
+        <span class="badge">Slide 22</span>
+      </header>
+      <section class="grid">
+        <article class="card full">
+          <h2>تصمیم‌های تایید شده (By Domain)</h2>
+          <div class="chip-row">
+            <span class="kpi ok">Architecture: Modular Monolith</span>
+            <span class="kpi ok">Delivery: Vertical Slice</span>
+            <span class="kpi ok">Data: Single DB + Ownership</span>
+            <span class="kpi ok">Performance: Redis + Query Layer</span>
+            <span class="kpi ok">Application: CQRS + MediatR</span>
+            <span class="kpi ok">API: Minimal API</span>
+            <span class="kpi ok">UI: Blazor WASM</span>
+            <span class="kpi ok">Security: IdentityServer</span>
+            <span class="kpi ok">Observability: Serilog + ELK</span>
+            <span class="kpi ok">Quality: TDD/BDD</span>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>Outcome for MVP</h3>
+          <ul class="list-compact">
+            <li>تحویل سریع‌تر با ریسک کنترل‌شده</li>
+            <li>مرزبندی ماژول‌ها و داده‌ها از ابتدا</li>
+            <li>کیفیت قابل پایش و قابل اعتماد</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Next Action</h3>
+          <ul class="list-compact">
+            <li>نهایی‌سازی Backlog فاز اول</li>
+            <li>تایید Architecture Baseline</li>
+            <li>شروع اجرای اسکوپ ۴ ماژول MVP</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h2>Executive Closing</h2>
+          <p>با این تصمیم‌ها تیم می‌تواند MVP را با سرعت، شفافیت و کنترل فنی بالا آغاز کند؛ در عین حال مسیر تکامل به SoA
+            به‌صورت تدریجی و مبتنی بر نیاز واقعی حفظ می‌شود.</p>
+          <span class="kpi info">
+            <p><strong>توجه:</strong> سه اسلاید بعدی به‌عنوان پیوست ارائه (Appendix) در نظر گرفته شده‌اند.</p>
+          </span>
+        </article>
+
+        <article class="card full">
+          <p>Footer: تایید مدیران</p>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+
+</html>

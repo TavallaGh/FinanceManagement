@@ -1,0 +1,157 @@
+erDiagram
+  ORGANIZATIONS ||--o{ BRANCHES : has
+  ORGANIZATIONS ||--o{ FISCAL_PERIODS : defines
+  ORGANIZATIONS ||--o{ LEDGERS : owns
+  ORGANIZATIONS ||--o{ PARTIES : owns
+  ORGANIZATIONS ||--o{ COST_CENTERS : owns
+  ORGANIZATIONS ||--o{ PROJECTS : owns
+  ORGANIZATIONS ||--o{ AUTO_NUMBER_SEQUENCES : configures
+  ORGANIZATIONS ||--o{ USER_ORGANIZATION_ROLES : grants
+
+  ROLES ||--o{ USER_ORGANIZATION_ROLES : assigned
+  USER_ACCOUNTS ||--o{ USER_ORGANIZATION_ROLES : linked
+
+  FISCAL_PERIODS ||--o{ JOURNAL_ENTRIES : contains
+  BRANCHES ||--o{ JOURNAL_ENTRIES : recorded_in
+  VOUCHER_TYPES ||--o{ JOURNAL_ENTRIES : typed_as
+  USER_ACCOUNTS ||--o{ JOURNAL_ENTRIES : created_by
+  AUTO_NUMBER_SEQUENCES ||--o{ JOURNAL_ENTRIES : numbers
+
+  JOURNAL_ENTRIES ||--|{ JOURNAL_ENTRY_LINES : has
+  LEDGERS ||--o{ ACCOUNTS : groups
+  ACCOUNTS ||--o{ JOURNAL_ENTRY_LINES : posted_to
+  PARTIES ||--o{ JOURNAL_ENTRY_LINES : optional_party
+  COST_CENTERS ||--o{ JOURNAL_ENTRY_LINES : optional_cc
+  PROJECTS ||--o{ JOURNAL_ENTRY_LINES : optional_project
+
+  ORGANIZATIONS {
+    bigint id PK "NN"
+    varchar code UK "NN"
+    varchar name "NN"
+    char base_currency "NN"
+    boolean is_active "NN"
+  }
+
+  BRANCHES {
+    bigint id PK "NN"
+    bigint organization_id FK "NN"
+    varchar code "NN"
+    varchar name "NN"
+    boolean is_active "NN"
+  }
+
+  FISCAL_PERIODS {
+    bigint id PK "NN"
+    bigint organization_id FK "NN"
+    int year_no "NN"
+    date starts_on "NN"
+    date ends_on "NN"
+    boolean is_closed "NN"
+  }
+
+  LEDGERS {
+    bigint id PK "NN"
+    bigint organization_id FK "NN"
+    varchar code "NN"
+    varchar name "NN"
+    boolean is_active "NN"
+  }
+
+  ACCOUNTS {
+    bigint id PK "NN"
+    bigint ledger_id FK "NN"
+    bigint parent_account_id FK "NULL"
+    varchar code "NN"
+    varchar name "NN"
+    varchar normal_balance "NN"
+    boolean allow_manual_posting "NN"
+  }
+
+  USER_ACCOUNTS {
+    bigint id PK "NN"
+    varchar username UK "NN"
+    varchar email UK "NN"
+    varchar password_hash "NN"
+    boolean is_active "NN"
+  }
+
+  ROLES {
+    bigint id PK "NN"
+    varchar code UK "NN"
+    varchar title "NN"
+  }
+
+  USER_ORGANIZATION_ROLES {
+    bigint id PK "NN"
+    bigint user_id FK "NN"
+    bigint organization_id FK "NN"
+    bigint role_id FK "NN"
+    datetime assigned_at "NN"
+  }
+
+  VOUCHER_TYPES {
+    bigint id PK "NN"
+    varchar code UK "NN"
+    varchar title "NN"
+  }
+
+  AUTO_NUMBER_SEQUENCES {
+    bigint id PK "NN"
+    bigint organization_id FK "NN"
+    bigint voucher_type_id FK "NN"
+    varchar prefix "NULL"
+    int next_number "NN"
+    int padding_size "NN"
+  }
+
+  JOURNAL_ENTRIES {
+    bigint id PK "NN"
+    bigint organization_id FK "NN"
+    bigint fiscal_period_id FK "NN"
+    bigint branch_id FK "NN"
+    bigint voucher_type_id FK "NN"
+    bigint created_by_user_id FK "NN"
+    bigint sequence_id FK "NN"
+    varchar voucher_no UK "NN"
+    date entry_date "NN"
+    varchar status "NN"
+  }
+
+  JOURNAL_ENTRY_LINES {
+    bigint id PK "NN"
+    bigint journal_entry_id FK "NN"
+    bigint account_id FK "NN"
+    bigint party_id FK "NULL"
+    bigint cost_center_id FK "NULL"
+    bigint project_id FK "NULL"
+    decimal debit_amount "NN"
+    decimal credit_amount "NN"
+    varchar line_description "NULL"
+  }
+
+  PARTIES {
+    bigint id PK "NN"
+    bigint organization_id FK "NN"
+    varchar code "NN"
+    varchar name "NN"
+    varchar national_id "NULL"
+    boolean is_active "NN"
+  }
+
+  COST_CENTERS {
+    bigint id PK "NN"
+    bigint organization_id FK "NN"
+    varchar code "NN"
+    varchar title "NN"
+    boolean is_active "NN"
+  }
+
+  PROJECTS {
+    bigint id PK "NN"
+    bigint organization_id FK "NN"
+    varchar code "NN"
+    varchar title "NN"
+    date start_date "NULL"
+    date end_date "NULL"
+    boolean is_active "NN"
+  }

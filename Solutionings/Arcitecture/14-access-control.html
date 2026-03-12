@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 15 — IDP (Access Control)</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>IDP (Access Control) Model (3-Layer + Ownership)</h1>
+          <p class="subtitle">نمای گرافیکی مدل دسترسی با جزئیات فنی پیاده‌سازی در Modular Monolith</p>
+        </div>
+        <span class="badge">Slide 15</span>
+      </header>
+      <section class="grid">
+        <article class="card full">
+          <h2>IDP (Access Control) Layers — Visual Model</h2>
+          <div class="diagram" role="img" aria-label="3-layer IDP (Access Control) model with ownership rule">
+            <svg viewBox="0 0 1060 420" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <rect class="node soft" x="40" y="30" rx="12" ry="12" width="980" height="70" />
+              <text x="530" y="72" text-anchor="middle">Identity + Role + Claims (JWT / Policy-based Authorization)</text>
+
+              <rect class="node" x="80" y="140" rx="12" ry="12" width="280" height="92" />
+              <text x="220" y="178" text-anchor="middle">Layer 1: فرم / دیتا</text>
+              <text x="220" y="205" text-anchor="middle">Form &amp; Data Scope</text>
+
+              <rect class="node" x="390" y="140" rx="12" ry="12" width="280" height="92" />
+              <text x="530" y="178" text-anchor="middle">Layer 2: عملیات</text>
+              <text x="530" y="205" text-anchor="middle">View / Edit / Delete / Approve</text>
+
+              <rect class="node" x="700" y="140" rx="12" ry="12" width="280" height="92" />
+              <text x="840" y="178" text-anchor="middle">Layer 3: نوع سند</text>
+              <text x="840" y="205" text-anchor="middle">Opening / Normal / Closing</text>
+
+              <rect class="node pulse" x="220" y="280" rx="12" ry="12" width="620" height="90" />
+              <text x="530" y="318" text-anchor="middle">Ownership Rule + Document Status Gate</text>
+              <text x="530" y="345" text-anchor="middle">(Owner, Creator, Workflow State, Fiscal Period Lock)</text>
+
+              <line class="arrow" x1="220" y1="232" x2="220" y2="280" />
+              <line class="arrow" x1="530" y1="232" x2="530" y2="280" />
+              <line class="arrow" x1="840" y1="232" x2="840" y2="280" />
+            </svg>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h3>دید تکنیکال پیاده‌سازی</h3>
+          <ul class="list-compact">
+            <li>Authorization Policy + Claims در API Host</li>
+            <li>Permission Matrix در DB (Role, Scope, Operation, DocumentType)</li>
+            <li>PermissionEvaluator در Application Layer</li>
+            <li>OwnershipGuard برای وضعیت سند و قفل دوره مالی</li>
+            <li>Audit Log برای تصمیم مجاز/غیرمجاز</li>
+          </ul>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

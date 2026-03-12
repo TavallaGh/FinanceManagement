@@ -1,0 +1,198 @@
+---
+description: Execute Jira-to-GitLab workflow from a Jira task ID/link, including status transition, branch/MR/issue creation, and bi-directional linking.
+---
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+You **MUST** consider the user input before proceeding (if not empty).
+
+## Execution Mode
+
+- This prompt runs in **operational mode** by default.
+- For each task prompt execution, you must update Jira status and perform required GitLab operations using tokens loaded from `.secrets/credentials.local`.
+- Do not switch to advisory-only mode unless the user explicitly requests dry-run/no-op behavior.
+
+## Outline
+
+1. Parse input as **Jira Task ID or Jira link**.
+
+- Accepted examples:
+	- `AC-1`
+	- `https://nexttoptech.atlassian.net/browse/AC-1`
+
+2. Load local credentials from `.secrets/credentials.local`:
+
+```bash
+source .specify/scripts/bash/load-secrets.sh
+```
+
+PowerShell alternative:
+
+```powershell
+. .specify/scripts/powershell/load-secrets.ps1
+```
+
+3. Validate required Jira credentials:
+
+- `JIRA_BASE_URL`
+- `JIRA_EMAIL`
+- `JIRA_API_TOKEN`
+
+4. Validate required GitLab credentials:
+
+- `GITLAB_BASE_URL`
+- `GITLAB_TOKEN`
+
+Also use workspace routing values when present:
+
+- `GITLAB_WORKSPACE_PROJECT_ID`
+- `GITLAB_PROJECT_PROJECT_ID`
+- `GITLAB_PROTOTYPE_PROJECT_ID`
+- `GITLAB_GROUP_PATH`
+
+5. Fetch Jira issue details by key and detect issue type and title.
+
+5.1 Enforce mandatory Jira metadata before execution continues:
+
+- `AoC` present
+- `DoD` present
+- `Test Cases` present
+- `Epic` assigned
+- `Fix Version` contains `V 0.1 (MVP)`
+- Labels include at least one domain label (`frontend`, `backend`, `blocked`) based on task scope
+
+If any required field is missing, stop and return remediation details.
+
+6. Move Jira task to `In Progress` using this exact call pattern:
+
+Jira transitions GET:
+
+```bash
+curl --request GET \
+	--url "$JIRA_BASE_URL/rest/api/3/issue/$JIRA_TASK_KEY/transitions" \
+	--user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+	--header "Accept: application/json"
+```
+
+Jira transitions POST:
+
+```bash
+curl --request POST \
+	--url "$JIRA_BASE_URL/rest/api/3/issue/$JIRA_TASK_KEY/transitions" \
+	--user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+	--header "Content-Type: application/json" \
+	--data '{
+		"transition": {
+			"id": "<TRANSITION_ID>"
+		}
+	}'
+```
+
+Transition selection rules:
+
+- Prefer transition id `21` when available.
+- Otherwise pick transition whose `to.name` is `In Progress` (case-insensitive).
+
+Kanban status policy for AC board:
+
+- Stories begin in `Backlog` and are moved to board when selected for execution.
+- `To Do` is pre-start queue (WIP cap `16` tasks).
+- Task enters `In Progress` at work start; story enters `In Progress` when first child task starts.
+- Completed implementation moves to `In Review`.
+- After technical review/merge, move to `PO Review`.
+- After product acceptance, move to `Done`.
+
+7. Build naming and branch strategy from Jira issue type:
+
+- Title format (default):
+	- `[JIRA-TASKID] - jira task title`
+- Branch format:
+	- task development: `features|bugs|technicals/<jira-task-title-slug>`
+	- promotion to test: `story/<jira-task-title-slug>`
+	- promotion to stage: `sprint/<sprint-id-or-title-slug>`
+	- hotfix: `hotfix/<jira-task-title-slug>`
+	- note: if user writes `stroy`, treat it as `story`
+
+Type mapping:
+
+- Jira type contains `Bug` → `bugs`
+- Jira type contains `Technical`, `Spike`, `Chore` → `technicals`
+- Jira type contains `Story` → `features` for task development, `story` for promotion branch
+- Jira type contains `Hotfix` → `hotfix`
+
+8. GitLab issue/MR title rules:
+
+- For `bugs` or `technicals` tasks:
+	- GitLab Issue title = Jira task title format
+	- GitLab MR title = same as GitLab Issue title
+- For `story` tasks:
+	- GitLab Issue title = `[JIRA-STORYID] - Jira story title`
+	- GitLab MR title follows the same title rule and remains linked to that issue
+
+9. Create/update GitLab artifacts using workflow in `docs/workflows/git-workflow-flows.md`:
+
+- Follow hierarchy and MR gates:
+	- task branch (`features|bugs|technicals/*`) targets `develop` with squash MR
+	- default MR options: enable `Delete source branch` and `Squash commits`
+	- apply default options for direct task/delivery merges to `develop|test|stage|main`
+	- exception: no forced squash for cherry-pick assembled promotion branches (for example `story/*`) or direct merges between mainline branches
+	- no direct MR from `develop` to `test`
+	- promotion to `test` uses `story/*` branch assembled from `develop` via cherry-pick, no squash
+	- no direct MR from `test` to `stage`
+	- promotion to `stage` uses `sprint/*`
+	- `hotfix/*` branches from `main` and MRs directly to `main`
+- Select target repository/project using configured workspace variables and task scope.
+- Create or reuse source branch, GitLab issue, and MR.
+- Ensure every story and standalone task has an equivalent GitLab issue.
+- Ensure every MR is linked to its corresponding GitLab issue.
+- Ensure release-level GitLab milestone exists and use it for release-related artifacts.
+
+10. Link everything both ways:
+
+- Put Jira link in GitLab Issue description.
+- Put Jira link in GitLab MR description.
+- Add GitLab Issue and MR links to Jira task as **Web Links** (`/remotelink`).
+- Keep issue and MR mutually linked in descriptions.
+- For story tasks, add task MR link targeting `develop` as Jira Web Link.
+- For standalone tasks, add MR link targeting relevant branch as Jira Web Link.
+- For stories, add story MR link targeting `test` and linked GitLab issue URL as Jira Web Links.
+
+11. Checkout local repo to the created source branch and ensure local branch is synced with its direct parent.
+
+12. Return summary table:
+
+- Jira task URL
+- Jira status after transition
+- GitLab Issue URL
+- GitLab MR URL
+- Created branch name
+- Target branch name
+
+## Naming Rules (Mandatory)
+
+- Standard title:
+	- `[JIRA-TASKID] - jira task title`
+- Branch:
+	- `features|bugs|technicals|story|sprint|hotfix/<slug>`
+
+## Safety Rules
+
+- Do not print raw credentials or tokens.
+- Never create/update resources outside configured Jira/GitLab project.
+- If Jira task is inaccessible, stop and report exact error.
+- If MR already exists, reuse it instead of creating duplicates.
+- If required credentials are missing or placeholders, stop and return a clear remediation message.
+
+## Example Jira Create (Reference Only)
+
+```bash
+curl --request POST "$JIRA_BASE_URL/rest/api/3/issue" \
+	--user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+	--header "Accept: application/json" \
+	--header "Content-Type: application/json" \
+	--data "{\"fields\":{\"project\":{\"key\":\"$JIRA_PROJECT_KEY\"},\"summary\":\"$TASK_TITLE\",\"description\":\"$TASK_BODY\",\"issuetype\":{\"name\":\"Task\"}}}"
+```

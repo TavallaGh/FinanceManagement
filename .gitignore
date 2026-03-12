@@ -1,0 +1,66 @@
+# =========================
+# .NET / Visual Studio
+# =========================
+
+# Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]uild[Ll]og.*
+
+# Rider / VS / VS Code user files
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]enchmarkDotNet.Artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+*.nuget.props
+*.nuget.targets
+
+# Logs
+*.log
+logs/
+
+# ASP.NET / IIS
+.idea/
+wwwroot/lib/
+*.dbmdl
+*.jfm
+
+# Publish output
+publish/
+
+# Single-file and generated apphost
+apphost
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# Local secrets
+# =========================
+
+.secrets/*
+!.secrets/README.md
+!.secrets/credentials.template
+.secrets/credentials.template

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Technical Section - Decision and Coverage Matrix</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #e2e8f0; background: radial-gradient(circle at 14% 18%, #164e63 0%, transparent 34%), radial-gradient(circle at 84% 16%, #0c4a6e 0%, transparent 28%), radial-gradient(circle at 68% 84%, #0f766e 0%, transparent 34%), #082f49; }
+    .slide-header { background: linear-gradient(120deg, rgba(8,47,73,.92), rgba(14,116,144,.82)); border-color: rgba(125,211,252,.35); }
+    .card { background: rgba(7,89,133,.36); border-color: rgba(125,211,252,.28); }
+    .subtitle, .card p, .card li { color: #bfdbfe; }
+    .badge { color: #e0f2fe; border-color: rgba(125,211,252,.52); background: rgba(8,47,73,.72); }
+
+    .table-wrap { overflow-x: auto; }
+
+    .selection-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 880px;
+    }
+
+    .selection-table th,
+    .selection-table td {
+      border: 1px solid rgba(125,211,252,.28);
+      padding: 9px;
+      text-align: right;
+      color: #dbeafe;
+      line-height: 1.65;
+      vertical-align: top;
+      font-size: .9rem;
+    }
+
+    .selection-table thead th {
+      background: rgba(8,47,73,.72);
+      color: #e0f2fe;
+      white-space: nowrap;
+    }
+
+    .selection-table code {
+      color: #a5f3fc;
+      background: rgba(2, 6, 23, .46);
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>ماتریس تصمیم معماری و شکاف های پوششی</h1>
+          <p class="subtitle">جدول مستقل و کانتنت محور برای ارائه جلسه، بدون نیاز به دسترسی به پرزنتیشن مرجع</p>
+        </div>
+        <span class="badge">Decision Coverage Matrix</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Decision Matrix</h2>
+          <div class="table-wrap">
+            <table class="selection-table" aria-label="Architecture decisions and coverage gaps matrix">
+              <thead>
+                <tr>
+                  <th>محور تصمیم</th>
+                  <th>کانتنت کلیدی موجود</th>
+                  <th>تصمیم معماری/اجرایی</th>
+                  <th>شکاف پوششی که بسته می شود</th>
+                  <th>اثر مدیریتی</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>ساختار کلان سیستم</td>
+                  <td>مسیر End-to-End از کاربر تا UI، API Host، ماژول ها، SQL/Redis و لایه Ops</td>
+                  <td>حفظ معماری یکپارچه برای MVP با مرزبندی روشن اجزا</td>
+                  <td>ابهام در مرز مسئولیت اجزا و جریان درخواست</td>
+                  <td>تصمیم گیری سریع تر در اولویت بندی فنی و کاهش ریسک Scope Creep</td>
+                </tr>
+                <tr>
+                  <td>استراتژی داده و CQRS</td>
+                  <td>تفکیک Command/Query، مالکیت داده هر ماژول، ممنوعیت Cross-Module Join</td>
+                  <td>الزام Data Ownership + Query Layer رسمی برای خواندن های سنگین</td>
+                  <td>وابستگی بین ماژول ها و شکست مرزبندی داده</td>
+                  <td>کاهش Technical Debt و افزایش قابلیت تکامل به SoA</td>
+                </tr>
+                <tr>
+                  <td>کارایی خواندن و کش</td>
+                  <td>Read Ladder (Projection/Dapper/View/Read Model) + قواعد TTL و Invalidation در Redis</td>
+                  <td>استفاده هدفمند از Redis برای داده مرجع و کوئری پرتکرار</td>
+                  <td>Latency بالا در Gridها و فشار بیش از حد روی SQL Server</td>
+                  <td>بهبود تجربه کاربر و پایداری عملکرد در بار واقعی</td>
+                </tr>
+                <tr>
+                  <td>مشاهده پذیری و قابلیت اطمینان</td>
+                  <td>Structured Logging، CorrelationId، HealthChecks، Metrics و Alerting</td>
+                  <td>تعریف KPI عملیاتی (p95/p99، Error Rate، Throughput) و پایش مداوم</td>
+                  <td>تشخیص دیرهنگام خطا و دشواری ریشه یابی Incident</td>
+                  <td>افزایش آمادگی عملیات و کاهش MTTR در رخدادها</td>
+                </tr>
+                <tr>
+                  <td>کیفیت و اطمینان تحویل</td>
+                  <td>TDD برای Domain/Service، BDD برای سناریوی کاربر، Quality Gate قبل از Merge/Release</td>
+                  <td>Test-First + Acceptance Scenario به عنوان شرط ورود تغییرات</td>
+                  <td>سرعت توسعه بدون تضمین کیفیت و افزایش Regression</td>
+                  <td>تحویل قابل پیش بینی و کاهش ریسک شکست در محیط عملیاتی</td>
+                </tr>
+                <tr>
+                  <td>انتشار، نسخه بندی و ارتباط تغییر</td>
+                  <td>Release Flow: Build/Test -> Version Tag -> Release Notes -> Deploy/Rollback</td>
+                  <td>انتشار کنترل شده با اطلاع رسانی شفاف و Playbook بازگشت نسخه</td>
+                  <td>ریسک اختلال بعد از Release و ابهام در مالکیت پاسخگویی</td>
+                  <td>کاهش ریسک عملیاتی و افزایش اعتماد ذی نفعان به چرخه انتشار</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>جمع بندی</h2>
+          <p>این جدول مستقل از هر مرجع بیرونی، نشان می دهد چه تصمیم هایی گرفته شده، هر تصمیم کدام شکاف را می پوشاند، و اثر مدیریتی آن چیست. بنابراین در جلسه ارائه، بدون نمایش پرزنتیشن دیگر نیز منطق معماری و پوشش ریسک ها کاملا قابل دفاع است.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

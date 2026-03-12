@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 5 — Tech Stack Overview</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Tech Stack Overview</h1>
+          <p class="subtitle">فناوری‌های منتخب برای MVP و رشد مرحله‌ای</p>
+        </div>
+        <span class="badge">Slide 5</span>
+      </header>
+
+      <section class="grid">
+        <article class="card small">
+          <h2>Backend Core</h2>
+          <ul class="list-compact">
+            <li>.NET 10 + ASP.NET Minimal API</li>
+            <li>CQRS با MediatR برای جداسازی Read/Write</li>
+            <li>Endpointها داخل ماژول‌ها، Host فقط Register</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h2>Frontend & Experience</h2>
+          <ul class="list-compact">
+            <li>Blazor WebAssembly (Hosted)</li>
+            <li>یکپارچه با API Host برای توسعه سریع MVP</li>
+            <li>آماده برای توسعه تدریجی قابلیت‌ها</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h2>Data & Performance</h2>
+          <ul class="list-compact">
+            <li>SQL Server به‌عنوان DB اصلی MVP</li>
+            <li>Redis برای کش لایه خواندن</li>
+            <li>NoSQL به‌صورت Optional در فازهای بعدی</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h2>Security & Observability</h2>
+          <ul class="list-compact">
+            <li>Auth: Duende IdentityServer + Microsoft Identity</li>
+            <li>Logs: Serilog → ELK</li>
+            <li>Health/Metrics: کامل</li>
+          </ul>
+          <p>IdentityServer + ELK + Health/Metrics نیز در مسیر سرویس‌دهی قرار دارند.</p>
+          <div class="chip-row">
+            <span class="kpi">Security</span>
+            <span class="kpi">Observability</span>
+            <span class="kpi">Reliability</span>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h2>Integration Readiness</h2>
+          <ul class="list-compact">
+            <li>طراحی API برای اتصال کنترل‌شده با سرویس‌های داخلی</li>
+            <li>الگوی یکپارچه‌سازی با قراردادهای پایدار</li>
+            <li>جدا نگه‌داشتن وابستگی‌های بیرونی از هسته دامنه</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h2>Evolution Path</h2>
+          <ul class="list-compact">
+            <li>اکنون: Modular Monolith برای سرعت و سادگی MVP</li>
+            <li>بعدی: استخراج تدریجی سرویس‌ها بر اساس نیاز واقعی</li>
+            <li>هدف: گذار کم‌ریسک به SoA بدون بازنویسی پرهزینه</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

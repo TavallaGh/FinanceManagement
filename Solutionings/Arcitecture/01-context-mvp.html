@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 2 — Context MVP و مسیر اجرا</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Context MVP و مسیر اجرای معماری</h1>
+          <p class="subtitle">تیم، Scope چهار ماژول و فازبندی اجرای معماری</p>
+        </div>
+        <span class="badge">Slide 2</span>
+      </header>
+
+      <section class="grid">
+        <article class="card small">
+          <h2>اعضای تیم</h2>
+          <ul>
+            <li>تولی قربانیان — Product Manager</li>
+            <li>مصطفی حسن‌پور — Tech Lead</li>
+            <li>حمیدرضا غلامی — Software Engineer</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h2>بخش تایید</h2>
+          <ul>
+            <li>پیام رحیمی — VP Product (Approval)</li>
+            <li>مصطفی اکبری‌زاده — VP Tech (Approval)</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h2>Scope ماژول‌های MVP</h2>
+          <ul class="list-compact">
+            <li>دفتر کل</li>
+            <li>خزانه‌داری</li>
+            <li>IDP (Access Control)</li>
+            <li>تنظیمات سیستم</li>
+          </ul>
+        </article>
+
+        <article class="card full">
+          <h2>نقشه مسیر اجرای معماری</h2>
+          <div class="timeline-grid">
+            <div class="timeline-step">
+              <span class="step-badge">Phase 1</span>
+              <h3>Foundation</h3>
+              <p>راه‌اندازی Host، Identity، پایگاه داده، Logging و چارچوب تست.</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Phase 2</span>
+              <h3>Core Modules</h3>
+              <p>پیاده‌سازی ۴ ماژول اصلی: دفتر کل، خزانه‌داری، IDP (Access Control) و تنظیمات سیستم.</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Phase 3</span>
+              <h3>Performance &amp; Reliability</h3>
+              <p>افزودن Redis، Read Model بهینه، HealthCheck و داشبورد مانیتورینگ.</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Phase 4</span>
+              <h3>Release Readiness</h3>
+              <p>UAT، سخت‌گیری امنیتی، نسخه‌بندی و تحویل رسمی MVP.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 1 — عنوان</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Architecture &amp; SDD — Accounting v0 (MVP)</h1>
+          <p class="subtitle">Modular Monolith + Vertical Slice + CQRS + Observable Delivery</p>
+        </div>
+        <span class="badge">1404/12/08 • نسخه 0.1 • Approved</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full hero-card">
+          <div>
+            <h2>چشم‌انداز MVP</h2>
+            <p>
+              این ارائه Snapshot تصمیم‌های فنی تاییدشده را نشان می‌دهد تا تیم بتواند با ریسک پایین،
+              توسعه ماژول‌های حسابداری را شروع کند و همزمان مسیر تکامل به معماری سرویس‌محور حفظ شود.
+            </p>
+          </div>
+          <div class="hero-metrics">
+            <div class="metric">
+              <span class="metric-label">زمان عرضه فاز اول</span>
+              <strong class="metric-value">6–8 هفته</strong>
+            </div>
+            <div class="metric">
+              <span class="metric-label">ماژول‌های پایه MVP</span>
+              <strong class="metric-value">4 ماژول</strong>
+            </div>
+            <div class="metric">
+              <span class="metric-label">پایداری هدف</span>
+              <strong class="metric-value">99.5%</strong>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Latency خواندن</span>
+              <strong class="metric-value">&lt; 200ms</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>Stack مصوب</h3>
+          <div class="chip-row">
+            <span class="kpi">.NET 10</span>
+            <span class="kpi">ASP.NET Minimal API</span>
+            <span class="kpi">Blazor Hosted (WASM + API)</span>            
+            <span class="kpi">SQL Server</span>
+            <span class="kpi">Redis</span>
+            <span class="kpi">Serilog + ELK</span>
+            <span class="kpi">IdentityServer</span>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>اهداف این Deck</h3>
+          <ul class="list-compact">
+            <li>هم‌راستاسازی فنی و محصولی روی معماری v0</li>
+            <li>مشخص کردن مرز MVP و خروجی قابل تحویل</li>
+            <li>تثبیت تصمیم‌های پرریسک قبل از توسعه</li>
+            <li>ایجاد مبنای مشترک برای تیم Dev و مدیران</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>دامنه تحویل MVP</h3>
+          <ul class="list-compact">
+            <li>دفتر کل</li>
+            <li>خزانه‌داری</li>
+            <li>IDP (Access Control)</li>
+            <li>تنظیمات سیستم</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Required for Final KPIs</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>داده های مورد نیاز برای نهایی سازی درصدها</h1>
+          <p class="subtitle">Checklist داده ها برای حذف ابهام و محاسبه KPI واقعی</p>
+        </div>
+        <span class="badge">Actionable Input List</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Data Checklist (حداقل لازم)</h2>
+          <div class="zachman-wrap">
+            <table class="zachman-matrix">
+              <thead>
+                <tr>
+                  <th>داده</th>
+                  <th>فرمت پیشنهادی</th>
+                  <th>برای کدام محاسبه</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>Lead Time انسانی (Baseline)</th>
+                  <td>روز/ساعت به ازای هر فیچر</td>
+                  <td>Improvement Speed%</td>
+                </tr>
+                <tr>
+                  <th>Lead Time مدل AI+SDD</th>
+                  <td>روز/ساعت به ازای همان فیچرها</td>
+                  <td>Improvement Speed%</td>
+                </tr>
+                <tr>
+                  <th>Defect Rate انسانی و AI</th>
+                  <td>تعداد باگ Production / Feature</td>
+                  <td>Quality Fulfillment و Improvement%</td>
+                </tr>
+                <tr>
+                  <th>Rework Rate انسانی و AI</th>
+                  <td>ساعت بازکاری / Feature</td>
+                  <td>Cost Reduction و Quality Gate</td>
+                </tr>
+                <tr>
+                  <th>Cost per Feature انسانی و AI</th>
+                  <td>واحد مالی یکسان (مثلا میلیون تومان)</td>
+                  <td>Cost Improvement%</td>
+                </tr>
+                <tr>
+                  <th>وزن مدیریتی KPIها</th>
+                  <td>Speed/Quality/Cost = مجموع 100%</td>
+                  <td>شاخص Combined وزنی</td>
+                </tr>
+                <tr>
+                  <th>وزن فازها</th>
+                  <td>Need/Build/Review/Launch = مجموع 100%</td>
+                  <td>Phase-weighted Averages</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>فرمول خروجی نهایی</h3>
+          <ul class="list-compact">
+            <li>Improvement% = (Baseline - New) / Baseline * 100</li>
+            <li>Fulfillment% = (Actual / Target) * 100</li>
+            <li>Weighted Score = Sum(Score_i * Weight_i)</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی بعد از دریافت داده</h3>
+          <ul class="list-compact">
+            <li>اصلاح تمام درصدهای Deck با عدد واقعی</li>
+            <li>حذف برچسب های برآوردی</li>
+            <li>یک KPI Dashboard نهایی برای مدیریت</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

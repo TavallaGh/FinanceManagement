@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cost Reconciliation Matrix</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>جدول یکپارچه هزینه (Cost)</h1>
+          <p class="subtitle">برآورد فرضی هزینه با مدل تیم یکپارچه Product + Dev (بدون QA مستقل) و حقوق پایه 1000 دلار/ماه</p>
+        </div>
+        <span class="badge">Cost Consolidated Matrix</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Unified Cost Matrix: Team Cost, Tooling Cost, Rework Cost, and Net Impact</h2>
+          <div class="zachman-wrap">
+            <table class="zachman-matrix">
+              <thead>
+                <tr>
+                  <th>ردیف</th>
+                  <th>آیتم هزینه</th>
+                  <th>Traditional ($/month)</th>
+                  <th>AI + SDD ($/month)</th>
+                  <th>Saving / Increase%</th>
+                  <th>Cost Ratio</th>
+                  <th>فرض یا مبنا</th>
+                  <th>تحلیل کوتاه</th>
+                  <th>یادداشت مدیریتی</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>1</th>
+                  <th>حقوق تیم یکپارچه Product + Dev</th>
+                  <td>7,000</td>
+                  <td>4,000</td>
+                  <td>42.9% Saving</td>
+                  <td>1.75x</td>
+                  <td>Traditional: (6 Dev + 1 PM) × 1000 | AI+SDD: (3 Dev + 1 PM) × 1000</td>
+                  <td>با کمک AI ظرفیت توسعه بیشتر می شود و تیم کوچک تر هم نیاز را پوشش می دهد</td>
+                  <td>هزینه ثابت نیروی انسانی کاهش می یابد، در حالی که PM ثابت می ماند</td>
+                </tr>
+                <tr>
+                  <th>2</th>
+                  <th>هزینه تحلیل/تحویل/تست فیچر توسط PM</th>
+                  <td>0</td>
+                  <td>0</td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td>بدون QA مستقل؛ PM نقش تحلیل اولیه + پذیرش نهایی فیچر را انجام می دهد</td>
+                  <td>حقوق PM در ردیف 1 لحاظ شده و این ردیف هزینه افزوده جدیدی ندارد</td>
+                  <td>برای جلوگیری از دوباره شماری، این ردیف صرفا توضیح نقش PM است</td>
+                </tr>
+                <tr>
+                  <th>3</th>
+                  <th>هزینه UI Designer</th>
+                  <td>1,000</td>
+                  <td>500</td>
+                  <td>50.0% Saving</td>
+                  <td>2.00x</td>
+                  <td>Traditional: 1 UI | AI+SDD: 0.5 UI (پاره وقت)</td>
+                  <td>در مدل AI+SDD بخشی از کارهای UI با Design Tokens/Patternهای آماده پوشش داده می شود</td>
+                  <td>کاهش هزینه UI بدون حذف کامل نقش طراحی</td>
+                </tr>
+                <tr>
+                  <th>4</th>
+                  <th>هزینه ساخت و نگهداری اتوماسیون تست توسط Dev</th>
+                  <td>300</td>
+                  <td>500</td>
+                  <td>66.7% Increase</td>
+                  <td>0.60x</td>
+                  <td>در مدل AI+SDD تیم Dev باید Test Automation و CI checks را فعالانه نگه دارد</td>
+                  <td>هزینه مستقیم اتوماسیون بالا می رود اما هزینه های خطا/بازکاری را کاهش می دهد</td>
+                  <td>این هزینه ماهیت سرمایه گذاری توانمندساز دارد</td>
+                </tr>
+                <tr>
+                  <th>5</th>
+                  <th>هزینه بازکاری (Rework)</th>
+                  <td>1,500</td>
+                  <td>700</td>
+                  <td>53.3% Saving</td>
+                  <td>2.14x</td>
+                  <td>بر مبنای ساعات بازکاری ماهانه و نرخ 10$/hour</td>
+                  <td>شفافیت نیاز و Gateهای کیفیت حجم بازکاری را کم می کند</td>
+                  <td>بیشترین ROI در کاهش کار دوباره حاصل می شود</td>
+                </tr>
+                <tr>
+                  <th>6</th>
+                  <th>هزینه خطای پس از انتشار</th>
+                  <td>1,200</td>
+                  <td>500</td>
+                  <td>58.3% Saving</td>
+                  <td>2.40x</td>
+                  <td>هزینه پشتیبانی + Hotfix + تاخیر عملیاتی</td>
+                  <td>کیفیت بهتر انتشار باعث هزینه کمتر Incident می شود</td>
+                  <td>اثر غیرمستقیم مثبت روی رضایت مشتری و برند</td>
+                </tr>
+                <tr>
+                  <th>7</th>
+                  <th>هزینه ابزارهای AI/Automation</th>
+                  <td>200</td>
+                  <td>900</td>
+                  <td>350.0% Increase</td>
+                  <td>0.22x</td>
+                  <td>Copilot/LLM/API/CI Credits در مدل AI+SDD</td>
+                  <td>هزینه ابزار افزایش می یابد ولی در برابر صرفه جویی نیروی انسانی کوچک است</td>
+                  <td>این هزینه باید به عنوان سرمایه گذاری توانمندساز دیده شود</td>
+                </tr>
+                <tr>
+                  <th>8</th>
+                  <th>جمع کل ماهانه</th>
+                  <td>11,200</td>
+                  <td>7,100</td>
+                  <td>36.6% Saving</td>
+                  <td>1.58x</td>
+                  <td>Sum of Rows 1..7</td>
+                  <td>افزایش هزینه اتوماسیون/ابزار با کاهش هزینه انسانی، بازکاری و Incident جبران می شود</td>
+                  <td>در مدل بدون QA مستقل نیز Cost Efficiency خالص مثبت باقی می ماند</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>فرض های سناریو</h3>
+          <ul class="list-compact">
+            <li>حقوق پایه فرضی هر توسعه دهنده: 1000 دلار در ماه.</li>
+            <li>ساختار تیم: 1 PM + تیم Dev یکپارچه، بدون نقش QA مستقل.</li>
+            <li>PM هم تحلیل اولیه را انجام می دهد و هم تحویل/تست فیچرها را مدیریت می کند.</li>
+            <li>نقش UI حذف نشده و به صورت 0.5 نفر (پاره وقت) در مدل AI+SDD لحاظ شده است.</li>
+            <li>تیم Dev مسئول آماده سازی و نگهداری اتوماسیون تست/CI است.</li>
+            <li>ماه کاری موثر: 160 ساعت (برای برآورد هزینه های زمانی).</li>
+            <li>هزینه ابزار AI و اتوماسیون عمدا محافظه کارانه و بالاتر در نظر گرفته شده است.</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>فرمول های هزینه</h3>
+          <ul class="list-compact">
+            <li>Saving% = (Traditional - AI) / Traditional * 100</li>
+            <li>Cost Ratio = Traditional / AI</li>
+            <li>Net Monthly Saving = 11,200 - 7,100 = 4,100$</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی مورد انتظار مدیریت</h3>
+          <ul class="list-compact">
+            <li>در مدل تیم یکپارچه بدون QA، هزینه کل ماهانه حدود 36.6% کاهش دارد.</li>
+            <li>افزایش هزینه اتوماسیون توسط Dev، با کاهش Rework و Incident جبران می شود.</li>
+            <li>وجود PM ثابت و UI پاره وقت، مدل را واقع گرایانه تر و قابل اجرا برای تیم شما می کند.</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

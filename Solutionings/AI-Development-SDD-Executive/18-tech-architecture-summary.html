@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Technical Section - Architecture Entry</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #dbeafe; background: radial-gradient(circle at 16% 20%, #155e75 0%, transparent 35%), radial-gradient(circle at 82% 16%, #0369a1 0%, transparent 30%), radial-gradient(circle at 70% 84%, #164e63 0%, transparent 34%), #082f49; }
+    .slide-header { background: linear-gradient(120deg, rgba(8,47,73,.92), rgba(12,74,110,.84)); border-color: rgba(125,211,252,.34); }
+    .card { background: rgba(8,47,73,.7); border-color: rgba(125,211,252,.28); }
+    .subtitle, .card p, .card li { color: #bae6fd; }
+    .badge { color: #e0f2fe; border-color: rgba(125,211,252,.52); background: rgba(12,74,110,.72); }
+
+    .entry-flow {
+      width: 100%;
+      border: 1px dashed rgba(125,211,252,.4);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(8,47,73,.44);
+      overflow-x: auto;
+    }
+
+    .entry-flow svg {
+      width: 100%;
+      min-width: 980px;
+      height: auto;
+      display: block;
+    }
+
+    .flow-node { fill: rgba(14,116,144,.42); stroke: rgba(125,211,252,.72); stroke-width: 1.4; }
+    .flow-node.core { fill: rgba(2,132,199,.34); }
+    .flow-arrow { stroke: rgba(186,230,253,.86); stroke-width: 1.5; marker-end: url(#arrowhead); }
+    .flow-text { fill: #e0f2fe; font-size: 13px; font-family: "Segoe UI", Tahoma, sans-serif; }
+
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stack-item {
+      border: 1px solid rgba(125,211,252,.26);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(7,89,133,.28);
+    }
+
+    .stack-item h3 {
+      margin: 0 0 8px;
+      color: #e0f2fe;
+      font-size: .95rem;
+    }
+
+    @media (max-width: 900px) {
+      .stack-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>ورود به معماری: چرا این مسیر را انتخاب کردیم؟</h1>
+          <p class="subtitle">ترکیب اصول معماری (Slide 03) و Tech Stack منتخب (Slide 04) برای شروع سکشن تکنیکال</p>
+        </div>
+        <span class="badge">Architecture Entry</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>منطق تصمیم معماری در یک نگاه</h2>
+          <div class="entry-flow" role="img" aria-label="Architecture decision flow from principles to stack and outcomes">
+            <svg viewBox="0 0 1080 300" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(186,230,253,.9)" />
+                </marker>
+              </defs>
+
+              <rect class="flow-node" x="24" y="84" rx="12" ry="12" width="246" height="90"></rect>
+              <text class="flow-text" x="147" y="116" text-anchor="middle">Architecture Principles</text>
+              <text class="flow-text" x="147" y="136" text-anchor="middle">No Shared Domain, Data Ownership</text>
+              <text class="flow-text" x="147" y="156" text-anchor="middle">CQRS Thin Handlers, TDD+BDD</text>
+
+              <rect class="flow-node" x="306" y="84" rx="12" ry="12" width="224" height="90"></rect>
+              <text class="flow-text" x="418" y="116" text-anchor="middle">Architecture Choice</text>
+              <text class="flow-text" x="418" y="136" text-anchor="middle">MVP = Modular Monolith</text>
+              <text class="flow-text" x="418" y="156" text-anchor="middle">+ Vertical Slice</text>
+
+              <rect class="flow-node core" x="566" y="84" rx="12" ry="12" width="250" height="90"></rect>
+              <text class="flow-text" x="691" y="116" text-anchor="middle">Tech Stack Baseline</text>
+              <text class="flow-text" x="691" y="136" text-anchor="middle">.NET + Minimal API + Blazor</text>
+              <text class="flow-text" x="691" y="156" text-anchor="middle">SQL + Redis + ELK + Identity</text>
+
+              <rect class="flow-node" x="852" y="84" rx="12" ry="12" width="204" height="90"></rect>
+              <text class="flow-text" x="954" y="116" text-anchor="middle">Delivery Outcome</text>
+              <text class="flow-text" x="954" y="136" text-anchor="middle">Fast MVP + Controlled Risk</text>
+              <text class="flow-text" x="954" y="156" text-anchor="middle">Ready for Gradual SoA</text>
+
+              <line class="flow-arrow" x1="270" y1="129" x2="306" y2="129"></line>
+              <line class="flow-arrow" x1="530" y1="129" x2="566" y2="129"></line>
+              <line class="flow-arrow" x1="816" y1="129" x2="852" y2="129"></line>
+            </svg>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>ورود به Tech Stack منتخب</h2>
+          <div class="stack-grid">
+            <div class="stack-item">
+              <h3>Backend Core</h3>
+              <ul class="list-compact">
+                <li>.NET 10 + ASP.NET Minimal API</li>
+                <li>CQRS with MediatR</li>
+                <li>Endpoint در ماژول، Host فقط Register</li>
+              </ul>
+            </div>
+            <div class="stack-item">
+              <h3>Frontend + Data</h3>
+              <ul class="list-compact">
+                <li>Blazor WebAssembly (Hosted)</li>
+                <li>SQL Server (OLTP)</li>
+                <li>Redis برای Read Caching</li>
+              </ul>
+            </div>
+            <div class="stack-item">
+              <h3>Security + Observability</h3>
+              <ul class="list-compact">
+                <li>Duende IdentityServer + Microsoft Identity</li>
+                <li>Serilog -> ELK</li>
+                <li>Health Checks + Metrics</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>پیام معماری</h3>
+          <p>اصل کار این است: در MVP با معماری یکپارچه سریع جلو می‌رویم، اما قواعد مرزبندی را طوری نگه می‌داریم که استخراج سرویس‌ها بعدا کم‌ریسک باشد.</p>
+        </article>
+
+        <article class="card small">
+          <h3>پیام اجرایی</h3>
+          <p>این اسلاید نقطه ورود سکشن 3 است: اول قواعد و فناوری را شفاف می‌کند، سپس در اسلایدهای بعدی دیاگرام‌ها و جداول تصمیم را جزئی می‌کند.</p>
+        </article>
+
+        <article class="card small">
+          <h3>پل به اسلاید بعدی</h3>
+          <p>در ادامه، سه دیاگرام کلیدی (Context/Container/Layered) نشان می‌دهند این تصمیم چطور در طراحی واقعی سیستم پیاده شده است.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

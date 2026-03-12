@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 24 — RAG Architecture Diagram</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>RAG Architecture Diagram</h1>
+          <p class="subtitle">جریان داده از اسناد تا پاسخ نهایی با Retrieval-Augmented Generation</p>
+        </div>
+        <span class="badge">Slide 24</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>RAG Pipeline</h2>
+          <div class="diagram" role="img" aria-label="RAG architecture diagram">
+            <svg viewBox="0 0 1080 420" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <rect class="node" x="30" y="70" rx="12" ry="12" width="190" height="56" />
+              <text x="125" y="104" text-anchor="middle">Data Sources</text>
+
+              <rect class="node" x="260" y="70" rx="12" ry="12" width="190" height="56" />
+              <text x="355" y="104" text-anchor="middle">Ingestion / ETL</text>
+
+              <rect class="node" x="490" y="70" rx="12" ry="12" width="190" height="56" />
+              <text x="585" y="104" text-anchor="middle">Chunk + Embed</text>
+
+              <rect class="node soft" x="720" y="70" rx="12" ry="12" width="190" height="56" />
+              <text x="815" y="104" text-anchor="middle">Vector Store</text>
+
+              <rect class="node" x="950" y="70" rx="12" ry="12" width="100" height="56" />
+              <text x="1000" y="104" text-anchor="middle">Index</text>
+
+              <rect class="node" x="120" y="250" rx="12" ry="12" width="200" height="56" />
+              <text x="220" y="284" text-anchor="middle">User Query</text>
+
+              <rect class="node pulse" x="380" y="220" rx="12" ry="12" width="260" height="116" />
+              <text x="510" y="260" text-anchor="middle">Retriever + Ranker</text>
+              <text x="510" y="286" text-anchor="middle">Top-K Context Selection</text>
+
+              <rect class="node" x="700" y="250" rx="12" ry="12" width="160" height="56" />
+              <text x="780" y="284" text-anchor="middle">LLM</text>
+
+              <rect class="node soft" x="900" y="250" rx="12" ry="12" width="160" height="56" />
+              <text x="980" y="284" text-anchor="middle">Grounded Answer</text>
+
+              <line class="arrow" x1="220" y1="98" x2="260" y2="98" />
+              <line class="arrow" x1="450" y1="98" x2="490" y2="98" />
+              <line class="arrow" x1="680" y1="98" x2="720" y2="98" />
+              <line class="arrow" x1="910" y1="98" x2="950" y2="98" />
+
+              <line class="arrow" x1="220" y1="278" x2="380" y2="278" />
+              <line class="arrow" x1="815" y1="126" x2="560" y2="220" />
+              <line class="arrow" x1="640" y1="278" x2="700" y2="278" />
+              <line class="arrow" x1="860" y1="278" x2="900" y2="278" />
+            </svg>
+          </div>
+          <p class="subtitle">
+            مفهوم ساده این دیاگرام: ابتدا دانش سازمانی جمع‌آوری و قابل جست‌وجو می‌شود، سپس هنگام هر سوال،
+            فقط بخش‌های مرتبط بازیابی می‌گردد و همراه سوال به مدل زبانی داده می‌شود تا پاسخ نهایی هم دقیق‌تر باشد
+            و هم بر پایه مستندات واقعی سیستم تولید شود.
+          </p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

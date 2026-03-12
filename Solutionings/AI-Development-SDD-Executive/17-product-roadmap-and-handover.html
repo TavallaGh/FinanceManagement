@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Section - Roadmap and Handover</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #ffedd5; background: radial-gradient(circle at 16% 20%, #9a3412 0%, transparent 35%), radial-gradient(circle at 78% 18%, #92400e 0%, transparent 28%), radial-gradient(circle at 72% 82%, #7c2d12 0%, transparent 34%), #1c1917; }
+    .slide-header { background: linear-gradient(120deg, rgba(67,20,7,.92), rgba(120,53,15,.84)); border-color: rgba(251,146,60,.35); }
+    .card { background: rgba(67,20,7,.74); border-color: rgba(251,146,60,.3); }
+    .subtitle, .card p, .card li { color: #fed7aa; }
+    .badge { color: #ffedd5; border-color: rgba(251,146,60,.5); background: rgba(120,53,15,.7); }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>نقشه راه Product و Hand-off به سکشن Architecture</h1>
+          <p class="subtitle">جمع بندی محصول برای ورود کنترل شده به تحلیل و تصمیم گیری معماری تکنیکال</p>
+        </div>
+        <span class="badge">Section 2 Closing</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Product Roadmap Snapshot (From Proposal)</h2>
+          <div class="timeline-grid">
+            <div class="timeline-step">
+              <span class="step-badge">Phase A</span>
+              <h3>هسته پایه</h3>
+              <p>داده های پایه، دسترسی ها، دفتر کل و درخواست های مالی</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Phase B</span>
+              <h3>یکپارچگی نقدینگی</h3>
+              <p>جریان خزانه، گزارش های تکمیلی، و کاهش عملیات دستی</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Phase C</span>
+              <h3>هوشمندی تجاری</h3>
+              <p>Dashboardهای مدیریتی و عملیات پایان سال</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Phase D</span>
+              <h3>یکپارچگی بیرونی</h3>
+              <p>اتصال به سرویس های بیرونی و خودمختاری بیشتر سیستم</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>Hand-off Package برای سکشن 3</h2>
+          <ul class="list-compact">
+            <li>Prototypeهای PM (Vibe Coding) + Demo Scenarios</li>
+            <li>Design System artifacts + Feature specs</li>
+            <li>Technical task backlog with priorities</li>
+            <li>Acceptance checklist و KPI baseline</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی تصمیم</h3>
+          <p>از این نقطه به بعد، تمرکز ارائه از «چی بسازیم» به «چطور با معماری درست بسازیم» منتقل می شود.</p>
+        </article>
+
+        <article class="card small">
+          <h3>ریسک باقیمانده</h3>
+          <p>اگر Prototype و Design System همگام نمانند، انحراف هزینه و زمان در سکشن 3 رخ می دهد.</p>
+        </article>
+
+        <article class="card small">
+          <h3>گام بعد</h3>
+          <p>شروع سکشن Architecture با تحلیل گزینه های فنی، Trade-off و نقشه پیاده سازی.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

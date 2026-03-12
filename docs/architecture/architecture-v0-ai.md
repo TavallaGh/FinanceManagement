@@ -1,0 +1,378 @@
+# Accounting Architecture v0 (AI-Optimized Specification)
+
+> Version: 0.1
+> Architecture Style: Modular Monolith + Vertical Slice
+> Status: MVP Approved
+> AI Agents: MUST FOLLOW ALL RULES DEFINED IN THIS DOCUMENT
+
+---
+
+# 1. System Overview
+
+Accounting v0 is a modular financial system built using:
+
+* .NET (Backend)
+* Blazor WebAssembly (Frontend)
+* SQL Server (Primary Database)
+* Redis (Caching Layer)
+* CQRS with MediatR
+* Minimal API
+* Duende IdentityServer + Microsoft Identity
+* Serilog + ELK
+* Health Checks + Metrics Monitoring
+
+The system is designed as:
+
+> Modular Monolith (MVP) with future migration path to SoA.
+
+---
+
+# 2. Architectural Constraints (MANDATORY)
+
+AI Agents MUST respect these constraints:
+
+1. No shared business domain between modules.
+2. Only a minimal SharedKernel is allowed.
+3. Endpoints MUST be defined inside modules.
+4. Host MUST only register modules.
+5. Cross-module direct database joins are NOT allowed.
+6. Business logic MUST NOT be placed in CQRS handlers.
+7. Handlers MUST be thin orchestrators.
+8. SQL Server is the primary source of truth.
+9. Redis is cache only (never authoritative).
+10. Observability is mandatory (logs + metrics + health).
+
+---
+
+# 3. High-Level Architecture
+
+```mermaid
+flowchart TB
+  User --> BlazorWASM
+  BlazorWASM --> API
+
+  subgraph Host
+    API --> Identity
+    API --> RegisterModules
+    API --> Logging
+    API --> Health
+  end
+
+  subgraph Modules
+    RegisterModules --> Ledgers
+    RegisterModules --> Journals
+    RegisterModules --> Treasury
+    RegisterModules --> Workflow
+    RegisterModules --> Reporting
+  end
+
+  Ledgers --> MediatR
+  Journals --> MediatR
+  Treasury --> MediatR
+
+  MediatR --> Services
+  Services --> SQL
+  Services --> Redis
+
+  Logging --> ELK
+```
+
+---
+
+# 4. Solution Structure
+
+```
+/src
+  Accounting.Api                ← Host (Composition Root)
+  Accounting.Blazor             ← Frontend
+  Accounting.SharedKernel       ← Minimal Shared Types
+
+  /Modules
+    /Ledgers
+    /Journals
+    /Treasury
+    /Workflow
+    /Reporting
+    /IdentityAccess
+```
+
+---
+
+# 5. Shared Kernel Rules
+
+SharedKernel MAY contain:
+
+* EntityId
+* Result
+* Error
+* BaseEntity
+* AggregateRoot (technical only)
+* DomainEvent (technical only)
+
+SharedKernel MUST NOT contain:
+
+* Ledger
+* Journal
+* Treasury
+* Business Rules
+* Cross-module abstractions
+
+SharedKernel must remain stable and small.
+
+---
+
+# 6. Module Design Rules
+
+Each module:
+
+* Owns its Domain
+* Owns its Database tables
+* Defines its own Endpoints
+* Implements Vertical Slice architecture
+
+### Example Module Structure
+
+```
+Modules/Ledgers
+  /Features
+    /CreateLedger
+    /GetLedgers
+  /Services
+  /Domain
+  LedgersDbContext.cs
+  Module.cs
+```
+
+---
+
+# 7. Endpoint Strategy
+
+### Rule
+
+Endpoints MUST be defined inside the module.
+
+Host MUST only register them.
+
+### Example
+
+Inside module:
+
+```csharp
+public static class LedgersModule
+{
+    public static IServiceCollection AddLedgersModule(...)
+    public static IEndpointRouteBuilder MapLedgersEndpoints(...)
+}
+```
+
+Inside Host:
+
+```csharp
+builder.Services.AddLedgersModule();
+app.MapLedgersEndpoints();
+```
+
+Host MUST NOT contain business routing logic.
+
+---
+
+# 8. CQRS Architecture
+
+Pattern: CQRS + MediatR
+
+## Handler Rules
+
+Handlers MUST:
+
+* Orchestrate
+* Call services
+* Manage transaction boundaries
+* Return response
+
+Handlers MUST NOT:
+
+* Contain complex business logic
+* Execute complex SQL joins
+* Contain domain rules
+
+## Business Logic Location
+
+Business logic MUST live in:
+
+* Domain layer
+* Service layer
+
+---
+
+# 9. Database Architecture
+
+Primary DB: SQL Server
+
+## Rules
+
+1. Each module owns its tables.
+
+2. Cross-module joins are forbidden.
+
+3. Reporting must use:
+
+   * Dedicated query layer
+   * Read models
+   * Views / Dapper
+
+4. Migrations must be module-scoped.
+
+---
+
+# 10. Redis Caching
+
+Redis is used for:
+
+* Lookup caching
+* Permission caching
+* Read query caching
+
+Redis MUST NOT:
+
+* Be source of truth
+* Store transactional state
+
+Cache keys MUST support versioning.
+
+---
+
+# 11. Optional NoSQL Usage
+
+NoSQL MAY be introduced when:
+
+* Read models become too complex
+* Audit/event storage grows large
+* Analytical workloads require it
+
+NoSQL introduction requires architectural review.
+
+---
+
+# 12. Authentication & Authorization
+
+Authentication:
+
+* Duende IdentityServer
+* Microsoft Identity
+
+Authorization:
+
+* Policy-based
+* Role-based
+* Scope-based (Company / FiscalYear / Office)
+* Ownership-based (Document level)
+
+All endpoints MUST require authentication.
+
+---
+
+# 13. Observability
+
+## Logging
+
+* Serilog
+* Structured JSON logs
+* CorrelationId required
+* Logs forwarded to ELK
+
+## Health Checks
+
+Mandatory:
+
+* API health
+* SQL connectivity
+* Redis connectivity
+* Identity availability
+
+## Metrics
+
+Must include:
+
+* Request latency
+* Error rate
+* SQL query duration
+* Redis hit/miss ratio
+
+---
+
+# 14. Frontend Architecture
+
+Frontend: Blazor WebAssembly (Hosted)
+
+Rules:
+
+* UI must call backend APIs only
+* No direct database logic
+* Token-based authentication
+* API-first design
+
+---
+
+# 15. Migration Path to SoA
+
+Future strategy:
+
+* Extract high-change modules first:
+
+  * Integration
+  * Reporting
+  * Workflow
+
+Preconditions:
+
+* Clear module boundaries
+* No shared business domain
+* Controlled data ownership
+
+---
+
+# 16. AI Development Guidelines
+
+When AI Agent generates code:
+
+1. Follow Vertical Slice pattern.
+2. Keep handlers thin.
+3. Place business logic in services.
+4. Never introduce shared domain entities.
+5. Never introduce cross-module DB join.
+6. Always include structured logging.
+7. Include basic validation.
+
+---
+
+# 17. Do / Don't Summary
+
+## DO
+
+* Keep modules isolated.
+* Register endpoints inside modules.
+* Use MediatR properly.
+* Log everything structured.
+* Maintain data ownership.
+
+## DO NOT
+
+* Create shared business models.
+* Put logic in handlers.
+* Join tables across modules.
+* Bypass services.
+* Store transactional truth in Redis.
+
+---
+
+# 18. Final Architectural Identity
+
+This system is:
+
+* Modular
+* API-first
+* CQRS-based
+* Service-oriented internally
+* Cache-aware
+* Observability-first
+* AI-assisted development ready

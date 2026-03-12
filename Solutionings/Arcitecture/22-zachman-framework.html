@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 23 — Zachman Framework</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Zachman Framework (MVP View)</h1>
+          <p class="subtitle">نمای یکپارچه پرسش‌های کلیدی معماری برای ذی‌نفعان مختلف در سیستم حسابداری</p>
+        </div>
+        <span class="badge">Slide 23</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Zachman Matrix — Accounting MVP</h2>
+          <div class="zachman-wrap">
+            <table class="zachman-matrix" aria-label="Zachman matrix for accounting MVP">
+              <thead>
+                <tr>
+                  <th>سطح / پرسش</th>
+                  <th>What (Data)</th>
+                  <th>How (Function)</th>
+                  <th>Where (Network)</th>
+                  <th>Who (People)</th>
+                  <th>When (Time)</th>
+                  <th>Why (Motivation)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>Scope<br/>Planner</th>
+                  <td>Ledger, Treasury, Access, Settings</td>
+                  <td>فرآیندهای مالی پایه</td>
+                  <td>HQ + شعب + Cloud</td>
+                  <td>Finance, Admin, Manager</td>
+                  <td>دوره مالی و تقویم عملیات</td>
+                  <td>یکپارچگی و کنترل مالی</td>
+                </tr>
+                <tr>
+                  <th>Business Model<br/>Owner</th>
+                  <td>مالکیت داده هر ماژول</td>
+                  <td>ثبت سند، پرداخت، کنترل دسترسی</td>
+                  <td>جریان بین واحدها</td>
+                  <td>نقش‌ها و سطح دسترسی</td>
+                  <td>چرخه تایید و بستن دوره</td>
+                  <td>کاهش خطا و افزایش سرعت</td>
+                </tr>
+                <tr>
+                  <th>System Model<br/>Designer</th>
+                  <td>SQL + Read Models + Cache</td>
+                  <td>CQRS + Vertical Slice</td>
+                  <td>API Host + External Services</td>
+                  <td>Identity + Authorization</td>
+                  <td>Jobها، Eventها، SLA</td>
+                  <td>پایداری، نگهداشت‌پذیری</td>
+                </tr>
+                <tr>
+                  <th>Technology Model<br/>Builder</th>
+                  <td>SQL Server / Redis</td>
+                  <td>.NET + Minimal API + MediatR</td>
+                  <td>Hosted Blazor + API</td>
+                  <td>Duende + Microsoft Identity</td>
+                  <td>Release / Monitoring cadence</td>
+                  <td>تحویل سریع MVP</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="subtitle">
+            این جدول کمک می‌کند تیم روی یک زبان مشترک معماری هم‌راستا شود: در هر سطح (از دید کسب‌وکار تا فناوری)
+            دقیقاً مشخص می‌شود «چه داده‌ای»، «چه کاری»، «توسط چه کسی»، «در چه زمانی» و «با چه هدفی» باید انجام شود.
+            نتیجه این است که تصمیم‌های MVP شفاف‌تر، قابل‌پیگیری‌تر و قابل‌تحویل‌تر می‌شوند.
+          </p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

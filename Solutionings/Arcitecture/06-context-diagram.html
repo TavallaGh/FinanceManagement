@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 7 — Context Diagram</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Context Diagram (C4-L1)</h1>
+          <p class="subtitle">این دیاگرام مرز سیستم حسابداری MVP را مشخص می‌کند، بازیگران و سامانه‌های پیرامونی را نشان می‌دهد و مسیرهای ارتباطی کلان بین آن‌ها را شفاف می‌سازد.</p>
+        </div>
+        <span class="badge">Slide 7</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>System Context — Accounting Platform (MVP)</h2>
+          <div class="diagram" role="img" aria-label="Context diagram for accounting platform">
+            <svg viewBox="0 0 1060 430" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <rect class="node" x="40" y="80" rx="12" ry="12" width="180" height="64" />
+              <text x="130" y="118" text-anchor="middle">کاربر مالی / حسابدار</text>
+
+              <rect class="node" x="40" y="270" rx="12" ry="12" width="180" height="64" />
+              <text x="130" y="308" text-anchor="middle">مدیر سیستم / ادمین</text>
+
+              <rect class="node pulse" x="300" y="120" rx="14" ry="14" width="460" height="190" />
+              <text x="530" y="155" text-anchor="middle">Accounting Platform (MVP)</text>
+
+              <rect class="node" x="332" y="172" rx="10" ry="10" width="190" height="52" />
+              <text x="427" y="203" text-anchor="middle">دفتر کل</text>
+
+              <rect class="node" x="538" y="172" rx="10" ry="10" width="190" height="52" />
+              <text x="633" y="203" text-anchor="middle">خزانه‌داری</text>
+
+              <rect class="node" x="332" y="236" rx="10" ry="10" width="190" height="52" />
+              <text x="427" y="267" text-anchor="middle">IDP (Access Control)</text>
+
+              <rect class="node" x="538" y="236" rx="10" ry="10" width="190" height="52" />
+              <text x="633" y="267" text-anchor="middle">تنظیمات سیستم</text>
+
+              <rect class="node soft" x="830" y="145" rx="12" ry="12" width="190" height="64" />
+              <text x="925" y="183" text-anchor="middle">بانک / درگاه پرداخت</text>
+
+              <rect class="node soft" x="830" y="240" rx="12" ry="12" width="190" height="64" />
+              <text x="925" y="278" text-anchor="middle">سامانه گزارش/BI</text>
+
+              <rect class="node soft" x="830" y="335" rx="12" ry="12" width="190" height="64" />
+              <text x="925" y="373" text-anchor="middle">سرویس اطلاع‌رسانی</text>
+
+              <line class="arrow" x1="220" y1="112" x2="300" y2="165" />
+              <line class="arrow" x1="220" y1="302" x2="300" y2="250" />
+
+              <line class="arrow" x1="760" y1="188" x2="830" y2="177" />
+              <line class="arrow" x1="760" y1="220" x2="830" y2="272" />
+              <line class="arrow" x1="760" y1="252" x2="830" y2="367" />
+            </svg>
+          </div>
+        </article>
+
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+
+</html>

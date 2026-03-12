@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Executive Deck Sections</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body {
+      color: #e2e8f0;
+      background: radial-gradient(circle at 15% 18%, #1e3a8a 0%, transparent 36%),
+                  radial-gradient(circle at 85% 15%, #5b21b6 0%, transparent 30%),
+                  radial-gradient(circle at 70% 82%, #0f766e 0%, transparent 38%),
+                  #0b1220;
+    }
+
+    .slide-header {
+      background: linear-gradient(120deg, rgba(15,23,42,.9), rgba(30,41,59,.84));
+      border-color: rgba(148, 163, 184, .35);
+    }
+
+    .subtitle,
+    .card p,
+    .card li { color: #cbd5e1; }
+
+    .badge {
+      border-color: rgba(34, 211, 238, .45);
+      color: #a5f3fc;
+      background: rgba(15, 23, 42, .7);
+    }
+
+    .card {
+      background: rgba(15,23,42,.68);
+      border-color: rgba(148, 163, 184, .32);
+    }
+
+    .sections-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .section-card {
+      border: 1px solid rgba(148, 163, 184, .5);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 230px;
+    }
+
+    .section-card.ai {
+      background: linear-gradient(165deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.82));
+    }
+
+    .section-card.ai h2,
+    .section-card.ai p,
+    .section-card.ai li {
+      color: #dbeafe;
+    }
+
+    .section-card.product {
+      background: linear-gradient(165deg, rgba(76, 29, 2, 0.9), rgba(120, 53, 15, 0.82));
+    }
+
+    .section-card.product h2,
+    .section-card.product p,
+    .section-card.product li {
+      color: #ffedd5;
+    }
+
+    .section-card.tech {
+      background: linear-gradient(165deg, rgba(8, 47, 73, 0.9), rgba(12, 74, 110, 0.82));
+    }
+
+    .section-card.tech h2,
+    .section-card.tech p,
+    .section-card.tech li {
+      color: #dbeafe;
+    }
+
+    .section-card h2 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .section-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 0.96rem;
+    }
+
+    .section-card ul {
+      margin: 0;
+      padding-right: 18px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 0.92rem;
+    }
+
+    .section-link {
+      margin-top: auto;
+      display: inline-block;
+      width: fit-content;
+      padding: 8px 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid rgba(34, 211, 238, 0.5);
+      color: #dbeafe;
+      background: rgba(30, 41, 59, 0.7);
+    }
+
+    .section-link.disabled {
+      border-color: rgba(148, 163, 184, 0.35);
+      color: #94a3b8;
+      pointer-events: none;
+      background: rgba(15, 23, 42, 0.55);
+    }
+
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>ساختار جدید پرزنتیشن</h1>
+          <p class="subtitle">نمای کلی ارائه برای حرکت مرحله ای: AI Overview -> Product MVP -> Technical Architecture</p>
+        </div>
+        <span class="badge">Master Index</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Presentation Sections</h2>
+          <div class="sections-grid">
+            <section class="section-card ai">
+              <h2>سکشن 1: AI Pilot Overview</h2>
+              <p>مرور اجرای پایلوت، فلوهای عملیاتی، جداول زمان/کیفیت/هزینه و شاخص های مدیریتی.</p>
+              <ul>
+                <li>شروع از 00-ai-overview.html</li>
+                <li>شامل اسلایدهای 01 تا 08 فعلی</li>
+                <li>پایه عددی تصمیم Scale</li>
+              </ul>
+              <a class="section-link" href="00-ai-overview.html">ورود به سکشن 1</a>
+            </section>
+
+            <section class="section-card product">
+              <h2>سکشن 2: Product Requirements (Accounting MVP)</h2>
+              <p>نیازمندی های محصول بر مبنای پروپوزال، با تاکید بر Prototype وایب کدینگ PM و استخراج Design System + Technical Tasks.</p>
+              <ul>
+                <li>دامنه ماژول ها و Feature List</li>
+                <li>Use Case / User Journey</li>
+                <li>Acceptance Criteria سطح محصول</li>
+              </ul>
+              <a class="section-link" href="09-product-vibe-prototype.html">ورود به سکشن 2</a>
+            </section>
+
+            <section class="section-card tech">
+              <h2>سکشن 3: Technical Analysis & Architecture Decisions</h2>
+              <p>تحلیل تکنیکال، تصمیم های معماری، trade-offها، ریسک ها، و نقشه پیاده سازی مهندسی.</p>
+              <ul>
+                <li>خلاصه دیاگرام های Context / Container / Layered</li>
+                <li>جداول مهم Zachman و ریسک های مصوب</li>
+                <li>جمع بندی RAG + Agent Workflow</li>
+              </ul>
+              <a class="section-link" href="18-tech-architecture-summary.html">ورود به سکشن 3</a>
+            </section>
+          </div>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategy Triad Interpretation</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>تفسیر سه مولفه برای پروژه اکانتینگ</h1>
+          <p class="subtitle">سرعت، کیفیت و هزینه در مدل AI + SDD باید همزمان و متوازن رشد کنند</p>
+        </div>
+        <span class="badge">Strategic Balance</span>
+      </header>
+      <section class="grid">
+        <article class="card small">
+          <h2>سرعت</h2>
+          <ul class="list-compact">
+            <li>کاهش Lead Time از ایده تا Feature Ready</li>
+            <li>اتومات شدن ساخت Task و شروع توسعه</li>
+            <li>کاهش زمان Hand-off بین Product و Dev</li>
+          </ul>
+          <span class="kpi ok">بهبود نسبت به انسانی: 60%</span>
+        </article>
+
+        <article class="card small">
+          <h2>کیفیت</h2>
+          <ul class="list-compact">
+            <li>SDD برای ردیابی Requirement تا Code</li>
+            <li>رعایت استانداردهای کدنویسی و معماری</li>
+            <li>Gate تایید Product بعد از هر Feature</li>
+          </ul>
+          <span class="kpi ok">بهبود نسبت به انسانی: 32%</span>
+        </article>
+
+        <article class="card small">
+          <h2>کاهش هزینه</h2>
+          <ul class="list-compact">
+            <li>کاهش دوباره کاری ناشی از ابهام نیاز</li>
+            <li>کاهش کارهای دستی تکرارشونده تیم</li>
+            <li>افزایش خروجی با همان ظرفیت تیم</li>
+          </ul>
+          <span class="kpi ok">بهبود نسبت به انسانی: 36.6%</span>
+        </article>
+
+        <article class="card full">
+          <h2>نمای بصری توازن مولفه ها</h2>
+          <div class="diagram">
+            <svg viewBox="0 0 980 250" role="img" aria-label="Balanced strategy bars">
+              <rect x="80" y="60" width="130" height="140" fill="rgba(34,211,238,.20)" stroke="rgba(34,211,238,.8)"></rect>
+              <rect x="280" y="80" width="130" height="120" fill="rgba(52,211,153,.20)" stroke="rgba(52,211,153,.8)"></rect>
+              <rect x="480" y="95" width="130" height="105" fill="rgba(245,158,11,.18)" stroke="rgba(245,158,11,.8)"></rect>
+              <text x="145" y="220" text-anchor="middle">Speed +60%</text>
+              <text x="345" y="220" text-anchor="middle">Quality +32%</text>
+              <text x="545" y="220" text-anchor="middle">Cost +36.6%</text>
+
+              <rect x="700" y="60" width="230" height="140" rx="12" class="node soft"></rect>
+              <text x="815" y="105" text-anchor="middle">Managerial Rule</text>
+              <text x="815" y="130" text-anchor="middle">No speed gain with</text>
+              <text x="815" y="155" text-anchor="middle">quality or risk damage</text>
+            </svg>
+          </div>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Section - MVP Requirements</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #ffedd5; background: radial-gradient(circle at 16% 20%, #9a3412 0%, transparent 35%), radial-gradient(circle at 78% 18%, #92400e 0%, transparent 28%), radial-gradient(circle at 72% 82%, #7c2d12 0%, transparent 34%), #1c1917; }
+    .slide-header { background: linear-gradient(120deg, rgba(67,20,7,.92), rgba(120,53,15,.84)); border-color: rgba(251,146,60,.35); }
+    .card { background: rgba(67,20,7,.74); border-color: rgba(251,146,60,.3); }
+    .subtitle, .card p, .card li { color: #fed7aa; }
+    .badge { color: #ffedd5; border-color: rgba(251,146,60,.5); background: rgba(120,53,15,.7); }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>نیازمندی های Product برای MVP اکانتینگ</h1>
+          <p class="subtitle">دامنه MVP از پروپوزال: پایه های سیستم، مالی/حسابداری، و جریان درخواست های خزانه</p>
+        </div>
+        <span class="badge">MVP Product Scope</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>MVP Scope Matrix</h2>
+          <div class="zachman-wrap">
+            <table class="zachman-matrix">
+              <thead>
+                <tr>
+                  <th>ردیف</th>
+                  <th>حوزه</th>
+                  <th>ماژول/بخش</th>
+                  <th>نمونه قابلیت MVP</th>
+                  <th>هدف محصول</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>1</th>
+                  <th>حقوق دسترسی</th>
+                  <td>مدیریت کاربران و نقش ها</td>
+                  <td>تعریف نقش، دسترسی فرم و عملیات</td>
+                  <td>کنترل امنیتی پایه و ردیابی مسئولیت</td>
+                </tr>
+                <tr>
+                  <th>2</th>
+                  <th>تنظیمات سیستم</th>
+                  <td>اطلاعات پایه (ارز، شعبه، مرکز هزینه، پروژه، اشخاص)</td>
+                  <td>ایجاد/ویرایش موجودیت های پایه</td>
+                  <td>جلوگیری از تکرار داده و یکپارچگی مرجع</td>
+                </tr>
+                <tr>
+                  <th>3</th>
+                  <th>حسابداری</th>
+                  <td>دفتر کل و اسناد</td>
+                  <td>ثبت سند، بررسی، قطعی سازی، شماره گذاری اتومات</td>
+                  <td>چرخه کامل سند حسابداری با کنترل بیشتر</td>
+                </tr>
+                <tr>
+                  <th>4</th>
+                  <th>خزانه داری</th>
+                  <td>مدیریت درخواست پرداخت</td>
+                  <td>ایجاد درخواست، پیگیری، اتصال به ثبت سند</td>
+                  <td>حذف پیگیری دستی و افزایش شفافیت گردش درخواست</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>قاعده Scope</h3>
+          <p>فقط قابلیت هایی وارد MVP می شوند که ارزش عملیاتی مستقیم و قابل اندازه گیری در 2 تا 3 ماه داشته باشند.</p>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی برای توسعه</h3>
+          <p>هر قابلیت MVP باید به Feature قابل تحویل با معیار پذیرش روشن تبدیل شود.</p>
+        </article>
+
+        <article class="card small">
+          <h3>ضد پراکندگی</h3>
+          <p>Backlog محصول از الزامات فازهای بعدی جدا می ماند تا تیم روی «ارزش نزدیک» متمرکز بماند.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

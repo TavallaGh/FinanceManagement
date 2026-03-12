@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tooling Integration & Automation</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>ابزارهای سازمانی متصل به Agent</h1>
+          <p class="subtitle">اتوماسیون کامل چرخه Task, Git Flow, Review و Traceability</p>
+        </div>
+        <span class="badge">Tooling and Automation</span>
+      </header>
+      <section class="grid">
+        <article class="card full">
+          <h2>نقشه ابزار تا خروجی</h2>
+          <div class="diagram">
+            <svg viewBox="0 0 1020 280" role="img" aria-label="Tools to automation value">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)"></polygon>
+                </marker>
+              </defs>
+              <rect class="node" x="40" y="55" width="180" height="70" rx="10"></rect>
+              <text x="130" y="95" text-anchor="middle">Jira Workflow</text>
+              <rect class="node soft" x="40" y="145" width="180" height="70" rx="10"></rect>
+              <text x="130" y="185" text-anchor="middle">GitLab Issue/MR</text>
+
+              <rect class="node" x="290" y="95" width="220" height="90" rx="12"></rect>
+              <text x="400" y="130" text-anchor="middle">Agent Runtime</text>
+              <text x="400" y="152" text-anchor="middle">Rules + Prompts + SDD</text>
+
+              <rect class="node soft" x="580" y="55" width="180" height="70" rx="10"></rect>
+              <text x="670" y="95" text-anchor="middle">Auto Tasking</text>
+              <rect class="node" x="580" y="145" width="180" height="70" rx="10"></rect>
+              <text x="670" y="185" text-anchor="middle">Git Flow Guardrails</text>
+
+              <rect class="node" x="820" y="95" width="160" height="90" rx="12"></rect>
+              <text x="900" y="130" text-anchor="middle">Feature Delivery</text>
+              <text x="900" y="152" text-anchor="middle">Traceable + Ready</text>
+
+              <line class="arrow" x1="220" y1="90" x2="290" y2="130"></line>
+              <line class="arrow" x1="220" y1="180" x2="290" y2="150"></line>
+              <line class="arrow" x1="510" y1="140" x2="580" y2="90"></line>
+              <line class="arrow" x1="510" y1="140" x2="580" y2="180"></line>
+              <line class="arrow" x1="760" y1="90" x2="820" y2="130"></line>
+              <line class="arrow" x1="760" y1="180" x2="820" y2="150"></line>
+            </svg>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h3>نتیجه مدیریتی</h3>
+          <p>Agent یک ابزار مجزا نیست؛ لایه ای است که خروجی همان ابزارهای سازمانی را نسبت به مدل انسانی بهبود می دهد.</p>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

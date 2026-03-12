@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Section - Design System and Technical Tasks</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #ffedd5; background: radial-gradient(circle at 16% 20%, #9a3412 0%, transparent 35%), radial-gradient(circle at 78% 18%, #92400e 0%, transparent 28%), radial-gradient(circle at 72% 82%, #7c2d12 0%, transparent 34%), #1c1917; }
+    .slide-header { background: linear-gradient(120deg, rgba(67,20,7,.92), rgba(120,53,15,.84)); border-color: rgba(251,146,60,.35); }
+    .card { background: rgba(67,20,7,.74); border-color: rgba(251,146,60,.3); }
+    .subtitle, .card p, .card li { color: #fed7aa; }
+    .badge { color: #ffedd5; border-color: rgba(251,146,60,.5); background: rgba(120,53,15,.7); }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>از Prototype تا برنامه اجرایی تحویل</h1>
+          <p class="subtitle">خروجی Vibe Coding توسط PM نقطه شروع است؛ سپس تیم آن را به الگوی طراحی محصول و برنامه تحویل قابل اجرا تبدیل می کند.</p>
+        </div>
+        <span class="badge">Product Delivery Handover</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>مسیر تبدیل ایده به خروجی قابل تحویل</h2>
+          <div class="timeline-grid">
+            <div class="timeline-step">
+              <span class="step-badge">Step 1</span>
+              <h3>Prototype (PM)</h3>
+              <p>سناریوی واقعی کار + فرم ها + تجربه اولیه کاربر</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Step 2</span>
+              <h3>الگوی طراحی محصول</h3>
+              <p>یکدست سازی ظاهر صفحات، اجزای تکرارشونده و رفتارهای مشترک</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Step 3</span>
+              <h3>تعریف قابلیت ها</h3>
+              <p>شرح قابلیت + معیار پذیرش + سناریوی بررسی</p>
+            </div>
+            <div class="timeline-step">
+              <span class="step-badge">Step 4</span>
+              <h3>برنامه تحویل</h3>
+              <p>تقسیم کار، اولویت بندی و زمان بندی قابل پیگیری برای اجرا</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>نمونه تبدیل نیاز محصول به برنامه اجرایی</h2>
+          <div class="zachman-wrap">
+            <table class="zachman-matrix">
+              <thead>
+                <tr>
+                  <th>قابلیت محصول</th>
+                  <th>خروجی طراحی محصول</th>
+                  <th>اقدام های اجرایی</th>
+                  <th>آماده برای شروع وقتی که...</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>فرم درخواست پرداخت</th>
+                  <td>فرم استاندارد با پیام های واضح برای خطا/تایید</td>
+                  <td>تعریف مراحل ثبت تا تایید، تعیین مسئول هر مرحله، و مسیر پیگیری</td>
+                  <td>فیلدها، قوانین کسب وکار و معیار پذیرش نهایی شفاف شده باشد</td>
+                </tr>
+                <tr>
+                  <th>ثبت سند حسابداری</th>
+                  <td>نمای لیست اسناد، وضعیت هر سند و مسیر تایید</td>
+                  <td>تعریف جریان ثبت سند همراه با کنترل صحت اطلاعات، کنترل فیلدهای اجباری و کنترل شماره گذاری</td>
+                  <td>قواعد اعتبارسنجی اطلاعات و پیام خطاهای قابل فهم از قبل توافق و مستند شده باشد</td>
+                </tr>
+                <tr>
+                  <th>کنترل دسترسی نقش ها</th>
+                  <td>ماتریس دسترسی ساده و قابل فهم برای نقش ها</td>
+                  <td>تعیین سطح دسترسی هر نقش در صفحه، عملیات و داده</td>
+                  <td>نقش ها و محدوده دسترسی هرکدام توسط Product تایید شده باشد</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Technical Section - Key Tables</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #e2e8f0; background: radial-gradient(circle at 14% 18%, #164e63 0%, transparent 34%), radial-gradient(circle at 84% 16%, #0c4a6e 0%, transparent 28%), radial-gradient(circle at 68% 84%, #0f766e 0%, transparent 34%), #082f49; }
+    .slide-header { background: linear-gradient(120deg, rgba(8,47,73,.92), rgba(14,116,144,.82)); border-color: rgba(125,211,252,.35); }
+    .card { background: rgba(7,89,133,.36); border-color: rgba(125,211,252,.28); }
+    .subtitle, .card p, .card li { color: #bfdbfe; }
+    .badge { color: #e0f2fe; border-color: rgba(125,211,252,.52); background: rgba(8,47,73,.72); }
+
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+
+    .mini-table th,
+    .mini-table td {
+      border: 1px solid rgba(125,211,252,.28);
+      padding: 8px;
+      text-align: right;
+      color: #dbeafe;
+      line-height: 1.6;
+      font-size: .9rem;
+    }
+
+    .mini-table thead th {
+      background: rgba(8,47,73,.72);
+      color: #e0f2fe;
+    }
+
+    .table-wrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>جداول تصمیم: Zachman + Risk Matrix</h1>
+          <p class="subtitle">دو جدول اصلی ارائه معماری که به زبان اجرایی، مسیر تحویل MVP را شفاف می کنند</p>
+        </div>
+        <span class="badge">Key Tables</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>خلاصه Zachman برای MVP</h2>
+          <div class="table-wrap">
+            <table class="mini-table" aria-label="Zachman summary table">
+              <thead>
+                <tr>
+                  <th>سطح</th>
+                  <th>What</th>
+                  <th>How</th>
+                  <th>Who</th>
+                  <th>Why</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Planner</td>
+                  <td>ماژول های Ledger/Treasury/Access/Settings</td>
+                  <td>فرآیند مالی پایه</td>
+                  <td>Finance + Admin + Manager</td>
+                  <td>کنترل و یکپارچگی مالی</td>
+                </tr>
+                <tr>
+                  <td>Owner</td>
+                  <td>مالکیت داده ماژولی</td>
+                  <td>ثبت سند، پرداخت، کنترل دسترسی</td>
+                  <td>نقش های عملیاتی</td>
+                  <td>کاهش خطا و افزایش سرعت</td>
+                </tr>
+                <tr>
+                  <td>Designer/Builder</td>
+                  <td>SQL + Cache + Read Model</td>
+                  <td>Modular Monolith + CQRS + Vertical Slice</td>
+                  <td>Identity + Engineering Team</td>
+                  <td>تحویل سریع و نگهداشت پذیر</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>ریسک های مهم + کنترل پیشنهادی</h2>
+          <div class="table-wrap">
+            <table class="mini-table" aria-label="Risk and mitigation table">
+              <thead>
+                <tr>
+                  <th>ریسک</th>
+                  <th>شدت/احتمال</th>
+                  <th>علت ریشه ای</th>
+                  <th>کنترل مصوب</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>DB Coupling</td>
+                  <td>High / Medium</td>
+                  <td>وابستگی بین جدول های ماژولی</td>
+                  <td>Data Ownership + ممنوعیت Join بین ماژولی</td>
+                </tr>
+                <tr>
+                  <td>Grid Performance</td>
+                  <td>High / High</td>
+                  <td>کوئری سنگین در صفحات پرترافیک</td>
+                  <td>Query Layer + Redis + Read Model</td>
+                </tr>
+                <tr>
+                  <td>Auth Complexity</td>
+                  <td>Medium / Medium</td>
+                  <td>ترکیب نقش، سند و وضعیت</td>
+                  <td>Policy استاندارد + Integration Tests</td>
+                </tr>
+                <tr>
+                  <td>AI Code Drift</td>
+                  <td>Medium / Medium</td>
+                  <td>کد ناسازگار با استاندارد تیم</td>
+                  <td>Template ثابت + PR Gates + TDD/BDD</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card full">
+          <h2>نتیجه</h2>
+          <p>این دو جدول کنار هم نشان می دهند «چه تصمیمی» گرفتیم و «چطور ریسک اجرای آن» را کنترل می کنیم؛ یعنی معماری از حالت بحث فنی به برنامه قابل اجرا تبدیل می شود.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

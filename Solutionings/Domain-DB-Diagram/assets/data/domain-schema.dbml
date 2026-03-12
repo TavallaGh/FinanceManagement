@@ -1,0 +1,208 @@
+// Hypothetical Accounting Domain Schema (DBML)
+
+Table organizations {
+  id bigint [pk, increment, not null]
+  code varchar(20) [not null, unique]
+  name varchar(200) [not null]
+  base_currency char(3) [not null, default: 'IRR']
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+}
+
+Table branches {
+  id bigint [pk, increment, not null]
+  organization_id bigint [not null]
+  code varchar(20) [not null]
+  name varchar(200) [not null]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (organization_id, code) [unique]
+  }
+}
+
+Table fiscal_periods {
+  id bigint [pk, increment, not null]
+  organization_id bigint [not null]
+  year_no int [not null]
+  starts_on date [not null]
+  ends_on date [not null]
+  is_closed boolean [not null, default: false]
+
+  indexes {
+    (organization_id, year_no) [unique]
+  }
+}
+
+Table ledgers {
+  id bigint [pk, increment, not null]
+  organization_id bigint [not null]
+  code varchar(20) [not null]
+  name varchar(200) [not null]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (organization_id, code) [unique]
+  }
+}
+
+Table accounts {
+  id bigint [pk, increment, not null]
+  ledger_id bigint [not null]
+  parent_account_id bigint [null]
+  code varchar(30) [not null]
+  name varchar(200) [not null]
+  normal_balance varchar(6) [not null, note: 'debit|credit']
+  allow_manual_posting boolean [not null, default: true]
+
+  indexes {
+    (ledger_id, code) [unique]
+  }
+}
+
+Table user_accounts {
+  id bigint [pk, increment, not null]
+  username varchar(80) [not null, unique]
+  email varchar(200) [not null, unique]
+  password_hash varchar(255) [not null]
+  is_active boolean [not null, default: true]
+}
+
+Table roles {
+  id bigint [pk, increment, not null]
+  code varchar(50) [not null, unique]
+  title varchar(120) [not null]
+}
+
+Table user_organization_roles {
+  id bigint [pk, increment, not null]
+  user_id bigint [not null]
+  organization_id bigint [not null]
+  role_id bigint [not null]
+  assigned_at timestamp [not null]
+
+  indexes {
+    (user_id, organization_id, role_id) [unique]
+  }
+}
+
+Table voucher_types {
+  id bigint [pk, increment, not null]
+  code varchar(20) [not null, unique]
+  title varchar(120) [not null]
+}
+
+Table auto_number_sequences {
+  id bigint [pk, increment, not null]
+  organization_id bigint [not null]
+  voucher_type_id bigint [not null]
+  prefix varchar(20) [null]
+  next_number int [not null, default: 1]
+  padding_size int [not null, default: 6]
+
+  indexes {
+    (organization_id, voucher_type_id) [unique]
+  }
+}
+
+Table journal_entries {
+  id bigint [pk, increment, not null]
+  organization_id bigint [not null]
+  fiscal_period_id bigint [not null]
+  branch_id bigint [not null]
+  voucher_type_id bigint [not null]
+  created_by_user_id bigint [not null]
+  sequence_id bigint [not null]
+  voucher_no varchar(50) [not null]
+  entry_date date [not null]
+  status varchar(20) [not null, default: 'draft', note: 'draft|posted|void']
+  description varchar(500) [null]
+
+  indexes {
+    (organization_id, voucher_no) [unique]
+    (fiscal_period_id, entry_date)
+  }
+}
+
+Table parties {
+  id bigint [pk, increment, not null]
+  organization_id bigint [not null]
+  code varchar(20) [not null]
+  name varchar(200) [not null]
+  national_id varchar(20) [null]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (organization_id, code) [unique]
+  }
+}
+
+Table cost_centers {
+  id bigint [pk, increment, not null]
+  organization_id bigint [not null]
+  code varchar(20) [not null]
+  title varchar(200) [not null]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (organization_id, code) [unique]
+  }
+}
+
+Table projects {
+  id bigint [pk, increment, not null]
+  organization_id bigint [not null]
+  code varchar(20) [not null]
+  title varchar(200) [not null]
+  start_date date [null]
+  end_date date [null]
+  is_active boolean [not null, default: true]
+
+  indexes {
+    (organization_id, code) [unique]
+  }
+}
+
+Table journal_entry_lines {
+  id bigint [pk, increment, not null]
+  journal_entry_id bigint [not null]
+  account_id bigint [not null]
+  party_id bigint [null]
+  cost_center_id bigint [null]
+  project_id bigint [null]
+  debit_amount decimal(18,2) [not null, default: 0]
+  credit_amount decimal(18,2) [not null, default: 0]
+  line_description varchar(400) [null]
+
+  indexes {
+    (journal_entry_id, id)
+    (account_id)
+  }
+
+  Note: 'Business rule: exactly one of debit_amount/credit_amount must be > 0'
+}
+
+Ref: branches.organization_id > organizations.id [delete: restrict, update: cascade]
+Ref: fiscal_periods.organization_id > organizations.id [delete: restrict, update: cascade]
+Ref: ledgers.organization_id > organizations.id [delete: restrict, update: cascade]
+Ref: accounts.ledger_id > ledgers.id [delete: restrict, update: cascade]
+Ref: accounts.parent_account_id > accounts.id [delete: set null, update: cascade]
+Ref: user_organization_roles.user_id > user_accounts.id [delete: cascade, update: cascade]
+Ref: user_organization_roles.organization_id > organizations.id [delete: cascade, update: cascade]
+Ref: user_organization_roles.role_id > roles.id [delete: restrict, update: cascade]
+Ref: auto_number_sequences.organization_id > organizations.id [delete: cascade, update: cascade]
+Ref: auto_number_sequences.voucher_type_id > voucher_types.id [delete: restrict, update: cascade]
+Ref: journal_entries.organization_id > organizations.id [delete: restrict, update: cascade]
+Ref: journal_entries.fiscal_period_id > fiscal_periods.id [delete: restrict, update: cascade]
+Ref: journal_entries.branch_id > branches.id [delete: restrict, update: cascade]
+Ref: journal_entries.voucher_type_id > voucher_types.id [delete: restrict, update: cascade]
+Ref: journal_entries.created_by_user_id > user_accounts.id [delete: restrict, update: cascade]
+Ref: journal_entries.sequence_id > auto_number_sequences.id [delete: restrict, update: cascade]
+Ref: parties.organization_id > organizations.id [delete: cascade, update: cascade]
+Ref: cost_centers.organization_id > organizations.id [delete: cascade, update: cascade]
+Ref: projects.organization_id > organizations.id [delete: cascade, update: cascade]
+Ref: journal_entry_lines.journal_entry_id > journal_entries.id [delete: cascade, update: cascade]
+Ref: journal_entry_lines.account_id > accounts.id [delete: restrict, update: cascade]
+Ref: journal_entry_lines.party_id > parties.id [delete: set null, update: cascade]
+Ref: journal_entry_lines.cost_center_id > cost_centers.id [delete: set null, update: cascade]
+Ref: journal_entry_lines.project_id > projects.id [delete: set null, update: cascade]

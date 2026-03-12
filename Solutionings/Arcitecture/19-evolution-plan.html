@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 20 — MVP to SoA</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>MVP → SoA Evolution Plan</h1>
+          <p class="subtitle">نقشه تکامل مرحله‌ای: شروع سریع با MVP و حرکت کنترل‌شده به SoA بر اساس نیاز واقعی</p>
+        </div>
+        <span class="badge">Slide 20</span>
+      </header>
+      <section class="grid">
+        <article class="card full">
+          <h2>Evolution Timeline</h2>
+          <div class="diagram" role="img" aria-label="Evolution timeline from MVP modular monolith to service-oriented architecture">
+            <svg viewBox="0 0 1060 280" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <line class="arrow" x1="110" y1="145" x2="950" y2="145" />
+
+              <rect class="node pulse" x="70" y="92" rx="12" ry="12" width="230" height="106" />
+              <text x="185" y="130" text-anchor="middle">Phase 1: MVP</text>
+              <text x="185" y="156" text-anchor="middle">Modular Monolith</text>
+              <text x="185" y="182" text-anchor="middle">Fast Delivery</text>
+
+              <rect class="node" x="415" y="92" rx="12" ry="12" width="230" height="106" />
+              <text x="530" y="130" text-anchor="middle">Phase 2: Extraction</text>
+              <text x="530" y="156" text-anchor="middle">Integration / Reporting / Workflow</text>
+              <text x="530" y="182" text-anchor="middle">Operational Decoupling</text>
+
+              <rect class="node soft" x="760" y="92" rx="12" ry="12" width="230" height="106" />
+              <text x="875" y="130" text-anchor="middle">Phase 3: SoA (Selective)</text>
+              <text x="875" y="156" text-anchor="middle">Domain Service Extraction</text>
+              <text x="875" y="182" text-anchor="middle">Only by Real Pressure</text>
+            </svg>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>Phase 1 — MVP</h3>
+          <ul class="list-compact">
+            <li>تمرکز روی زمان عرضه و ثبات محصول</li>
+            <li>مرزبندی ماژول‌ها در یک Host مشترک</li>
+            <li>حداقل پیچیدگی عملیاتی</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Phase 2 — Controlled Extraction</h3>
+          <ul class="list-compact">
+            <li>استخراج Integration / Reporting / Workflow</li>
+            <li>کاهش بار عملیاتی هسته حسابداری</li>
+            <li>ایجاد مرزهای سرویسی با ریسک پایین</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Phase 3 — Selective SoA</h3>
+          <ul class="list-compact">
+            <li>استخراج سرویس دامنه فقط با فشار واقعی</li>
+            <li>تصمیم مبتنی بر KPI (Latency/Scale/Ownership)</li>
+            <li>جلوگیری از Over-Engineering زودهنگام</li>
+          </ul>
+        </article>
+
+        <article class="card full">
+          <h2>اصل تصمیم‌گیری تکامل</h2>
+          <div class="chip-row">
+            <span class="kpi ok">Business Need First</span>
+            <span class="kpi ok">Measure Before Extract</span>
+            <span class="kpi ok">Incremental Evolution</span>
+            <span class="kpi">No Premature Microservices</span>
+          </div>
+        </article>
+      </section>
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

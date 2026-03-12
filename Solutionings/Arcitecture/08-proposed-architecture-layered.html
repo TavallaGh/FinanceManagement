@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slide 9 — Proposed Architecture (Layered)</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Proposed Architecture — Modular Monolith + Vertical Slice</h1>
+          <p class="subtitle">نمای کامل لایه‌بندی و جایگاه ۴ ماژول اصلی در معماری پیشنهادی</p>
+        </div>
+        <span class="badge">Slide 9</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Layered View with Module Boundaries</h2>
+          <div class="diagram" role="img" aria-label="Proposed layered architecture with modules in modular monolith and vertical slice">
+            <svg viewBox="0 0 1140 650" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148,163,184,.95)" />
+                </marker>
+              </defs>
+
+              <rect class="node" x="20" y="20" rx="16" ry="16" width="1100" height="600" />
+              <text x="570" y="50" text-anchor="middle">Accounting Host (Modular Monolith)</text>
+
+              <rect class="node soft" x="40" y="70" rx="10" ry="10" width="780" height="42" />
+              <text x="430" y="97" text-anchor="middle">Cross-Cutting Layer: AuthZ | Validation | Logging | Monitoring | Caching Policies</text>
+
+              <rect class="node soft" x="40" y="122" rx="10" ry="10" width="780" height="42" />
+              <text x="430" y="149" text-anchor="middle">Presentation Layer (Shared): Blazor UI + Shared Components</text>
+
+              <rect class="node soft" x="40" y="174" rx="10" ry="10" width="780" height="42" />
+              <text x="430" y="201" text-anchor="middle">Shared Domain Layer: Common Value Objects, Policies, Contracts</text>
+
+              <rect class="node" x="830" y="122" rx="12" ry="12" width="280" height="470" />
+              <text x="970" y="149" text-anchor="middle">External / Infra Services (Shared)</text>
+
+              <rect class="node" x="50" y="240" rx="12" ry="12" width="180" height="330" />
+              <text x="140" y="268" text-anchor="middle">دفتر کل</text>
+              <rect class="node soft" x="62" y="284" rx="8" ry="8" width="156" height="60" />
+              <text x="140" y="320" text-anchor="middle">Endpoint / API</text>
+              <rect class="node soft" x="62" y="354" rx="8" ry="8" width="156" height="60" />
+              <text x="140" y="390" text-anchor="middle">App (CQRS Handlers)</text>
+              <rect class="node soft" x="62" y="424" rx="8" ry="8" width="156" height="60" />
+              <text x="140" y="460" text-anchor="middle">Domain (Entities/Rules)</text>
+              <rect class="node soft" x="62" y="494" rx="8" ry="8" width="156" height="60" />
+              <text x="140" y="530" text-anchor="middle">Infra (Repo/Queries)</text>
+
+              <rect class="node" x="240" y="240" rx="12" ry="12" width="180" height="330" />
+              <text x="330" y="268" text-anchor="middle">خزانه‌داری</text>
+              <rect class="node soft" x="252" y="284" rx="8" ry="8" width="156" height="60" />
+              <text x="330" y="320" text-anchor="middle">Endpoint / API</text>
+              <rect class="node soft" x="252" y="354" rx="8" ry="8" width="156" height="60" />
+              <text x="330" y="390" text-anchor="middle">App (CQRS Handlers)</text>
+              <rect class="node soft" x="252" y="424" rx="8" ry="8" width="156" height="60" />
+              <text x="330" y="460" text-anchor="middle">Domain (Entities/Rules)</text>
+              <rect class="node soft" x="252" y="494" rx="8" ry="8" width="156" height="60" />
+              <text x="330" y="530" text-anchor="middle">Infra (Repo/Queries)</text>
+
+              <rect class="node" x="430" y="240" rx="12" ry="12" width="180" height="330" />
+              <text x="520" y="268" text-anchor="middle">IDP (Access Control)</text>
+              <rect class="node soft" x="442" y="284" rx="8" ry="8" width="156" height="60" />
+              <text x="520" y="320" text-anchor="middle">Endpoint / API</text>
+              <rect class="node soft" x="442" y="354" rx="8" ry="8" width="156" height="60" />
+              <text x="520" y="390" text-anchor="middle">App (CQRS Handlers)</text>
+              <rect class="node soft" x="442" y="424" rx="8" ry="8" width="156" height="60" />
+              <text x="520" y="460" text-anchor="middle">Domain (Entities/Rules)</text>
+              <rect class="node soft" x="442" y="494" rx="8" ry="8" width="156" height="60" />
+              <text x="520" y="530" text-anchor="middle">Infra (Repo/Queries)</text>
+
+              <rect class="node" x="620" y="240" rx="12" ry="12" width="180" height="330" />
+              <text x="710" y="268" text-anchor="middle">تنظیمات سیستم</text>
+              <rect class="node soft" x="632" y="284" rx="8" ry="8" width="156" height="60" />
+              <text x="710" y="320" text-anchor="middle">Endpoint / API</text>
+              <rect class="node soft" x="632" y="354" rx="8" ry="8" width="156" height="60" />
+              <text x="710" y="390" text-anchor="middle">App (CQRS Handlers)</text>
+              <rect class="node soft" x="632" y="424" rx="8" ry="8" width="156" height="60" />
+              <text x="710" y="460" text-anchor="middle">Domain (Entities/Rules)</text>
+              <rect class="node soft" x="632" y="494" rx="8" ry="8" width="156" height="60" />
+              <text x="710" y="530" text-anchor="middle">Infra (Repo/Queries)</text>
+
+              <rect class="node soft" x="850" y="180" rx="10" ry="10" width="240" height="62" />
+              <text x="970" y="216" text-anchor="middle">SQL Server (OLTP)</text>
+
+              <rect class="node soft" x="850" y="265" rx="10" ry="10" width="240" height="62" />
+              <text x="970" y="301" text-anchor="middle">Redis Cache</text>
+
+              <rect class="node soft" x="850" y="435" rx="10" ry="10" width="240" height="62" />
+              <text x="970" y="471" text-anchor="middle">ELK + Metrics + Health</text>
+
+              <line class="arrow" x1="218" y1="524" x2="830" y2="240" />
+              <line class="arrow" x1="408" y1="524" x2="830" y2="320" />
+              <line class="arrow" x1="598" y1="524" x2="830" y2="400" />
+              <line class="arrow" x1="788" y1="524" x2="830" y2="480" />
+            </svg>
+          </div>
+          <p class="subtitle">در این معماری، هر ماژول مرزبندی مستقل دارد و به‌صورت Vertical Slice پیاده‌سازی می‌شود؛ در عین حال استقرار یکپارچه Modular Monolith حفظ می‌گردد تا توسعه MVP سریع، کنترل‌شده و قابل تکامل باشد.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Section - Acceptance and KPIs</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body { color: #ffedd5; background: radial-gradient(circle at 16% 20%, #9a3412 0%, transparent 35%), radial-gradient(circle at 78% 18%, #92400e 0%, transparent 28%), radial-gradient(circle at 72% 82%, #7c2d12 0%, transparent 34%), #1c1917; }
+    .slide-header { background: linear-gradient(120deg, rgba(67,20,7,.92), rgba(120,53,15,.84)); border-color: rgba(251,146,60,.35); }
+    .card { background: rgba(67,20,7,.74); border-color: rgba(251,146,60,.3); }
+    .subtitle, .card p, .card li { color: #fed7aa; }
+    .badge { color: #ffedd5; border-color: rgba(251,146,60,.5); background: rgba(120,53,15,.7); }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>پذیرش محصول و KPIهای سکشن Product</h1>
+          <p class="subtitle">تعریف معیارهایی که PM بر اساس آن ها Feature را قبول یا رد می کند.</p>
+        </div>
+        <span class="badge">Acceptance Framework</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>Acceptance Matrix</h2>
+          <div class="zachman-wrap">
+            <table class="zachman-matrix">
+              <thead>
+                <tr>
+                  <th>Feature Group</th>
+                  <th>Acceptance Criteria (Product)</th>
+                  <th>Evidence</th>
+                  <th>KPI Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>درخواست پرداخت</th>
+                  <td>ثبت، تایید، و رهگیری وضعیت بدون خروج از سیستم</td>
+                  <td>Demo script + signed UAT checklist</td>
+                  <td>Cycle time درخواست تا ثبت سند</td>
+                </tr>
+                <tr>
+                  <th>اسناد حسابداری</th>
+                  <td>ثبت تا قطعی سازی با شماره گذاری کنترل شده</td>
+                  <td>Scenario replay + exception handling results</td>
+                  <td>Error rate و rework rate</td>
+                </tr>
+                <tr>
+                  <th>دسترسی و نقش</th>
+                  <td>محدودسازی فرم/عملیات/داده برای هر نقش</td>
+                  <td>Role-based test pack</td>
+                  <td>Security incident prevention</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card small">
+          <h3>گیت پذیرش PM</h3>
+          <p>Feature زمانی پذیرفته می شود که هم سناریوی محصول پاس شود و هم شواهد تست قابل ارائه باشد.</p>
+        </article>
+
+        <article class="card small">
+          <h3>KPIهای Product</h3>
+          <ul class="list-compact">
+            <li>Lead Time از نیاز تا Feature Ready</li>
+            <li>Defect Leakage بعد از تحویل</li>
+            <li>Rework Rate در اسپرینت</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>اصل تصمیم</h3>
+          <p>PM تصمیم می گیرد، اما تصمیم باید بر شواهد دمو، تست و KPI متکی باشد.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>
