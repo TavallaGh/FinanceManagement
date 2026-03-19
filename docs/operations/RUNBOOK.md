@@ -28,7 +28,12 @@ Bash:
 ./scripts/task-exec.sh --jira AC-123 --status "In Progress" --repo auto
 ```
 
-## 3) Optional: Create/Reuse MR in Same Run
+## 3) Optional: Create/Reuse MRs in Same Run (Both Repositories)
+
+For each Jira task/subtask, create/reuse two MRs:
+
+- Workspace MR: implementation/process docs and task logs
+- Project MR: product code changes
 
 PowerShell:
 
@@ -36,10 +41,20 @@ PowerShell:
 ./scripts/task-exec.ps1 -JiraKey AC-123 -SourceBranch "features/ac-123-foo" -TargetBranch "develop"
 ```
 
+```powershell
+./scripts/task-exec.ps1 -JiraKey AC-123 -Repo workspace -SourceBranch "features/ac-123-foo" -TargetBranch "develop"
+./scripts/task-exec.ps1 -JiraKey AC-123 -Repo project -SourceBranch "features/ac-123-foo" -TargetBranch "develop"
+```
+
 Bash:
 
 ```bash
 ./scripts/task-exec.sh --jira AC-123 --source "features/ac-123-foo" --target "develop"
+```
+
+```bash
+./scripts/task-exec.sh --jira AC-123 --repo workspace --source "features/ac-123-foo" --target "develop"
+./scripts/task-exec.sh --jira AC-123 --repo project --source "features/ac-123-foo" --target "develop"
 ```
 
 ## 4) Dry-Run Mode (No Write Operations)
@@ -82,6 +97,7 @@ Re-apply in future release by dropping revert commit or re-cherry-picking origin
 
 - Executors write JSON logs under `logs/task-exec/`.
 - Keep logs for traceability: task key, status transition, issue/MR IDs, repo ID, timestamps.
+- Keep logs for traceability: task key, status transition, workspace issue/MR IDs, project issue/MR IDs, repo IDs, timestamps.
 
 ## 8) Failure Policy
 
@@ -100,6 +116,7 @@ After implementation and before moving final status forward, run the completion 
 Expected outputs:
 
 - Task execution document with timestamps and references.
+- Both task MR references (workspace + project) and their states.
 - Story folder update (or standalone folder update) by GitFlow type.
 - Story summary update when all related tasks are complete.
 - Postman collection update for API tasks.
@@ -151,8 +168,13 @@ or with Jira URL:
 Operational behavior:
 
 - Load credentials from `.secrets/credentials.local`.
-- Resolve Jira issue and read linked GitLab MR URL from Jira Web Links.
+- Resolve Jira issue and read linked workspace/project GitLab MR URLs from Jira Web Links.
 - Run general + .NET-focused review checks.
 - Present findings to user one by one for approval.
 - Post only approved findings as MR comments (inline preferred).
 - Continue review on remaining findings even when some findings are rejected.
+
+Review target:
+
+- Primary: project MR (code review)
+- Secondary: workspace MR (documentation/traceability consistency)

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>نمونه End-to-End</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>نمونه واقعی End-to-End (Story-based)</h1>
+          <p class="subtitle">از Jira Story تا Completion با Artifactهای کامل</p>
+        </div>
+        <span class="badge">Execution Walkthrough</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>فلو نمونه</h2>
+          <ol class="list-compact">
+            <li>Story در Jira شناسایی می‌شود (Backlog/To Do)</li>
+            <li>Refienment Story نوشته و تایید TL/PO اخذ می‌شود</li>
+            <li>Solution ساخته می‌شود: solution.md + task-plan.md + task specs</li>
+            <li>Taskها به Jira (subtasks) import/align می‌شوند</li>
+            <li>Implementation records با branch/commit/MR evidence تکمیل می‌شوند</li>
+            <li>Completion برای story/task ثبت و handoff نهایی انجام می‌شود</li>
+          </ol>
+        </article>
+
+        <article class="card small">
+          <h3>Artifactهای مرحله‌ای</h3>
+          <ul class="list-compact">
+            <li>00.refienment: فهم و مرز</li>
+            <li>01.solution: برنامه اجرایی</li>
+            <li>02.implementation: شواهد تحویل</li>
+            <li>03.completation: بسته شدن رسمی</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>شاخص موفقیت</h3>
+          <ul class="list-compact">
+            <li>هر Task قابل ردگیری تا کد و MR</li>
+            <li>هیچ ابهامی در Scope و AoC نماند</li>
+            <li>تصمیم‌های Product/Tech قابل audit باشند</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>اگر یکی از فازها حذف شود چه می‌شود؟</h3>
+          <p>ریسک بازکاری، اختلاف برداشت، و تاخیر release بالا می‌رود چون زنجیره traceability شکسته می‌شود.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

@@ -11,6 +11,10 @@ Use `.claude/commands/speckit.codereview.md` to start reviewer-led code review a
 - Reads a Jira task key or Jira link as input
 - Updates Jira task status during execution (minimum: move to `In Progress`, then next workflow states as needed)
 - Creates or reuses GitLab issue and merge request via token-authenticated API calls
+- Reuse-first behavior is mandatory: existing GitLab issue/MR must be reused, and duplicates must not be created
+- For each Jira task/subtask, creates/reuses two task MRs:
+  - Workspace MR for process/work-item artifacts
+  - Project MR for product code changes
 - Adds bi-directional links between Jira and GitLab
 - Creates/reuses source branch and aligns target branch with Git workflow v1.2
 - Checks out and syncs the local source branch
@@ -20,12 +24,13 @@ Use `.claude/commands/speckit.codereview.md` to start reviewer-led code review a
 - Story lifecycle starts in `Backlog`; selected stories move to board columns.
 - `To Do` is the pre-start queue with WIP limit `16` tasks.
 - Task start transitions to `In Progress`; story enters `In Progress` when first child task starts.
-- Newly created GitLab MRs must start in `Draft` state.
+- Newly created GitLab MRs must start in `Draft` state (both workspace + project task MRs).
 - Default MR strategy: enable `Delete source branch` and `Squash commits`.
 - Apply default strategy to task MRs to `develop` and direct delivery MRs to `test`, `stage`, or `main`.
 - Exception: do not force squash for cherry-pick assembled promotion branches (for example `story/*`) or direct merges between mainline branches.
 - Completed implementation transitions to `In Review`.
 - On transition to `In Review`, linked GitLab MR must be `Ready` (auto-convert from `Draft`/`WIP` when possible).
+- On transition to `In Review`, both linked task MRs (workspace + project) must be `Ready` (auto-convert from `Draft`/`WIP` when possible).
 - After technical merge/review transitions to `PO Review`.
 - Final product acceptance transitions to `Done`.
 
@@ -128,16 +133,20 @@ Code review start (Claude reviewer):
 - Jira task URL
 - Jira status after transition
 - GitLab issue URL
-- GitLab merge request URL
+- Workspace GitLab merge request URL
+- Project GitLab merge request URL
 - Created source branch name
 - Target branch name
 
 ## Jira ↔ GitLab linking requirements
 
 - Every story and standalone task must have an equivalent GitLab issue.
+- If an equivalent GitLab issue already exists, reuse it; do not create a duplicate.
 - Every MR must be linked to its related GitLab issue.
-- Story task Jira item must include MR-to-`develop` Web Link.
-- Standalone task Jira item must include MR Web Link to relevant target branch.
+- If workspace/project task MR already exists, reuse it; do not create a duplicate.
+- Every Jira task/subtask must include two task MR Web Links: workspace MR + project MR.
+- Story task Jira item must include both MR-to-`develop` Web Links (workspace + project).
+- Standalone task Jira item must include both MR Web Links to relevant target branch (workspace + project).
 - Story Jira item must include story MR-to-`test` Web Link and linked GitLab issue Web Link.
 - Every release must have a corresponding GitLab milestone.
 

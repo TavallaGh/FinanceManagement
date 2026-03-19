@@ -23,9 +23,17 @@ This workspace runs agents in **operational mode** for task-oriented prompts.
    - `AoC`, `DoD`, `Test Cases`, `Epic`, `Fix Version`, labels
    - Fix Version must be `V 0.1 (MVP)`.
 5. Enforce traceability:
+   - if GitLab issue already exists for the Jira task context, reuse it and do not create a duplicate issue
+   - if task MR already exists (workspace or project), reuse it and do not create a duplicate MR
+   - for subtasks: create GitLab issue from the Jira task first, then create MR from that task
+   - for subtasks: derive GitLab issue from the Jira parent task key/title, and include both parent/task Jira links in the GitLab issue description
+   - for subtasks: derive GitLab MR title from subtask key/summary, and include both parent/task Jira links in the MR description
+   - for every Jira task/subtask in GitFlow: create TWO task MRs, one in workspace repository and one in project repository
+   - workspace MR scope: workspace/process/task-log artifacts (for example implementation logs under `docs/work-items/**`)
+   - project MR scope: product code changes
    - GitLab issue for each story and standalone task
    - MR linked to GitLab issue
-   - Jira Web Links for issue/MR as defined in workflow docs
+   - Jira Web Links for issue/MR as defined in workflow docs, including both workspace MR and project MR URLs
    - when creating an MR, it must start as `Draft`
    - default MR strategy: enable `Delete source branch` and `Squash commits` for task and delivery MRs (including merges to `develop`, and direct delivery merges to `test|stage|main`)
    - exception: do not force squash for cherry-pick assembled promotion branches (for example `story/*`) or direct merges between mainline branches

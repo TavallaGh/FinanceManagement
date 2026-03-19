@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solution دقیق</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Solution — تبدیل تحلیل به بسته اجرایی</h1>
+          <p class="subtitle">ساخت Task Package استاندارد برای اجرا و import به Jira</p>
+        </div>
+        <span class="badge">01.solution</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>وظیفه اصلی Solution</h2>
+          <ul class="list-compact">
+            <li>تبدیل وضوح Refienment به Taskهای قابل اجرا</li>
+            <li>ساخت یک Task Plan تجمیعی در سطح Story</li>
+            <li>ساخت یک فایل Markdown مستقل برای هر Task</li>
+          </ul>
+        </article>
+        <article class="card full path-card">
+          <h3>Paths (کلیدی)</h3>
+          <ul class="path-list">
+            <li class="path-item">docs/work-items/01.solution/linked/stories/&lt;STORY-KEY&gt;/solution.md</li>
+            <li class="path-item">docs/work-items/01.solution/linked/stories/&lt;STORY-KEY&gt;/task-plan.md</li>
+            <li class="path-item">docs/work-items/01.solution/linked/stories/&lt;STORY-KEY&gt;/tasks/&lt;TASK-KEY&gt;.md</li>
+          </ul>
+        </article>
+
+        <article class="card meduim">
+          <h3>حداقل محتوای هر Task</h3>
+          <ul class="list-compact">
+            <li>Description</li>
+            <li>Goal Of Task</li>
+            <li>Problem To Solve</li>
+            <li>AoC + Scope + Expectations</li>
+            <li>TDD + BDD + DoD</li>
+            <li>Traceability Sources</li>
+          </ul>
+        </article>
+
+        <article class="card meduim">
+          <h3>Rule مهم</h3>
+          <p>اگر Taskها برای یک Story هستند، بعد از تایید Solution باید به صورت Subtask زیر همان Story در Jira ثبت شوند.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

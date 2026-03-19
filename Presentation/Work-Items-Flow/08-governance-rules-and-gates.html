@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>قوانین و گیت‌های کنترل</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Governance Rules & Quality Gates</h1>
+          <p class="subtitle">قوانینی که باعث می‌شوند خروجی قابل اتکا، قابل تحویل و قابل حسابرسی باشد</p>
+        </div>
+        <span class="badge">Governance</span>
+      </header>
+
+      <section class="grid">
+        <article class="card small">
+          <h3>Gate 1: Refienment Approval</h3>
+          <ul class="list-compact">
+            <li>Tech Lead تایید</li>
+            <li>Product Owner تایید</li>
+            <li>بدون این، ورود به Solution ممنوع</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Gate 2: Solution Quality</h3>
+          <ul class="list-compact">
+            <li>Taskها باید Scope شفاف داشته باشند</li>
+            <li>AoC/Expectations/TDD/BDD/DoD کامل باشند</li>
+            <li>Traceability به Source-of-Truth ثبت شده باشد</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Gate 3: Operational Compliance</h3>
+          <ul class="list-compact">
+            <li>Fix Version: V 0.1 (MVP)</li>
+            <li>Metadata اجباری Jira کامل باشد</li>
+            <li>Issue/MR links دوطرفه ثبت شود</li>
+          </ul>
+        </article>
+
+        <article class="card full">
+          <h2>Anti-Patternهایی که باید حذف شوند</h2>
+          <ul class="list-compact">
+            <li>رفتن مستقیم به کدنویسی بدون Refienment مصوب</li>
+            <li>Task مبهم بدون Problem/Goal/AoC</li>
+            <li>MR بدون لینک Issue یا Jira</li>
+            <li>جابجا شدن مسیر فایل‌ها خلاف README هر فاز</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

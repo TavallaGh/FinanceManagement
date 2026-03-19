@@ -16,6 +16,15 @@ This file defines default routing between the three GitLab repositories.
 
 ## Routing Policy
 
+### Dual-Repo Task MR Policy (Mandatory)
+
+For every Jira task/subtask in GitFlow, execution must produce two task MRs:
+
+- Workspace MR in `Accounting-Workspace` for process/docs/task-log artifacts (for example `docs/work-items/**`).
+- Project MR in `Accounting-Project` for product code changes.
+
+Jira Web Links must include both MR URLs.
+
 Use explicit override when available. Otherwise `auto` uses these rules:
 
 1. If item is process/docs/workflow/automation/meta → route to `workspace`.

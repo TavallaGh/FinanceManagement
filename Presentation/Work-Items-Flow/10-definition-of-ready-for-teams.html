@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Definition of Ready</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Definition of Ready برای شروع اجرای تیم</h1>
+          <p class="subtitle">چک‌لیست حداقلی قبل از شروع هر Task/Story</p>
+        </div>
+        <span class="badge">Team Readiness</span>
+      </header>
+
+      <section class="grid">
+        <article class="card small">
+          <h3>Ready for Solution</h3>
+          <ul class="list-compact">
+            <li>Refienment کامل و تایید شده</li>
+            <li>AoC/DoD واضح و بدون تناقض</li>
+            <li>حدود Scope مشخص</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Ready for Implementation</h3>
+          <ul class="list-compact">
+            <li>Task Spec کامل (Expectation/TDD/BDD/DoD)</li>
+            <li>Dependencies و Risks ثبت شده</li>
+            <li>Jira metadata کامل + Fix Version صحیح</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Ready for Completion</h3>
+          <ul class="list-compact">
+            <li>Implementation evidence کامل</li>
+            <li>MR/Issue/Jira links ثبت شده</li>
+            <li>Validation notes و rollback notes موجود</li>
+          </ul>
+        </article>
+
+        <article class="card full">
+          <h2>قانون طلایی</h2>
+          <p>
+            اگر Artifact فاز قبل ناقص است، فاز بعد نباید شروع شود. این قانون هزینه بازکاری را به شدت کاهش می‌دهد
+            و کیفیت تحویل را قابل پیش‌بینی می‌کند.
+          </p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

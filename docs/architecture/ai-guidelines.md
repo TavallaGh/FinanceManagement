@@ -41,6 +41,7 @@ Modern C# standards (mandatory where applicable):
 Required domain principle:
 
 - DDD: use domain language, keep invariants near domain logic, and model behavior around business concepts.
+- Shared domain base rule: all domain entities must follow `docs/architecture/ddd-domain-conventions.md` inheritance and audit naming standards.
 
 Method input parameter standard (mandatory):
 
@@ -146,6 +147,14 @@ Domain structure standard (mandatory):
   - `Enums/`
   - `Aggregates/`
   - `Contracts/`
+
+DDD.Domain inheritance standard (mandatory):
+
+- Use `NT.DDD.Domain` base entities/contracts for non-IDP modules.
+- Choose audit base class by behavior scope (`CreationAuditedEntity`, `ModificationAuditedEntity`, `AuditedEntity`, `FullAuditedEntity`).
+- Audit timestamps must use `CreatedOnUtc`, `UpdatedOnUtc`, `DeletedOnUtc`.
+- Audit aliases such as `CreatedAt`, `UpdatedAt`, and `DeletedAt` are forbidden for domain audit contracts.
+- For IDP modules, keep identity framework inheritance and apply the same audit naming shape defined in `docs/architecture/ddd-domain-conventions.md`.
 
 Commons structure standard (mandatory):
 

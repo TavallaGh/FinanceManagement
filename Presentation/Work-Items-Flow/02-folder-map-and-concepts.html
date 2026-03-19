@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>نقشه پوشه‌ها و مفاهیم</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>نقشه فولدر Work-Items</h1>
+          <p class="subtitle">هر بخش چه نقشی دارد و چه نوع خروجی می‌سازد</p>
+        </div>
+        <span class="badge">Folder Semantics</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>ساختار اصلی</h2>
+          <ul class="list-compact">
+            <li><strong>00.refienment</strong>: فهم عمیق مسئله، Why، مرز پذیرش، برآورد کلان</li>
+            <li><strong>01.solution</strong>: تبدیل خروجی Refienment به Task Package قابل اجرا</li>
+            <li><strong>02.implementation</strong>: ثبت شواهد واقعی پیاده‌سازی و تحویل</li>
+            <li><strong>03.completation</strong>: closeout نهایی، handoff و follow-up</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>independent</h3>
+          <p>برای مواردی که هنوز به Story/Task خاص در Jira لینک نشده‌اند.</p>
+        </article>
+
+        <article class="card small">
+          <h3>linked</h3>
+          <p>برای Artifactهایی که به Story یا Task مشخص متصل هستند.</p>
+        </article>
+
+        <article class="card small">
+          <h3>templates</h3>
+          <p>استانداردسازی خروجی، کاهش ابهام، و تضمین یکپارچگی فرم گزارش‌ها.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>
