@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>فلو عملیاتی Jira/GitLab</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Operational Flow — Jira ↔ GitLab ↔ Docs</h1>
+          <p class="subtitle">چطور یک Task از نظر عملیاتی اجرا و ردیابی می‌شود</p>
+        </div>
+        <span class="badge">Traceability Core</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>گام‌های عملیاتی استاندارد</h2>
+          <ul class="list-compact">
+            <li>Resolve Task از Jira (با key یا URL)</li>
+            <li>اعتبارسنجی Metadata: AoC, DoD, Test Cases, Epic, Fix Version</li>
+            <li>Transition وضعیت مطابق برد (To Do → In Progress → ...)</li>
+            <li>ساخت/بازیابی GitLab Issue و سپس MR (برای Subtask ترتیب اجباری)</li>
+            <li>ثبت لینک‌های دوطرفه Jira Web Links و MR/Issue references</li>
+            <li>ثبت Artifact فاز مربوطه در docs/work-items</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>قانون مهم Subtask</h3>
+          <ul class="list-compact">
+            <li>اول GitLab Issue</li>
+            <li>بعد MR</li>
+            <li>Issue/MR باید parent+subtask لینک Jira را داشته باشند</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>Branch Strategy خلاصه</h3>
+          <ul class="list-compact">
+            <li>features|bugs|technicals/* روی develop</li>
+            <li>story/* برای promotion به test</li>
+            <li>sprint/* برای promotion به stage</li>
+            <li>hotfix/* مستقیم از main</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>خروجی نهایی عملیات</h3>
+          <ul class="list-compact">
+            <li>Jira URL + Status</li>
+            <li>GitLab Issue URL</li>
+            <li>GitLab MR URL</li>
+            <li>Source/Target Branch</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

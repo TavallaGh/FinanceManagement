@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Implementation دقیق</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb one"></div>
+    <div class="bg-orb two"></div>
+    <main class="slide">
+      <header class="slide-header">
+        <div>
+          <h1>Implementation — ثبت شواهد تحویل</h1>
+          <p class="subtitle">اینجا خروجی واقعی توسعه ثبت می‌شود، نه برنامه‌ریزی</p>
+        </div>
+        <span class="badge">02.implementation</span>
+      </header>
+
+      <section class="grid">
+        <article class="card full">
+          <h2>ساختار خروجی فاز Implementation</h2>
+          <ul class="list-compact">
+            <li>ثبت شواهد Story-based و Standalone به صورت قابل حسابرسی</li>
+            <li>در صورت API: postman collection</li>
+            <li>در صورت ماژول: module/README + CHANGELOG</li>
+          </ul>
+        </article>
+
+        <article class="card full path-card">
+          <h3>Paths (Implementation)</h3>
+          <ul class="path-list">
+            <li class="path-item">docs/work-items/02.implementation/stories/&lt;STORY-KEY&gt;/tasks/&lt;TASK-KEY&gt;.md</li>
+            <li class="path-item">docs/work-items/02.implementation/stories/&lt;STORY-KEY&gt;/story-summary.md</li>
+            <li class="path-item">docs/work-items/02.implementation/standalone/&lt;type&gt;/&lt;TASK-KEY&gt;.md</li>
+            <li class="path-item">docs/work-items/02.implementation/**/postman/*.postman_collection.json</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>فیلدهای اجباری هر Task Record</h3>
+          <ul class="list-compact">
+            <li>start/end datetime</li>
+            <li>Jira metadata + links</li>
+            <li>branch source→target</li>
+            <li>GitLab issue + MR</li>
+            <li>commit refs + rollback/review notes</li>
+          </ul>
+        </article>
+
+        <article class="card small">
+          <h3>هدف این فاز</h3>
+          <p>قابل حسابرسی‌کردن توسعه: هر ادعا باید پشتوانه اجرایی، لینک و شواهد داشته باشد.</p>
+        </article>
+
+        <article class="card small">
+          <h3>مرزبندی</h3>
+          <p>این فاز برای «ثبت اجرای انجام‌شده» است؛ تحلیل یا طراحی اولیه باید قبلاً در فازهای قبل انجام شده باشد.</p>
+        </article>
+      </section>
+
+      <footer id="slide-footer" class="slide-footer"></footer>
+    </main>
+  </div>
+  <script src="assets/slides.js"></script>
+</body>
+</html>

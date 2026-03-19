@@ -1,21 +1,21 @@
 # Work Items Documentation
 
-This tree organizes delivery artifacts by phase so teams can navigate discovery through completion in one place.
+This tree organizes delivery artifacts by phase so teams can navigate Refienment through completion in one place.
 
 ## Tree View
 
 ```text
 docs/work-items/
-  discovery/
+  Refienment/
     independent/
-      <DISCOVERY-KEY>.md
+      <Refienment-KEY>.md
     linked/
-      stories/<STORY-KEY>/discovery.md
-      tasks/<TASK-KEY>/discovery.md
+      stories/<STORY-KEY>/REFIENMENT.md
+      tasks/<TASK-KEY>/REFIENMENT.md
     templates/
-      discovery-standalone.template.md
-      discovery-linked-story.template.md
-      discovery-linked-task.template.md
+      REFIENMENT-standalone.template.md
+      REFIENMENT-linked-story.template.md
+      REFIENMENT-linked-task.template.md
   solution/
     independent/
       <SOLUTION-KEY>.md
@@ -49,14 +49,14 @@ docs/work-items/
 
 ## Usage Rules
 
-- `independent/` is for discovery or solution work not tied to Jira story/task yet.
+- `independent/` is for Refienment or solution work not tied to Jira story/task yet.
 - `linked/` is for artifacts attached to an existing story/task.
 - `implementation/` is the execution evidence area for engineering work items.
 - `completion/` captures implementation-done sign-off and handoff details.
 
 ## Phase Input Policy
 
-- Discovery phase must ingest product documentation and requirement briefs as primary input.
+- Refienment phase must ingest product documentation and requirement briefs as primary input.
 - Solution phase must ingest solution meeting notes and spike outputs as primary input.
 - Implementation phase must ingest approved task/story execution context and produce delivery evidence.
 - Completion phase must ingest final implementation outcome and produce closeout/sign-off artifacts.
@@ -66,7 +66,7 @@ docs/work-items/
 When a Jira task is provided for execution:
 
 1. Resolve and validate the Jira task from key or URL.
-2. Extract required metadata and linked artifacts (story, issue, MR, branch, status).
+2. Extract required metadata and linked artifacts (story, workspace issue/MR, project issue/MR, branch, status).
 3. Execute operational workflow end to end (Jira transition + GitLab actions) according to workspace policy.
 4. Write documentation to phase-correct locations under `docs/work-items/`.
 5. Use AI-friendly English structure for generated work-item records.
@@ -74,7 +74,7 @@ When a Jira task is provided for execution:
 
 Recommended output paths for Jira-triggered execution:
 
-- Discovery linked task: `docs/work-items/discovery/linked/tasks/<TASK-KEY>/discovery.md`
+- Refienment linked task: `docs/work-items/REFIENMENT/linked/tasks/<TASK-KEY>/REFIENMENT.md`
 - Solution linked task: `docs/work-items/solution/linked/tasks/<TASK-KEY>/solution.md`
 - Implementation record: `docs/work-items/implementation/standalone/<type>/<TASK-KEY>.md` or story task path
 - Completion record: `docs/work-items/completion/linked/tasks/<TASK-KEY>/completion.md`

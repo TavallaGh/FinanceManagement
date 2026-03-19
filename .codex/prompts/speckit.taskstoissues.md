@@ -132,6 +132,11 @@ Type mapping:
 - For `story` tasks:
 	- GitLab Issue title = `[JIRA-STORYID] - Jira story title`
 	- GitLab MR title follows the same title rule and remains linked to that issue
+- For `subtask` tasks:
+	- GitLab Issue title is derived from parent Jira key/title (`[PARENT-KEY] - parent summary`)
+	- GitLab MR title is derived from the subtask key/summary (`[SUBTASK-KEY] - subtask summary`)
+	- GitLab Issue description must include both parent and subtask Jira links
+	- GitLab MR description must include both parent and subtask Jira links
 
 9. Create/update GitLab artifacts using workflow in `docs/workflows/git-workflow-flows.md`:
 
@@ -147,6 +152,14 @@ Type mapping:
 	- `hotfix/*` branches from `main` and MRs directly to `main`
 - Select target repository/project using configured workspace variables and task scope.
 - Create or reuse source branch, GitLab issue, and MR.
+- If source/target branch is not provided, derive them automatically from Jira issue type and task summary, then continue execution.
+- Reuse-first rule: if GitLab issue already exists for the Jira task context, do not create another issue.
+- Reuse-first rule: if workspace/project task MR already exists, do not create another MR.
+- For every Jira task/subtask, create/reuse TWO task MRs:
+	- Workspace MR in `Accounting-Workspace` for process/work-item artifacts (for example `docs/work-items/**`).
+	- Project MR in `Accounting-Project` for product code changes.
+- For subtasks, enforce strict order: create/reuse the GitLab issue from the Jira task first, then create/reuse the MR from that task.
+- For subtasks, derive the GitLab issue from the Jira parent task key/title (not the subtask title only), and include both parent Jira link and subtask Jira link in the GitLab issue description.
 - Ensure every story and standalone task has an equivalent GitLab issue.
 - Ensure every MR is linked to its corresponding GitLab issue.
 - Ensure release-level GitLab milestone exists and use it for release-related artifacts.
@@ -157,18 +170,20 @@ Type mapping:
 - Put Jira link in GitLab MR description.
 - Add GitLab Issue and MR links to Jira task as **Web Links** (`/remotelink`).
 - Keep issue and MR mutually linked in descriptions.
-- For story tasks, add task MR link targeting `develop` as Jira Web Link.
-- For standalone tasks, add MR link targeting relevant branch as Jira Web Link.
+- Ensure the task-level sequence is preserved in links: Jira task -> GitLab issue -> GitLab MR, and add Jira Web Links back to both issue and MR.
+- For story tasks, add BOTH task MR links targeting `develop` (workspace + project) as Jira Web Links.
+- For standalone tasks, add BOTH task MR links targeting relevant branch (workspace + project) as Jira Web Links.
 - For stories, add story MR link targeting `test` and linked GitLab issue URL as Jira Web Links.
 
-11. Checkout local repo to the created source branch and ensure local branch is synced with its direct parent.
+11. Checkout local repo to the created/reused source branch and ensure local branch is synced with its direct parent.
 
 12. Return summary table:
 
 - Jira task URL
 - Jira status after transition
 - GitLab Issue URL
-- GitLab MR URL
+- Workspace GitLab MR URL
+- Project GitLab MR URL
 - Created branch name
 - Target branch name
 
@@ -184,6 +199,7 @@ Type mapping:
 - Do not print raw credentials or tokens.
 - Never create/update resources outside configured Jira/GitLab project.
 - If Jira task is inaccessible, stop and report exact error.
+- If GitLab issue already exists, always reuse it and never create duplicates.
 - If MR already exists, reuse it instead of creating duplicates.
 - If required credentials are missing or placeholders, stop and return a clear remediation message.
 

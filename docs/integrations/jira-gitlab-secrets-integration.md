@@ -68,6 +68,9 @@ The prompt `.codex/prompts/speckit.taskstoissues.md` is configured to:
 - Read a Jira task key/link and fetch task details.
 - Update Jira status for workflow execution.
 - Perform GitLab issue/MR/branch operations in configured repositories.
+- For each Jira task/subtask, create/reuse two task MRs:
+	- Workspace MR for `docs/work-items/**` and process artifacts.
+	- Project MR for product code changes.
 - Maintain bi-directional Jira↔GitLab links.
 - Return a summary with final status and created/reused artifacts.
 
@@ -80,7 +83,8 @@ The prompt `.codex/prompts/speckit.taskstoissues.md` is configured to:
 - Enforce Jira↔GitLab traceability:
 	- GitLab issue per story and standalone task.
 	- MR linked to corresponding GitLab issue.
-	- Jira Web Links for task/story MRs and issue URLs as defined by workflow docs.
+	- Two task MRs per Jira task/subtask (workspace + project).
+	- Jira Web Links for task/story MRs and issue URLs as defined by workflow docs, including both workspace/project task MR URLs.
 - Enforce GitLab milestone creation for releases.
 
 ## Security notes

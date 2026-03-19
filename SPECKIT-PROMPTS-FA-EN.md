@@ -44,7 +44,7 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 <a id="fa-speckit-specify"></a>
 ### FA: `/speckit.specify`
 - هدف: ساخت یا ویرایش `spec.md` از روی نیازمندی متنی.
-- زمان استفاده: شروع فاز Discovery یا شروع فیچر جدید.
+- زمان استفاده: شروع فاز REFIENMENT یا شروع فیچر جدید.
 - مثال:
 ```text
 /speckit.specify پیاده سازی مدیریت چند شعبه برای حسابداری
@@ -157,7 +157,7 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 <a id="en-speckit-specify"></a>
 ### EN: `/speckit.specify`
 - Purpose: Build or update `spec.md` from natural-language requirements.
-- Use when: Starting Discovery or defining a new feature.
+- Use when: Starting REFIENMENT or defining a new feature.
 - Example:
 ```text
 /speckit.specify Implement multi-branch accounting workflow

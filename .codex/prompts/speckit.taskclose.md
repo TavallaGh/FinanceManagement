@@ -20,7 +20,8 @@ Close the documentation loop for a completed task in a GitFlow-aligned structure
 4. Collect execution references:
    - branch name and target branch
    - related GitLab issue URL
-   - related GitLab MR URL
+   - workspace GitLab MR URL
+   - project GitLab MR URL
    - commit list (if available)
    - current Jira status and timestamps
 5. Write/update task documentation file using path policy:
@@ -30,7 +31,7 @@ Close the documentation loop for a completed task in a GitFlow-aligned structure
    - Start datetime
    - End datetime
    - Jira metadata and links
-   - GitLab issue/MR metadata and links
+   - GitLab issue metadata and both MR links (workspace + project)
    - branch strategy details
    - checklist of delivered changes
    - rollback and risk notes

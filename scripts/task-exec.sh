@@ -106,8 +106,107 @@ ISSUE_JSON="$(curl -sS --fail \
   --header "Accept: application/json")"
 
 SUMMARY="$(echo "$ISSUE_JSON" | jq -r '.fields.summary')"
+ISSUE_TYPE_NAME="$(echo "$ISSUE_JSON" | jq -r '.fields.issuetype.name // ""')"
 LABELS_JSON="$(echo "$ISSUE_JSON" | jq -c '.fields.labels // []')"
 
+to_branch_slug() {
+  local text="${1:-}"
+  local slug
+  slug="$(echo "$text" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
+  [[ -z "$slug" ]] && slug="task"
+  echo "$slug"
+}
+
+resolve_branch_plan() {
+  local issue_type_name="$1"
+  local summary="$2"
+  local task_key="$3"
+
+  if [[ -z "$SOURCE_BRANCH" ]]; then
+    local kind="features"
+    local default_target="develop"
+
+    if [[ "$issue_type_name" =~ [Bb][Uu][Gg] ]]; then
+      kind="bugs"
+      default_target="develop"
+    elif [[ "$issue_type_name" =~ [Tt][Ee][Cc][Hh][Nn][Ii][Cc][Aa][Ll]|[Ss][Pp][Ii][Kk][Ee]|[Cc][Hh][Oo][Rr][Ee] ]]; then
+      kind="technicals"
+      default_target="develop"
+    elif [[ "$issue_type_name" =~ [Hh][Oo][Tt][Ff][Ii][Xx] ]]; then
+      kind="hotfix"
+      default_target="main"
+    fi
+
+    local slug
+    slug="$(to_branch_slug "$summary")"
+    SOURCE_BRANCH="$kind/$(echo "$task_key" | tr '[:upper:]' '[:lower:]')-$slug"
+
+    if [[ -z "$TARGET_BRANCH" ]]; then
+      TARGET_BRANCH="$default_target"
+    fi
+  fi
+
+  if [[ -z "$TARGET_BRANCH" ]]; then
+    case "$SOURCE_BRANCH" in
+      story/*|Story/*) TARGET_BRANCH="test" ;;
+      sprint/*|Sprint/*) TARGET_BRANCH="stage" ;;
+      hotfix/*|Hotfix/*) TARGET_BRANCH="main" ;;
+      *) TARGET_BRANCH="develop" ;;
+    esac
+  fi
+}
+
+ensure_gitlab_branch_exists() {
+  local branch="$1"
+  local ref_branch="$2"
+  local branch_enc
+  branch_enc="$(printf '%s' "$branch" | jq -sRr @uri)"
+
+  if curl -sS --fail \
+    --request GET \
+    --url "$GITLAB_BASE_URL/api/v4/projects/$PROJECT_ID/repository/branches/$branch_enc" \
+    --header "PRIVATE-TOKEN: $GITLAB_TOKEN" >/dev/null 2>&1; then
+    return
+  fi
+
+  [[ "$DRY_RUN" == "true" ]] && return
+
+  curl -sS --fail \
+    --request POST \
+    --url "$GITLAB_BASE_URL/api/v4/projects/$PROJECT_ID/repository/branches" \
+    --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+    --data-urlencode "branch=$branch" \
+    --data-urlencode "ref=$ref_branch" >/dev/null
+}
+
+ensure_local_branch_checked_out() {
+  [[ "$DRY_RUN" == "true" ]] && return
+
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return
+  fi
+
+  set +e
+  git fetch origin "$TARGET_BRANCH" >/dev/null 2>&1
+  git fetch origin "$SOURCE_BRANCH" >/dev/null 2>&1
+
+  if git show-ref --verify "refs/heads/$SOURCE_BRANCH" >/dev/null 2>&1; then
+    git checkout "$SOURCE_BRANCH" >/dev/null 2>&1
+  elif git show-ref --verify "refs/remotes/origin/$SOURCE_BRANCH" >/dev/null 2>&1; then
+    git checkout -b "$SOURCE_BRANCH" "origin/$SOURCE_BRANCH" >/dev/null 2>&1
+  elif git show-ref --verify "refs/remotes/origin/$TARGET_BRANCH" >/dev/null 2>&1; then
+    git checkout -b "$SOURCE_BRANCH" "origin/$TARGET_BRANCH" >/dev/null 2>&1
+  elif git show-ref --verify "refs/heads/$TARGET_BRANCH" >/dev/null 2>&1; then
+    git checkout -b "$SOURCE_BRANCH" "$TARGET_BRANCH" >/dev/null 2>&1
+  else
+    git checkout -b "$SOURCE_BRANCH" >/dev/null 2>&1
+  fi
+
+  if git show-ref --verify "refs/remotes/origin/$TARGET_BRANCH" >/dev/null 2>&1; then
+    git rebase "origin/$TARGET_BRANCH" >/dev/null 2>&1
+  fi
+  set -e
+}
 if ! echo "$ISSUE_JSON" | jq -e '.fields.fixVersions[]?.name | select(. == "V 0.1 (MVP)")' >/dev/null; then
   echo "Jira issue $JIRA_KEY must include Fix Version 'V 0.1 (MVP)'" >&2
   exit 1
@@ -216,6 +315,9 @@ ensure_gitlab_mr_ready() {
 
 PROJECT_ID="$(select_project_id "$REPO_MODE" "$LABELS_JSON")"
 
+resolve_branch_plan "$ISSUE_TYPE_NAME" "$SUMMARY" "$JIRA_KEY"
+ensure_gitlab_branch_exists "$SOURCE_BRANCH" "$TARGET_BRANCH"
+
 if [[ "$DRY_RUN" != "true" ]]; then
   curl -sS --fail \
     --request POST \
@@ -321,6 +423,8 @@ add_jira_remotelink() {
 
 add_jira_remotelink "$GL_ISSUE_URL" "GitLab Issue"
 add_jira_remotelink "$GL_MR_URL" "GitLab MR"
+
+ensure_local_branch_checked_out
 
 LOG_DIR="$REPO_ROOT/logs/task-exec"
 mkdir -p "$LOG_DIR"

@@ -78,11 +78,20 @@ flowchart LR
   6. Ensure mandatory Jira metadata is present (`AoC`, `DoD`, `Test Cases`, `Fix Version`, `Epic`, labels).
   7. Enforce MVP Fix Version `V 0.1 (MVP)` for story/task items in this phase.
   8. Ensure GitLab issue exists for each story and standalone task, and connect MR to that issue.
-  9. Ensure release-level GitLab milestone exists and is used for release artifacts.
-  10. Return a summary containing:
+  8.a. Reuse-first policy: if GitLab issue already exists for the Jira task context, reuse it and do not create duplicates.
+  8.b. Reuse-first policy: if task MR already exists (workspace or project), reuse it and do not create duplicates.
+    8.1. For every Jira task/subtask in GitFlow, create/reuse two task MRs:
+      - Workspace MR for workspace/process/task-log artifacts.
+      - Project MR for product code changes.
+  9. For subtasks, enforce order: create/reuse GitLab issue from the Jira task first, then create/reuse the MR from that task.
+  10. For subtasks, GitLab issue derivation must be based on parent Jira key/title and include both parent and subtask Jira links in description.
+  11. For subtasks, GitLab MR title must be based on subtask key/summary and MR description must include both parent and subtask Jira links.
+  12. Ensure release-level GitLab milestone exists and is used for release artifacts.
+  13. Return a summary containing:
      - Jira task URL + status
      - GitLab issue URL
-     - GitLab MR URL
+    - Workspace GitLab MR URL
+    - Project GitLab MR URL
      - Source branch
      - Target branch
 
@@ -102,7 +111,7 @@ flowchart LR
 
   - Start datetime / end datetime
   - Jira info and links
-  - Git branch and MR info
+  - Git branch and both MR links/states (workspace + project)
   - Commit references
   - Validation notes and rollback notes
 

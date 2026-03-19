@@ -58,7 +58,7 @@ Default MR options:
 
 Default strategy applies to:
 
-- Task MRs to `develop`.
+- Task MRs to `develop` (both workspace and project task MRs).
 - Direct delivery MRs to `test`, `stage`, or `main`.
 
 Exceptions (no forced squash):
@@ -101,6 +101,9 @@ Hotfixes are merged directly into `main` and appear as independent patch-level r
 ### 1) Developing a Task (in `develop`)
 
 - Each task is developed in an isolated branch (`features/...`, `bugs/...`, `technicals/...`).
+- For each Jira task/subtask, open two task MRs:
+  - Workspace MR for process/work-item artifacts (for example `docs/work-items/**`).
+  - Project MR for product code changes.
 - MR to `develop` uses squash and enables source-branch deletion.
 - Sync command: `git rebase origin/develop`.
 
@@ -170,7 +173,7 @@ This workflow is bound to the Jira board lifecycle below:
 3. `In Progress`
   - Task enters when work starts.
   - Story enters as soon as the first child task starts.
-  - Task MRs to `develop` move from draft to ready once implementation is complete.
+  - Task MRs to `develop` (workspace + project) move from draft to ready once implementation is complete.
   - When all story tasks are complete, story MR (cherry-picked branch to `test`) also moves from draft to ready.
 4. `In Review`
   - Task/story waits for technical review and merge.
@@ -189,9 +192,14 @@ For all stories and tasks in MVP:
 
 Traceability requirements:
 
+- For Jira subtasks: create the GitLab issue from the Jira task first, then create the MR from that task.
+- For Jira subtasks: derive the GitLab issue from parent Jira key/title and include both parent/subtask Jira links in the GitLab issue description.
+- For Jira subtasks: derive the GitLab MR title from subtask key/summary and include both parent/subtask Jira links in MR description.
+- For every Jira task/subtask: create two task MRs, one in workspace repo and one in project repo.
+- Workspace MR scope is workspace/process/task-log artifacts; project MR scope is product code.
 - Every story and every standalone task must have an equivalent GitLab issue.
 - Every MR must be linked to its related GitLab issue.
-- Story task Jira items must include Web Link to task MR targeting `develop`.
-- Standalone task Jira items must include Web Link to MR targeting the relevant branch.
+- Story task Jira items must include Web Links to both task MRs targeting `develop` (workspace + project).
+- Standalone task Jira items must include Web Links to both task MRs targeting the relevant branch (workspace + project).
 - Story Jira items must include Web Links to story MR targeting `test` and to related GitLab issue.
 - Every release must have a matching GitLab milestone.

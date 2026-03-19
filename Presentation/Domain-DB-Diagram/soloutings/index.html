@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Domain DB Diagram</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="title-wrap">
+      <h1>Domain DB Diagram</h1>
+      <p>Lightweight markdown-driven schema viewer/editor</p>
+    </div>
+    <div class="actions">
+      <button id="openFolderBtn">Open Schema Folder</button>
+      <button id="reloadBtn" disabled>Reload</button>
+      <span id="statusText">Select a folder with .md schema files</span>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <section class="canvas-section">
+      <div id="canvas" class="canvas">
+        <div id="viewport" class="viewport">
+          <svg id="relationsLayer" class="relations-layer"></svg>
+          <div id="tablesLayer" class="tables-layer"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="editor-panel">
+      <h2>Table Editor</h2>
+      <div id="emptyEditor" class="empty-editor">Select a table to edit</div>
+      <div id="editorContent" class="editor-content hidden">
+        <label>
+          Table Name
+          <input id="tableNameInput" type="text" />
+        </label>
+
+        <div class="columns-head">
+          <h3>Columns</h3>
+          <button id="addColumnBtn" type="button">Add Column</button>
+        </div>
+
+        <div id="columnsList" class="columns-list"></div>
+      </div>
+    </aside>
+  </main>
+
+  <template id="columnEditorTemplate">
+    <div class="column-editor-row">
+      <input data-field="name" type="text" placeholder="Column" />
+      <input data-field="type" type="text" placeholder="Type" />
+      <label class="mini-check">
+        <input data-field="pk" type="checkbox" /> PK
+      </label>
+      <input data-field="fk" type="text" placeholder="FK: Table.Column" list="fkSuggestions" />
+      <button data-action="delete" type="button" class="danger">Delete</button>
+    </div>
+  </template>
+
+  <datalist id="fkSuggestions"></datalist>
+
+  <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+  <script src="markdownParser.js"></script>
+  <script src="fileSystem.js"></script>
+  <script src="diagram.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
