@@ -61,70 +61,72 @@
     <main class="slide">
       <header class="slide-header">
         <div>
-          <h1>Frontend Structure Standard (Blazor)</h1>
-          <p class="subtitle">استاندارد Concrete فرانت‌اند با تفکیک Pages / Clients / Models / Components / Bootstrappers</p>
+          <h1>Frontend Structure Standard (Angular)</h1>
+          <p class="subtitle">استاندارد فرانت‌اند Angular با Nx Monorepo و معماری BFF</p>
         </div>
         <span class="badge">Slide 26</span>
       </header>
 
       <section class="grid">
         <article class="card full">
-          <h2>Frontend Template (Required)</h2>
+          <h2>Frontend Structure (Nx Monorepo)</h2>
           <div class="frontend-layout">
             <div class="frontend-col">
-              <h3>Blazor Root</h3>
-              <p class="frontend-path">src/Accounting.Blazor/</p>
+              <h3>Angular Root</h3>
+              <p class="frontend-path">accounting-frontend</p>
               <ul class="list-compact">
-                <li>Layout/</li>
-                <li>Components/ (dynamic reusable)</li>
-                <li>Models/&lt;Module&gt;/Request|Response/</li>
-                <li>Pages/&lt;Module&gt;/&lt;Page&gt;/</li>
-                <li>Clients/&lt;Module&gt;/</li>
-                <li>Bootstrappers/</li>
+                <li>apps/erp-web/ (main app)</li>
+                <li>libs/shared/ (UI, data-access, util)</li>
+                <li>libs/domains/ (domain libraries)</li>
+                <li>public/ (assets, tokens)</li>
+                <li>docs/frontend/ (documentation)</li>
               </ul>
             </div>
 
             <div class="frontend-col">
-              <h3>Page + Client Rule</h3>
-              <p class="frontend-path">Pages/&lt;Module&gt;/&lt;Page&gt;/</p>
+              <h3>App Structure</h3>
+              <p class="frontend-path">apps/erp-web/src/app/</p>
               <ul class="list-compact">
-                <li>&lt;Page&gt;.razor (markup only)</li>
-                <li>&lt;Page&gt;PageComponent.cs (C# logic)</li>
-                <li>Clients/&lt;Module&gt;/&lt;Page&gt;ApiClient.cs</li>
-                <li>one ApiClient per razor page</li>
+                <li>core/ (app-wide infrastructure)</li>
+                <li>features/ (business modules)</li>
+                <li>shared/ (app-scoped helpers)</li>
+                <li>Modern Angular (signals, inject())</li>
+                <li>BFF برای authentication و API</li>
               </ul>
             </div>
 
             <div class="frontend-col">
               <h3>Responsibilities</h3>
               <ul class="list-compact">
-                <li>.razor فقط Markup و Binding</li>
-                <li>Page component کلاس شبه‌سرویس با منطق C#</li>
-                <li>Api call فقط در ApiClientهای concrete</li>
-                <li>DI فقط در Bootstrappers</li>
-                <li>DI registration با Reflection (ترجیحی)</li>
+                <li>Components: UI فقط، بدون HTTP مستقیم</li>
+                <li>Services: Business logic و BFF calls</li>
+                <li>Design System: Token-based styling</li>
+                <li>i18n: Flat uppercase keys</li>
+                <li>RTL/LTR: Logical CSS properties</li>
               </ul>
             </div>
           </div>
-          <p>این ساختار باعث می‌شود منطق UI، قراردادها و تماس با API جدا بمانند و توسعه Featureهای جدید سریع‌تر و امن‌تر انجام شود.</p>
+          <p>این ساختار با Nx dependency boundaries، جداسازی لایه‌ها و الگوهای Modern Angular، توسعه را سریع‌تر و قابل نگهداری‌تر می‌کند.</p>
         </article>
 
         <article class="card small">
           <h3>Rule Check</h3>
           <div class="chip-row">
-            <span class="kpi ok">Concrete-only classes</span>
-            <span class="kpi ok">One page = one ApiClient</span>
-            <span class="kpi ok">RequestModel/ResponseModel</span>
-            <span class="kpi ok">Bootstrapper + Reflection DI</span>
+            <span class="kpi ok">No HttpClient in components</span>
+            <span class="kpi ok">Token-based design</span>
+            <span class="kpi ok">Translation keys only</span>
+            <span class="kpi ok">Logical CSS properties</span>
           </div>
         </article>
 
         <article class="card small">
-          <h3>Migration Note</h3>
+          <h3>Documentation</h3>
           <ul class="list-compact">
-            <li>لایه Service و Interface در فرانت حذف شود</li>
-            <li>Request/Response به Models/&lt;Module&gt;/Request|Response منتقل شود</li>
-            <li>API call مستقیم داخل .razor یا component class مجاز نیست</li>
+            <li>docs/frontend/architecture/ (ERP, BFF)</li>
+            <li>docs/frontend/guides/ (development)</li>
+            <li>docs/frontend/design/ (design system)</li>
+            <li>docs/frontend/localization/ (i18n)</li>
+            <li>docs/frontend/rules/ (copilot instructions)</li>
           </ul>
         </article>
       </section>

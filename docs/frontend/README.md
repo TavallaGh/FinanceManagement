@@ -1,43 +1,72 @@
-# Frontend Documentation
+# ERP System Frontend
 
-This folder is generated from:
-- Prototype source: `projects/Accounting-Prototype`
-- MVP definitions: `docs/mvp/*.md`
+A modern ERP frontend foundation built with Angular and an Nx monorepo.
 
-## Structure
+## Overview
 
-- `system-design/`: Frontend architecture, runtime flow, and UI shell design.
-	- Includes `blazor-frontend-structure.md` for module/page/model/service conventions.
-- `mvp/`: MVP split for frontend implementation (now vs later) based on MVP markdown files.
-- `design-tokens/`: Extracted visual tokens from current prototype (color scale).
-- `design-tokens/prototype-style-system.md`: Full extracted style system (typography, spacing, radius, shadows, status colors, RTL/LTR rules).
-- `components/`: Extracted component inventory and prioritized component scope.
-- `recheck-report.md`: Post-generation validation report against prototype sources.
+This repository contains the frontend foundation for an ERP system with:
 
-## Current Blazor Implementation Reference
+- Nx monorepo architecture
+- Angular SPA with BFF-based runtime
+- Modern Angular patterns (signals, zone-less)
+- Shared design system and token-based styling
+- Persian/English support with full RTL/LTR
+- Dark and light themes
 
-For the implemented frontend folder structure used in `Accounting-Project`, use:
+## System Requirements
 
-- `projects/Accounting-Project/docs/blazor-frontend-structure.md`
-- `projects/Accounting-Project/docs/solution-layers-needs.md`
+- Node.js v18+
+- npm v9+
+- Angular CLI v21+
+- Nx v19+
 
-Implementation root:
+## Quick Start
 
-- `projects/Accounting-Project/src/Accounting.Blazor`
+```bash
+# Install dependencies
+npm install
 
-Use this implementation reference when validating frontend layers and folder checks against architecture rules.
+# Start development server
+npm start
+```
 
-## Added Sample In Project
+Application runs at `http://localhost:4200`.
 
-- `projects/Accounting-Prototype/src/pages/LoginPageSample.jsx`
-- `projects/Accounting-Prototype/src/README.md`
+## Common Commands
 
-These files provide a migration-friendly `src` sample without changing current runtime behavior.
+```bash
+# Development
+npm start                                    # Start dev server
+nx lint erp-web                             # Run linter
+nx test erp-web                             # Run tests
 
-## Source Of Truth
+# Build
+nx build erp-web --configuration=production # Production build
+```
 
-- UI bootstrap and module loading: `projects/Accounting-Prototype/index.html`
-- Application shell, auth flow, routing, permissions: `projects/Accounting-Prototype/app.js`
-- Screen components: `projects/Accounting-Prototype/components/*.js`
-- GL screens: `projects/Accounting-Prototype/financial/generalledger/*.js`
-- MVP page specs: `docs/mvp/*_Dev.md`, `docs/mvp/*_Help.md`
+## Documentation
+
+### Architecture
+
+- [architecture/erp-architecture.md](architecture/erp-architecture.md) - Workspace structure and patterns
+- [architecture/bff-architecture.md](architecture/bff-architecture.md) - BFF pattern and security model
+
+### Guides
+
+- [guides/development-guide.md](guides/development-guide.md) - Development conventions and workflow
+
+### Design
+
+- [design/design-system.md](design/design-system.md) - Design system and UI guidance
+
+### Localization
+
+- [localization/i18n-guide.md](localization/i18n-guide.md) - Internationalization and RTL/LTR support
+
+### Rules
+
+- [rules/copilot-instructions.md](rules/copilot-instructions.md) - AI assistant instructions and patterns
+
+## License
+
+[MIT License](LICENSE)

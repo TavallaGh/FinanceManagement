@@ -108,11 +108,12 @@
         <article class="card small">
           <h3>Storage Options</h3>
           <ul class="list-compact">
-            <li>Option 1 (SPA): JSON files</li>
-            <li>localization/en.json</li>
-            <li>localization/fa.json</li>
-            <li>localization/tr.json</li>
-            <li>Option 2: DB for multi-tenant overrides</li>
+            <li>SPA: JSON files (@ngx-translate)</li>
+            <li>apps/erp-web/src/assets/i18n/fa.json</li>
+            <li>apps/erp-web/src/assets/i18n/en.json</li>
+            <li>public/assets/i18n/ (runtime)</li>
+            <li>Language in cookie: erp_app_language (via BFF)</li>
+            <li>Session in HttpOnly cookies (via BFF)</li>
           </ul>
         </article>
 
@@ -123,7 +124,8 @@
             <li>No hard-coded error/validation text</li>
             <li>All user text must use keys</li>
             <li>Backend must return keys only</li>
-            <li>AI generation/review must enforce this</li>
+            <li>RTL/LTR: Use logical properties only</li>
+            <li>Docs: docs/frontend/localization/i18n-guide.md</li>
           </ul>
         </article>
       </section>
