@@ -16,6 +16,7 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 | `/speckit.checklist` | Generate a custom checklist for the current feature. | [FA](#fa-speckit-checklist) | [EN](#en-speckit-checklist) |
 | `/speckit.analyze` | Run cross-artifact consistency analysis (`spec.md`, `plan.md`, `tasks.md`). | [FA](#fa-speckit-analyze) | [EN](#en-speckit-analyze) |
 | `/speckit.implement` | Execute implementation tasks from `tasks.md`. | [FA](#fa-speckit-implement) | [EN](#en-speckit-implement) |
+| `/speckit.generate-entities` | Generate multi-domain C# entities from domain docs with mandatory DDD/security rules. | [FA](#fa-speckit-generate-entities) | [EN](#en-speckit-generate-entities) |
 | `/speckit.taskstoissues` | Execute Jira-to-GitLab operational flow for a task. | [FA](#fa-speckit-taskstoissues) | [EN](#en-speckit-taskstoissues) |
 | `/speckit.taskclose` | Finalize task documentation and rollup artifacts. | [FA](#fa-speckit-taskclose) | [EN](#en-speckit-taskclose) |
 | `/speckit.codereview` | Run Claude review-only flow on linked MR after implementation done. | [FA](#fa-speckit-codereview) | [EN](#en-speckit-codereview) |
@@ -103,6 +104,17 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 ```text
 /speckit.implement
 ```
+
+<a id="fa-speckit-generate-entities"></a>
+### FA: `/speckit.generate-entities`
+- هدف: تولید موجودیت های دامنه C# از چند سند دامنه به صورت همزمان.
+- قوانین اجباری: `docs/architecture/ddd-domain-conventions.md` و `docs/architecture/security-implementation-review-rules.md`.
+- زمان استفاده: وقتی Data/Domain docs آماده هستند و باید Entityها طبق قواعد استاندارد تولید شوند.
+- مثال:
+```text
+/speckit.generate-entities --docs "docs/work-items/domain/accounting.md,docs/work-items/domain/idp.md" --out "src" --namespace "NextTopTech.Accounting" --user-key "int"
+```
+
 
 <a id="fa-speckit-taskstoissues"></a>
 ### FA: `/speckit.taskstoissues`
@@ -216,6 +228,15 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 ```text
 /speckit.implement
 ```
+<a id="en-speckit-generate-entities"></a>
+### EN: `/speckit.generate-entities`
+- Purpose: Generate C# domain entities across multiple domain docs in one run.
+- Mandatory rules: `docs/architecture/ddd-domain-conventions.md` and `docs/architecture/security-implementation-review-rules.md`.
+- Use when: Domain/data docs are ready and entities must be generated under strict conventions.
+- Example:
+```text
+/speckit.generate-entities --docs "docs/work-items/domain/accounting.md,docs/work-items/domain/idp.md" --out "src" --namespace "NextTopTech.Accounting" --user-key "int"
+```
 
 <a id="en-speckit-taskstoissues"></a>
 ### EN: `/speckit.taskstoissues`
@@ -263,7 +284,8 @@ or with full Jira URL:
 3. `/speckit.plan`
 4. `/speckit.tasks`
 5. `/speckit.analyze`
-6. `/speckit.taskstoissues <JIRA-KEY>`
-7. `/speckit.implement`
-8. `/speckit.taskclose <JIRA-KEY>`
-9. `/speckit.codereview <JIRA-KEY>`
+6. `/speckit.generate-entities --docs <DOMAIN-DOCS> --out <OUTPUT-ROOT>`
+7. `/speckit.taskstoissues <JIRA-KEY>`
+8. `/speckit.implement`
+9. `/speckit.taskclose <JIRA-KEY>`
+10. `/speckit.codereview <JIRA-KEY>`

@@ -1,0 +1,128 @@
+---
+title: "speckit.taskcompletion"
+description: "Generate or update Task completion markdown under the parent Story folder using the task template. Use task template when reference is a task id; otherwise use story completion template. Places file at the exact path: docs/work-items/03.completation/linked/stories/<STORY>/tasks/<TASK>/completion.md"
+tags:
+  - task
+  - completion
+  - traceability
+inputs:
+  - name: reference_id
+    description: "Jira reference id (e.g., AC-28 or AC-28-01). If a task id (has additional suffix), create task completion; otherwise create story completion."
+    required: true
+  - name: title
+    description: "Title of the story or task"
+    required: false
+  - name: summary
+    description: "Short summary of delivered work"
+    required: false
+  - name: changes
+    description: "List of changed files and code locations (paths)"
+    required: false
+  - name: mrs
+    description: "Workspace and project MR URLs (comma separated)"
+    required: false
+---
+
+Behavior:
+- If `reference_id` matches task pattern (contains a dash suffix like `AC-28-01` or has more than one hyphen part), treat as Task. Create or update file:
+  `docs/work-items/03.completation/linked/stories/<PARENT-STORY>/tasks/<TASK>/completion.md`.
+- Otherwise treat as Story and create/update:
+  `docs/work-items/03.completation/linked/stories/<STORY>/completion.md`.
+
+Templates to use (replace placeholders):
+
+Task template (use when reference is a task id):
+
+```
+# {TASK_ID} — Task Completion
+
+## Summary
+
+- **Task:** {TASK_ID}
+- **Related Story:** {STORY_ID}
+- **Title:** {TITLE}
+- **Status:** Completed — ready for review
+
+## Description
+
+- {SUMMARY}
+
+## Acceptance Criteria
+
+- {LIST_AOC}
+
+## Implementation Notes
+
+- Files changed and rationale:
+  - {CHANGES}
+
+## Tests
+
+- Automated tests: {TESTS}
+- Manual verification steps:
+  1. ...
+
+## Traceability
+
+- Jira: https://nexttoptech.atlassian.net/browse/{STORY_ID}
+- Workspace MR: {WORKSPACE_MR}
+- Project MR: {PROJECT_MR}
+
+## Source Files
+
+- {CHANGES}
+
+## Sign-off
+
+- Developer:
+- Reviewer:
+```
+
+Story template (use when reference is a story id):
+
+```
+# {STORY_ID} — Completion Report
+
+## Summary
+
+- **Story:** {STORY_ID}
+- **Title:** {TITLE}
+- **Status:** Completed — ready for review
+
+## What Was Delivered
+
+- {SUMMARY}
+
+## Acceptance Criteria (AoC)
+
+- {LIST_AOC}
+
+## Verification Steps
+
+- Automated tests and manual verification steps
+
+## Traceability
+
+- Jira: https://nexttoptech.atlassian.net/browse/{STORY_ID}
+- Workspace MR: {WORKSPACE_MR}
+- Project MR: {PROJECT_MR}
+
+## Source Files / Links
+
+- {CHANGES}
+
+## Lessons Learned / Notes
+
+- ...
+
+## Sign-off
+
+- Developer:
+- Reviewer:
+- PO:
+```
+
+Usage notes:
+- Ensure `changes` contains workspace-relative paths.
+- If `reference_id` is a task id but the parent story cannot be inferred, ask the user for the parent story id.
+- Always add or update the `Traceability` section with MR URLs if provided in `mrs`.

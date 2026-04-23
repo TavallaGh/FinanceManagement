@@ -116,6 +116,12 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **Core development**: Implement models, services, CLI commands, endpoints
    - **Integration work**: Database connections, middleware, logging, external services
    - **Polish and validation**: Unit tests, performance optimization, documentation
+   - **Entity folder naming (mandatory)**: entity-centric folders must be named by exact entity names
+   - **Frontend response-key model (mandatory)**: use `GlobalResponseKey` for all frontend response outcomes (not only errors)
+   - **Response key naming (mandatory)**:
+     - `ERROR_<Entity>_<StateOrReason>`
+     - `INFOMATION_<Entity>_<StateOrEvent>`
+   - **Mandatory implementation gate**: logging + error handling are required at endpoint/handler/service boundaries; code without both is not acceptable
 
 8. Progress tracking and error handling:
    - Report progress after each completed task

@@ -23,6 +23,13 @@ Run a **review-only operational flow** for a Jira task that is declared implemen
 6. Pull MR metadata and changes.
 7. Perform review (general + .NET focused):
    - Architecture/layering consistency
+  - Entity-centric folder naming consistency (folders named by exact entity names)
+  - Frontend response-key policy compliance (`GlobalResponseKey` usage for all response outcomes)
+  - Response-key naming convention compliance:
+    - `ERROR_<Entity>_<StateOrReason>`
+    - `INFOMATION_<Entity>_<StateOrEvent>`
+  - Mandatory logging coverage at endpoint/handler/service boundaries
+  - Mandatory error-handling coverage at endpoint/handler/service boundaries
    - Security and secrets exposure
    - Config/runtime correctness
    - Dependency pinning and package hygiene
@@ -51,6 +58,8 @@ Run a **review-only operational flow** for a Jira task that is declared implemen
 - Never post duplicate comments (idempotent check by tag/body hash).
 - Never post outside configured Jira/GitLab scope.
 - Stop on API auth failures with remediation hints.
+- Missing required logging or missing required error handling in changed implementation code is at least `High` severity.
+- Missing response-key convention or non-key-based frontend response contracts is at least `High` severity.
 
 ## Suggested output structure
 

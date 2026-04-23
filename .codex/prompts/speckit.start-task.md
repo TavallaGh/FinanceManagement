@@ -1,0 +1,155 @@
+---
+description: Start a task in documentation-first mode. Generate domain design docs or a production-grade implementation plan only, then gate coding on TL approval.
+handoffs:
+  - label: Execute Implementation
+    agent: speckit.implement
+    prompt: Start implementation only after TL-approved implementation plan/domain artifacts are complete and repository targets are explicit.
+    send: true
+---
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+You **MUST** consider the user input before proceeding (if not empty).
+
+## Intent
+
+Use this prompt whenever a task markdown file is provided and the team wants to start a task.
+
+This prompt is a **documentation-first gate**. It must not generate code. It prepares required markdown artifacts and approval checkpoints before `/speckit.implement` is allowed.
+
+The implementation plan produced here must be **production-grade and execution-ready** (not generic), with complete TDD and BDD coverage mapping and explicit repository targets.
+
+## Outline
+
+1. Parse input and resolve task context:
+   - Accept task ID, task markdown path, or task markdown content.
+   - Determine the authoritative task file in docs/work-items.
+   - If task file cannot be resolved, stop and ask for a valid task file.
+
+2. Confirm phase and scope:
+   - Enforce that current execution is in task start mode (pre-code implementation).
+   - Enforce that this phase produces only documentation artifacts.
+   - If user requests coding in this phase, stop and redirect to post-approval implementation flow.
+
+3. Load required references:
+   - **Required**: task markdown file provided by user.
+   - **Required**: related plan/spec artifacts for the same task/story (if available).
+   - **Required**: DoD, TDD, BDD acceptance and test references for the task.
+   - **Required**: repository context from user prompt or task artifacts:
+     - workspace/process repository target
+     - product code repository target(s)
+     - module/service paths expected to change
+   - **Required**: governance and architecture rules:
+     - AGENTS.md
+     - docs/workflows/git-workflow-flows.md
+     - docs/workflows/specify-codex-flow.md
+     - .specify/memory/constitution.md
+     - docs/architecture/ddd-domain-conventions.md
+     - docs/architecture/security-implementation-review-rules.md
+   - **Required for Jira/GitLab flow tasks**: .codex/prompts/speckit.taskstoissues.md
+
+4. Enforce task readiness package completeness:
+   - Validate task markdown has clear:
+     - AoC
+     - DoD
+     - Test Cases
+     - Goal Of Task
+     - Problem-To-Solve
+   - Validate DoD/TDD/BDD are review-ready and testable.
+   - Validate traceability expectations are present (Jira <-> GitLab issue <-> MR links where applicable).
+   - Validate Fix Version target is `V 0.1 (MVP)` when task uses Jira metadata.
+   - If any item is missing, stop and produce a remediation checklist.
+
+5. Classify task type and choose documentation output:
+   - Determine whether task is a **Domain Design task**.
+   - Domain Design task indicators include terms like `domain`, `data model`, `entity`, `aggregate`, `schema`, or explicit domain-design scope.
+   - If task is a Domain Design task:
+     - Generate markdown-only domain artifacts (no code):
+       - Domain model summary
+       - Domain DB diagram markdown (Mermaid ER or equivalent markdown diagram)
+       - Entity property dictionary
+       - Source traceability map
+     - Store artifacts under:
+       - `docs/work-items/00.refienment/JiraStory/<PARENT-STORY-KEY>/domain-design/`
+     - Required markdown sections for each domain artifact:
+       - `Table` section for entities/relations
+       - `Property Descriptions` section for every property and why it exists
+       - `Source Traceability` section showing the source document/requirement for each field
+   - If task is **not** a Domain Design task:
+     - Generate task implementation plan markdown only (no code) and ensure it is production-ready:
+       - scope and assumptions
+       - repository routing matrix (workspace repo vs product repo, exact paths/modules)
+       - mandatory per-domain hierarchy map (`01.Domain` / `02.Application` / `03.Infra` / `04.Presentation`) for the target domain
+       - entity-centric folder naming map where folder names are exact entity names
+       - implementation steps and dependencies
+       - code-level implementation blueprint (files/classes/interfaces/contracts to create/update; no source code)
+       - data model/migration impact (if any)
+       - security/privacy controls and abuse-case checks
+       - observability requirements (logs/metrics/traces), including method-level logging for user-domain operations
+      - global response-key model using `GlobalResponseKey` for all frontend responses (errors and information)
+       - response key naming catalog using required patterns:
+         - `ERROR_<Entity>_<StateOrReason>`
+         - `INFOMATION_<Entity>_<StateOrEvent>`
+       - TDD plan with test-first execution order and test case mapping
+       - BDD scenarios with Given/When/Then and expected evidence
+       - rollout, rollback, and feature-flag strategy (if relevant)
+     - Store plan under implementation work-items task folder.
+
+5.1 Production-ready quality gate for non-domain plans:
+   - Plan must be specific enough that `/speckit.implement` can create real production code without guessing missing architecture details.
+   - Every AoC/DoD/Test Case must map to implementation and verification items.
+  - Plan must include mandatory logging + error-handling strategy for endpoint/handler/service boundaries.
+   - If plan is vague, generic, or missing repository/file targeting, stop and return a remediation checklist.
+
+6. Enforce domain design rules in generated docs:
+   - Domain design docs must follow confirmed DDD conventions.
+   - Require alignment with docs/architecture/ddd-domain-conventions.md.
+   - Require audited entity and UTC audit naming consistency where applicable.
+   - Require no business invariants in handlers/endpoints; domain invariants must stay in rich domain model.
+   - If violations are detected in generated docs, stop and return required corrections.
+
+7. TL approval gate (mandatory):
+   - Summarize all loaded and generated docs for review.
+   - Ask for explicit TL approval status for the documentation package.
+   - **Hard gate**: If TL approval is not explicit, do not start implementation and do not generate code.
+   - On non-approval, return only:
+     - missing/failed items
+     - required updates
+     - exact approval request checklist
+
+8. Post-approval handoff behavior:
+  - After explicit TL approval of generated docs/plan, mark task as ready for implementation.
+  - Trigger `/speckit.implement` for coding phase.
+  - Pass forward approved repository targets and plan artifact path.
+  - Respect dependency order and TDD-first execution when required.
+  - Update task progress and completion markers in task files.
+
+9. During implementation phase (handled by `/speckit.implement`):
+   - Keep implementation strictly within approved scope.
+   - Follow security and review gates from policy docs.
+   - Maintain Jira/GitLab traceability sequence and reuse-first behavior.
+   - Keep domain design implementation compliant with confirmed domain rules.
+
+10. Completion output for this prompt:
+   - Return a concise implementation start report containing:
+     - Task identity and source file
+     - Readiness checks summary
+     - Task classification (Domain Design or Non-Domain)
+     - Generated markdown artifacts and their paths
+     - TL approval confirmation reference or pending approval checklist
+     - Handoff readiness to `/speckit.implement`
+
+## Hard Rules
+
+- No code generation in task start phase.
+- No code implementation before TL-approved documentation package.
+- No skipping required docs (task, DoD, TDD, BDD, policy, domain conventions).
+- No ambiguous implementation plans. Plans must be repository-targeted and production-executable.
+- No implementation-ready plan is valid without entity folder naming rules, response-key catalog, and logging/error-handling coverage.
+- No scope drift beyond approved work-items.
+- For domain design work, always enforce previously confirmed domain rules.
+- Domain Design artifacts must be markdown and include table, property descriptions, and source traceability.
