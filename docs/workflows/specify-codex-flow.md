@@ -13,7 +13,10 @@ flowchart TD
     D --> E[/speckit.tasks/]
     D --> F[/speckit.checklist/]
     E --> G[/speckit.analyze/]
-    E --> H[/speckit.implement/]
+    E --> GE[/speckit.generate-entities/]
+    E --> ST[/speckit.start-task/]
+    GE --> H[/speckit.implement/]
+    ST --> H[/speckit.implement/]
     E --> I[/speckit.taskstoissues/]
     H --> J[/speckit.taskclose/]
 ```
@@ -33,11 +36,18 @@ flowchart TD
   - Produces `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`.
 - `/speckit.tasks`
   - Generates dependency-ordered `tasks.md` grouped by user story.
-  - Can hand off to `/speckit.analyze` and `/speckit.implement`.
+  - Can hand off to `/speckit.analyze` and `/speckit.start-task`.
+- `/speckit.start-task`
+  - Documentation-first task gate before implementation.
+  - Generates either domain-design markdown artifacts or a production-grade implementation plan.
+  - Requires explicit repository targeting and executable TDD/BDD plan details.
+  - Requires explicit TL approval before implementation can begin.
 - `/speckit.analyze`
   - Performs cross-artifact consistency checks (`spec.md`, `plan.md`, `tasks.md`).
 - `/speckit.implement`
-  - Executes the implementation plan according to generated tasks.
+  - Executes the TL-approved implementation plan in the related target repo(s).
+  - Delivers real production-ready code with TDD-first execution and BDD acceptance validation.
+  - Enforces traceability from AoC/DoD/Test Cases to code and tests.
 - `/speckit.taskstoissues`
   - Executes Jira/GitLab task workflow (not only generation).
   - Updates Jira status and performs GitLab operations using loaded tokens.
@@ -115,6 +125,29 @@ flowchart LR
   - Commit references
   - Validation notes and rollback notes
 
+  ## Task Start Artifacts (Mandatory)
+
+  Before implementation coding starts, `/speckit.start-task` must generate markdown artifacts and pass TL approval:
+
+  - Domain Design task:
+    - Location: `docs/work-items/00.refienment/JiraStory/<PARENT-STORY-KEY>/domain-design/`
+    - Required sections in each markdown artifact:
+      - `Table`
+      - `Property Descriptions`
+      - `Source Traceability`
+    - Required artifact set:
+      - Domain model summary
+      - Domain DB diagram markdown
+      - Entity property dictionary
+      - Source traceability map
+  - Non-domain task:
+    - Location: implementation work-items task folder
+    - Required artifact: task implementation plan markdown
+      - Scope and assumptions
+      - Implementation steps and dependencies
+      - TDD/BDD verification plan
+      - Risks and rollback notes
+
   ## Commit Policy in Operational Flow
 
   - Agent should create a commit after each logical change set.
@@ -148,4 +181,6 @@ flowchart LR
 - All paths are treated as absolute by the scripts.
 - `plan.md` is required before task generation.
 - `tasks.md` is required before implementation mode.
+- `start-task` TL-approved artifacts are required before `implement` mode.
+- Implementation plans must be repository-targeted and production-executable (not generic).
 - Branch creation and spec bootstrap must run once per feature request.

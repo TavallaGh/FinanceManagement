@@ -142,6 +142,8 @@ Each Module MUST:
 Domain structure standard (mandatory):
 
 - Use `Domain/<EntityName>/` as the root per business entity.
+- Folder names for entity-centric code MUST be the exact entity name (PascalCase) and MUST NOT use ambiguous aliases.
+- Entity folders must stay consistent across related layers where applicable (for example Domain/Application/Infrastructure feature grouping).
 - Under each entity root, organize as needed into:
   - `Entities/`
   - `Enums/`
@@ -206,6 +208,18 @@ Result Pattern (mandatory):
 - All command/query outcomes must use Result Pattern.
 - Use shared Result and Option abstractions from `src/Frameworks/Accounting.Frameworks`.
 - Backends must return structured failures with code + localization key, not translated text.
+
+Frontend response key contract (mandatory):
+
+- `GlobalResponseKey` (or equivalent response key enum) is the canonical key source for ALL backend-to-frontend responses, not only failures.
+- Response keys must be used for success/information and error outcomes.
+- Required key naming structure:
+  - `ERROR_<Entity>_<StateOrReason>`
+  - `INFOMATION_<Entity>_<StateOrEvent>`
+- Example keys:
+  - `ERROR_User_VlidationFailed`
+  - `INFOMATION_USER_CREATED`
+- No raw message-only response contracts are allowed.
 
 Rich Domain Modeling (mandatory):
 
@@ -299,6 +313,13 @@ Logging MUST:
 - Be structured (Serilog)
 - Include CorrelationId
 - Avoid logging sensitive data
+
+Implementation logging and error-handling gate (mandatory):
+
+- Logging and error handling are required in every implementation task.
+- Endpoint, handler, and service boundaries must include explicit error handling and response-key mapping.
+- User-facing API responses must be key-based and deterministic.
+- Code without proper logs and error handling is NOT acceptable and must be rejected in review.
 
 Health checks MUST include:
 

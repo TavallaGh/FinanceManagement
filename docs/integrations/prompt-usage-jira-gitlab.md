@@ -2,6 +2,7 @@
 
 Use the prompt `.codex/prompts/speckit.taskstoissues.md` from Copilot Chat to run the Jira → GitLab workflow.
 
+Use `.codex/prompts/speckit.start-task.md` to run task-start in documentation-first mode before implementation coding.
 Use `.codex/prompts/speckit.taskclose.md` to finalize task documentation after implementation.
 
 Use `.claude/commands/speckit.codereview.md` to start reviewer-led code review after the task is declared done.
@@ -18,6 +19,21 @@ Use `.claude/commands/speckit.codereview.md` to start reviewer-led code review a
 - Adds bi-directional links between Jira and GitLab
 - Creates/reuses source branch and aligns target branch with Git workflow v1.2
 - Checks out and syncs the local source branch
+
+
+## Task Start Gate (Before Coding)
+
+- Run `/speckit.start-task` whenever a task markdown file is attached for task start.
+- In task-start phase, code generation is not allowed.
+- Output is markdown-only and depends on task type:
+  - Domain Design task output path: `docs/work-items/00.refienment/JiraStory/<PARENT-STORY-KEY>/domain-design/`
+  - Non-domain task output path: implementation work-items task folder (task implementation plan markdown)
+- Domain Design markdown artifacts must include:
+  - `Table`
+  - `Property Descriptions` for every property and why it exists
+  - `Source Traceability` and source references for each field
+- TL approval of generated documentation is a hard gate.
+- `/speckit.implement` can start only after TL approval is explicit.
 
 ## Jira Kanban behavior (AC board)
 
@@ -96,6 +112,16 @@ In Copilot Chat, run one of these:
 
 ```text
 /speckit.taskstoissues https://nexttoptech.atlassian.net/browse/AC-2
+```
+
+Task start documentation gate:
+
+```text
+/speckit.start-task AC-27
+```
+
+```text
+/speckit.start-task docs/work-items/01.solution/linked/stories/AC-13/tasks/AC-27.md
 ```
 
 Task completion documentation:
