@@ -43,6 +43,13 @@
 - Added endpoints: <list>
 - Updated endpoints: <list>
 - Removed endpoints: <list>
+- Endpoint mapper files: <list>
+- Endpoint contract compliance (mandatory for endpoint tasks):
+	- Group prefix used with `MapGroup("/api/v1/...")`: <yes/no>
+	- Child routes under group are relative (no leading slash): <yes/no>
+	- Each endpoint has explicit `Produces` and `WithDescription`: <yes/no>
+	- Each endpoint has explicit `RequireAuthorization(...)`: <yes/no>
+	- Endpoint handlers remain thin (no business/data access logic): <yes/no>
 
 ## Validation & Review Notes
 

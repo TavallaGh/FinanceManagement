@@ -18,6 +18,12 @@
 
 - Postman collection path: <path>
 - Endpoint groups: <list>
+- Endpoint mapper files: <list>
+- Endpoint contract notes:
+	- group prefixes (`MapGroup`) used
+	- child route style (relative under group)
+	- authorization policy approach (`RequireAuthorization` usage)
+	- response contract coverage (`Produces` statuses)
 
 ## Operational Notes
 

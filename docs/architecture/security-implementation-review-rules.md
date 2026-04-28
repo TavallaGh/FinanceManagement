@@ -48,6 +48,12 @@ Mandatory policy:
 - All access-control decisions must run server-side.
 - Scope checks (Company/FiscalYear/Office or equivalent domain scope) are mandatory where applicable.
 
+Endpoint-definition security constraints (mandatory):
+- Grouped endpoints must use explicit API prefixes and child routes must be relative (no leading slash on child mappings).
+- Every endpoint must explicitly declare authorization policy/permission; implicit unsecured defaults are forbidden.
+- Endpoint-level permission checks must be least-privilege and operation-specific.
+- Admin-only operations must use explicit admin policy, not broad wildcard access.
+
 ## 2.2 Token and Session Security
 
 - Use standard token validation middleware; do not implement custom token parsing.
@@ -87,6 +93,8 @@ Mandatory policy:
 Every PR review must verify and report:
 - Authentication coverage for new/changed endpoints.
 - Authorization policy and object-level access checks.
+- Endpoint route safety checks (group prefix correctness and no absolute child route leakage).
+- Endpoint contract clarity (`Produces`, status coverage, and deterministic error mapping).
 - Cryptography usage and forbidden algorithms check.
 - Secrets handling (no hard-coded credentials/keys/tokens).
 - Logging safety (no sensitive leakage).

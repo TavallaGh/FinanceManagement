@@ -1,0 +1,151 @@
+{
+  "info": {
+    "name": "AC-13 - User Management APIs",
+    "description": "Story-level API rollup collection updated during AC-29 task close.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get User Permissions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sso/users/{{userId}}/permissions?layer=2&index=0&size=Ten",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "sso",
+            "users",
+            "{{userId}}",
+            "permissions"
+          ],
+          "query": [
+            {
+              "key": "layer",
+              "value": "2"
+            },
+            {
+              "key": "index",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "Ten"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Current User Permissions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sso/users/me/permissions?layer=2&index=0&size=Ten",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "sso",
+            "users",
+            "me",
+            "permissions"
+          ],
+          "query": [
+            {
+              "key": "layer",
+              "value": "2"
+            },
+            {
+              "key": "index",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "Ten"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Grant Direct Permissions",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 100,\n  \"grantUserPermissionDetails\": [\n    {\n      \"layer\": 2,\n      \"permissionResourceCodeTypes\": 10001,\n      \"permissionActions\": [2, 3]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sso/users/permissions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "sso",
+            "users",
+            "permissions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Search Permissions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sso/permissions?query=10001&index=0&size=Ten",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "sso",
+            "permissions"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "10001"
+            },
+            {
+              "key": "index",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "Ten"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:5001"
+    },
+    {
+      "key": "userId",
+      "value": "100"
+    }
+  ]
+}
