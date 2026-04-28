@@ -260,6 +260,23 @@ Modules/Ledgers/Features/CreateLedger/
 - No business logic inside endpoint.
 - No data access inside endpoint.
 
+Mandatory endpoint definition standard (for all endpoint-creation tasks):
+
+- Define endpoint classes as static endpoint mappers (for example `UserEndpoints`, `PermissionEndpoints`).
+- Use `MapGroup("/api/v1/...<module-prefix>")` with `.WithGroupName(AppConst.SwaggerGroupDefinitions)`.
+- Child route mappings under a group MUST be relative. Leading slash in child routes is forbidden.
+- Every mapped route MUST include explicit `.WithDescription(...)` and explicit `.Produces(...)` contracts for success and error statuses.
+- Every mapped route MUST include explicit authorization (`RequireAuthorization(...)`) with least privilege policy/permission.
+- Prefer permission-key based policies for business operations and dedicated named policy for admin-only operations.
+- Keep endpoint handlers thin: compose request DTO/query params, call mediator/service, return result.
+- Endpoint handlers MUST include structured logging and deterministic exception-to-response mapping.
+- Endpoint handlers MUST NOT parse or validate JWT manually; rely on configured authentication middleware.
+
+Reference implementation source-of-truth:
+
+- `projects/accounting-sso/src/04.Presentation/IDP/Erp.Sso.Ids/Endpoints/UserEndpoints.cs`
+- `projects/accounting-sso/src/04.Presentation/IDP/Erp.Sso.Ids/Endpoints/PermissionEndpoints.cs`
+
 Endpoint responsibility:
 
 - Receive request
@@ -270,6 +287,14 @@ Processing chain:
 
 - Minimal API endpoint -> Handler -> Service(s) -> Repository
 - Domain business rules must be implemented in rich Domain (services coordinate infrastructure/application concerns).
+
+Endpoint creation review checklist (mandatory):
+
+- Verify route group prefix and relative child routes.
+- Verify each endpoint has explicit response contracts and description.
+- Verify each endpoint has explicit authorization policy and deny-by-default behavior.
+- Verify no business/data-access logic leaks into endpoint methods.
+- Verify logging and exception mapping are present in endpoint handlers.
 
 ---
 

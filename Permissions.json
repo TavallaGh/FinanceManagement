@@ -1,0 +1,705 @@
+[
+    {
+        "id": "e5e048d3-193c-4320-a64f-ea97b02e57e7",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "doc_types",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "b76e81ed-a419-4872-b495-183a7d14dabd",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "parties",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change",
+            "assign_detail"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "523a3460-7071-4e8d-8df4-f05363748876",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "tr_requests",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "4ce547e9-5210-401b-b42f-a7d48bbaf3f0",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "gl_settings",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "6ea67b6b-a837-45fc-b6a7-62942e953b93",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "gl_reports",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "0a0eaeca-b4e5-4ecc-9dda-a653f60d7669",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "details",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "e20ff263-f161-433f-af9c-3665589c3a4c",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "roles",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "202190e7-a7fd-4430-928c-21f998a9ba90",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "org_info",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "ffd869c7-bcfc-44ad-b153-802d669c6957",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "review_req",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "883eb6d0-0cfb-4810-8d3d-9bc8d3048ad7",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "doc_list",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export"
+        ],
+        "data_scopes": {
+            "allowed_ledgers": [
+                "4"
+            ],
+            "allowed_branches": [
+                "804ea6c6-d7e9-4a7d-9cb1-3b810967c712",
+                "e92e8ff1-c7fc-4380-85d0-520995a5dff8",
+                "c2dbe35c-7f84-448b-9394-437a02c13931"
+            ],
+            "allowed_doctypes": [
+                "sys_general"
+            ]
+        }
+    },
+    {
+        "id": "174a9c9c-9713-494a-b1d5-179f9ec21e05",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "acc_review",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "318d96f8-38e0-4977-adb9-1cad5c11fe18",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "org_chart",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change",
+            "design"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "ac29a5c7-0201-4775-b9c4-36a7f31d8380",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "payment_req",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "e1c2e355-b206-4fd8-8771-2d8e7008f7de",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "branches",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "f00d416c-7a87-48a0-83e8-bb03a053757a",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "projects",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change",
+            "assign_detail"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "3eeb320f-ec20-4697-bdec-e2a774b6c50a",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "acc_structure",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change",
+            "design_tree"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "9965b0a1-cda1-4732-814f-e531eaeed03c",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "gl",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "32ac16f2-a7b2-441f-849c-afed702e70bd",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "std_desc",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "ec4ccd43-57a3-47fa-b719-4578a4a3bc05",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "ledgers",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "4e201f78-aee6-4621-a259-4bb7ef43d5a3",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "base_info_root",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "f6e4f5cb-4e37-4c59-aa06-d34d04f5aebf",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "auto_num",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "6f10b300-2e21-4abd-adc9-c323b7ea913b",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "doc_finalize",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "47365274-e5a2-41e1-b53a-075a9a4a16db",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "my_requests",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "632826c1-6f57-4ed9-b642-f3cd05be6a72",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "year_end_setup",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "b8924adb-3ed6-4e91-af67-907bac47502c",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "fiscal_periods",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change",
+            "manage_periods"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "57d9e033-91f2-47b0-ac88-e85ddd653146",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "rep_voucher_items",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "e8a7d93c-915b-46b3-9f7e-e0de011b59b3",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "gl_base_info",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "c1d3e55d-b395-434e-8b47-b3e22885da37",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "print_req",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "ab1500c4-4e4b-4ab2-a58a-e8815d6d8b9f",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "gl_docs",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "e3c7e173-b600-443f-a4eb-d1447b0be266",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "users_list",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "72f6eefa-a651-4a6f-8020-64cc8ee7c402",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "print_doc",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "418f6b50-60ea-456d-a594-dcc0bd12a24a",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "permissions",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "e83364a9-2d44-468e-a67a-b9093ef1b1b5",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "cost_centers",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change",
+            "assign_detail"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "0b4c85b1-1589-4e81-bd22-5e4bcbc022e5",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "rep_trial_balance",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "704894a9-99ed-4d55-86cd-d3eab0a87a86",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "rep_voucher_stats",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "47519bb4-493a-42e6-a0cb-e5d6e7ca3cd2",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "doc_review",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "a1f88b45-990e-4114-bc82-9f54be4573e8",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "voucher_list_view",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change"
+        ],
+        "data_scopes": {}
+    },
+    {
+        "id": "604df256-f4c4-4807-a33e-b0e41f05cf0c",
+        "role_id": "99322c3b-4230-4dbc-b1ae-ec6afaa3fbee",
+        "user_id": null,
+        "resource_code": "currency_settings",
+        "actions": [
+            "create",
+            "view",
+            "edit",
+            "delete",
+            "print",
+            "import",
+            "export",
+            "attach",
+            "status_change",
+            "manage_rates",
+            "update_rates",
+            "rates_history"
+        ],
+        "data_scopes": {}
+    }
+]

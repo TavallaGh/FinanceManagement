@@ -19,7 +19,7 @@
 |---|---|---|---|---|
 | AC-27 | BE | <TBD> | <TBD> | To Do |
 | AC-28 | BE | <TBD> | <TBD> | To Do |
-| AC-29 | BE | <TBD> | <TBD> | To Do |
+| AC-29 | BE | features/ac-29-be-03-direct-permission-management-apis | workspace: https://gitlab.com/next-top-tech/accounting/accounting-workspace/-/merge_requests/15 ; project: https://gitlab.com/next-top-tech/accounting/accounting-sso/-/merge_requests/4 | In Progress |
 | AC-30 | BE | <TBD> | <TBD> | To Do |
 | AC-31 | FE | <TBD> | <TBD> | To Do |
 | AC-32 | FE | <TBD> | <TBD> | To Do |
@@ -40,8 +40,20 @@
 
 ## API Rollup (if any)
 
-- Postman collection: <TBD>
-- Endpoints impacted: <TBD>
+- Postman collection: docs/work-items/02.implementation/stories/AC-13/postman/AC-13.postman_collection.json
+- Endpoints impacted:
+	- projects/accounting-sso/src/04.Presentation/IDP/Erp.Sso.Ids/Endpoints/UserEndpoints.cs
+		- GET /api/v1/sso/users
+		- POST /api/v1/sso/users
+		- PUT /api/v1/sso/users/{userId:int}
+		- POST /api/v1/sso/users/{userId:int}/deactivate
+		- DELETE /api/v1/sso/users/{userId:int}
+		- POST /api/v1/sso/users/{userId:int}/reset-password
+		- GET /api/v1/sso/users/{userId:int}/permissions
+		- POST /api/v1/sso/users/permissions
+		- GET /api/v1/sso/users/me/permissions
+	- projects/accounting-sso/src/04.Presentation/IDP/Erp.Sso.Ids/Endpoints/PermissionEndpoints.cs
+		- GET /api/v1/sso/permissions
 
 ## Validation
 

@@ -33,7 +33,14 @@
 ## API Rollup (if any)
 
 - Postman collection: <path>
-- Endpoints impacted: <list>
+- Endpoints impacted:
+	- <file path>
+		- <METHOD route>
+
+Endpoint documentation rule for endpoint-creation tasks:
+- Document exact grouped routes as implemented (no shorthand).
+- Include module endpoint mapper file path(s).
+- Ensure child routes are documented relative to their group prefix in code and fully expanded in docs.
 
 ## Validation
 

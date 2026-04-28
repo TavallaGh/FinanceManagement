@@ -23,13 +23,20 @@ Run a **review-only operational flow** for a Jira task that is declared implemen
 6. Pull MR metadata and changes.
 7. Perform review (general + .NET focused):
    - Architecture/layering consistency
-  - Entity-centric folder naming consistency (folders named by exact entity names)
-  - Frontend response-key policy compliance (`GlobalResponseKey` usage for all response outcomes)
-  - Response-key naming convention compliance:
-    - `ERROR_<Entity>_<StateOrReason>`
-    - `INFOMATION_<Entity>_<StateOrEvent>`
-  - Mandatory logging coverage at endpoint/handler/service boundaries
-  - Mandatory error-handling coverage at endpoint/handler/service boundaries
+   - Endpoint definition contract compliance for Minimal API tasks
+   - Endpoint contract details check:
+     - endpoint mapper class pattern under module presentation
+     - grouped route prefix pattern (`MapGroup("/api/v1/...")`)
+     - no leading slash on child routes under a group
+     - explicit `Produces` and `WithDescription` on each mapped endpoint
+     - explicit `RequireAuthorization(...)` on each protected endpoint
+   - Entity-centric folder naming consistency (folders named by exact entity names)
+   - Frontend response-key policy compliance (`GlobalResponseKey` usage for all response outcomes)
+   - Response-key naming convention compliance:
+     - `ERROR_<Entity>_<StateOrReason>`
+     - `INFOMATION_<Entity>_<StateOrEvent>`
+   - Mandatory logging coverage at endpoint/handler/service boundaries
+   - Mandatory error-handling coverage at endpoint/handler/service boundaries
    - Security and secrets exposure
    - Config/runtime correctness
    - Dependency pinning and package hygiene
@@ -60,6 +67,7 @@ Run a **review-only operational flow** for a Jira task that is declared implemen
 - Stop on API auth failures with remediation hints.
 - Missing required logging or missing required error handling in changed implementation code is at least `High` severity.
 - Missing response-key convention or non-key-based frontend response contracts is at least `High` severity.
+- Endpoint security contract violation (missing auth policy or absolute child route leakage) is at least `High` severity.
 
 ## Suggested output structure
 

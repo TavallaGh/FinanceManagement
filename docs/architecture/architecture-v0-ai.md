@@ -251,6 +251,25 @@ app.MapLedgersEndpoints();
 
 Host MUST NOT contain business routing logic.
 
+### Endpoint Definition Contract (Mandatory)
+
+For any task that creates or changes endpoints, implementation MUST follow this contract:
+
+* Define endpoints in dedicated static mapper classes under module presentation (for example `UserEndpoints`, `PermissionEndpoints`).
+* Use grouped routing with explicit module prefix, for example `MapGroup("/api/v1/sso/users")`.
+* Child route templates under group MUST be relative (no leading `/`).
+* Each endpoint MUST declare:
+  * explicit response contracts (`Produces`)
+  * explicit operation description (`WithDescription`)
+  * explicit authorization (`RequireAuthorization`)
+* Endpoint methods MUST remain thin orchestration only (request binding, mediator/service dispatch, response mapping).
+* Structured logs and deterministic exception mapping are required at endpoint boundary.
+
+Reference implementation:
+
+* `projects/accounting-sso/src/04.Presentation/IDP/Erp.Sso.Ids/Endpoints/UserEndpoints.cs`
+* `projects/accounting-sso/src/04.Presentation/IDP/Erp.Sso.Ids/Endpoints/PermissionEndpoints.cs`
+
 ---
 
 # 8. CQRS Architecture
