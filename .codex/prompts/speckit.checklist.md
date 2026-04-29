@@ -1,5 +1,5 @@
 ---
-description: Generate a custom checklist for the current feature based on user requirements.
+description: Generate a custom requirements-quality checklist. When a Jira story key is provided (e.g. AC-14), saves output to docs/work-items/00.refinement/linked/stories/<KEY>/checklists/. Otherwise saves to the current feature specs directory.
 ---
 
 ## Checklist Purpose: "Unit Tests for English"
@@ -33,9 +33,20 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Execution Steps
 
-1. **Setup**: Run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS list.
-   - All file paths must be absolute.
-   - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Setup**: Determine output directory based on `$ARGUMENTS`:
+
+   **If `$ARGUMENTS` contains a Jira story key pattern (e.g. `AC-14`, `AC-123`)**:
+   - Extract the story key (e.g. `AC-14`)
+   - Set `CHECKLIST_DIR` = `docs/work-items/00.refinement/linked/stories/{STORY_KEY}/checklists/`
+   - Also read the refinement artifact at `docs/work-items/00.refinement/linked/stories/{STORY_KEY}/refinement.md` if it exists, and use it as primary source context for generating the checklist.
+   - Use it alongside any available `spec.md`, `plan.md`, `tasks.md` in `specs/` directories.
+
+   **Otherwise (no story key — free-form feature mode)**:
+   - Run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS list.
+   - Set `CHECKLIST_DIR` = `{FEATURE_DIR}/checklists/`
+
+   All file paths must be absolute.
+   For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **Clarify intent (dynamic)**: Derive up to THREE initial contextual clarifying questions (no pre-baked catalog). They MUST:
    - Be generated from the user's phrasing + extracted signals from spec/plan/tasks
@@ -87,7 +98,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - If source docs are large, generate interim summary items instead of embedding raw text
 
 5. **Generate checklist** - Create "Unit Tests for Requirements":
-   - Create `FEATURE_DIR/checklists/` directory if it doesn't exist
+   - Create `CHECKLIST_DIR` directory if it doesn't exist
    - Generate unique checklist filename:
      - Use short, descriptive name based on domain (e.g., `ux.md`, `api.md`, `security.md`)
      - Format: `[domain].md`
