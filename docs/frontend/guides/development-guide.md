@@ -100,6 +100,7 @@ Example:
 ## Styling Rules
 
 - Use design tokens.
+- Use the shared typography tokens from `public/styles/tokens/_typography.scss` instead of local font-size ramps.
 - Use logical properties for RTL and LTR support.
 - Avoid hardcoded colors, spacing, and shadows.
 - Keep styles local unless they are true global primitives.
@@ -130,7 +131,16 @@ npm run graph
 - App features live in `apps/erp-web/src/app/features/`.
 - App-wide infrastructure lives in `apps/erp-web/src/app/core/`.
 - App-scoped reusable helpers live in `apps/erp-web/src/app/shared/`.
+- Internal component docs and story-book pages live in `apps/erp-web/src/app/dev-tools/story-book/`.
 - Shared generic UI belongs in `libs/shared/ui/`.
+
+## Story Book Placement
+
+- Put shared component documentation pages under `apps/erp-web/src/app/dev-tools/story-book/`.
+- Keep story-book routes in a local `story-book.routes.ts` file.
+- Route previews from `/story-book/<component-name>`.
+- Current shared showcase routes include `/story-book/checkbox`, `/story-book/date-time-picker`, `/story-book/icon`, and `/story-book/tag`.
+- Do not place design-system preview pages under `apps/erp-web/src/app/features/`.
 
 ## Quality Checklist
 

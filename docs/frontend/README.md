@@ -32,6 +32,13 @@ npm start
 
 Application runs at `http://localhost:4200`.
 
+The internal shared-component showcase is available at:
+
+- `http://localhost:4200/story-book/checkbox`
+- `http://localhost:4200/story-book/date-time-picker`
+- `http://localhost:4200/story-book/icon`
+- `http://localhost:4200/story-book/tag`
+
 ## Common Commands
 
 ```bash
@@ -58,6 +65,12 @@ nx build erp-web --configuration=production # Production build
 ### Design
 
 - [design/design-system.md](design/design-system.md) - Design system and UI guidance
+- [design/ui-components.md](design/ui-components.md) - Shared UI component catalog and story-book references
+
+### Story Book
+
+- Shared UI previews and usage docs live under `apps/erp-web/src/app/dev-tools/story-book/`
+- Current showcase routes: `story-book/checkbox`, `story-book/date-time-picker`, `story-book/icon`, `story-book/tag`
 
 ### Localization
 
