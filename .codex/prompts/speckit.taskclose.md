@@ -2,7 +2,7 @@
 description: Finalize a task by documenting execution details, references, API collection updates, and story-level rollup artifacts.
 ---
 
-## User Input
+# User Input
 
 ```text
 $ARGUMENTS

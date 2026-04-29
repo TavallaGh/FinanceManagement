@@ -11,16 +11,16 @@
 
 - Start datetime: 2026-03-13 00:00:00 UTC
 - End datetime: <TBD>
-- Current status: To Do
+- Current status: In Progress
 
 ## Task Coverage
 
 | Task Key | Type | Branch | MR | Status |
 |---|---|---|---|---|
 | AC-27 | BE | <TBD> | <TBD> | To Do |
-| AC-28 | BE | <TBD> | <TBD> | To Do |
-| AC-29 | BE | features/ac-29-be-03-direct-permission-management-apis | workspace: https://gitlab.com/next-top-tech/accounting/accounting-workspace/-/merge_requests/15 ; project: https://gitlab.com/next-top-tech/accounting/accounting-sso/-/merge_requests/4 | In Progress |
-| AC-30 | BE | <TBD> | <TBD> | To Do |
+| AC-28 | BE | <TBD> | <TBD> | Done |
+| AC-29 | BE | features/ac-29-be-03-direct-permission-management-apis | workspace: https://gitlab.com/next-top-tech/accounting/accounting-workspace/-/merge_requests/15 ; project: https://gitlab.com/next-top-tech/accounting/accounting-sso/-/merge_requests/4 | Done |
+| AC-30 | BE | features/be-04-security-audit-and-tests | workspace: https://gitlab.com/next-top-tech/accounting/accounting-workspace/-/merge_requests/16 ; project: https://gitlab.com/next-top-tech/accounting/accounting-sso/-/merge_requests/5 | In Progress — close doc: [AC-30.md](tasks/AC-30.md) |
 | AC-31 | FE | <TBD> | <TBD> | To Do |
 | AC-32 | FE | <TBD> | <TBD> | To Do |
 | AC-33 | FE | <TBD> | <TBD> | To Do |
