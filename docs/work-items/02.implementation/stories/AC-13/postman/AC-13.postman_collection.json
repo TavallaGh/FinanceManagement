@@ -1,151 +1,304 @@
 {
   "info": {
     "name": "AC-13 - User Management APIs",
-    "description": "Story-level API rollup collection updated during AC-29 task close.",
+    "description": "Story-level API rollup collection. All requests route through the BFF gateway at {{baseUrl}} (https://localhost:7283). The __Host-bff session cookie and X-CSRF anti-forgery header are mandatory on every request. Obtain the cookie value by completing the BFF Login flow in a browser, then set the bffCookie variable.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Get User Permissions",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/sso/users/{{userId}}/permissions?layer=2&index=0&size=Ten",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "sso",
-            "users",
-            "{{userId}}",
-            "permissions"
-          ],
-          "query": [
-            {
-              "key": "layer",
-              "value": "2"
+      "name": "BFF Auth",
+      "item": [
+        {
+          "name": "BFF Login",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bff/login?returnUrl=/",
+              "host": ["{{baseUrl}}"],
+              "path": ["bff", "login"],
+              "query": [
+                { "key": "returnUrl", "value": "/", "description": "Redirect target after login" }
+              ]
             },
-            {
-              "key": "index",
-              "value": "0"
-            },
-            {
-              "key": "size",
-              "value": "Ten"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "name": "Get Current User Permissions",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/sso/users/me/permissions?layer=2&index=0&size=Ten",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "sso",
-            "users",
-            "me",
-            "permissions"
-          ],
-          "query": [
-            {
-              "key": "layer",
-              "value": "2"
-            },
-            {
-              "key": "index",
-              "value": "0"
-            },
-            {
-              "key": "size",
-              "value": "Ten"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "name": "Grant Direct Permissions",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+            "description": "Initiates OIDC login flow via BFF. Opens OIDC provider consent page. Complete in a browser; copy the __Host-bff Set-Cookie value into the bffCookie collection variable."
           }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"userId\": 100,\n  \"grantUserPermissionDetails\": [\n    {\n      \"layer\": 2,\n      \"permissionResourceCodeTypes\": 10001,\n      \"permissionActions\": [2, 3]\n    }\n  ]\n}"
         },
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/sso/users/permissions",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "sso",
-            "users",
-            "permissions"
-          ]
+        {
+          "name": "BFF Logout",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bff/logout?returnUrl=/",
+              "host": ["{{baseUrl}}"],
+              "path": ["bff", "logout"],
+              "query": [
+                { "key": "returnUrl", "value": "/", "description": "Redirect target after logout" }
+              ]
+            },
+            "description": "Terminates the current BFF session and clears the __Host-bff cookie."
+          }
+        },
+        {
+          "name": "BFF User Session",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bff/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["bff", "user"]
+            },
+            "description": "Returns the authenticated user's claims from the active BFF session."
+          }
         }
-      }
+      ]
     },
     {
-      "name": "Search Permissions",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/v1/sso/permissions?query=10001&index=0&size=Ten",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "sso",
-            "permissions"
-          ],
-          "query": [
-            {
-              "key": "query",
-              "value": "10001"
+      "name": "Users",
+      "item": [
+        {
+          "name": "Search Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users?q=&active=true&index=0&size=Ten",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users"],
+              "query": [
+                { "key": "q", "value": "", "description": "Optional search query string" },
+                { "key": "active", "value": "true", "description": "Filter by active status (true/false)" },
+                { "key": "index", "value": "0", "description": "Page index (0-based)" },
+                { "key": "size", "value": "Ten", "description": "Page size enum: Ten, Twenty, Fifty, Hundred" }
+              ]
             },
-            {
-              "key": "index",
-              "value": "0"
+            "description": "Retrieves users with optional filtering by search query and active status, and paging support."
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"john.doe\",\n  \"password\": \"P@ssw0rd!\",\n  \"email\": \"john.doe@example.com\",\n  \"externalIssuer\": null,\n  \"externalSubjectId\": null,\n  \"forceChangePassword\": false,\n  \"status\": true,\n  \"userType\": \"Standard\"\n}"
             },
-            {
-              "key": "size",
-              "value": "Ten"
-            }
-          ]
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users"]
+            },
+            "description": "Creates a new user. Returns the created user summary including its generated id."
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"john.doe.updated\",\n  \"email\": \"john.doe.updated@example.com\",\n  \"forceChangePassword\": false,\n  \"status\": true,\n  \"userType\": \"Standard\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users", "{{userId}}"]
+            },
+            "description": "Updates an existing user by id. All fields are optional; only supplied fields are applied."
+          }
+        },
+        {
+          "name": "Deactivate User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users/{{userId}}/deactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users", "{{userId}}", "deactivate"]
+            },
+            "description": "Soft-deletes (deactivates) a user account. The account is disabled but data is retained. Use Delete User for permanent removal."
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users/{{userId}}?confirm=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users", "{{userId}}"],
+              "query": [
+                { "key": "confirm", "value": "true", "description": "Must be true to execute the hard delete. Omitting or setting false returns 400." }
+              ]
+            },
+            "description": "Permanently deletes a user. Requires confirm=true query parameter as a safety guard."
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Admin-initiated reset\",\n  \"notifyUser\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users/{{userId}}/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users", "{{userId}}", "reset-password"]
+            },
+            "description": "Resets a user's password. Body is optional; if omitted, a temporary password is auto-generated and returned in the response."
+          }
+        },
+        {
+          "name": "Get User Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users/{{userId}}/permissions?layer=2&index=0&size=Ten",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users", "{{userId}}", "permissions"],
+              "query": [
+                { "key": "layer", "value": "2", "description": "PermissionLayer enum value (e.g. 2 = Accounting)" },
+                { "key": "index", "value": "0" },
+                { "key": "size", "value": "Ten" }
+              ]
+            },
+            "description": "Returns effective permissions for the specified user. Requires admin role."
+          }
+        },
+        {
+          "name": "Get Current User Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users/me/permissions?layer=2&index=0&size=Ten",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users", "me", "permissions"],
+              "query": [
+                { "key": "layer", "value": "2", "description": "PermissionLayer enum value (e.g. 2 = Accounting)" },
+                { "key": "index", "value": "0" },
+                { "key": "size", "value": "Ten" }
+              ]
+            },
+            "description": "Returns effective permissions for the currently authenticated user."
+          }
+        },
+        {
+          "name": "Grant Direct Permissions",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 100,\n  \"grantUserPermissionDetails\": [\n    {\n      \"layer\": 2,\n      \"permissionResourceCodeTypes\": 10001,\n      \"permissionActions\": [2, 3]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/users/permissions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "users", "permissions"]
+            },
+            "description": "Grants direct ACL permissions to a user. permissionActions: 1=View, 2=Create, 3=Edit, 4=Delete, 5=StatusChange."
+          }
         }
-      }
+      ]
+    },
+    {
+      "name": "Permissions",
+      "item": [
+        {
+          "name": "Search Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/permissions?query=10001&index=0&size=Ten",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "permissions"],
+              "query": [
+                { "key": "query", "value": "10001", "description": "Search query — at least 3 characters; matches permission layer, source, or key" },
+                { "key": "index", "value": "0" },
+                { "key": "size", "value": "Ten" }
+              ]
+            },
+            "description": "Searches available permission definitions. Query must be at least 3 characters and matches on layer, source, or key."
+          }
+        }
+      ]
     }
   ],
   "variable": [
     {
       "key": "baseUrl",
-      "value": "https://localhost:5001"
+      "value": "https://localhost:7283",
+      "description": "BFF gateway base URL (launchSettings https port). All SSO API calls are proxied through this gateway."
     },
     {
       "key": "userId",
-      "value": "100"
+      "value": "100",
+      "description": "Target user ID used in user-specific route segments."
+    },
+    {
+      "key": "bffCookie",
+      "value": "",
+      "description": "Value of the __Host-bff session cookie issued after BFF Login. Copy from the Set-Cookie response header and paste here. Used as: Cookie: __Host-bff={{bffCookie}}"
+    },
+    {
+      "key": "xcsrfToken",
+      "value": "1",
+      "description": "Anti-forgery token required by Duende BFF on all proxied API requests (DisableAntiForgeryCheck=false). Static value '1' per BFF specification."
     }
   ]
 }
