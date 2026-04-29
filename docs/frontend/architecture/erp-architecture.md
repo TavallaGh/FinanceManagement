@@ -72,6 +72,7 @@ Its app-level structure is:
 
 ```text
 apps/erp-web/src/app/
+├── dev-tools/
 ├── core/
 ├── features/
 └── shared/
@@ -79,6 +80,7 @@ apps/erp-web/src/app/
 
 ### App-Level Responsibilities
 
+- `dev-tools/` for internal documentation, story-book pages, and developer-only UI previews
 - `core/` for app-wide infrastructure, configuration, guards, interceptors, and core services
 - `shared/` for app-scoped reusable helpers and components
 - `features/` for ERP business modules
@@ -155,6 +157,7 @@ Practical rules:
 - Generic reusable UI belongs in `libs/shared/ui`.
 - Feature-specific UI belongs in `apps/erp-web/src/app/features/<feature>/components/`.
 - App-scoped shared pieces belong in `apps/erp-web/src/app/shared/`.
+- Internal shared-component showcases belong in `apps/erp-web/src/app/dev-tools/story-book/`.
 
 Do not create parallel folder conventions inside a feature.
 
