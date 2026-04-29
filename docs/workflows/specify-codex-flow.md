@@ -6,12 +6,12 @@ This document describes the current SpecKit workflow for Codex based on files in
 
 ```mermaid
 flowchart TD
-    A[/speckit.constitution/] --> B[/speckit.specify/]
+    A[/speckit.constitution/] --> B[/speckit.refine/]
     B --> C[/speckit.clarify/]
-    B --> D[/speckit.plan/]
+    B --> CL[/speckit.checklist/]
+    B --> D[/speckit.solution/]
     C --> D
     D --> E[/speckit.tasks/]
-    D --> F[/speckit.checklist/]
     E --> G[/speckit.analyze/]
     E --> GE[/speckit.generate-entities/]
     E --> ST[/speckit.start-task/]
@@ -23,27 +23,36 @@ flowchart TD
 
 ## Command Responsibilities
 
-- `/speckit.specify`
-  - Creates or updates feature specification from natural language.
-  - Creates a numbered feature branch and initializes `specs/<branch>/spec.md`.
-  - Produces a requirements checklist under `specs/<branch>/checklists/`.
+- `/speckit.refine`
+  - Reads `docs/work-items/00.refinement/README.md` and templates.
+  - Fetches Jira story details via API.
+  - Generates `docs/work-items/00.refinement/linked/stories/<KEY>/refinement.md`.
+  - Generates `docs/work-items/00.refinement/linked/stories/<KEY>/checklists/requirements-checklist.md`.
+  - Does NOT create Jira tasks or start solution work.
 - `/speckit.clarify`
-  - Resolves high-impact ambiguities in `spec.md`.
-  - Can hand off to `/speckit.plan`.
-- `/speckit.plan`
-  - Runs planning workflow and generates design artifacts.
-  - Uses `.specify/scripts/*/setup-plan.*` and updates agent context via `update-agent-context.*`.
-  - Produces `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`.
+  - Resolves high-impact ambiguities in refinement.
+  - Can hand off to `/speckit.solution`.
+- `/speckit.solution`
+  - Reads `docs/work-items/01.solution/README.md` and templates.
+  - Requires approved `refinement.md` as input.
+  - Generates `solution.md`, `task-plan.md`, and optional per-task `tasks/<KEY>.md` detail files.
+  - Does NOT create Jira subtasks (that is `/speckit.tasks`).
 - `/speckit.tasks`
-  - Generates dependency-ordered `tasks.md` grouped by user story.
+  - Reads Solution artifacts (`solution.md`, `task-plan.md`).
+  - Generates per-task detail files under `docs/work-items/01.solution/linked/stories/<KEY>/tasks/`.
+  - Creates Jira subtasks via API under the parent story.
+  - Updates task files with real Jira keys.
   - Can hand off to `/speckit.analyze` and `/speckit.start-task`.
+- `/speckit.checklist`
+  - When story key provided: saves checklist to `docs/work-items/00.refinement/linked/stories/<KEY>/checklists/`.
+  - When no story key: saves to `FEATURE_DIR/checklists/` (free-form feature mode).
 - `/speckit.start-task`
   - Documentation-first task gate before implementation.
   - Generates either domain-design markdown artifacts or a production-grade implementation plan.
   - Requires explicit repository targeting and executable TDD/BDD plan details.
   - Requires explicit TL approval before implementation can begin.
 - `/speckit.analyze`
-  - Performs cross-artifact consistency checks (`spec.md`, `plan.md`, `tasks.md`).
+  - Performs cross-artifact consistency checks.
 - `/speckit.implement`
   - Executes the TL-approved implementation plan in the related target repo(s).
   - Delivers real production-ready code with TDD-first execution and BDD acceptance validation.

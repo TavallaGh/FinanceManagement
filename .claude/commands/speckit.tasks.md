@@ -1,6 +1,6 @@
 ---
-description: Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts.
-handoffs: 
+description: Generate dependency-ordered tasks from an approved Solution artifact and upload them as Jira subtasks under the parent story. Reads Solution README and templates. Outputs task-plan.md and per-task detail files, then creates Jira subtasks.
+handoffs:
   - label: Analyze For Consistency
     agent: speckit.analyze
     prompt: Run a project analysis for consistency
@@ -18,47 +18,130 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty).
+The argument is a Jira Story key (e.g. `AC-14`) or a full Jira story URL.
+
+---
 
 ## Outline
 
-1. **Setup**: Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+### Step 1 — Load Work-Items Solution Rules
 
-2. **Load design documents**: Read from FEATURE_DIR:
-   - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)
-   - **Optional**: data-model.md (entities), contracts/ (interface contracts), research.md (decisions), quickstart.md (test scenarios)
-   - Note: Not all projects have all documents. Generate tasks based on what's available.
+Read the following files before generating anything:
 
-3. **Execute task generation workflow**:
-   - Load plan.md and extract tech stack, libraries, project structure
-   - Load spec.md and extract user stories with their priorities (P1, P2, P3, etc.)
-   - If data-model.md exists: Extract entities and map to user stories
-   - If contracts/ exists: Map interface contracts to user stories
-   - If research.md exists: Extract decisions for setup tasks
-   - Generate tasks organized by user story (see Task Generation Rules below)
-   - Generate dependency graph showing user story completion order
-   - Create parallel execution examples per user story
-   - Validate task completeness (each user story has all needed tasks, independently testable)
+1. `docs/work-items/01.solution/README.md` — Phase rules and task packaging model.
+2. `docs/work-items/01.solution/templates/solution-story-task-plan.template.md` — Task plan template.
+3. `docs/work-items/01.solution/templates/solution-agentic-task.template.md` — Per-task detail template.
 
-4. **Generate tasks.md**: Use `.specify/templates/tasks-template.md` as structure, fill with:
-   - Correct feature name from plan.md
-   - Phase 1: Setup tasks (project initialization)
-   - Phase 2: Foundational tasks (blocking prerequisites for all user stories)
-   - Phase 3+: One phase per user story (in priority order from spec.md)
-   - Each phase includes: story goal, independent test criteria, tests (if requested), implementation tasks
-   - Final Phase: Polish & cross-cutting concerns
-   - All tasks must follow the strict checklist format (see Task Generation Rules below)
-   - Clear file paths for each task
-   - Dependencies section showing story completion order
-   - Parallel execution examples per story
-   - Implementation strategy section (MVP first, incremental delivery)
+Reference examples:
 
-5. **Report**: Output path to generated tasks.md and summary:
-   - Total task count
-   - Task count per user story
-   - Parallel opportunities identified
-   - Independent test criteria for each story
-   - Suggested MVP scope (typically just User Story 1)
-   - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
+- `docs/work-items/01.solution/linked/stories/AC-13/task-plan.md`
+- `docs/work-items/01.solution/linked/stories/AC-13/tasks/AC-27.md`
+
+---
+
+### Step 2 — Load Approved Solution Artifacts
+
+Derive the story key from `$ARGUMENTS`.
+
+Read:
+
+1. `docs/work-items/01.solution/linked/stories/{STORY_KEY}/solution.md`
+2. `docs/work-items/01.solution/linked/stories/{STORY_KEY}/task-plan.md`
+
+If neither file exists: **ERROR** — "Solution artifacts not found. Run `/speckit.solution {STORY_KEY}` first and get it approved."
+
+Extract from solution:
+- Story key, Jira URL
+- Non-functional requirements
+- Technical decisions
+- Work breakdown (proposed tasks with names, stacks, priorities)
+
+Extract from task-plan:
+- All proposed tasks from the aggregated task landscape table
+- Dependencies between tasks
+- Jira mapping rule (subtask under story)
+
+---
+
+### Step 3 — Load Credentials
+
+Load `.secrets/credentials.local` and extract:
+- `JIRA_BASE_URL`
+- `JIRA_EMAIL`
+- `JIRA_API_TOKEN`
+
+Validate credentials before proceeding.
+
+---
+
+### Step 4 — Generate Per-Task Detail Files
+
+For each proposed task in the task plan (from `task-plan.md` task table):
+
+Output path: `docs/work-items/01.solution/linked/stories/{STORY_KEY}/tasks/{TASK_SLUG}.md`
+
+Use `solution-agentic-task.template.md` structure. Fill each section with task-specific content:
+- Task Identity (parent story, name, stack, status = draft)
+- Description (full detailed description)
+- Goal Of Task
+- What Problem This Task Should Be Done For
+- AoC items (numbered, specific and testable)
+- Scope (in/out)
+- TDD Coverage
+- BDD Scenarios
+- DoD items
+- Execution Notes (dependencies, risks, verification checkpoints)
+- Source Traceability
+
+Quality bar: match the detail of `docs/work-items/01.solution/linked/stories/AC-13/tasks/AC-27.md`.
+
+---
+
+### Step 5 — Create Jira Subtasks
+
+For each task in the task plan, create a Jira subtask under the parent story:
+
+```
+POST {JIRA_BASE_URL}/rest/api/3/issue
+Authorization: Basic base64({JIRA_EMAIL}:{JIRA_API_TOKEN})
+Content-Type: application/json
+
+{
+  "fields": {
+    "project": { "key": "{PROJECT_KEY}" },
+    "parent": { "key": "{STORY_KEY}" },
+    "summary": "{TASK_NAME}",
+    "issuetype": { "name": "Subtask" },
+    "description": {
+      "version": 1,
+      "type": "doc",
+      "content": [...]   // AoC, DoD, Goal, Problem from task detail file
+    },
+    "labels": [...],     // inherit from parent story + task-specific
+    "fixVersions": [{ "name": "V 0.1 (MVP)" }]
+  }
+}
+```
+
+Rules:
+- All tasks become Jira subtasks under `{STORY_KEY}`.
+- Fix Version must be `V 0.1 (MVP)`.
+- AoC, DoD, Goal, and Problem fields must be populated from the task detail file.
+- After creation, record the Jira subtask key returned by the API.
+- Update the per-task detail file: replace `TBD` key with the real Jira key.
+- Update `task-plan.md` table: replace `TBD-xx` keys with real Jira keys.
+
+---
+
+### Step 6 — Report
+
+Print a summary:
+
+- Story key and Jira URL
+- List of created Jira subtasks: key, name, URL
+- Paths to all generated per-task detail files
+- Updated `task-plan.md` path
+- Reminder: tasks are now in Jira Backlog; use `/speckit.taskstoissues <TASK_KEY>` to start each task
 
 Context for task generation: $ARGUMENTS
 

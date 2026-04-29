@@ -9,17 +9,40 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 | Prompt | Short Description | Persian Guide | English Guide |
 |---|---|---|---|
 | `/speckit.constitution` | Create or update project constitution and sync dependent templates. | [FA](#fa-speckit-constitution) | [EN](#en-speckit-constitution) |
-| `/speckit.specify` | Create/update feature specification from natural language input. | [FA](#fa-speckit-specify) | [EN](#en-speckit-specify) |
+| `/speckit.refine` | **[Work-Items Flow]** Generate Refinement artifact + checklist for a Jira story under `docs/work-items/00.refinement/`. | [FA](#fa-speckit-refine) | [EN](#en-speckit-refine) |
 | `/speckit.clarify` | Ask targeted clarification questions and encode answers into spec. | [FA](#fa-speckit-clarify) | [EN](#en-speckit-clarify) |
-| `/speckit.plan` | Generate implementation planning artifacts from the spec. | [FA](#fa-speckit-plan) | [EN](#en-speckit-plan) |
-| `/speckit.tasks` | Generate dependency-ordered `tasks.md`. | [FA](#fa-speckit-tasks) | [EN](#en-speckit-tasks) |
-| `/speckit.checklist` | Generate a custom checklist for the current feature. | [FA](#fa-speckit-checklist) | [EN](#en-speckit-checklist) |
-| `/speckit.analyze` | Run cross-artifact consistency analysis (`spec.md`, `plan.md`, `tasks.md`). | [FA](#fa-speckit-analyze) | [EN](#en-speckit-analyze) |
-| `/speckit.implement` | Execute implementation tasks from `tasks.md`. | [FA](#fa-speckit-implement) | [EN](#en-speckit-implement) |
+| `/speckit.solution` | **[Work-Items Flow]** Generate `solution.md` + `task-plan.md` for an approved refined story under `docs/work-items/01.solution/`. | [FA](#fa-speckit-solution) | [EN](#en-speckit-solution) |
+| `/speckit.tasks` | **[Work-Items Flow]** Generate per-task detail files from solution and upload tasks as Jira subtasks under the parent story. | [FA](#fa-speckit-tasks) | [EN](#en-speckit-tasks) |
+| `/speckit.checklist` | Generate a requirements-quality checklist. When given a story key, saves to the story's refinement folder. | [FA](#fa-speckit-checklist) | [EN](#en-speckit-checklist) |
+| `/speckit.analyze` | Run cross-artifact consistency analysis. | [FA](#fa-speckit-analyze) | [EN](#en-speckit-analyze) |
+| `/speckit.implement` | Execute implementation tasks. | [FA](#fa-speckit-implement) | [EN](#en-speckit-implement) |
 | `/speckit.generate-entities` | Generate multi-domain C# entities from domain docs with mandatory DDD/security rules. | [FA](#fa-speckit-generate-entities) | [EN](#en-speckit-generate-entities) |
 | `/speckit.taskstoissues` | Execute Jira-to-GitLab operational flow for a task. | [FA](#fa-speckit-taskstoissues) | [EN](#en-speckit-taskstoissues) |
 | `/speckit.taskclose` | Finalize task documentation and rollup artifacts. | [FA](#fa-speckit-taskclose) | [EN](#en-speckit-taskclose) |
 | `/speckit.codereview` | Run Claude review-only flow on linked MR after implementation done. | [FA](#fa-speckit-codereview) | [EN](#en-speckit-codereview) |
+
+## Work-Items Flow Overview
+
+The primary workflow for Jira story execution follows this sequence:
+
+```
+/speckit.refine <STORY-KEY>
+   ↓  (generates docs/work-items/00.refinement/linked/stories/<KEY>/refinement.md + checklists/)
+/speckit.checklist <STORY-KEY>     ← optional extra checklist passes
+   ↓
+[Tech Lead + PO approve refinement]
+   ↓
+/speckit.solution <STORY-KEY>
+   ↓  (generates docs/work-items/01.solution/linked/stories/<KEY>/solution.md + task-plan.md + tasks/)
+[Tech Lead + PO approve solution]
+   ↓
+/speckit.tasks <STORY-KEY>
+   ↓  (generates per-task detail files + uploads as Jira subtasks under parent story)
+/speckit.taskstoissues <TASK-KEY>  ← per subtask: start GitLab flow
+/speckit.implement
+/speckit.taskclose <TASK-KEY>
+/speckit.codereview <TASK-KEY>
+```
 
 ## Environment Endpoints (From credentials.template)
 
@@ -42,47 +65,55 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 /speckit.constitution
 ```
 
-<a id="fa-speckit-specify"></a>
-### FA: `/speckit.specify`
-- هدف: ساخت یا ویرایش `spec.md` از روی نیازمندی متنی.
-- زمان استفاده: شروع فاز REFIENMENT یا شروع فیچر جدید.
+<a id="fa-speckit-refine"></a>
+### FA: `/speckit.refine`
+- هدف: تولید مستند Refinement کامل برای یک Story جیرا، شامل تحلیل عمیق مشکل، AoC، DoD، تقسیم‌بندی Capability Slice ها، و چک‌لیست کیفیت.
+- زمان استفاده: شروع فاز Refinement برای یک Story جیرا. قبل از هر Solution یا پیاده‌سازی.
+- خروجی: `docs/work-items/00.refinement/linked/stories/<KEY>/refinement.md` + `checklists/requirements-checklist.md`
 - مثال:
 ```text
-/speckit.specify پیاده سازی مدیریت چند شعبه برای حسابداری
+/speckit.refine AC-14
 ```
 
 <a id="fa-speckit-clarify"></a>
 ### FA: `/speckit.clarify`
 - هدف: پیدا کردن ابهام های مهم و ثبت پاسخ ها در Spec.
-- زمان استفاده: قبل از Plan زمانی که Spec ناقص یا مبهم است.
+- زمان استفاده: قبل از Solution زمانی که Refinement ناقص یا مبهم است.
 - مثال:
 ```text
 /speckit.clarify
 ```
 
-<a id="fa-speckit-plan"></a>
-### FA: `/speckit.plan`
-- هدف: تولید خروجی های طراحی و برنامه اجرا (مثل `plan.md`, `research.md`).
-- زمان استفاده: ابتدای فاز Solution پس از مشخص شدن نیازها.
+<a id="fa-speckit-solution"></a>
+### FA: `/speckit.solution`
+- هدف: تولید `solution.md` و `task-plan.md` برای یک Story تأییدشده. شامل تصمیمات فنی، تجزیه وظایف، و مدل Task Packaging.
+- زمان استفاده: بعد از تأیید Refinement توسط Tech Lead و PO. قبل از ایجاد Subtask های جیرا.
+- خروجی: `docs/work-items/01.solution/linked/stories/<KEY>/solution.md` + `task-plan.md` + `tasks/<TASK-KEY>.md`
 - مثال:
 ```text
-/speckit.plan
+/speckit.solution AC-14
 ```
 
 <a id="fa-speckit-tasks"></a>
 ### FA: `/speckit.tasks`
-- هدف: تولید `tasks.md` به ترتیب وابستگی.
-- زمان استفاده: بعد از Plan و قبل از اجرا.
+- هدف: تولید فایل‌های جزئیات هر Task از Solution و آپلود آن‌ها به جیرا به عنوان Subtask زیر Story والد.
+- زمان استفاده: بعد از تأیید Solution توسط Tech Lead و PO.
+- خروجی: فایل‌های `tasks/<KEY>.md` به‌روزرسانی شده + Subtask های جیرا ایجادشده
 - مثال:
 ```text
-/speckit.tasks
+/speckit.tasks AC-14
 ```
 
 <a id="fa-speckit-checklist"></a>
 ### FA: `/speckit.checklist`
-- هدف: ایجاد چک لیست اختصاصی برای کنترل کیفیت یا آماده بودن خروجی.
-- زمان استفاده: قبل از شروع اجرا یا قبل از تحویل.
-- مثال:
+- هدف: تولید چک لیست کیفیت نیازمندی‌ها (نه تست پیاده‌سازی). هر آیتم یک سؤال از نوع «آیا نیازمندی X کامل/واضح/قابل اندازه‌گیری است؟» می‌باشد.
+- زمان استفاده: بعد از Refinement یا Solution برای اعتبارسنجی کیفیت مستندات.
+- خروجی با Story Key: `docs/work-items/00.refinement/linked/stories/<KEY>/checklists/<domain>.md`
+- مثال با Story Key:
+```text
+/speckit.checklist AC-14
+```
+- مثال بدون Story Key (فیچر آزاد):
 ```text
 /speckit.checklist
 ```
@@ -166,14 +197,17 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 /speckit.constitution
 ```
 
-<a id="en-speckit-specify"></a>
-### EN: `/speckit.specify`
-- Purpose: Build or update `spec.md` from natural-language requirements.
-- Use when: Starting REFIENMENT or defining a new feature.
+<a id="en-speckit-refine"></a>
+### EN: `/speckit.refine`
+- Purpose: Generate a full Refinement artifact for a Jira story. Reads Refinement README and templates. Fetches story from Jira. Generates `refinement.md` (problem narrative, AoC, DoD, capability slices, dependencies, open questions) and `requirements-checklist.md`.
+- Use when: Starting the Refinement phase for a Jira story. Must run before Solution.
+- Output: `docs/work-items/00.refinement/linked/stories/<KEY>/refinement.md` + `checklists/requirements-checklist.md`
 - Example:
 ```text
-/speckit.specify Implement multi-branch accounting workflow
+/speckit.refine AC-14
 ```
+
+> **Note**: `/speckit.specify` is retained for free-form (non-Jira) feature specs only.
 
 <a id="en-speckit-clarify"></a>
 ### EN: `/speckit.clarify`
@@ -184,29 +218,36 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 /speckit.clarify
 ```
 
-<a id="en-speckit-plan"></a>
-### EN: `/speckit.plan`
-- Purpose: Generate planning artifacts (for example `plan.md`, `research.md`).
-- Use when: Entering Solution phase after requirements are clarified.
+<a id="en-speckit-solution"></a>
+### EN: `/speckit.solution`
+- Purpose: Generate `solution.md` + `task-plan.md` for an approved refined story. Reads Solution README and templates. Produces technical decisions, work breakdown, aggregated task table, and optional per-task detail files.
+- Use when: Refinement is approved by Tech Lead and PO. Before creating Jira subtasks.
+- Output: `docs/work-items/01.solution/linked/stories/<KEY>/solution.md` + `task-plan.md` + `tasks/*.md`
 - Example:
 ```text
-/speckit.plan
+/speckit.solution AC-14
 ```
 
 <a id="en-speckit-tasks"></a>
 ### EN: `/speckit.tasks`
-- Purpose: Generate dependency-ordered `tasks.md`.
-- Use when: Plan is ready and implementation needs actionable tasks.
+- Purpose: Generate per-task detail files from an approved Solution artifact and upload all tasks as Jira subtasks under the parent story. Uses Solution README templates as the standard format.
+- Use when: Solution is approved and tasks are ready for Jira import.
+- Output: Updated `task-plan.md` with real Jira keys + per-task `tasks/<KEY>.md` files + Jira subtasks created
 - Example:
 ```text
-/speckit.tasks
+/speckit.tasks AC-14
 ```
 
 <a id="en-speckit-checklist"></a>
 ### EN: `/speckit.checklist`
-- Purpose: Generate a custom checklist for quality and readiness.
-- Use when: Before implementation or before handoff/review.
-- Example:
+- Purpose: Generate a requirements-quality checklist ("unit tests for requirements writing"). When a story key is provided, saves output to the story's refinement `checklists/` folder.
+- Use when: After Refinement or Solution to validate quality and completeness of artifacts.
+- Output with story key: `docs/work-items/00.refinement/linked/stories/<KEY>/checklists/<domain>.md`
+- Example with story key:
+```text
+/speckit.checklist AC-14
+```
+- Example free-form:
 ```text
 /speckit.checklist
 ```
@@ -277,15 +318,19 @@ or with full Jira URL:
 /speckit.codereview https://nexttoptech.atlassian.net/browse/AC-245
 ```
 
-## Suggested End-to-End Sequence
+## Suggested End-to-End Sequence (Work-Items Flow)
 
-1. `/speckit.specify`
-2. `/speckit.clarify`
-3. `/speckit.plan`
-4. `/speckit.tasks`
-5. `/speckit.analyze`
-6. `/speckit.generate-entities --docs <DOMAIN-DOCS> --out <OUTPUT-ROOT>`
-7. `/speckit.taskstoissues <JIRA-KEY>`
-8. `/speckit.implement`
-9. `/speckit.taskclose <JIRA-KEY>`
-10. `/speckit.codereview <JIRA-KEY>`
+1. `/speckit.refine <STORY-KEY>` — Generate Refinement artifact + requirements checklist
+2. `/speckit.checklist <STORY-KEY>` — (optional) Additional checklist passes on refinement
+3. `/speckit.clarify` — Resolve open questions before solution
+4. **[Approval Gate]** Tech Lead + PO approve Refinement
+5. `/speckit.solution <STORY-KEY>` — Generate `solution.md` + `task-plan.md`
+6. **[Approval Gate]** Tech Lead + PO approve Solution
+7. `/speckit.tasks <STORY-KEY>` — Generate per-task files + upload as Jira subtasks
+8. `/speckit.analyze` — Cross-artifact consistency check
+9. `/speckit.generate-entities --docs <DOMAIN-DOCS> --out <OUTPUT-ROOT>` — (if entities needed)
+10. Per subtask: `/speckit.taskstoissues <TASK-KEY>` — Start Jira-to-GitLab flow
+11. `/speckit.implement` — Execute implementation
+12. `/speckit.taskclose <TASK-KEY>` — Finalize task docs
+13. `/speckit.codereview <TASK-KEY>` — Claude MR review
+

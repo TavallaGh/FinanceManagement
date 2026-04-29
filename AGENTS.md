@@ -1,4 +1,4 @@
-# AGENTS Contract (Operational)
+﻿# AGENTS Contract (Operational)
 
 This workspace runs agents in **operational mode** for task-oriented prompts.
 
