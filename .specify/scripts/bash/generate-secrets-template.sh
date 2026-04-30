@@ -78,6 +78,8 @@ GITLAB_PROJECT_REPO_URL=https://gitlab.com/next-top-tech/accounting/accounting-p
 GITLAB_PROJECT_PROJECT_ID=79777164
 GITLAB_PROTOTYPE_REPO_URL=https://gitlab.com/next-top-tech/accounting/accounting-prototype
 GITLAB_PROTOTYPE_PROJECT_ID=79777183
+GITLAB_FRONT_REPO_URL=https://gitlab.com/next-top-tech/accounting/accounting-prototype
+GITLAB_PROTOTYPE_PROJECT_ID=81336784
 GITLAB_PROJECT_ID=79777158
 GITLAB_GROUP_ID=125634417
 
