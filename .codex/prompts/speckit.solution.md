@@ -1,5 +1,5 @@
 ---
-description: Generate solution artifacts (solution.md and task-plan.md) for an approved refined Jira story. Reads Solution README and templates. Outputs under docs/work-items/01.solution/linked/stories/<STORY-KEY>/.
+description: Generate solution artifacts (solution.md and task-plan.md) for an approved refined Jira story. DISCUSSION AND PLANNING ONLY — no tasks are created, no Jira writes, no per-task detail files. Outputs under docs/work-items/01.solution/linked/stories/<STORY-KEY>/.
 handoffs:
   - label: Generate Tasks
     agent: speckit.tasks
@@ -126,25 +126,19 @@ Quality bar: match the task table of `docs/work-items/01.solution/linked/stories
 
 ---
 
-### Step 6 — Generate Per-Task Detail Files (Optional)
+### Step 6 — STOP: No Task Files Are Created Here
 
-If user input includes `--with-task-specs` or if the task plan has ≥ 3 tasks:
-
-For each proposed task in the task plan, generate a detail file:
-
-Output path: `docs/work-items/01.solution/linked/stories/{STORY_KEY}/tasks/{TASK_KEY_OR_SLUG}.md`
-
-Use `solution-agentic-task.template.md` structure. Fill:
-- Task Identity (parent story, key, name, stack, status = draft)
-- Description
-- Goal Of Task
-- What Problem This Task Solves
-- AoC items (numbered)
-- Scope (in/out)
-- TDD Coverage (unit, integration, contract)
-- BDD Scenarios
-- DoD items (numbered)
-- Execution Notes (dependencies, risks, verification checkpoints)
+> **THIS PROMPT DOES NOT CREATE TASK FILES.**
+>
+> The `/speckit.solution` phase is a planning and discussion phase only.
+> Its output is exactly two files: `solution.md` and `task-plan.md`.
+>
+> Per-task detail files (`tasks/TBD-XX.md`) are **never** generated here.
+> They are generated exclusively by `/speckit.tasks` after the solution is approved.
+>
+> Do NOT create any files under `docs/work-items/01.solution/linked/stories/{STORY_KEY}/tasks/`.
+> Do NOT call any Jira write API.
+> Do NOT import anything to Jira.
 
 ---
 
@@ -157,6 +151,6 @@ Print a summary:
 - Path to `task-plan.md`
 - Count of proposed tasks with their names/keys
 - List of technical decisions made
-- Reminder: solution must be approved before tasks are pushed to Jira via `/speckit.tasks`
+- **Reminder: this solution is a planning artifact only. No tasks were created. Run `/speckit.tasks {STORY_KEY}` after TL + PO approval to generate task files and import to Jira.**
 
 **IMPORTANT**: Do NOT create Jira subtasks in this phase. That happens in `/speckit.tasks` after approval.
