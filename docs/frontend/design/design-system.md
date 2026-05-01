@@ -50,6 +50,43 @@ Core tokens live in:
 - `public/styles/tokens/_radius.scss`
 - `public/styles/tokens/_elevation.scss`
 - `public/styles/tokens/_z-index.scss`
+- `public/styles/tokens/_semantic.scss` ← **the only layer components may consume**
+
+## Token Architecture
+
+Tokens are organized in two strict layers.
+
+### Layer 1 — Primitive Tokens
+
+Raw values: palette scales, spacing steps, font sizes, radii, shadow definitions.
+
+- Defined in `_colors.scss`, `_spacing.scss`, `_typography.scss`, `_radius.scss`, `_elevation.scss`, `_z-index.scss`.
+- Naming: `--color-{palette}-{scale}`, `--spacing-{n}`, `--shadow-{size}`, etc.
+- **Never consumed directly by component or feature SCSS.**
+
+### Layer 2 — Semantic Tokens
+
+Intent-based aliases that reference primitives.
+
+- Defined exclusively in `public/styles/tokens/_semantic.scss`.
+- Naming: intent-based with no palette or scale reference — `--fg-primary`, `--gap-sm`, `--elevation-2`, `--z-modal`.
+- **Components and feature styles must consume only these aliases.**
+
+### Naming Convention
+
+| Category | Primitive example | Semantic example |
+|---|---|---|
+| Color | `--color-neutral-900` | `--fg-primary` |
+| Color | `--color-primary-500` | `--color-accent` (AC-78) |
+| Spacing | `--spacing-4` | `--padding-md` |
+| Elevation | `--shadow-sm` | `--elevation-2` |
+| Z-index | _(none — z-index has no primitives)_ | `--z-modal` |
+
+### Violation Remediation
+
+Existing components that violate the two-layer rule are catalogued in
+`docs/design/token-violation-audit.md` (in the accounting-frontend project).
+Remediation is tracked under AC-78.
 
 ## Design Principles
 
@@ -118,7 +155,7 @@ Examples:
 - `--color-red-100`
 - `--color-green-100`
 
-When a reusable component needs a specific visual treatment, prefer consuming the shared palette tokens from `public/styles/tokens/_colors.scss` directly instead of introducing component-specific alias layers that are only used once.
+Reusable components must consume semantic tokens from `public/styles/tokens/_semantic.scss` only. Direct consumption of primitive palette tokens (`--color-*` scales) in component SCSS is prohibited.
 
 Every color choice must remain valid for both light and dark themes.
 
