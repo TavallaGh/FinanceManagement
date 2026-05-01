@@ -136,28 +136,39 @@ Example:
 
 ### Colors
 
-Use semantic variables such as:
+Components must consume semantic color aliases from `_semantic.scss` only. Direct use of primitive palette tokens (`--color-{palette}-{scale}`) in component SCSS is prohibited.
 
-- `--bg-primary`
-- `--surface-primary`
-- `--fg-primary`
-- `--border-primary`
-- `--color-primary-500`
-- `--color-green-700`
-- `--color-amber-700`
+**Global style entry point:** `_semantic.scss` must be imported in `apps/erp-web/src/styles.scss` as `@use '../../../public/styles/tokens/semantic'` — after all primitive token imports and before any component-level rules.
 
-The shared colors file also exposes extended palette primitives for component-level styling.
+**Surface and text aliases:**
 
-Examples:
+- `--bg-primary`, `--bg-secondary`, `--bg-tertiary`
+- `--surface-primary`, `--surface-secondary`, `--surface-hover`, `--surface-active`
+- `--fg-primary`, `--fg-secondary`, `--fg-tertiary`
+- `--border-primary`, `--border-secondary`
 
-- `--color-neutral-100`
-- `--color-blue-700`
-- `--color-red-100`
-- `--color-green-100`
+**Interactive state aliases** (for focus rings, hover borders, checked states, caret — added AC-78):
 
-Reusable components must consume semantic tokens from `public/styles/tokens/_semantic.scss` only. Direct consumption of primitive palette tokens (`--color-*` scales) in component SCSS is prohibited.
+- `--color-accent` — primary action color (checked state, focus ring, active borders, caret)
+- `--color-accent-subtle` — tint for hover/today background on calendar cells
+- `--color-interactive-hover` — hover border accent
+- `--color-interactive-hover-border` — calendar cell today ring / navigation button hover border
+- `--color-interactive-border` — calendar cell hover inner border
+- `--color-interactive-emphasis` — primary accent text (floated labels, icon buttons at rest)
+- `--color-danger-interactive` — danger/error interactive state (invalid borders, error indicators)
+- `--color-neutral-disabled` — disabled state border and muted background tint
 
-Every color choice must remain valid for both light and dark themes.
+**Status variant aliases** (for badge/tag components — added AC-78):
+
+- `--color-primary-bg` / `--color-primary-fg`
+- `--color-secondary-bg` / `--color-secondary-fg`
+- `--color-success-bg` / `--color-success-fg`
+- `--color-info-bg` / `--color-info-fg`
+- `--color-warning-bg` / `--color-warning-fg`
+- `--color-danger-bg` / `--color-danger-fg`
+- `--color-contrast-bg` / `--color-contrast-fg`
+
+Every color choice must remain valid for both light and dark themes. All semantic aliases cascade through the `[data-theme='dark']` override on `<html>` automatically. **Do not add `:host-context([data-theme='dark'])` override blocks when consuming semantic aliases** — they are redundant and will be removed during review.
 
 ### Spacing
 
