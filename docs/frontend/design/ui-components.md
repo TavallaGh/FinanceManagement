@@ -43,6 +43,18 @@ Current story-book pages for shared UI components include:
 - `apps/erp-web/src/app/dev-tools/story-book/pages/icon/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/tag/`
 
+### Story Book Shell Layout
+
+The story-book shell (`apps/erp-web/src/app/dev-tools/story-book/layout/story-book-shell.component`) provides the shared application frame for all story-book pages.
+
+It includes:
+
+- language switcher (Persian / English)
+- theme toggle button (sun / moon) that calls `ThemeService.setTheme()` — added AC-65
+- sidebar navigation
+
+The theme toggle is visible in the header and reflects the active theme. It does not require any input from feature pages.
+
 ## Component Catalog
 
 ### Checkbox Component
@@ -63,6 +75,11 @@ The checkbox supports:
 - template-driven forms
 - reactive forms with `formControlName`
 - Angular signal forms with `formField`
+
+**Dark mode token usage inside `checkbox.component.scss`:**
+- Checkmark icon stroke: `--fg-white` (always white, contrasts against `--color-accent` checked background regardless of theme)
+- Error indicator background: `--fg-white` for the indicator icon fill
+- Disabled box background: `color-mix(in srgb, var(--color-neutral-disabled) ..., var(--surface-primary))` so the blended base adapts to the active theme surface
 
 Use the shared checkbox for generic boolean selection patterns instead of recreating local checkbox UI.
 
@@ -134,6 +151,13 @@ The date picker supports:
 - optional `UTC`, `timeZoneName`, `min`, `max`, and `datepickerFilterDays` inputs
 - shared floating-label, clear-action, and range-divider styling aligned with the design system
 - story-book coverage for all four supported picker variants
+
+**Dark mode implementation notes:**
+- The floated label color is set inline via `_applyLabelState()` using `var(--fg-primary)` (floated/focused) and `var(--fg-secondary)` (unfloated) so both states adapt to the active theme.
+- The floated label background and `box-shadow` spread use `var(--surface-primary)` to mask the underlying input border cleanly in both themes. Never use `#ffffff` or a hardcoded color here.
+- The calendar popup background uses `var(--surface-primary)` rather than any `color-mix(..., white)` expression.
+- Selected date text uses `var(--fg-white)` for always-white text on the accent-colored cell.
+- Hover border uses `var(--color-interactive-hover-border)` (not `--color-interactive-hover`).
 
 Use the shared date picker for generic date and date-time inputs instead of wiring the underlying third-party package directly inside features.
 
