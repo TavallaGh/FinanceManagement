@@ -6,7 +6,7 @@ param(
     [string]$JiraKey,
 
     [string]$StatusTarget = 'In Progress',
-    [ValidateSet('auto', 'workspace', 'project', 'prototype')]
+    [ValidateSet('auto', 'workspace', 'project', 'prototype', 'front')]
     [string]$Repo = 'auto',
     [string]$CredentialsFile = '.secrets/credentials.local',
     [string]$SourceBranch,
@@ -188,6 +188,7 @@ function Get-RepoProjectId {
     if ($RepoMode -eq 'workspace') { return Get-RequiredEnv 'GITLAB_WORKSPACE_PROJECT_ID' }
     if ($RepoMode -eq 'project') { return Get-RequiredEnv 'GITLAB_PROJECT_PROJECT_ID' }
     if ($RepoMode -eq 'prototype') { return Get-RequiredEnv 'GITLAB_PROTOTYPE_PROJECT_ID' }
+    if ($RepoMode -eq 'front') { return Get-RequiredEnv 'GITLAB_FRONT_PROJECT_ID' }
 
     $labelsLower = @($Labels | ForEach-Object { $_.ToLowerInvariant() })
     if ($labelsLower -contains 'process' -or $labelsLower -contains 'docs' -or $labelsLower -contains 'workflow' -or $labelsLower -contains 'automation' -or $labelsLower -contains 'meta') {

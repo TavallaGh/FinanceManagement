@@ -151,10 +151,10 @@ Components must consume semantic color aliases from `_semantic.scss` only. Direc
 
 - `--color-accent` — primary action color (checked state, focus ring, active borders, caret)
 - `--color-accent-subtle` — tint for hover/today background on calendar cells
-- `--color-interactive-hover` — hover border accent
-- `--color-interactive-hover-border` — calendar cell today ring / navigation button hover border
+- `--color-interactive-hover` — hover color for icon buttons and interactive text (not borders; use `--color-interactive-hover-border` for border hover)
+- `--color-interactive-hover-border` — hover border color for inputs, calendar navigation buttons, and any bordered interactive element
 - `--color-interactive-border` — calendar cell hover inner border
-- `--color-interactive-emphasis` — primary accent text (floated labels, icon buttons at rest)
+- `--color-interactive-emphasis` — primary accent text (active/focused icon buttons; **not** used for floated form labels — those use `--fg-primary`)
 - `--color-danger-interactive` — danger/error interactive state (invalid borders, error indicators)
 - `--color-neutral-disabled` — disabled state border and muted background tint
 
@@ -168,7 +168,43 @@ Components must consume semantic color aliases from `_semantic.scss` only. Direc
 - `--color-danger-bg` / `--color-danger-fg`
 - `--color-contrast-bg` / `--color-contrast-fg`
 
+`--color-contrast-bg` and `--color-contrast-fg` always invert the current theme — dark background with light text in light mode, light background with dark text in dark mode. Use them only when an element must visually oppose the surrounding surface.
+
 Every color choice must remain valid for both light and dark themes. All semantic aliases cascade through the `[data-theme='dark']` override on `<html>` automatically. **Do not add `:host-context([data-theme='dark'])` override blocks when consuming semantic aliases** — they are redundant and will be removed during review.
+
+### Runtime Theme Switching (AC-65)
+
+Theme switching is managed exclusively by `ThemeService` (`core/services/theme.service.ts`). It is the single point of truth for reading and applying the active theme at runtime.
+
+**Initialization order:**
+1. `ThemeService` is instantiated via `APP_INITIALIZER` before the first component renders.
+2. On init it reads `localStorage` for a persisted preference.
+3. If no value is persisted it falls back to the OS/browser `prefers-color-scheme` setting.
+4. The resolved theme is applied to `document.documentElement` before paint — no visible flash.
+
+**Consuming `ThemeService` in features:**
+
+```typescript
+import { ThemeService } from '../core/services/theme.service';
+
+// Read current theme reactively (Observable)
+themeService.theme$.subscribe(theme => { /* ... */ });
+
+// Read current theme synchronously
+const current = themeService.getTheme(); // 'light' | 'dark'
+
+// Switch theme
+themeService.setTheme('dark');
+themeService.setTheme('light');
+```
+
+**Theme-switch performance:**
+When `setTheme()` is called, the service adds `theme-switching` to `<html>` before changing `data-theme`, then removes it after two animation frames. A global CSS rule suppresses all `transition` declarations during this window so that no component-level animation fires while CSS tokens are changing — the swap is visually instant regardless of how many animated elements are on screen.
+
+**Rules:**
+- Always use `ThemeService` to change the theme. Never set `document.documentElement.dataset.theme` directly from feature code.
+- Never write `:host-context([data-theme='dark'])` inside component SCSS. Semantic tokens cascade automatically.
+- Never hardcode color values as fallbacks inside `color-mix()` or `var()` calls using `white`, `#ffffff`, or `#000000`. Use `--surface-primary`, `--fg-white`, or the appropriate semantic alias so the fallback also adapts to theme.
 
 ### Spacing
 
