@@ -206,6 +206,50 @@ When `setTheme()` is called, the service adds `theme-switching` to `<html>` befo
 - Never write `:host-context([data-theme='dark'])` inside component SCSS. Semantic tokens cascade automatically.
 - Never hardcode color values as fallbacks inside `color-mix()` or `var()` calls using `white`, `#ffffff`, or `#000000`. Use `--surface-primary`, `--fg-white`, or the appropriate semantic alias so the fallback also adapts to theme.
 
+### Theme Initialization Strategy (AC-66)
+
+**Challenge:**  
+The application enforces a strict Content Security Policy that disallows `script-src 'unsafe-inline'`. This prevents using the traditional inline script in `index.html` for zero-flicker theme application.
+
+**Chosen Strategy:** APP_INITIALIZER-Based Initialization
+
+The theme is applied as early as possible in the Angular lifecycle using `APP_INITIALIZER`:
+
+1. `ThemeService` is eagerly instantiated via `APP_INITIALIZER` token in `app.config.ts`
+2. The service constructor reads theme preference from `localStorage`
+3. If no preference exists, falls back to `prefers-color-scheme` media query
+4. Theme is applied to `document.documentElement.dataset.theme` synchronously
+
+**Tradeoff:**  
+Because `APP_INITIALIZER` runs **after** Angular bootstrap (but before component rendering), there may be a **single-frame flash** of the default (light) theme on cold page loads before the stored theme is applied. This is a known limitation of CSP-compliant initialization without server-side nonce generation.
+
+**Acceptance:**  
+This single-frame flash is accepted for MVP as:
+- It is CSP-compliant (zero violations)
+- It occurs only on cold load (first visit or hard refresh)
+- It is imperceptible in most cases (<16ms)
+- The alternative (nonce-based script) requires server-side infrastructure changes
+
+**Future Improvement Path:**  
+If zero-flicker is critical for production, implement server-side nonce generation:
+- Server renders CSP nonce in `index.html`
+- Inline script with nonce reads localStorage and applies theme before DOM render
+- Requires backend template rendering integration
+
+**Implementation Details:**
+
+| Property | Value |
+|----------|-------|
+| Storage Key | `app-theme` |
+| Valid Values | `'light'` \| `'dark'` |
+| Fallback | OS-level `prefers-color-scheme` media query |
+| CSP Compliance | ✅ Zero violations (verified in browser DevTools) |
+
+**Code References:**
+- Theme Service: `apps/erp-web/src/app/core/services/theme.service.ts`
+- Bootstrap Config: `apps/erp-web/src/app/app.config.ts` (APP_INITIALIZER)
+- Unit Tests: `theme.service.spec.ts` (tests T-01 through T-12)
+
 ### Spacing
 
 Use the spacing scale and semantic spacing variables.
