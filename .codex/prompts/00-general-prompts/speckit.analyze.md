@@ -1,4 +1,4 @@
----
+﻿---
 description: Perform a non-destructive cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md after task generation.
 ---
 
@@ -9,6 +9,15 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+### Reusable Script Policy (Mandatory)
+
+- Use reusable scripts in `scripts/`.
+- Do NOT create ad-hoc/new scripts for this command.
+- Reuse `scripts/task-exec.ps1` or `scripts/task-exec.sh` for Jira/GitLab operational flow when applicable.
+- Reuse `scripts/create-jira-subtask.ps1` for Jira task/subtask create-update operations when applicable.
+- Credentials must be loaded from `.secrets/credentials.local`.
+
 
 ## Goal
 
@@ -182,3 +191,4 @@ Ask the user: "Would you like me to suggest concrete remediation edits for the t
 ## Context
 
 $ARGUMENTS
+

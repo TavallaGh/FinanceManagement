@@ -1,4 +1,4 @@
----
+﻿---
 description: Create or update the project constitution from interactive or provided principle inputs, ensuring all dependent templates stay in sync.
 handoffs: 
   - label: Build Specification
@@ -13,6 +13,15 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+### Reusable Script Policy (Mandatory)
+
+- Use reusable scripts in `scripts/`.
+- Do NOT create ad-hoc/new scripts for this command.
+- Reuse `scripts/task-exec.ps1` or `scripts/task-exec.sh` for Jira/GitLab operational flow when applicable.
+- Reuse `scripts/create-jira-subtask.ps1` for Jira task/subtask create-update operations when applicable.
+- Credentials must be loaded from `.secrets/credentials.local`.
+
 
 ## Outline
 
@@ -82,3 +91,4 @@ If the user supplies partial updates (e.g., only one principle revision), still 
 If critical info missing (e.g., ratification date truly unknown), insert `TODO(<FIELD_NAME>): explanation` and include in the Sync Impact Report under deferred items.
 
 Do not create a new template; always operate on the existing `.specify/memory/constitution.md` file.
+

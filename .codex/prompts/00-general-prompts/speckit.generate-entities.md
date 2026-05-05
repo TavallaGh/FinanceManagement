@@ -1,4 +1,4 @@
----
+﻿---
 description: Generate C# domain entities from one or more domain docs while enforcing DDD.Domain and security rules.
 ---
 
@@ -9,6 +9,15 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+### Reusable Script Policy (Mandatory)
+
+- Use reusable scripts in `scripts/`.
+- Do NOT create ad-hoc/new scripts for this command.
+- Reuse `scripts/task-exec.ps1` or `scripts/task-exec.sh` for Jira/GitLab operational flow when applicable.
+- Reuse `scripts/create-jira-subtask.ps1` for Jira task/subtask create-update operations when applicable.
+- Credentials must be loaded from `.secrets/credentials.local`.
+
 
 ## Command Purpose
 
@@ -94,3 +103,4 @@ This command is complete only when:
 - Entities are generated for all domains
 - DDD naming/inheritance constraints pass
 - Security-rule constraints pass for generated code
+
