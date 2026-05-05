@@ -2,6 +2,14 @@
 description: Start Claude code review for a completed Jira task using linked GitLab MR
 ---
 
+### Reusable Script Policy (Mandatory)
+
+- Use reusable scripts in `scripts/`.
+- Do NOT create ad-hoc/new scripts for this command.
+- Reuse `scripts/task-exec.ps1` or `scripts/task-exec.sh` for Jira/GitLab operational flow when applicable.
+- Reuse `scripts/create-jira-subtask.ps1` for Jira task/subtask create-update operations when applicable.
+- Credentials must be loaded from `.secrets/credentials.local`.
+
 # /speckit.codereview
 
 Run a **review-only operational flow** for a Jira task that is declared implementation-complete.

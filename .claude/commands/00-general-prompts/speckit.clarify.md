@@ -1,4 +1,4 @@
----
+﻿---
 description: Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.
 handoffs: 
   - label: Build Technical Plan
@@ -13,6 +13,15 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+### Reusable Script Policy (Mandatory)
+
+- Use reusable scripts in `scripts/`.
+- Do NOT create ad-hoc/new scripts for this command.
+- Reuse `scripts/task-exec.ps1` or `scripts/task-exec.sh` for Jira/GitLab operational flow when applicable.
+- Reuse `scripts/create-jira-subtask.ps1` for Jira task/subtask create-update operations when applicable.
+- Credentials must be loaded from `.secrets/credentials.local`.
+
 
 ## Outline
 
@@ -179,3 +188,4 @@ Behavior rules:
 - If quota reached with unresolved high-impact categories remaining, explicitly flag them under Deferred with rationale.
 
 Context for prioritization: $ARGUMENTS
+

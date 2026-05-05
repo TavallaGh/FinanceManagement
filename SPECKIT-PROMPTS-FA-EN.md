@@ -4,43 +4,71 @@ This guide catalogs SpecKit-based prompts available in this workspace and explai
 
 این راهنما پرامپت های مبتنی بر SpecKit که در این پروژه در دسترس هستند را فهرست می کند و نحوه استفاده از آن ها را توضیح می دهد.
 
-## Prompt Index
+## Prompt Categories (Updated)
 
-| Prompt | Short Description | Persian Guide | English Guide |
-|---|---|---|---|
-| `/speckit.constitution` | Create or update project constitution and sync dependent templates. | [FA](#fa-speckit-constitution) | [EN](#en-speckit-constitution) |
-| `/speckit.refine` | **[Work-Items Flow]** Generate Refinement artifact + checklist for a Jira story under `docs/work-items/00.refinement/`. | [FA](#fa-speckit-refine) | [EN](#en-speckit-refine) |
-| `/speckit.clarify` | Ask targeted clarification questions and encode answers into spec. | [FA](#fa-speckit-clarify) | [EN](#en-speckit-clarify) |
-| `/speckit.solution` | **[Work-Items Flow]** Generate `solution.md` + `task-plan.md` for an approved refined story under `docs/work-items/01.solution/`. | [FA](#fa-speckit-solution) | [EN](#en-speckit-solution) |
-| `/speckit.tasks` | **[Work-Items Flow]** Generate per-task detail files from solution and upload tasks as Jira subtasks under the parent story. | [FA](#fa-speckit-tasks) | [EN](#en-speckit-tasks) |
-| `/speckit.checklist` | Generate a requirements-quality checklist. When given a story key, saves to the story's refinement folder. | [FA](#fa-speckit-checklist) | [EN](#en-speckit-checklist) |
-| `/speckit.analyze` | Run cross-artifact consistency analysis. | [FA](#fa-speckit-analyze) | [EN](#en-speckit-analyze) |
-| `/speckit.implement` | Execute implementation tasks. | [FA](#fa-speckit-implement) | [EN](#en-speckit-implement) |
-| `/speckit.generate-entities` | Generate multi-domain C# entities from domain docs with mandatory DDD/security rules. | [FA](#fa-speckit-generate-entities) | [EN](#en-speckit-generate-entities) |
-| `/speckit.taskstoissues` | Execute Jira-to-GitLab operational flow for a task. | [FA](#fa-speckit-taskstoissues) | [EN](#en-speckit-taskstoissues) |
-| `/speckit.taskclose` | Finalize task documentation and rollup artifacts. | [FA](#fa-speckit-taskclose) | [EN](#en-speckit-taskclose) |
-| `/speckit.codereview` | Run Claude review-only flow on linked MR after implementation done. | [FA](#fa-speckit-codereview) | [EN](#en-speckit-codereview) |
+Both prompt trees are now categorized into three folders:
+
+1. General Prompts
+2. Story Refinement Flow Prompts
+3. Implementation Phase Prompts
+
+### Ordered Flow Prompts (0-based)
+
+Refinement flow order:
+
+1. `00.speckit.refine`
+2. `01.speckit.solution`
+3. `02.speckit.tasks`
+
+Implementation phase order:
+
+1. `00.speckit.taskstoissues`
+2. `01.speckit.start-task`
+3. `02.speckit.implement`
+4. `03.speckit.taskclose`
+5. `04.speckit.taskcompletion`
+
+### Prompt Index
+
+| Prompt | Category | Short Description | Persian Guide | English Guide |
+|---|---|---|---|---|
+| `/speckit.constitution` | General | Create or update project constitution and sync dependent templates. | [FA](#fa-speckit-constitution) | [EN](#en-speckit-constitution) |
+| `/speckit.clarify` | General | Ask targeted clarification questions and encode answers into spec. | [FA](#fa-speckit-clarify) | [EN](#en-speckit-clarify) |
+| `/speckit.checklist` | General | Generate a requirements-quality checklist. When given a story key, saves to the story's refinement folder. | [FA](#fa-speckit-checklist) | [EN](#en-speckit-checklist) |
+| `/speckit.analyze` | General | Run cross-artifact consistency analysis. | [FA](#fa-speckit-analyze) | [EN](#en-speckit-analyze) |
+| `/speckit.generate-entities` | General | Generate multi-domain C# entities from domain docs with mandatory DDD/security rules. | [FA](#fa-speckit-generate-entities) | [EN](#en-speckit-generate-entities) |
+| `/speckit.codereview` | General (Claude flow) | Run Claude review-only flow on linked MR after implementation done. | [FA](#fa-speckit-codereview) | [EN](#en-speckit-codereview) |
+| `/speckit.refine` | Story Refinement Flow | **[Work-Items Flow]** Generate Refinement artifact + checklist for a Jira story under `docs/work-items/00.refinement/`. | [FA](#fa-speckit-refine) | [EN](#en-speckit-refine) |
+| `/speckit.solution` | Story Refinement Flow | **[Work-Items Flow]** Generate `solution.md` + `task-plan.md` for an approved refined story under `docs/work-items/01.solution/`. | [FA](#fa-speckit-solution) | [EN](#en-speckit-solution) |
+| `/speckit.tasks` | Story Refinement Flow | **[Work-Items Flow]** Generate per-task detail files from solution and upload tasks as Jira subtasks under the parent story. | [FA](#fa-speckit-tasks) | [EN](#en-speckit-tasks) |
+| `/speckit.taskstoissues` | Implementation Phase | Execute Jira-to-GitLab operational flow for a task. | [FA](#fa-speckit-taskstoissues) | [EN](#en-speckit-taskstoissues) |
+| `/speckit.start-task` | Implementation Phase | Start task in documentation-first mode and gate implementation on approval. | N/A | N/A |
+| `/speckit.implement` | Implementation Phase | Execute implementation tasks. | [FA](#fa-speckit-implement) | [EN](#en-speckit-implement) |
+| `/speckit.taskclose` | Implementation Phase | Finalize task documentation and rollup artifacts. | [FA](#fa-speckit-taskclose) | [EN](#en-speckit-taskclose) |
+| `/speckit.taskcompletion` | Implementation Phase | Create/update completion markdown for story/task completion output. | N/A | N/A |
 
 ## Work-Items Flow Overview
 
 The primary workflow for Jira story execution follows this sequence:
 
 ```
-/speckit.refine <STORY-KEY>
+/speckit.refine <STORY-KEY>      (00)
    ↓  (generates docs/work-items/00.refinement/linked/stories/<KEY>/refinement.md + checklists/)
 /speckit.checklist <STORY-KEY>     ← optional extra checklist passes
    ↓
 [Tech Lead + PO approve refinement]
    ↓
-/speckit.solution <STORY-KEY>
+/speckit.solution <STORY-KEY>    (01)
    ↓  (generates docs/work-items/01.solution/linked/stories/<KEY>/solution.md + task-plan.md + tasks/)
 [Tech Lead + PO approve solution]
    ↓
-/speckit.tasks <STORY-KEY>
+/speckit.tasks <STORY-KEY>       (02)
    ↓  (generates per-task detail files + uploads as Jira subtasks under parent story)
-/speckit.taskstoissues <TASK-KEY>  ← per subtask: start GitLab flow
-/speckit.implement
-/speckit.taskclose <TASK-KEY>
+/speckit.taskstoissues <TASK-KEY>  (00 implementation)
+/speckit.start-task <TASK-KEY>     (01 implementation)
+/speckit.implement                 (02 implementation)
+/speckit.taskclose <TASK-KEY>      (03 implementation)
+/speckit.taskcompletion <TASK-KEY> (04 implementation)
 /speckit.codereview <TASK-KEY>
 ```
 
@@ -330,7 +358,9 @@ or with full Jira URL:
 8. `/speckit.analyze` — Cross-artifact consistency check
 9. `/speckit.generate-entities --docs <DOMAIN-DOCS> --out <OUTPUT-ROOT>` — (if entities needed)
 10. Per subtask: `/speckit.taskstoissues <TASK-KEY>` — Start Jira-to-GitLab flow
-11. `/speckit.implement` — Execute implementation
-12. `/speckit.taskclose <TASK-KEY>` — Finalize task docs
-13. `/speckit.codereview <TASK-KEY>` — Claude MR review
+11. Per subtask: `/speckit.start-task <TASK-KEY>` — Prepare approved implementation package
+12. `/speckit.implement` — Execute implementation
+13. `/speckit.taskclose <TASK-KEY>` — Finalize task docs
+14. `/speckit.taskcompletion <TASK-KEY>` — Write completion markdown
+15. `/speckit.codereview <TASK-KEY>` — Claude MR review
 
