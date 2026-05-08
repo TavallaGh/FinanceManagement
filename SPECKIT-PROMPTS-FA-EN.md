@@ -25,8 +25,8 @@ Implementation phase order:
 1. `00.speckit.taskstoissues`
 2. `01.speckit.start-task`
 3. `02.speckit.implement`
-4. `03.speckit.taskclose`
-5. `04.speckit.taskcompletion`
+4. `03.speckit.taskcompletion`
+5. `04.speckit.taskclose`
 
 ### Prompt Index
 

@@ -24,7 +24,7 @@
 - RTL/LTR direction switching (client-side via language toggle)
 - Submit guard on login button and OTP verify button
 - Per-field inline error display
-- Wire `ForgotPassword/*` views to AC-46 backend endpoints
+- Wire `ForgotPassword/*` views to the existing forgot-password API route contract
 
 ### Out of Scope
 - AD login tab — excluded per AOC-13
@@ -35,17 +35,14 @@
 - Any other project (frontend, API, domain)
 
 ### Dependency
-- **AC-46 must be complete** before FP backend wiring can be tested. The 4 endpoints must exist:
-  - `POST /Account/ForgotPassword/Identify`
-  - `POST /Account/ForgotPassword/RequestOtp`
-  - `POST /Account/ForgotPassword/VerifyOtp`
-  - `POST /Account/ForgotPassword/SetPassword`
+- **AC-14-BE-01 must be complete** before FP backend wiring can be tested.
+- The repo already contains the forgot-password API controller surface under `ForgotPasswordApiController`; confirm the frontend binds to the current route contract before implementation starts.
 
 ---
 
-## 2. Current State: What Is Already Done (Staged Changes)
+## 2. Current State: What Is Already Implemented
 
-The following is confirmed implemented and staged in the SSO repo:
+The following generated artifacts already exist in the SSO repo and should be treated as the baseline:
 
 ### 2.1 `AccountController.cs` — Done ✅
 | Change | Detail |
@@ -102,6 +99,17 @@ The following is confirmed implemented and staged in the SSO repo:
 - `.dir-ltr` helper for inputs
 - `#loading-overlay.hidden` display override
 
+### 2.7 Forgot-password views, view models, and resources — Done ✅
+- `Views/Account/ForgotPassword/Identify.cshtml`
+- `Views/Account/ForgotPassword/VerifyOtp.cshtml`
+- `Views/Account/ForgotPassword/SetPassword.cshtml`
+- `Models/Account/ForgotPassword/IdentifyViewModel.cs`
+- `Models/Account/ForgotPassword/VerifyOtpViewModel.cs`
+- `Models/Account/ForgotPassword/SetPasswordViewModel.cs`
+- `Resources/LoginResources.fa.resx` / `Resources/LoginResources.en.resx`
+- `Resources/ForgotPasswordResources.fa.resx` / `Resources/ForgotPasswordResources.en.resx`
+- `Controllers/ForgotPasswordController.cs` and `Controllers/ForgotPasswordApiController.cs`
+
 ---
 
 ## 3. Gap Analysis — What Needs to Be Completed
@@ -115,13 +123,11 @@ The following items are **not yet done** and are required to satisfy AOC/DOD:
 | AD login tab removal | AOC-13, DOD-08 | P1 |
 | OTP `maxlength` fix: `5` → `6` | AOC-08 | P1 |
 | OTP length in `constants.js` / `index.js` fix | AOC-08 | P1 |
-| Wire `ForgotPassword/Identify` form to `POST /Account/ForgotPassword/Identify` | AOC-07 | P1 (after AC-46) |
-| Wire `ForgotPassword/VerifyOtp` form to `POST /Account/ForgotPassword/VerifyOtp` | AOC-08 | P1 (after AC-46) |
-| Wire `ForgotPassword/SetPassword` form to `POST /Account/ForgotPassword/SetPassword` | AOC-09 | P1 (after AC-46) |
-| Razor `.resx` localization files (FA + EN for all 4 screens) | AOC-10, DOD-03, DOD-07 | P1 |
+| Normalize forgot-password route bindings against the existing `ForgotPasswordApiController` route contract | AOC-07/AOC-08/AOC-09 | P1 |
+| Complete FA/EN resource key coverage for all 4 screens and bind them in the views | AOC-10, DOD-03, DOD-07 | P1 |
 | Configure `IStringLocalizer<T>` in `Program.cs` | AOC-10 | P1 |
 | Password-mismatch inline error (replace `alert()`) | AOC-09 | P2 |
-| OTP invalid inline error (from backend response) | AOC-08 | P2 (after AC-46) |
+| OTP invalid inline error (from backend response) | AOC-08 | P2 (after route alignment) |
 
 ---
 
@@ -132,15 +138,16 @@ All changes are in one repository: `projects/accounting-sso`
 | Layer | Path | Changes Required |
 |---|---|---|
 | 04.Presentation/IDP | `Erp.Sso.Ids/Views/Account/Login.cshtml` | Fix AOC-04/05/08/13 gaps |
-| 04.Presentation/IDP | `Erp.Sso.Ids/Views/Account/ForgotPassword/` *(new folder)* | `Identify.cshtml`, `VerifyOtp.cshtml`, `SetPassword.cshtml` |
-| 04.Presentation/IDP | `Erp.Sso.Ids/Controllers/ForgotPasswordController.cs` | GET actions to serve FP views (POST handled by AC-46) |
+| 04.Presentation/IDP | `Erp.Sso.Ids/Views/Account/ForgotPassword/` | Existing generated views: `Identify.cshtml`, `VerifyOtp.cshtml`, `SetPassword.cshtml` |
+| 04.Presentation/IDP | `Erp.Sso.Ids/Controllers/ForgotPasswordController.cs` | GET actions already exist; keep view routing aligned |
+| 04.Presentation/IDP | `Erp.Sso.Ids/Controllers/ForgotPasswordApiController.cs` | Existing POST API surface; confirm route normalization before wiring |
 | 04.Presentation/IDP | `Erp.Sso.Ids/Models/Account/ForgotPassword/` | `IdentifyViewModel`, `VerifyOtpViewModel`, `SetPasswordViewModel` |
-| 04.Presentation/IDP | `Erp.Sso.Ids/Resources/` | `Login.fa.resx`, `Login.en.resx`, `ForgotPassword.fa.resx`, `ForgotPassword.en.resx` |
+| 04.Presentation/IDP | `Erp.Sso.Ids/Resources/` | Existing generated localization resources: `LoginResources.*` and `ForgotPasswordResources.*` |
 | 04.Presentation/IDP | `Erp.Sso.Ids/Program.cs` | Add `AddLocalization()` + `UseRequestLocalization()` |
 | wwwroot/js | `wwwroot/js/account/login/constants.js` | Fix OTP length (5→6) |
 | wwwroot/js | `wwwroot/js/account/login/index.js` | Fix submit guard, OTP length, remove AD tab logic, inline mismatch error |
 | wwwroot/css | `wwwroot/css/Login.css` | Add mismatch-error display style (if needed) |
-| Workspace docs | `docs/work-items/01.solution/linked/stories/AC-14/tasks/AC-47/` | This file + logs |
+| Workspace docs | `docs/work-items/02.implementation/stories/AC-14/tasks/AC-47-implementation-plan.md` | This plan file |
 
 > **Note:** The AD-tab JS logic in `index.js` (`setLoginMethod()`, AD button event) must be removed entirely — not just hidden.
 
@@ -152,7 +159,7 @@ All changes are in one repository: `projects/accounting-sso`
 Erp.Sso.Ids/
 ├── Controllers/
 │   ├── AccountController.cs          ← already done (staged)
-│   └── ForgotPasswordController.cs   ← GET views only; POST routes from AC-46
+│   └── ForgotPasswordController.cs   ← GET views only; POST routes handled by the existing API controller
 ├── Models/
 │   └── Account/
 │       ├── LoginViewModel.cs         ← already done (staged)
@@ -168,10 +175,10 @@ Erp.Sso.Ids/
 │           ├── VerifyOtp.cshtml
 │           └── SetPassword.cshtml
 ├── Resources/
-│   ├── Login.fa.resx
-│   ├── Login.en.resx
-│   ├── ForgotPassword.fa.resx
-│   └── ForgotPassword.en.resx
+│   ├── LoginResources.fa.resx
+│   ├── LoginResources.en.resx
+│   ├── ForgotPasswordResources.fa.resx
+│   └── ForgotPasswordResources.en.resx
 └── wwwroot/
     ├── css/Login.css                 ← minor patch
     └── js/account/login/
@@ -216,7 +223,7 @@ Erp.Sso.Ids/
 
 ### 6.4 ForgotPassword Views (new)
 
-**Option A — Separate Razor Views (Recommended for AC-46 wiring):**
+**Option A — Separate Razor Views (recommended baseline):**
 
 `ForgotPassword/Identify.cshtml`
 - `@model IdentifyViewModel`
@@ -257,8 +264,7 @@ Erp.Sso.Ids/
 - `[HttpGet("/Account/ForgotPassword/Identify")]` → `View(new IdentifyViewModel())`
 - `[HttpGet("/Account/ForgotPassword/VerifyOtp")]` → `View(new VerifyOtpViewModel())`
 - `[HttpGet("/Account/ForgotPassword/SetPassword")]` → `View(new SetPasswordViewModel())`
-- POST routes are owned by AC-46 (`ForgotPasswordController` in AC-46 scope — confirm ownership before creating)
-- If AC-46 already owns this controller, extend it with GET views only
+- POST routes are owned by the existing forgot-password API controller surface; keep GET views decoupled from POST contract changes.
 
 ### 6.6 ViewModels
 
@@ -279,14 +285,14 @@ Erp.Sso.Ids/
 
 All in `Erp.Sso.Ids/Resources/`
 
-`Login.fa.resx` and `Login.en.resx` keys:
+`LoginResources.fa.resx` and `LoginResources.en.resx` keys:
 ```
 Title, HeaderSubtitle, Username, Password, LoginBtn,
 ForgotPasswordLink, Footer,
 Error_InvalidCredentials, Error_EmptyUsername, Error_EmptyPassword
 ```
 
-`ForgotPassword.fa.resx` and `ForgotPassword.en.resx` keys:
+`ForgotPasswordResources.fa.resx` and `ForgotPasswordResources.en.resx` keys:
 ```
 IdentifyTitle, IdentifyDesc, UsernameOrEmail, Next, Cancel,
 VerifyOtpTitle, OtpDesc, Verify, Back,
@@ -329,8 +335,8 @@ All frontend-facing response keys follow the `GlobalResponseKey` naming contract
 |---|---|
 | Anti-CSRF | `@Html.AntiForgeryToken()` on all POST forms; `[ValidateAntiForgeryToken]` on all POST actions |
 | Empty input guard (server-side) | Already staged in `AccountController.cs` — apply same to FP controller |
-| OTP enumeration guard | POST Identify always returns neutral message regardless of username existence (AC-46 contract — verify) |
-| Dev-only OTP bypass | Verify `ASPNETCORE_ENVIRONMENT == Development` guard in AC-46 — UI does not control this |
+| OTP enumeration guard | POST Identify always returns neutral message regardless of username existence (existing API contract — verify) |
+| Dev-only OTP bypass | Verify `ASPNETCORE_ENVIRONMENT == Development` guard in the backend — UI does not control this |
 | Password not reflected in URL | All FP forms use `method="post"` |
 | Token in hidden field | SetPassword form passes reset token in hidden `input` — token must not be logged |
 | OTP numeric filter | `pattern="[0-9]{6}"` + JS numeric-only enforcement |
@@ -351,9 +357,9 @@ All method-level logging follows structured log pattern: `logger.LogXxx("Message
 | `AccountController` POST Login (fail) | Already staged | Warning | `"Login failed for user {Username}"` |
 | `AccountController` Logout | Already staged | Info | `"Logout requested. LogoutId: {LogoutId}"` |
 | `ForgotPasswordController` GET Identify | New | Debug | `"Rendering ForgotPassword/Identify page."` |
-| `ForgotPasswordController` POST Identify | Owned by AC-46 | — | — |
-| `ForgotPasswordController` POST VerifyOtp | Owned by AC-46 | — | — |
-| `ForgotPasswordController` POST SetPassword | Owned by AC-46 | — | — |
+| `ForgotPasswordController` POST Identify | Existing API controller | — | — |
+| `ForgotPasswordController` POST VerifyOtp | Existing API controller | — | — |
+| `ForgotPasswordController` POST SetPassword | Existing API controller | — | — |
 
 ---
 
@@ -363,8 +369,8 @@ Test-first execution order:
 
 | Step | Test | Type | Target |
 |---|---|---|---|
-| T-01 | Resx keys FA == Resx keys EN (no missing keys) | Unit | `Login.fa.resx` vs `Login.en.resx` |
-| T-02 | Resx keys FA == Resx keys EN for ForgotPassword | Unit | `ForgotPassword.fa.resx` vs `ForgotPassword.en.resx` |
+| T-01 | Resx keys FA == Resx keys EN (no missing keys) | Unit | `LoginResources.fa.resx` vs `LoginResources.en.resx` |
+| T-02 | Resx keys FA == Resx keys EN for ForgotPassword | Unit | `ForgotPasswordResources.fa.resx` vs `ForgotPasswordResources.en.resx` |
 | T-03 | Submit button disabled when username empty | JS unit / Playwright | `Login.cshtml` submit guard |
 | T-04 | Submit button disabled when password empty | JS unit / Playwright | `Login.cshtml` submit guard |
 | T-05 | Submit button enabled when both fields filled | JS unit / Playwright | `Login.cshtml` submit guard |
@@ -402,7 +408,7 @@ Test-first execution order:
 
 - No feature flags required — the login page is the only entry point; it replaces the scaffold entirely.
 - Deployment is `Development`-first; no staging deploy until DOD-09 (integration tests pass).
-- Dev-bypass OTP (`12346`) is environment-guarded in AC-46 — UI has no awareness of it.
+- Dev-bypass OTP (`12346`) is environment-guarded in the backend — UI has no awareness of it.
 - Rollback: revert the single `Login.cshtml` file to the pre-staged version; no DB changes.
 
 ---
@@ -411,10 +417,8 @@ Test-first execution order:
 
 | # | Question | Owner | Blocker |
 |---|---|---|---|
-| Q1 | Is AC-46 (`ForgotPasswordController` backend) complete? POST endpoints reachable? | AC-46 owner | Yes — blocks FP wiring |
-| Q2 | Option A (separate Razor FP views) or Option B (SPA AJAX) — which approach is preferred? | TL | Yes |
-| Q3 | Should `IStringLocalizer<T>` use per-controller type param or single shared resource class? | TL | Yes |
-| Q4 | Is the `LoginMethod` field (`standard`/`ad`) needed in `LoginViewModel` after AD tab removal? | TL | Minor |
+| Q1 | Should the frontend bind to the existing `/api/v1/account/forgot/*` contract as-is? | TL + BE owner | Yes, connect to API |
+| Q2 | Should the generated AD toggle state be removed from the `LoginViewModel` and login JS in the same pass as the UI cleanup? | TL | Minor |
 
 ---
 
@@ -427,7 +431,7 @@ Test-first execution order:
 - [x] AD tab confirmed for removal
 - [x] Response key catalog (§7) approved
 - [x] TDD plan (§10) test coverage acceptable
-- [x] AC-46 dependency status confirmed — proceeding; FP wiring will be implemented; backend endpoints expected from AC-46 (Q1 resolved)
+- [x] Forgot-password dependency status confirmed — frontend wiring will connect to the existing API contract as-is (Q1 resolved)
 - [x] Plan ready to pass to `/speckit.implement`
 
 **TL Approved: 2026-04-30**
