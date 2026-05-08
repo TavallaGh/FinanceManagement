@@ -70,12 +70,14 @@ Each documented page must align with the existing shell and route structure in:
 
 If story-book text changes, update both language sources:
 
-- `apps/erp-web/src/assets/i18n/en.json`
-- `apps/erp-web/src/assets/i18n/fa.json`
 - `public/assets/i18n/en.json`
 - `public/assets/i18n/fa.json`
 
+**⚠️ IMPORTANT**: `apps/erp-web/src/assets/i18n/` is deprecated. Always write to `public/assets/i18n/` only.
+
 Never add story-book UI text in templates directly.
+
+Before adding a new key, check whether a shared `DS_COMMON_*` or `UI_*` key already covers the value. See `docs/frontend/localization/i18n-guide.md` for the full shared-key table and deduplication rules.
 
 ## Decision Rule: New Page Or Existing Page
 
@@ -191,7 +193,27 @@ If the example needs more than one file view, provide tabbed snippets such as:
 
 ### 6. Translations
 
-Add all new story-book labels and descriptions to both app and public i18n files in English and Persian.
+Add all new story-book labels and descriptions to both language files in English and Persian:
+
+- `public/assets/i18n/en.json`
+- `public/assets/i18n/fa.json`
+
+Before creating a component-specific key, check whether an existing shared key already covers the value:
+
+- `DS_COMMON_TOC_OVERVIEW` — overview TOC entry for every component
+- `DS_COMMON_IMPORT` — import TOC entry and import section heading
+- `DS_COMMON_API_TITLE` — API TOC entry and API section heading
+- `DS_COMMON_TOC_STATES` — states TOC entry
+- `DS_COMMON_FORM_TEMPLATE` / `DS_COMMON_FORM_REACTIVE` — form section titles
+- `DS_COMMON_STATE_DEFAULT/DISABLED/INVALID/WITH_VALUE` — state card titles
+- `DS_COMMON_API_NAME/TYPE/DEFAULT/DESCRIPTION/PROP` — API table column headers
+- `DS_COMMON_LABEL_USERNAME/EMAIL/PRICE/AMOUNT` — common field labels
+- `DS_COMMON_PLACEHOLDER_DECIMAL` — decimal placeholder `0.00`
+- `UI_SEARCH/SUCCESS/WARNING/ERROR/SETTINGS/BUTTON/SUBMIT/RESET/DELETE/EDIT` — common single-word UI labels
+
+Only introduce a new `DS_[COMPONENT]_*` key when no shared key covers the concept.
+
+See `docs/frontend/localization/i18n-guide.md` for the complete shared-key reference and deduplication rules.
 
 ### 7. Design System Documentation
 
