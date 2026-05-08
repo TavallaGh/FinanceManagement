@@ -1,0 +1,188 @@
+{
+  "info": {
+    "name": "AC-12 - Role Management APIs",
+    "description": "Story-level API rollup collection. AC-82 contributes the role CRUD surface under /api/v1/sso/roles. Requests route through the BFF gateway at {{baseUrl}} and require the __Host-bff session cookie plus the X-CSRF header.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "BFF Auth",
+      "item": [
+        {
+          "name": "BFF Login",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bff/login?returnUrl=/",
+              "host": ["{{baseUrl}}"],
+              "path": ["bff", "login"],
+              "query": [
+                { "key": "returnUrl", "value": "/", "description": "Redirect target after login" }
+              ]
+            },
+            "description": "Initiates the BFF/OIDC login flow. Complete in a browser and capture the __Host-bff cookie for subsequent API calls."
+          }
+        },
+        {
+          "name": "BFF User Session",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bff/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["bff", "user"]
+            },
+            "description": "Returns the authenticated user's claims from the active BFF session."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Roles",
+      "item": [
+        {
+          "name": "Search Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/roles?q=&active=true&index=0&size=Ten",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "roles"],
+              "query": [
+                { "key": "q", "value": "", "description": "Optional text search over name, labels, and system code" },
+                { "key": "active", "value": "true", "description": "Optional active-state filter" },
+                { "key": "index", "value": "0", "description": "Zero-based page index" },
+                { "key": "size", "value": "Ten", "description": "Page size enum: Ten, Twenty, Fifty, Hundred" }
+              ]
+            },
+            "description": "Returns a paginated role list filtered by text, explicit name, system code, and active state."
+          }
+        },
+        {
+          "name": "Get Role By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/roles/{{roleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "roles", "{{roleId}}"]
+            },
+            "description": "Returns a single role summary by numeric identifier."
+          }
+        },
+        {
+          "name": "Create Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Accountant\",\n  \"labelEn\": \"Accountant\",\n  \"labelFa\": \"<fa label>\",\n  \"descriptionEn\": \"Accounting role\",\n  \"descriptionFa\": \"<fa description>\",\n  \"systemCode\": \"ACCOUNTANT\",\n  \"startDate\": \"2026-05-07T00:00:00Z\",\n  \"endDate\": \"2027-05-07T00:00:00Z\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "roles"]
+            },
+            "description": "Creates a new role with bilingual labels/descriptions, unique name, and unique system code."
+          }
+        },
+        {
+          "name": "Update Role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"AccountantLead\",\n  \"labelEn\": \"Accountant Lead\",\n  \"labelFa\": \"<updated fa label>\",\n  \"descriptionEn\": \"Updated accounting role\",\n  \"descriptionFa\": \"<updated fa description>\",\n  \"systemCode\": \"ACCOUNTANT-LEAD\",\n  \"startDate\": \"2026-05-07T00:00:00Z\",\n  \"endDate\": \"2027-05-07T00:00:00Z\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/roles/{{roleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "roles", "{{roleId}}"]
+            },
+            "description": "Updates an existing role by id and revalidates duplicate name and system-code constraints."
+          }
+        },
+        {
+          "name": "Deactivate Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/roles/{{roleId}}/deactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "roles", "{{roleId}}", "deactivate"]
+            },
+            "description": "Marks a role inactive without deleting it."
+          }
+        },
+        {
+          "name": "Delete Role",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Cookie", "value": "__Host-bff={{bffCookie}}" },
+              { "key": "X-CSRF", "value": "{{xcsrfToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sso/roles/{{roleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sso", "roles", "{{roleId}}"]
+            },
+            "description": "Soft-deletes a role. The request fails with a keyed error when active user assignments still exist."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:7283",
+      "description": "BFF gateway base URL. All SSO API calls are proxied through this gateway."
+    },
+    {
+      "key": "roleId",
+      "value": "100",
+      "description": "Target role ID used in role-specific route segments."
+    },
+    {
+      "key": "bffCookie",
+      "value": "",
+      "description": "Value of the __Host-bff session cookie issued after BFF login."
+    },
+    {
+      "key": "xcsrfToken",
+      "value": "1",
+      "description": "Anti-forgery token required by Duende BFF on proxied API requests."
+    }
+  ]
+}
