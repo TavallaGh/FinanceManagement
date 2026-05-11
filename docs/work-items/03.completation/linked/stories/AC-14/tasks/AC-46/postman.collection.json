@@ -1,0 +1,402 @@
+{
+  "info": {
+    "_postman_id": "ac-46-forgot-password",
+    "name": "AC-46 — Forgot-Password Backend + OTP Validation",
+    "description": "Forgot-password flow with token management, OTP validation, and password reset endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Identify User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.environment.set('forgotPasswordToken', jsonData.data.token);",
+              "    pm.test('Token stored for next steps', function() {",
+              "        pm.expect(jsonData.data.token).to.exist;",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"user@example.com\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/account/forgot/identify",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "account",
+            "forgot",
+            "identify"
+          ]
+        },
+        "description": "Initiates forgot-password flow by accepting user identifier (email or phone)"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"user@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/account/forgot/identify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "account",
+                "forgot",
+                "identify"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"token\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"expiresIn\": 1800,\n    \"message\": \"Mock token generated for development\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "2a. Request OTP via Email",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.request.headers.add({key: 'X-Request-Token', value: pm.environment.get('forgotPasswordToken')})"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{forgotPasswordToken}}\",\n  \"email\": \"user@example.com\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/account/forgot/email",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "account",
+            "forgot",
+            "email"
+          ]
+        },
+        "description": "Queues email delivery for password reset OTP"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"email\": \"user@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/account/forgot/email",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "account",
+                "forgot",
+                "email"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Email queued for delivery\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "2b. Request OTP via SMS",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{forgotPasswordToken}}\",\n  \"phoneNumber\": \"+1234567890\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/account/forgot/sms",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "account",
+            "forgot",
+            "sms"
+          ]
+        },
+        "description": "Queues SMS delivery for password reset OTP"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"phoneNumber\": \"+1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/account/forgot/sms",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "account",
+                "forgot",
+                "sms"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"SMS queued for delivery\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "3. Verify OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.environment.set('resetToken', jsonData.data.resetToken);",
+              "    pm.test('Reset token stored', function() {",
+              "        pm.expect(jsonData.data.resetToken).to.exist;",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{forgotPasswordToken}}\",\n  \"otp\": \"123456\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/account/forgot/verify-otp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "account",
+            "forgot",
+            "verify-otp"
+          ]
+        },
+        "description": "Validates OTP submitted by user. In Development environment, any OTP is accepted."
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/account/forgot/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "account",
+                "forgot",
+                "verify-otp"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"verified\": true,\n    \"resetToken\": \"660f9511-f40c-52e5-b827-557766551111\",\n    \"expiresIn\": 600\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "4. Set New Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"resetToken\": \"{{resetToken}}\",\n  \"newPassword\": \"NewP@ssw0rd!\",\n  \"confirmPassword\": \"NewP@ssw0rd!\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/account/forgot/set-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "account",
+            "forgot",
+            "set-password"
+          ]
+        },
+        "description": "Completes password reset flow and sets new password. Password requirements: min 8 chars, uppercase, lowercase, digit, special char."
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resetToken\": \"660f9511-f40c-52e5-b827-557766551111\",\n  \"newPassword\": \"NewP@ssw0rd!\",\n  \"confirmPassword\": \"NewP@ssw0rd!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/account/forgot/set-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "account",
+                "forgot",
+                "set-password"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Password reset successfully\"\n  }\n}"
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://localhost:5001",
+      "type": "string"
+    },
+    {
+      "key": "environment",
+      "value": "development",
+      "type": "string"
+    },
+    {
+      "key": "forgotPasswordToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
