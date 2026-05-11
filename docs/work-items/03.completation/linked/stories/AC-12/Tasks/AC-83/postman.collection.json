@@ -1,0 +1,172 @@
+{
+  "item": [
+    {
+      "name": "GET /api/v1/sso/roles/{{roleId}}/users",
+      "response": [],
+      "request": {
+        "url": {
+          "query": [
+            {
+              "key": "index",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "10"
+            }
+          ],
+          "raw": "{{base_url}}/api/v1/sso/roles/{{roleId}}/users?index=0&size=10"
+        },
+        "description": "Auto-generated from completion.md for AC-83",
+        "header": [
+          {
+            "type": "text",
+            "value": "Bearer {{auth_token}}",
+            "key": "Authorization"
+          },
+          {
+            "type": "text",
+            "value": "application/json",
+            "key": "Accept"
+          }
+        ],
+        "method": "GET"
+      }
+    },
+    {
+      "name": "POST /api/v1/sso/roles/{{roleId}}/users",
+      "response": [],
+      "request": {
+        "url": {
+          "raw": "{{base_url}}/api/v1/sso/roles/{{roleId}}/users"
+        },
+        "description": "Auto-generated from completion.md for AC-83",
+        "header": [
+          {
+            "type": "text",
+            "value": "Bearer {{auth_token}}",
+            "key": "Authorization"
+          },
+          {
+            "type": "text",
+            "value": "application/json",
+            "key": "Accept"
+          },
+          {
+            "type": "text",
+            "value": "application/json",
+            "key": "Content-Type"
+          }
+        ],
+        "method": "POST",
+        "body": {
+          "raw": "{\n  \"userIds\": [1, 2]\n}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "DELETE /api/v1/sso/roles/{{roleId}}/users",
+      "response": [],
+      "request": {
+        "url": {
+          "raw": "{{base_url}}/api/v1/sso/roles/{{roleId}}/users"
+        },
+        "description": "Auto-generated from completion.md for AC-83",
+        "header": [
+          {
+            "type": "text",
+            "value": "Bearer {{auth_token}}",
+            "key": "Authorization"
+          },
+          {
+            "type": "text",
+            "value": "application/json",
+            "key": "Accept"
+          },
+          {
+            "type": "text",
+            "value": "application/json",
+            "key": "Content-Type"
+          }
+        ],
+        "method": "DELETE",
+        "body": {
+          "raw": "{\n  \"userIds\": [1, 2]\n}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "GET /api/v1/sso/roles/{{roleId}}/users/search",
+      "response": [],
+      "request": {
+        "url": {
+          "query": [
+            {
+              "key": "index",
+              "value": "0"
+            },
+            {
+              "key": "q",
+              "value": "ali"
+            },
+            {
+              "key": "size",
+              "value": "10"
+            }
+          ],
+          "raw": "{{base_url}}/api/v1/sso/roles/{{roleId}}/users/search?index=0&q=ali&size=10"
+        },
+        "description": "Auto-generated from completion.md for AC-83",
+        "header": [
+          {
+            "type": "text",
+            "value": "Bearer {{auth_token}}",
+            "key": "Authorization"
+          },
+          {
+            "type": "text",
+            "value": "application/json",
+            "key": "Accept"
+          }
+        ],
+        "method": "GET"
+      }
+    }
+  ],
+  "info": {
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Task-specific API endpoints for AC-83",
+    "name": "AC-83 API Collection",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.local"
+    },
+    {
+      "key": "auth_token",
+      "value": ""
+    },
+    {
+      "key": "environment",
+      "value": "dev"
+    },
+    {
+      "key": "role_id",
+      "value": "1"
+    }
+  ]
+}
