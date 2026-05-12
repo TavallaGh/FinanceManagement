@@ -11,12 +11,12 @@ Translations use `@ngx-translate/core`.
 
 ## Translation Files
 
-**Primary location** (actively used by the app):
+**Single source of truth**:
 
 - `public/assets/i18n/fa.json`
 - `public/assets/i18n/en.json`
 
-**⚠️ IMPORTANT**: Always add translation keys to `public/assets/i18n/` files. The `apps/erp-web/src/assets/i18n/` path is deprecated and should not be used.
+**⚠️ IMPORTANT**: All translation keys must be added to `public/assets/i18n/` files only. There is no secondary location.
 
 ## Key Naming Convention
 
@@ -141,7 +141,7 @@ Duplicate single-word or two-word values across components are forbidden — use
 | `UI_INFO` | Information | اطلاعات |
 | `UI_SETTINGS` | Settings | تنظیمات |
 | `UI_BUTTON` | Button | دکمه |
-| `UI_SUBMIT` | Submit | ارسال |
+| `UI_SUBMIT` | Submit | تایید |
 | `UI_RESET` | Reset | بازنشانی |
 | `UI_DELETE` | Delete | حذف |
 | `UI_EDIT` | Edit | ویرایش |

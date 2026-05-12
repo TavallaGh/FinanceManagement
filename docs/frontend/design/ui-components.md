@@ -23,6 +23,7 @@ Reusable UI components live in:
 
 Current shared components include:
 
+- `card/`
 - `checkbox/`
 - `checkbox-group/`
 - `date-picker/`
@@ -38,6 +39,9 @@ Interactive component previews and usage documentation live in:
 
 Current story-book pages for shared UI components include:
 
+- `apps/erp-web/src/app/dev-tools/story-book/pages/card/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/notification-card/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/action-card/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/checkbox/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/date-time-picker/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/icon/`
@@ -56,6 +60,94 @@ It includes:
 The theme toggle is visible in the header and reflects the active theme. It does not require any input from feature pages.
 
 ## Component Catalog
+
+### Card Components
+
+The shared card components family is implemented in:
+
+- `libs/shared/ui/src/lib/components/card/`
+
+The family includes three specialized card variants:
+
+- `card.component` — Base card container with optional header and footer slots
+- `stat-card.component` — Statistical metric card with icon, title, value, and optional trend indicator
+- `notification-card.component` — Notification display card with severity icon, content, and action buttons
+- `action-card.component` — Action prompt card with description and footer action buttons
+
+Interactive documentation is organized across three separate story-book pages:
+
+- `apps/erp-web/src/app/dev-tools/story-book/pages/card/` — Base card and stat card documentation
+- `apps/erp-web/src/app/dev-tools/story-book/pages/notification-card/` — Notification card documentation
+- `apps/erp-web/src/app/dev-tools/story-book/pages/action-card/` — Action card documentation
+
+#### Base Card (UiCardComponent)
+
+The base card provides a flexible container with:
+
+- default content slot
+- optional header slot via `uiCardHeader` directive
+- optional footer slot via `uiCardFooter` directive
+- consistent elevation, radius, and spacing tokens
+- automatic RTL/LTR layout support
+
+Use the base card for generic content grouping and as the foundation for specialized card variants.
+
+#### Stat Card (UiStatCardComponent)
+
+The stat card displays statistical metrics with:
+
+- 3-row layout: icon + trend badge (row 1), title (row 2), value (row 3)
+- configurable icon and icon variant background colors via `icon` and `iconVariant` inputs
+- optional trend indicator using `UiTagComponent` with `trend` ('up' | 'down') and `trendValue` inputs
+- automatic severity mapping: 'up' trend → success tag, 'down' trend → danger tag
+- icon hover scale animation
+- icon border with 10% opacity via `color-mix(in srgb, currentColor 10%, transparent)`
+- automatic RTL/LTR layout support (layout inherits from document direction)
+
+Icon variant options: `'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'danger'`
+
+Use the stat card for dashboard metrics, KPI displays, and summary statistics.
+
+**RTL/LTR Behavior:**
+- Layout automatically adapts to document `dir` attribute
+- Uses CSS logical properties for text alignment
+- No manual direction overrides needed in component styles
+
+#### Notification Card (UiNotificationCardComponent)
+
+The notification card displays notifications with:
+
+- 3-column grid layout: severity icon (left/right), content (center), action buttons (right/left)
+- severity variants: `'success' | 'info' | 'warning' | 'danger'`
+- configurable title, text, and optional date
+- read/unread state with visual indicator (purple background tint for unread)
+- mark-as-read button (conditionally shown when unread)
+- delete button with danger hover state
+- automatic RTL/LTR layout support via CSS Grid direction inheritance
+- flat design (no box-shadow), subtle border styling
+
+Use the notification card for activity feeds, alert lists, and notification centers.
+
+**RTL/LTR Behavior:**
+- CSS Grid automatically reverses column order based on document `dir`
+- Text alignment uses `text-align: start` for automatic adaptation
+- No hardcoded layout direction in component or page templates
+
+#### Action Card (UiActionCardComponent)
+
+The action card presents actionable prompts with:
+
+- header slot for icon and title via `uiCardHeader` directive
+- default content slot for description text
+- footer slot for action buttons via `uiCardFooter` directive
+- no footer border (clean separation between content and actions)
+- automatic RTL/LTR layout support
+
+Use the action card for call-to-action sections, empty states, and user prompts.
+
+**Styling Notes:**
+- Footer border removed via `::ng-deep .ui-card__footer { border-block-start: none !important; }`
+- Maintains consistent spacing and token usage with base card
 
 ### Checkbox Component
 
