@@ -73,8 +73,6 @@ If story-book text changes, update both language sources:
 - `public/assets/i18n/en.json`
 - `public/assets/i18n/fa.json`
 
-**⚠️ IMPORTANT**: `apps/erp-web/src/assets/i18n/` is deprecated. Always write to `public/assets/i18n/` only.
-
 Never add story-book UI text in templates directly.
 
 Before adding a new key, check whether a shared `DS_COMMON_*` or `UI_*` key already covers the value. See `docs/frontend/localization/i18n-guide.md` for the full shared-key table and deduplication rules.

@@ -415,6 +415,23 @@ For tag, keep the story-book page updated when changing:
 - grouping behavior
 - inline text examples
 
+For card components, keep the story-book pages updated when changing:
+
+- card variants (base, stat, notification, action)
+- layout structure or slot behavior
+- severity or status variants
+- RTL/LTR layout behavior
+- icon or trend indicator integration
+
+**RTL/LTR Storybook Guidelines:**
+
+- Never hardcode `dir="rtl"` or `dir="ltr"` on preview containers
+- Let components inherit direction from `<html dir>` attribute managed by `I18nService`
+- Test components in both Persian (RTL) and English (LTR) modes via language switcher
+- Use CSS logical properties (`inline-size`, `block-size`, `margin-inline-start`, `text-align: start`) for automatic direction support
+- Avoid manual `:host-context([dir="ltr"])` selectors unless element order must physically reverse
+- Document any direction-specific behavior in component catalog (`ui-components.md`)
+
 Do not add Storybook entries for feature-local components unless that feature is already documented there or the task explicitly requires it.
 
 ## Figma and Precision

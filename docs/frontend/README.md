@@ -34,6 +34,9 @@ Application runs at `http://localhost:4200`.
 
 The internal shared-component showcase is available at:
 
+- `http://localhost:4200/story-book/card`
+- `http://localhost:4200/story-book/notification-card`
+- `http://localhost:4200/story-book/action-card`
 - `http://localhost:4200/story-book/checkbox`
 - `http://localhost:4200/story-book/date-time-picker`
 - `http://localhost:4200/story-book/icon`
@@ -70,7 +73,7 @@ nx build erp-web --configuration=production # Production build
 ### Story Book
 
 - Shared UI previews and usage docs live under `apps/erp-web/src/app/dev-tools/story-book/`
-- Current showcase routes: `story-book/checkbox`, `story-book/date-time-picker`, `story-book/icon`, `story-book/tag`
+- Current showcase routes: `story-book/card`, `story-book/notification-card`, `story-book/action-card`, `story-book/checkbox`, `story-book/date-time-picker`, `story-book/icon`, `story-book/tag`
 
 ### Localization
 

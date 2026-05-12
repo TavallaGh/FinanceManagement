@@ -114,15 +114,6 @@ SPA --> localization resolver
 UI --> translated text
 ```
 
-### Active Translation Files (Angular ERP SPA)
-
-The app loads translations from:
-
-- `public/assets/i18n/en.json` — English
-- `public/assets/i18n/fa.json` — Persian (RTL)
-
-**⚠️ IMPORTANT**: `apps/erp-web/src/assets/i18n/` is deprecated. All new keys must go into `public/assets/i18n/` only. The deprecated path must not be used.
-
 ## 5. Localization Service / Helper
 
 A localization service is required to avoid direct resource access spread across UI layers.
@@ -178,47 +169,12 @@ Use descriptive category-prefixed uppercase keys:
 - `VALIDATION_REQUIRED_FIELD`
 - `PAGE_LOGIN_TITLE`
 - `NOTIFICATION_PASSWORD_RESET_SUCCESS`
-- `DS_INPUT_TITLE`
-- `DS_COMMON_STATE_DEFAULT`
 
 Rules:
 
 - Keys must be grouped by category.
 - Keys must be descriptive and stable.
 - Avoid ambiguous names such as `MSG_1` or `TEXT_LABEL`.
-- Do **not** use nested dot-notation keys (e.g. `common.save`). All keys must be flat uppercase.
-
-### Frontend SPA — Design System Prefix Rules
-
-For the Angular ERP SPA, these additional prefix rules apply:
-
-| Prefix | Usage |
-|---|---|
-| `UI_` | General UI — buttons, common single-word actions, shared labels |
-| `DS_` | Design-system storybook — component-specific documentation |
-| `DS_COMMON_` | Shared storybook labels reused across multiple components |
-
-**Deduplication rule**: Any value that is a single word or short generic phrase used in more than one design-system component must use a `DS_COMMON_*` or `UI_*` key. Component-specific keys for the same value are forbidden.
-
-Examples of shared keys that must not be duplicated per component:
-
-```json
-"DS_COMMON_TOC_OVERVIEW": "Overview",
-"DS_COMMON_IMPORT": "Import",
-"DS_COMMON_API_TITLE": "API",
-"DS_COMMON_TOC_STATES": "States",
-"DS_COMMON_FORM_TEMPLATE": "Template-Driven Form",
-"DS_COMMON_FORM_REACTIVE": "Reactive Form",
-"DS_COMMON_STATE_DEFAULT": "Default",
-"DS_COMMON_STATE_DISABLED": "Disabled",
-"DS_COMMON_STATE_INVALID": "Invalid",
-"DS_COMMON_STATE_WITH_VALUE": "With Value",
-"DS_COMMON_LABEL_USERNAME": "Username",
-"DS_COMMON_LABEL_EMAIL": "Email",
-"DS_COMMON_LABEL_PRICE": "Price",
-"DS_COMMON_LABEL_AMOUNT": "Amount",
-"DS_COMMON_PLACEHOLDER_DECIMAL": "0.00"
-```
 
 ## 9. Validation Localization
 
@@ -271,9 +227,6 @@ AI assistants must follow these rules:
 - Always reference strongly typed constants
 - Backend APIs must return message keys
 - Frontend must resolve translations
-- For Angular ERP SPA: always write to `public/assets/i18n/` — never to `apps/erp-web/src/assets/i18n/`
-- For design-system storybook: check `DS_COMMON_*` and `UI_*` shared keys before creating a component-specific key
-- If a value (single word or short phrase) already exists under a shared key, reuse the shared key — do not duplicate it
 
 AI review must reject code violating these constraints.
 
