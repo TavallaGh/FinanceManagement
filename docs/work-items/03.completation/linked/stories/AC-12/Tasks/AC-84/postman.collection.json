@@ -1,0 +1,139 @@
+{
+  "info": {
+    "name": "AC-84 API Collection",
+    "description": "Task-specific API endpoints for AC-84 role permission management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "GET /api/v1/sso/roles/{{role_id}}/permissions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sso/roles/{{role_id}}/permissions?q=Use&index=0&size=10",
+          "query": [
+            {
+              "key": "q",
+              "value": "Use"
+            },
+            {
+              "key": "index",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "10"
+            }
+          ]
+        },
+        "description": "Returns paginated role permission tree nodes with granted action overlays. Query q requires at least 3 characters."
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/v1/sso/roles/{{role_id}}/permissions (replace)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sso/roles/{{role_id}}/permissions"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"clear\": false,\n  \"permissions\": [\n    {\n      \"layer\": \"Accounting\",\n      \"resourceCode\": \"Roles\",\n      \"applyAll\": false,\n      \"actions\": [\"View\", \"Edit\"]\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Replaces role permissions using tree-oriented payload; rejects unknown permission keys."
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/v1/sso/roles/{{role_id}}/permissions (clear all)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sso/roles/{{role_id}}/permissions"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"clear\": true,\n  \"permissions\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Clears all persisted permission assignments for the role and returns an empty snapshot."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://sso-dev.nexttoptech.local"
+    },
+    {
+      "key": "auth_token",
+      "value": ""
+    },
+    {
+      "key": "environment",
+      "value": "dev"
+    },
+    {
+      "key": "role_id",
+      "value": "1"
+    }
+  ]
+}

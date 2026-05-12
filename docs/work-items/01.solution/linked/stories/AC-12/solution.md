@@ -16,7 +16,7 @@
   - **Security:** All role management endpoints require authentication and `AdminPolicyAccess` guard. Per-operation permission keys follow `PermissionKey.Build(PermissionLayer.Accounting, PermissionResourceCodeTypes.Roles, ...)` pattern.
   - **Audit:** All role lifecycle and assignment operations emit `AuditLogEntry` records via the existing `IAuditLogService`, matching the established pattern in `UserServices.cs`.
   - **Localization:** All entity string metadata uses bilingual fields (`LabelEn`/`LabelFa`, `DescriptionEn`/`DescriptionFa`). No hardcoded user-facing strings in API responses — error messages are keyed via `GlobalResponseKey`.
-  - **Architecture separation:** Thin handlers (Application layer) delegate to a single `IRoleService` contract. Business invariants live in domain or domain services. No data-access logic in handlers or endpoints.
+  - **Architecture separation:** Thin handlers (Application layer) delegate to the appropriate role service contract (`IRoleService` for CRUD, `IRoleUserService` for assignment, `IRolePermissionService` for permissions). Business invariants live in domain or domain services. No data-access logic in handlers or endpoints.
   - **Permission invalidation:** Token-claim mechanism (OQ-02 resolved). Role permission changes take effect at next JWT issuance. No additional cache invalidation plumbing is needed.
 
 ---
@@ -44,8 +44,8 @@
 - **Decision 2 — Token-natural permission invalidation (no additional invalidation mechanism).**
   Resolved in OQ-02: permissions (direct and role-derived) are encoded in JWT claims by `PermissionClaimsProfileService`. After a role's permissions change, the updated effective permissions are reflected in the next token issued. No cache invalidation hook is needed for role permission save.
 
-- **Decision 3 — Handler pattern: thin handler → single `IRoleService` call.**
-  Following the established pattern in `GrantDirectPermissionCommandHandler` and `CreateUserCommandHandler`: each handler injects the service contract and delegates to exactly one service method. No business or data-access logic in handlers.
+- **Decision 3 — Handler pattern: thin handler → single service call.**
+  Following the established pattern in `GrantDirectPermissionCommandHandler` and `CreateUserCommandHandler`: each handler injects the appropriate service contract (`IRoleService`, `IRoleUserService`, or `IRolePermissionService`) and delegates to exactly one service method. No business or data-access logic in handlers.
 
 - **Decision 4 — Endpoint authorization via `PermissionKey.Build` per operation.**
   Each role endpoint uses `PermissionKey.Build(PermissionLayer.Accounting, PermissionResourceCodeTypes.Roles, <action>)` as the authorization policy, matching the `UserEndpoints.cs` pattern. The admin guard `AppConst.AdminPolicyAccess` is applied to the role endpoint group.
@@ -59,8 +59,12 @@
 - **Decision 7 — Soft-delete contract: `Deprecated = true`.**
   Role deletion sets `Deprecated = true`. Roles with active `UserRoles` assignments cannot be soft-deleted — the API must validate and return a keyed error. Physical delete is never performed.
 
-- **Decision 8 — `RoleService` placed in `ERP.Sso.Infra.Sql/Roles/`.**
-  Follows the `UserServices.cs` placement convention (`src/03.Infra/ERP.Sso.Infra.Sql/Users/`). The corresponding contract `IRoleService` lives in `src/01.Domain/ERP.Sso.Domain/Roles/Contracts/`.
+- **Decision 8 — Role services placed in `ERP.Sso.Infra.Sql/Roles/`, split by responsibility.**
+  Follows the `UserServices.cs` placement convention (`src/03.Infra/ERP.Sso.Infra.Sql/Users/`). The role layer is split into three focused services:
+  - `RoleService : IRoleService` — role lifecycle (CRUD, deactivate, soft-delete)
+  - `RoleUserService : IRoleUserService` — role–user assignment and revocation
+  - `RolePermissionService : IRolePermissionService` — role permission tree assignment and query
+  All three contracts live in `src/01.Domain/ERP.Sso.Domain/Roles/Contracts/`.
 
 - **Decision 9 — `PermissionResourceCodeTypes.Roles` seeding is already present.**
   Confirmed in OQ-05: `AuthorizationDataSeeder` already seeds `PermissionResourceCodeTypes.Roles` permission keys. No new seeding work is required for the base permission catalog.

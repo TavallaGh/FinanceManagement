@@ -12,9 +12,9 @@
 ## Description
 
 - Implemented the role-user assignment API surface inside the existing `Roles` slice in `projects/accounting-sso`.
-- Extended `IRoleService` with assign, remove, assigned-user list, and candidate-search methods, plus task-specific DTOs for batch assignment, removal, search filtering, and user summaries.
-- Added thin MediatR commands and queries for assignment, removal, assigned-user listing, and candidate search without moving business logic out of `RoleService`.
-- Updated `RoleService` to normalize distinct positive user IDs, reject inactive roles, reject missing or inactive users on assignment, ignore duplicate assignments, ignore missing removals, and return paginated assigned-user and candidate-search results.
+- Created a dedicated `IRoleUserService` contract with assign, remove, assigned-user list, and candidate-search methods, plus task-specific DTOs for batch assignment, removal, search filtering, and user summaries.
+- Added thin MediatR commands and queries for assignment, removal, assigned-user listing, and candidate search without moving business logic out of `RoleUserService`.
+- Implemented `RoleUserService` to normalize distinct positive user IDs, reject inactive roles, reject missing or inactive users on assignment, ignore duplicate assignments, ignore missing removals, and return paginated assigned-user and candidate-search results.
 - Extended `RoleEndpoints` with `/api/v1/sso/roles/{roleId}/users` routes for list, search, assign, and remove while preserving `AdminPolicyAccess`, per-route `PermissionKey` guards, keyed validation, and not-found translation.
 - Added focused integration coverage for both service and endpoint behavior, including inactive-role rejection, short-query validation, exclusion of already assigned and inactive users, and persistence of assignment and removal changes.
 - No schema migration, seed update, or additional registration change was required for this slice.
@@ -34,7 +34,7 @@
 - **AOC-06:** All endpoints require `AdminPolicyAccess` and appropriate permission guards.
   - ✅ The role group keeps `AdminPolicyAccess`; list uses `View`, while search, assign, and remove use `Edit`.
 - **AOC-07:** Thin-handler pattern remains enforced.
-  - ✅ All four handlers remain one-line delegations to `IRoleService`.
+  - ✅ All four handlers remain one-line delegations to `IRoleUserService`.
 
 ## Implementation Notes
 
@@ -43,7 +43,7 @@
 | File | Change |
 | --- | --- |
 | `projects/accounting-sso/src/01.Domain/ERP.Sso.Domain/Common/Errors/GlobalResponseKey.cs` | Added assignment-specific validation keys plus assignment/removal information keys. |
-| `projects/accounting-sso/src/01.Domain/ERP.Sso.Domain/Roles/Contracts/IRoleService.cs` | Added assign, remove, assigned-user list, and candidate-search service methods. |
+| `projects/accounting-sso/src/01.Domain/ERP.Sso.Domain/Roles/Contracts/IRoleUserService.cs` | New dedicated contract for role-user assignment, removal, listing, and candidate search. |
 | `projects/accounting-sso/src/01.Domain/ERP.Sso.Domain/Roles/Dtos/AssignUsersToRoleRequest.cs` | Added batch assignment payload for `UserIds`. |
 | `projects/accounting-sso/src/01.Domain/ERP.Sso.Domain/Roles/Dtos/RemoveUsersFromRoleRequest.cs` | Added batch removal payload for `UserIds`. |
 | `projects/accounting-sso/src/01.Domain/ERP.Sso.Domain/Roles/Dtos/RoleUserSearchRequest.cs` | Added search filter contract for live-search query text. |
@@ -62,7 +62,7 @@
 
 | File | Change |
 | --- | --- |
-| `projects/accounting-sso/src/03.Infra/ERP.Sso.Infra.Sql/Roles/RoleService.cs` | Added the role-user membership implementation, keyed validation, paging, search filtering, and structured logging. |
+| `projects/accounting-sso/src/03.Infra/ERP.Sso.Infra.Sql/Roles/RoleUserService.cs` | New dedicated service implementing role-user membership, keyed validation, paging, search filtering, and structured logging. |
 | `projects/accounting-sso/src/04.Presentation/IDP/Erp.Sso.Ids/Endpoints/RoleEndpoints.cs` | Added the `/users` subgroup with list, search, assign, and remove endpoints under the existing role API surface. |
 
 ### Tests
