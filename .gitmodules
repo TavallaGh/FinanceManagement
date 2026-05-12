@@ -10,3 +10,6 @@
 [submodule "projects/accounting-sso"]
 	path = projects/accounting-sso
 	url = https://gitlab.com/next-top-tech/accounting/accounting-sso
+[submodule "projects/accounting-notification"]
+	path = projects/accounting-notification
+	url = https://gitlab.com/next-top-tech/accounting/accounting-notification
