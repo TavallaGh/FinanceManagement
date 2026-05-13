@@ -329,6 +329,80 @@ Use the predefined stack only:
 
 Do not introduce custom z-index values.
 
+## Grid System (AC-70)
+
+### Grid List Components
+
+The grid system is implemented as Angular components in the shared UI library:
+
+- `UiGridListComponent` (`ui-grid-list`) — Material-style grid list with fixed columns and configurable aspect-ratio tile heights.
+- `UiGridTileComponent` (`ui-grid-tile`) — Individual tile inside a grid list with colspan and rowspan support.
+
+Both components live in:
+
+- `libs/shared/ui/src/lib/components/grid-list/`
+
+Import from `@accounting-erp/shared/ui`.
+
+#### UiGridListComponent Inputs
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `cols` | `number` | `1` | Number of columns in the grid |
+| `rowHeight` | `string` | `'1:1'` | Tile height as `W:H` aspect ratio |
+| `gutterSize` | `string` | `var(--spacing-4)` | Gap between tiles (CSS value or token) |
+
+#### UiGridTileComponent Inputs
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `colspan` | `number` | `1` | Number of columns the tile spans |
+| `rowspan` | `number` | `1` | Number of rows the tile spans |
+
+#### Usage Example
+
+```html
+<ui-grid-list [cols]="3" rowHeight="4:1" gutterSize="var(--spacing-4)">
+  <ui-grid-tile>
+    <ui-card class="ui-fill ui-card-bg-surface">
+      <div class="ui-center">Content</div>
+    </ui-card>
+  </ui-grid-tile>
+  <ui-grid-tile [colspan]="2">
+    <ui-card class="ui-fill ui-card-bg-info">
+      <div class="ui-center">Wide tile</div>
+    </ui-card>
+  </ui-grid-tile>
+</ui-grid-list>
+```
+
+### Story Book
+
+Interactive documentation is available at:
+
+- **Route**: `/story-book/grid-system`
+- **Component**: `GridSystemStoryBookComponent` (`apps/erp-web/src/app/dev-tools/story-book/pages/grid-system/`)
+
+### Global Layout Utilities
+
+A set of global CSS utility classes is available via `public/styles/utils/_layout.scss` (imported globally in `apps/erp-web/src/styles.scss`).
+
+| Class | Purpose |
+|---|---|
+| `ui-fill` | Sets `height: 100%` — fills parent height |
+| `ui-center` | Flex center (horizontal + vertical) at 100% height |
+| `ui-mb-2` | `margin-block-end: var(--spacing-2)` |
+| `ui-mb-3` | `margin-block-end: var(--spacing-3)` |
+| `ui-card-bg-surface` | Sets `--bg-card` to `var(--surface-secondary)` |
+| `ui-card-bg-info` | Sets `--bg-card` to info-50, text to info-700 |
+| `ui-card-bg-success` | Sets `--bg-card` to success-50, text to success-700 |
+| `ui-card-bg-warning` | Sets `--bg-card` to warning-50, text to warning-700 |
+| `ui-card-bg-primary-subtle` | Sets `--bg-card` to primary-50, text to primary-700, medium weight |
+
+The `ui-card-bg-*` classes override the `--bg-card` CSS variable on the host element, which `UiCardComponent` reads for its background. This pattern keeps per-instance theming out of component SCSS.
+
+Do not place these utility classes inside component SCSS files. Use them directly in templates.
+
 ## Icons
 
 Icons should come from:
