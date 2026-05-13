@@ -277,9 +277,7 @@ After taskClose completes:
 
 ## Related Documentation
 
-- `.claude/commands/02-implementation-phase-prompts/03.speckit.taskcompletion.md` — TaskCompletion prompt
-- `.claude/commands/02-implementation-phase-prompts/04.speckit.taskclose.md` — TaskClose prompt
-- `.codex/prompts/02-implementation-phase-prompts/03.speckit.taskcompletion.md` — TaskCompletion (Codex)
-- `.codex/prompts/02-implementation-phase-prompts/04.speckit.taskclose.md` — TaskClose (Codex)
+- `.prompts/02-implementation-phase-prompts/03.speckit.taskcompletion.prompt.md` — TaskCompletion prompt
+- `.prompts/02-implementation-phase-prompts/04.speckit.taskclose.prompt.md` — TaskClose prompt
 - `docs/workflows/git-workflow-flows.md` — Git flow guardrails
 - `AGENTS.md` — Jira workflow status definitions and MR requirements

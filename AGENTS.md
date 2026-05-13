@@ -9,8 +9,8 @@ This workspace runs agents in **operational mode** for task-oriented prompts.
    - `docs/workflows/git-workflow-flows.md`
    - `docs/workflows/specify-codex-flow.md`
   - `.specify/memory/constitution.md`
-  - `.codex/prompts/speckit.taskstoissues.md`
-   - `.claude/commands/speckit.codereview.md`
+   - `.prompts/02-implementation-phase-prompts/00.speckit.taskstoissues.prompt.md`
+   - `.prompts/00-general-prompts/speckit.codereview.prompt.md`
 
 ## Mandatory Runtime Rules
 

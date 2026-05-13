@@ -63,7 +63,7 @@ source .specify/scripts/bash/load-secrets.sh
 
 ## 3) Use with Codex task-to-issue flow
 
-The prompt `.codex/prompts/speckit.taskstoissues.md` is configured to:
+The prompt `.prompts/02-implementation-phase-prompts/00.speckit.taskstoissues.prompt.md` is configured to:
 
 - Read a Jira task key/link and fetch task details.
 - Update Jira status for workflow execution.

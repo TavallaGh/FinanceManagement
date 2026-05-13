@@ -27,9 +27,11 @@ docs/work-items/
       solution-linked-story.template.md
       solution-linked-task.template.md
   implementation/
-    stories/<STORY-KEY>/tasks/<TASK-KEY>.md
+    stories/<STORY-KEY>/tasks/<TASK-KEY>-implementation-plan.md
+    stories/<STORY-KEY>/tasks/<TASK-KEY>-taskclose.md
     stories/<STORY-KEY>/story-summary.md
-    standalone/<type>/<TASK-KEY>.md
+    stories/<STORY-KEY>/postman/<STORY-KEY>.postman_collection.json
+    standalone/<type>/<TASK-KEY>-implementation-plan.md
     templates/
       task-record.template.md
       story-summary.template.md
@@ -76,5 +78,6 @@ Recommended output paths for Jira-triggered execution:
 
 - Refienment linked task: `docs/work-items/REFIENMENT/linked/tasks/<TASK-KEY>/REFIENMENT.md`
 - Solution linked task: `docs/work-items/solution/linked/tasks/<TASK-KEY>/solution.md`
-- Implementation record: `docs/work-items/implementation/standalone/<type>/<TASK-KEY>.md` or story task path
+- Implementation record: `docs/work-items/implementation/standalone/<type>/<TASK-KEY>-implementation-plan.md` or story task path
+- Task close record: `docs/work-items/implementation/stories/<STORY-KEY>/tasks/<TASK-KEY>-taskclose.md`
 - Completion record: `docs/work-items/completion/linked/tasks/<TASK-KEY>/completion.md`

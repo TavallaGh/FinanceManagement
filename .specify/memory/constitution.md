@@ -86,7 +86,7 @@ MVP issue metadata policy:
 	- `docs/workflows/specify-branching-template.md`
 	- `docs/integrations/jira-gitlab-secrets-integration.md`
 - Prompt contract:
-	- `.codex/prompts/speckit.taskstoissues.md`
+	- `.prompts/02-implementation-phase-prompts/00.speckit.taskstoissues.prompt.md`
 
 ## Governance
 
@@ -94,7 +94,7 @@ MVP issue metadata policy:
 - Any workflow rule change (naming, target branches, linking, transition behavior, safety limits) must update:
 	- this constitution,
 	- related docs under `docs/`,
-	- and prompt instructions under `.codex/prompts/` when applicable.
+	- and prompt instructions under `.prompts/` when applicable.
 - Priority order for conflicts:
 	1. Explicit user instruction in active task
 	2. This constitution

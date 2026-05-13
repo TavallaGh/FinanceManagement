@@ -8,8 +8,8 @@
 ### 1. ✅ Updated TaskClose Prompt
 
 **Files Updated:**
-- `.claude/commands/02-implementation-phase-prompts/03.speckit.taskclose.md`
-- `.codex/prompts/02-implementation-phase-prompts/04.speckit.taskclose.md`
+- `.prompts/02-implementation-phase-prompts/03.speckit.taskcompletion.prompt.md`
+- `.prompts/02-implementation-phase-prompts/04.speckit.taskclose.prompt.md`
 
 **What Changed:**
 - **Unified all duties in ONE prompt** (no separate steps)
@@ -162,11 +162,9 @@ docs/
     ├── task-close-workflow.md       # Existing - Original workflow docs
     └── git-workflow-flows.md        # Existing - Git flow reference
 
-.claude/commands/02-implementation-phase-prompts/
-└── 03.speckit.taskclose.md          # UPDATED - Unified prompt
-
-.codex/prompts/02-implementation-phase-prompts/
-└── 04.speckit.taskclose.md          # UPDATED - Unified prompt
+.prompts/02-implementation-phase-prompts/
+└── 03.speckit.taskcompletion.prompt.md   # CURRENT - TaskCompletion prompt
+└── 04.speckit.taskclose.prompt.md        # CURRENT - Unified TaskClose prompt
 ```
 
 ## Migration Guide
