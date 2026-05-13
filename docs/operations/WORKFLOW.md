@@ -87,7 +87,7 @@ Developer and user guides are maintained under `docs/guides/`.
 ## Code Review Gate (Claude Reviewer)
 
 - After implementer declares task `Done` (implementation done), run reviewer flow:
-	- `.claude/commands/speckit.codereview.md`
+	- `.prompts/00-general-prompts/speckit.codereview.prompt.md`
 - Reviewer source of truth is Jira task link and its GitLab MR Web Link.
 - Reviewer source of truth is Jira task link and Jira Web Links for both task MRs; project MR is the primary code-review target.
 - Reviewer must assess general quality with .NET-oriented checks.

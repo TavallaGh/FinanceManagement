@@ -9,7 +9,8 @@ docs/work-items/02.implementation/
   stories/
     <STORY-KEY>/
       tasks/
-        <TASK-KEY>.md
+        <TASK-KEY>-implementation-plan.md
+        <TASK-KEY>-taskclose.md
       story-summary.md
       postman/
         <STORY-KEY>.postman_collection.json
@@ -18,13 +19,13 @@ docs/work-items/02.implementation/
         CHANGELOG.md
   standalone/
     bugs/
-      <TASK-KEY>.md
+      <TASK-KEY>-implementation-plan.md
     technicals/
-      <TASK-KEY>.md
+      <TASK-KEY>-implementation-plan.md
     hotfix/
-      <TASK-KEY>.md
+      <TASK-KEY>-implementation-plan.md
     features/
-      <TASK-KEY>.md
+      <TASK-KEY>-implementation-plan.md
     postman/
       <TASK-KEY>.postman_collection.json
 ```

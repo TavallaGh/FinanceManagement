@@ -6,7 +6,7 @@ param(
     [string]$JiraKey,
 
     [string]$StatusTarget = 'In Progress',
-    [ValidateSet('auto', 'workspace', 'project', 'prototype', 'front')]
+    [ValidateSet('auto', 'workspace', 'project', 'prototype', 'front', 'SSO', 'Notification')]
     [string]$Repo = 'auto',
     [string]$CredentialsFile = '.secrets/credentials.local',
     [string]$SourceBranch,
@@ -189,6 +189,8 @@ function Get-RepoProjectId {
     if ($RepoMode -eq 'project') { return Get-RequiredEnv 'GITLAB_PROJECT_PROJECT_ID' }
     if ($RepoMode -eq 'prototype') { return Get-RequiredEnv 'GITLAB_PROTOTYPE_PROJECT_ID' }
     if ($RepoMode -eq 'front') { return Get-RequiredEnv 'GITLAB_FRONT_PROJECT_ID' }
+    if ($RepoMode -eq 'SSO') { return Get-RequiredEnv 'GITLAB_PROJECT_SSO_PROJECT_ID' }
+    if ($RepoMode -eq 'Notification') { return Get-RequiredEnv 'GITLAB_NOTIFICATION_PROJECT_ID' }
 
     $labelsLower = @($Labels | ForEach-Object { $_.ToLowerInvariant() })
     if ($labelsLower -contains 'process' -or $labelsLower -contains 'docs' -or $labelsLower -contains 'workflow' -or $labelsLower -contains 'automation' -or $labelsLower -contains 'meta') {
@@ -505,8 +507,8 @@ if (-not ($fixVersions -contains 'V 0.1 (MVP)')) {
     throw "Jira issue $JiraKey must include Fix Version 'V 0.1 (MVP)'"
 }
 
-if (-not ($labels | Where-Object { $_ -in @('frontend', 'backend', 'blocked') })) {
-    throw "Jira issue $JiraKey must include one of labels: frontend, backend, blocked"
+if (-not ($labels | Where-Object { $_ -in @('frontend', 'backend', 'blocked', 'Core') })) {
+    throw "Jira issue $JiraKey must include one of labels: frontend, backend, blocked, Core"
 }
 
 if ($StrictMetadata) {
@@ -532,23 +534,11 @@ if (-not $DryRun) {
     Invoke-JiraApi -Method Post -BaseUrl $jiraBase -Headers $jiraHeaders -Path "/rest/api/3/issue/$([System.Uri]::EscapeDataString($JiraKey))/transitions" -Body $transitionBody | Out-Null
 }
 
-$projectId = Get-RepoProjectId -RepoMode $Repo -Labels $labels
-$encodedProjectId = [System.Web.HttpUtility]::UrlEncode($projectId)
-
 $branchPlan = Resolve-BranchPlan -IssueTypeName $issueTypeName -Summary $summary -TaskKey $JiraKey -ProvidedSource $SourceBranch -ProvidedTarget $TargetBranch
 $SourceBranch = $branchPlan.Source
 $TargetBranch = $branchPlan.Target
 
-Ensure-GitLabBranchExists -BaseUrl $gitlabBase -Headers $gitlabHeaders -ProjectId $encodedProjectId -Branch $SourceBranch -Ref $TargetBranch -NoWrite:$DryRun
-
 $mvpMilestoneTitle = 'V 0.1 (MVP)'
-$milestones = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedProjectId/milestones?search=$([System.Uri]::EscapeDataString($mvpMilestoneTitle))"
-$milestone = $milestones | Where-Object { $_.title -eq $mvpMilestoneTitle } | Select-Object -First 1
-
-if (-not $milestone -and -not $DryRun) {
-    $milestoneBody = @{ title = $mvpMilestoneTitle }
-    $milestone = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedProjectId/milestones" -Body $milestoneBody
-}
 
 $issueLookupToken = if ($isSubtask -and -not [string]::IsNullOrWhiteSpace($parentKey)) { $parentKey } else { $JiraKey }
 $issueTitle = if ($isSubtask -and -not [string]::IsNullOrWhiteSpace($parentKey)) {
@@ -580,52 +570,121 @@ $mrDescription = if ($isSubtask -and -not [string]::IsNullOrWhiteSpace($parentKe
     "Related Jira: $jiraBase/browse/$JiraKey"
 }
 
-$existingIssues = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedProjectId/issues?search=$([System.Uri]::EscapeDataString($issueLookupToken))&state=opened"
-$gitlabIssue = $existingIssues | Where-Object { $_.title -eq $issueTitle } | Select-Object -First 1
-if (-not $gitlabIssue) {
-    $gitlabIssue = $existingIssues | Where-Object { $_.title -match [Regex]::Escape($issueLookupToken) } | Select-Object -First 1
+# ── WORKSPACE REPO (always mandatory) ───────────────────────────────────────
+$workspaceProjectId = Get-RequiredEnv 'GITLAB_WORKSPACE_PROJECT_ID'
+$encodedWsProjectId = [System.Web.HttpUtility]::UrlEncode($workspaceProjectId)
+
+Ensure-GitLabBranchExists -BaseUrl $gitlabBase -Headers $gitlabHeaders -ProjectId $encodedWsProjectId -Branch $SourceBranch -Ref $TargetBranch -NoWrite:$DryRun
+
+$wsMilestones = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedWsProjectId/milestones?search=$([System.Uri]::EscapeDataString($mvpMilestoneTitle))"
+$wsMilestone = $wsMilestones | Where-Object { $_.title -eq $mvpMilestoneTitle } | Select-Object -First 1
+if (-not $wsMilestone -and -not $DryRun) {
+    $wsMilestoneBody = @{ title = $mvpMilestoneTitle }
+    $wsMilestone = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedWsProjectId/milestones" -Body $wsMilestoneBody
 }
 
-if (-not $gitlabIssue -and -not $DryRun) {
-    $issueBody = @{
+$wsExistingIssues = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedWsProjectId/issues?search=$([System.Uri]::EscapeDataString($issueLookupToken))&state=opened"
+$wsGitlabIssue = $wsExistingIssues | Where-Object { $_.title -eq $issueTitle } | Select-Object -First 1
+if (-not $wsGitlabIssue) {
+    $wsGitlabIssue = $wsExistingIssues | Where-Object { $_.title -match [Regex]::Escape($issueLookupToken) } | Select-Object -First 1
+}
+if (-not $wsGitlabIssue -and -not $DryRun) {
+    $wsIssueBody = @{
         title = $issueTitle
         description = $issueDescription
         labels = [string]::Join(',', $labels)
     }
-    if ($milestone) { $issueBody['milestone_id'] = $milestone.id }
-    $gitlabIssue = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedProjectId/issues" -Body $issueBody
+    if ($wsMilestone) { $wsIssueBody['milestone_id'] = $wsMilestone.id }
+    $wsGitlabIssue = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedWsProjectId/issues" -Body $wsIssueBody
 }
 
-$gitlabMr = $null
-$mrs = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedProjectId/merge_requests?state=opened&source_branch=$([System.Uri]::EscapeDataString($SourceBranch))&target_branch=$([System.Uri]::EscapeDataString($TargetBranch))"
-$gitlabMr = $mrs | Select-Object -First 1
-
-if (-not $gitlabMr -and -not $DryRun) {
-    $isInProgressTransition = $StatusTarget -ieq 'In Progress'
-    $draftTitle = Get-DraftMrTitle -Title $mrBaseTitle
-    $mrBody = @{
+$wsGitlabMr = $null
+$wsMrs = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedWsProjectId/merge_requests?state=opened&source_branch=$([System.Uri]::EscapeDataString($SourceBranch))&target_branch=$([System.Uri]::EscapeDataString($TargetBranch))"
+$wsGitlabMr = $wsMrs | Select-Object -First 1
+if (-not $wsGitlabMr -and -not $DryRun) {
+    $wsIsInProgress = $StatusTarget -ieq 'In Progress'
+    $wsDraftTitle = Get-DraftMrTitle -Title $mrBaseTitle
+    $wsMrBody = @{
         source_branch = $SourceBranch
         target_branch = $TargetBranch
-        title = $draftTitle
+        title = $wsDraftTitle
         description = $mrDescription
-        remove_source_branch = [bool]$isInProgressTransition
-        squash = [bool]$isInProgressTransition
+        remove_source_branch = [bool]$wsIsInProgress
+        squash = [bool]$wsIsInProgress
     }
-    if ($gitlabIssue) {
-        $mrBody['description'] = "$mrDescription`nRelated GitLab Issue: $($gitlabIssue.web_url)"
-    }
-    $gitlabMr = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedProjectId/merge_requests" -Body $mrBody
+    if ($wsGitlabIssue) { $wsMrBody['description'] = "$mrDescription`nRelated GitLab Issue: $($wsGitlabIssue.web_url)" }
+    $wsGitlabMr = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedWsProjectId/merge_requests" -Body $wsMrBody
+}
+if ($wsGitlabMr -and $StatusTarget -ieq 'In Review') {
+    $wsGitlabMr = Ensure-GitLabMrReady -BaseUrl $gitlabBase -Headers $gitlabHeaders -ProjectId $encodedWsProjectId -Mr $wsGitlabMr -NoWrite:$DryRun
 }
 
-if ($gitlabMr -and $StatusTarget -ieq 'In Review') {
-    $gitlabMr = Ensure-GitLabMrReady -BaseUrl $gitlabBase -Headers $gitlabHeaders -ProjectId $encodedProjectId -Mr $gitlabMr -NoWrite:$DryRun
+# ── SECOND REPO (when Repo is specified and not workspace/auto) ───────────────
+$secondProjectId = $null
+$secondGitlabIssue = $null
+$secondGitlabMr = $null
+
+if ($Repo -notin @('auto', 'workspace')) {
+    $secondProjectId = Get-RepoProjectId -RepoMode $Repo -Labels $labels
+    $encodedSecondProjectId = [System.Web.HttpUtility]::UrlEncode($secondProjectId)
+
+    Ensure-GitLabBranchExists -BaseUrl $gitlabBase -Headers $gitlabHeaders -ProjectId $encodedSecondProjectId -Branch $SourceBranch -Ref $TargetBranch -NoWrite:$DryRun
+
+    $secMilestones = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedSecondProjectId/milestones?search=$([System.Uri]::EscapeDataString($mvpMilestoneTitle))"
+    $secMilestone = $secMilestones | Where-Object { $_.title -eq $mvpMilestoneTitle } | Select-Object -First 1
+    if (-not $secMilestone -and -not $DryRun) {
+        $secMilestoneBody = @{ title = $mvpMilestoneTitle }
+        $secMilestone = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedSecondProjectId/milestones" -Body $secMilestoneBody
+    }
+
+    $secExistingIssues = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedSecondProjectId/issues?search=$([System.Uri]::EscapeDataString($issueLookupToken))&state=opened"
+    $secondGitlabIssue = $secExistingIssues | Where-Object { $_.title -eq $issueTitle } | Select-Object -First 1
+    if (-not $secondGitlabIssue) {
+        $secondGitlabIssue = $secExistingIssues | Where-Object { $_.title -match [Regex]::Escape($issueLookupToken) } | Select-Object -First 1
+    }
+    if (-not $secondGitlabIssue -and -not $DryRun) {
+        $secIssueBody = @{
+            title = $issueTitle
+            description = $issueDescription
+            labels = [string]::Join(',', $labels)
+        }
+        if ($secMilestone) { $secIssueBody['milestone_id'] = $secMilestone.id }
+        $secondGitlabIssue = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedSecondProjectId/issues" -Body $secIssueBody
+    }
+
+    $secMrs = Invoke-RestMethod -Method Get -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedSecondProjectId/merge_requests?state=opened&source_branch=$([System.Uri]::EscapeDataString($SourceBranch))&target_branch=$([System.Uri]::EscapeDataString($TargetBranch))"
+    $secondGitlabMr = $secMrs | Select-Object -First 1
+    if (-not $secondGitlabMr -and -not $DryRun) {
+        $secIsInProgress = $StatusTarget -ieq 'In Progress'
+        $secDraftTitle = Get-DraftMrTitle -Title $mrBaseTitle
+        $secMrBody = @{
+            source_branch = $SourceBranch
+            target_branch = $TargetBranch
+            title = $secDraftTitle
+            description = $mrDescription
+            remove_source_branch = [bool]$secIsInProgress
+            squash = [bool]$secIsInProgress
+        }
+        if ($secondGitlabIssue) { $secMrBody['description'] = "$mrDescription`nRelated GitLab Issue: $($secondGitlabIssue.web_url)" }
+        $secondGitlabMr = Invoke-RestMethod -Method Post -Headers $gitlabHeaders -Uri "$gitlabBase/api/v4/projects/$encodedSecondProjectId/merge_requests" -Body $secMrBody
+    }
+    if ($secondGitlabMr -and $StatusTarget -ieq 'In Review') {
+        $secondGitlabMr = Ensure-GitLabMrReady -BaseUrl $gitlabBase -Headers $gitlabHeaders -ProjectId $encodedSecondProjectId -Mr $secondGitlabMr -NoWrite:$DryRun
+    }
 }
 
-if ($gitlabIssue) {
-    Add-JiraRemoteLink -BaseUrl $jiraBase -Headers $jiraHeaders -IssueKey $JiraKey -Url $gitlabIssue.web_url -Title "GitLab Issue $($gitlabIssue.iid)" -NoWrite:$DryRun
+# ── JIRA REMOTE LINKS ────────────────────────────────────────────────────────
+if ($wsGitlabIssue) {
+    Add-JiraRemoteLink -BaseUrl $jiraBase -Headers $jiraHeaders -IssueKey $JiraKey -Url $wsGitlabIssue.web_url -Title "GitLab Workspace Issue $($wsGitlabIssue.iid)" -NoWrite:$DryRun
 }
-if ($gitlabMr) {
-    Add-JiraRemoteLink -BaseUrl $jiraBase -Headers $jiraHeaders -IssueKey $JiraKey -Url $gitlabMr.web_url -Title "GitLab MR $($gitlabMr.iid)" -NoWrite:$DryRun
+if ($wsGitlabMr) {
+    Add-JiraRemoteLink -BaseUrl $jiraBase -Headers $jiraHeaders -IssueKey $JiraKey -Url $wsGitlabMr.web_url -Title "GitLab Workspace MR $($wsGitlabMr.iid)" -NoWrite:$DryRun
+}
+if ($secondGitlabIssue) {
+    Add-JiraRemoteLink -BaseUrl $jiraBase -Headers $jiraHeaders -IssueKey $JiraKey -Url $secondGitlabIssue.web_url -Title "GitLab Project Issue $($secondGitlabIssue.iid)" -NoWrite:$DryRun
+}
+if ($secondGitlabMr) {
+    Add-JiraRemoteLink -BaseUrl $jiraBase -Headers $jiraHeaders -IssueKey $JiraKey -Url $secondGitlabMr.web_url -Title "GitLab Project MR $($secondGitlabMr.iid)" -NoWrite:$DryRun
 }
 
 Ensure-LocalBranchCheckedOut -RepoRoot $repoRoot -SourceBranch $SourceBranch -TargetBranch $TargetBranch -NoWrite:$DryRun
@@ -637,17 +696,21 @@ if (-not (Test-Path $logDir -PathType Container)) {
 $logFile = Join-Path $logDir ("$($JiraKey)-$((Get-Date).ToString('yyyyMMdd-HHmmss')).json")
 
 $result = [PSCustomObject]@{
-    jiraKey = $JiraKey
-    jiraUrl = "$jiraBase/browse/$JiraKey"
-    jiraProjectKey = $jiraProjectKey
-    transitionApplied = if ($DryRun) { "dry-run:$($transition.to.name)" } else { $transition.to.name }
-    gitlabProjectId = $projectId
-    gitlabIssueUrl = if ($gitlabIssue) { $gitlabIssue.web_url } else { $null }
-    gitlabMrUrl = if ($gitlabMr) { $gitlabMr.web_url } else { $null }
-    sourceBranch = $SourceBranch
-    targetBranch = $TargetBranch
-    dryRun = [bool]$DryRun
-    timestamp = (Get-Date).ToString('o')
+    jiraKey              = $JiraKey
+    jiraUrl              = "$jiraBase/browse/$JiraKey"
+    jiraProjectKey       = $jiraProjectKey
+    transitionApplied    = if ($DryRun) { "dry-run:$($transition.to.name)" } else { $transition.to.name }
+    workspaceProjectId   = $workspaceProjectId
+    workspaceIssueUrl    = if ($wsGitlabIssue) { $wsGitlabIssue.web_url } else { $null }
+    workspaceMrUrl       = if ($wsGitlabMr) { $wsGitlabMr.web_url } else { $null }
+    projectRepo          = $Repo
+    projectProjectId     = $secondProjectId
+    projectIssueUrl      = if ($secondGitlabIssue) { $secondGitlabIssue.web_url } else { $null }
+    projectMrUrl         = if ($secondGitlabMr) { $secondGitlabMr.web_url } else { $null }
+    sourceBranch         = $SourceBranch
+    targetBranch         = $TargetBranch
+    dryRun               = [bool]$DryRun
+    timestamp            = (Get-Date).ToString('o')
 }
 
 $result | ConvertTo-Json -Depth 8 | Out-File -FilePath $logFile -Encoding utf8

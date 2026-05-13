@@ -1,8 +1,17 @@
 {
-	"folders": [
-		{
-			"path": "."
-		}
-	],
-	"settings": {}
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "chat.promptFilesLocations": {
+      ".github/prompts": true,
+      ".prompts": true,
+      ".prompts/02-implementation-phase-prompts": true,
+      ".prompts/01-refinement-flow-prompts": true,
+      ".prompts/00-general-prompts": true,
+    },
+    "chat.useCustomizationsInParentRepositories": true
+  }
 }

@@ -1,11 +1,11 @@
 # Prompt Usage: Jira to GitLab
 
-Use the prompt `.codex/prompts/speckit.taskstoissues.md` from Copilot Chat to run the Jira → GitLab workflow.
+Use the prompt `.prompts/02-implementation-phase-prompts/00.speckit.taskstoissues.prompt.md` from Copilot Chat to run the Jira → GitLab workflow.
 
-Use `.codex/prompts/speckit.start-task.md` to run task-start in documentation-first mode before implementation coding.
-Use `.codex/prompts/speckit.taskclose.md` to finalize task documentation after implementation.
+Use `.prompts/02-implementation-phase-prompts/01.speckit.start-task.prompt.md` to run task-start in documentation-first mode before implementation coding.
+Use `.prompts/02-implementation-phase-prompts/04.speckit.taskclose.prompt.md` to finalize task documentation after implementation.
 
-Use `.claude/commands/speckit.codereview.md` to start reviewer-led code review after the task is declared done.
+Use `.prompts/00-general-prompts/speckit.codereview.prompt.md` to start reviewer-led code review after the task is declared done.
 
 ## What this prompt does
 
