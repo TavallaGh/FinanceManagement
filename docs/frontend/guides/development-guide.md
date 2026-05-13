@@ -139,7 +139,7 @@ npm run graph
 - Put shared component documentation pages under `apps/erp-web/src/app/dev-tools/story-book/`.
 - Keep story-book routes in a local `story-book.routes.ts` file.
 - Route previews from `/story-book/<component-name>`.
-- Current shared showcase routes include `/story-book/card`, `/story-book/notification-card`, `/story-book/action-card`, `/story-book/checkbox`, `/story-book/date-time-picker`, `/story-book/icon`, and `/story-book/tag`.
+- Current shared showcase routes include `/story-book/card`, `/story-book/notification-card`, `/story-book/action-card`, `/story-book/checkbox`, `/story-book/date-time-picker`, `/story-book/icon`, `/story-book/tag`, and `/story-book/grid-system`.
 - Do not place design-system preview pages under `apps/erp-web/src/app/features/`.
 
 ## Quality Checklist

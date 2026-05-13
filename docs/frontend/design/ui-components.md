@@ -30,6 +30,7 @@ Current shared components include:
 - `icon/`
 - `tag/`
 - `tag-group/`
+- `grid-list/`
 
 ### Story Book Surface
 
@@ -46,6 +47,7 @@ Current story-book pages for shared UI components include:
 - `apps/erp-web/src/app/dev-tools/story-book/pages/date-time-picker/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/icon/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/tag/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/grid-system/`
 
 ### Story Book Shell Layout
 
@@ -305,6 +307,47 @@ The tag group supports:
 - accessible labeling through `ariaLabel`
 
 Use the shared tag group when several tags should be rendered as one related set with consistent spacing and orientation behavior.
+
+### Grid List Components
+
+The shared grid list components are implemented in:
+
+- `libs/shared/ui/src/lib/components/grid-list/`
+
+The family includes two components:
+
+- `grid-list.component` — Material-style grid list with fixed columns and aspect-ratio tile heights
+- `grid-tile.component` — Individual tile with colspan and rowspan support
+
+Interactive documentation is implemented in:
+
+- `apps/erp-web/src/app/dev-tools/story-book/pages/grid-system/`
+
+#### UiGridListComponent
+
+The grid list provides a tile-based layout container with:
+
+- configurable column count via `cols` input
+- aspect-ratio-driven row height via `rowHeight` input (e.g. `'4:1'`, `'1:1'`)
+- configurable gutter between tiles via `gutterSize` input
+- automatic RTL/LTR support through CSS logical properties
+- no Angular Material dependency
+
+Use `UiGridListComponent` as the container whenever a fixed-column, aspect-ratio tile layout is needed.
+
+#### UiGridTileComponent
+
+The grid tile provides a single slot inside a grid list with:
+
+- column span via `colspan` input (default: 1)
+- row span via `rowspan` input (default: 1)
+- full height/width fill of its assigned cell area
+
+Place `UiCardComponent` with `class="ui-fill"` inside the tile to get a card that fills the tile area.
+
+**RTL/LTR Behavior:**
+- Grid layout inherits direction from `<html dir>` attribute automatically
+- No manual direction overrides needed
 
 ## Update Rule
 
