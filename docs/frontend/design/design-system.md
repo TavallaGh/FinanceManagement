@@ -88,6 +88,8 @@ Existing components that violate the two-layer rule are catalogued in
 `docs/design/token-violation-audit.md` (in the accounting-frontend project).
 Remediation is tracked under AC-78.
 
+**Remediation status:** ✅ Complete as of 2026-05-13
+
 ## Design Principles
 
 - Keep interfaces clear and predictable.
