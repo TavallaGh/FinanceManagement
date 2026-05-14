@@ -28,6 +28,7 @@ Current shared components include:
 - `checkbox-group/`
 - `date-picker/`
 - `icon/`
+- `scroll-container/`
 - `tag/`
 - `tag-group/`
 - `grid-list/`
@@ -46,6 +47,7 @@ Current story-book pages for shared UI components include:
 - `apps/erp-web/src/app/dev-tools/story-book/pages/checkbox/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/date-time-picker/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/icon/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/scroll-container/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/tag/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/grid-system/`
 
@@ -307,6 +309,50 @@ The tag group supports:
 - accessible labeling through `ariaLabel`
 
 Use the shared tag group when several tags should be rendered as one related set with consistent spacing and orientation behavior.
+
+### Scroll Container Component
+
+The shared scroll container is implemented in:
+
+- `libs/shared/ui/src/lib/components/scroll-container/`
+
+Its interactive documentation is implemented in:
+
+- `apps/erp-web/src/app/dev-tools/story-book/pages/scroll-container/`
+
+The scroll container provides a lightweight, custom-scrollbar alternative with:
+
+- custom styled, draggable scrollbars (vertical, horizontal, or both)
+- auto-hide capability with configurable delay
+- smooth scrolling behavior
+- complete RTL/LTR support with logical CSS properties
+- proportional wheel-scroll with delta-mode normalization (pixels, lines, pages)
+- public API for programmatic scrolling: `scrollTo()`, `scrollBy()`, `scrollToTop()`, `scrollToBottom()`
+- scroll event emissions with position and ratio data
+- event outputs: `scrolled`, `reachTop`, `reachBottom`, `reachStart`, `reachEnd`
+- ResizeObserver for automatic geometry updates
+- MutationObserver for content change detection
+
+Configuration inputs:
+
+- `orientation` — scroll axis mode: `'vertical'` | `'horizontal'` | `'both'` (default: omitted = both)
+- `autoHide` — enable auto-hide behavior (default: `true`)
+- `autoHideDelay` — delay before hiding in milliseconds (default: `800`)
+- `smooth` — enable smooth scroll behavior (default: `true`)
+- `minThumbSize` — minimum thumb size in pixels (default: `24`)
+
+**RTL/LTR Behavior:**
+- Horizontal thumb positioning automatically reverses in RTL mode
+- Drag behavior correctly maps to logical start/end edges
+- Wheel scroll direction respects document `dir` attribute
+- Uses CSS logical properties for track positioning
+
+**Browser Support:**
+- Chrome/Edge: negative `scrollLeft` in RTL
+- Firefox: reversed positive `scrollLeft` in RTL
+- Safari: full support with current implementation
+
+Use the shared scroll container for custom content areas needing styled scrollbars, auto-hide behavior, or advanced scroll event handling instead of relying on native browser scrollbars.
 
 ### Grid List Components
 
