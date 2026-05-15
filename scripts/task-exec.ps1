@@ -273,7 +273,7 @@ function Ensure-GitLabMrReady {
     }
 
     $body = @{ title = $readyTitle } | ConvertTo-Json -Depth 4
-    return Invoke-RestMethod -Method Put -Headers $Headers -Uri "$BaseUrl/api/v4/projects/$ProjectId/merge_requests/$($Mr.iid)" -Body $body
+    return Invoke-RestMethod -Method Put -Headers $Headers -Uri "$BaseUrl/api/v4/projects/$ProjectId/merge_requests/$($Mr.iid)" -Body $body -ContentType 'application/json'
 }
 
 function Convert-ToBranchSlug {
@@ -521,9 +521,9 @@ if ($StrictMetadata) {
 }
 
 $transitions = Invoke-JiraApi -Method Get -BaseUrl $jiraBase -Headers $jiraHeaders -Path "/rest/api/3/issue/$([System.Uri]::EscapeDataString($JiraKey))/transitions"
-$transition = $transitions.transitions | Where-Object { $_.id -eq '21' } | Select-Object -First 1
+$transition = $transitions.transitions | Where-Object { $_.to.name -ieq $StatusTarget } | Select-Object -First 1
 if (-not $transition) {
-    $transition = $transitions.transitions | Where-Object { $_.to.name -ieq $StatusTarget } | Select-Object -First 1
+    $transition = $transitions.transitions | Where-Object { $_.id -eq '21' } | Select-Object -First 1
 }
 if (-not $transition) {
     throw "No transition found for target '$StatusTarget'"
