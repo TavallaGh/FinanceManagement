@@ -29,6 +29,7 @@ Current shared components include:
 - `date-picker/`
 - `icon/`
 - `scroll-container/`
+- `simple-list/`
 - `tag/`
 - `tag-group/`
 - `grid-list/`
@@ -48,6 +49,7 @@ Current story-book pages for shared UI components include:
 - `apps/erp-web/src/app/dev-tools/story-book/pages/date-time-picker/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/icon/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/scroll-container/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/simple-list/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/tag/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/grid-system/`
 
@@ -324,9 +326,9 @@ The scroll container provides a lightweight, custom-scrollbar alternative with:
 
 - custom styled, draggable scrollbars (vertical, horizontal, or both)
 - auto-hide capability with configurable delay
-- smooth scrolling behavior
 - complete RTL/LTR support with logical CSS properties
 - proportional wheel-scroll with delta-mode normalization (pixels, lines, pages)
+- orientation-aware wheel scroll (vertical delta maps to horizontal scroll when `orientation="horizontal"`)
 - public API for programmatic scrolling: `scrollTo()`, `scrollBy()`, `scrollToTop()`, `scrollToBottom()`
 - scroll event emissions with position and ratio data
 - event outputs: `scrolled`, `reachTop`, `reachBottom`, `reachStart`, `reachEnd`
@@ -352,7 +354,97 @@ Configuration inputs:
 - Firefox: reversed positive `scrollLeft` in RTL
 - Safari: full support with current implementation
 
+**Implementation Notes:**
+- Track element has `pointer-events: none` when not visible; `pointer-events: auto` only when the `--visible` modifier class is applied — this prevents the invisible track from intercepting mouse events and showing an unexpected cursor
+- Thumb drag start uses `getBoundingClientRect()` for accurate initial position; `offsetTop`/`offsetLeft` are unreliable when CSS `transform` is in use
+- `scroll-behavior: smooth` is intentionally absent from the viewport CSS; native smooth scroll causes wheel-event accumulation and jumpy behavior when scrolling quickly — scrolling is handled entirely through JavaScript for accuracy
+- Thumb transform is directly synced to viewport scroll position on every drag frame for immediate 1:1 tracking
+- Body `cursor: grabbing` and `user-select: none` are applied while a thumb is being dragged, and restored on pointer up
+
+**Internal Usage:**
+- `UiSimpleListComponent` embeds `UiScrollContainerComponent` internally. When a `height` is set on `<ui-simple-list>`, the internal scroll container fills that height and handles scrolling. Consumers do not need to wrap simple lists in a scroll container manually.
+
 Use the shared scroll container for custom content areas needing styled scrollbars, auto-hide behavior, or advanced scroll event handling instead of relying on native browser scrollbars.
+
+### Simple List Components
+
+The simple list components are implemented in:
+
+- `libs/shared/ui/src/lib/components/simple-list/`
+
+Interactive documentation is implemented in:
+
+- `apps/erp-web/src/app/dev-tools/story-book/pages/simple-list/`
+
+The family includes two components:
+
+- `ui-simple-list.component` — Container that wraps its content in an internal `UiScrollContainerComponent`
+- `ui-simple-list-item.component` — Individual row with state-driven styling
+
+#### UiSimpleListComponent
+
+The simple list provides a scrollable list container with:
+
+- internal `UiScrollContainerComponent` for vertical scrolling — no external scroll container needed
+- transparent background and no border or border-radius of its own
+- height-activated scroll: set `height` (or `max-height`) on `<ui-simple-list>` to enable bounded scrolling; without a height the list expands to fit all items
+- RTL/LTR safe layout through internal scroll container
+
+**Usage:**
+
+```html
+<!-- Scrollable list showing 3 items at a time -->
+<ui-simple-list style="height: 9rem;">
+  @for (item of items; track item) {
+    <ui-simple-list-item>{{ item }}</ui-simple-list-item>
+  }
+</ui-simple-list>
+```
+
+**Composition rule:** Do not wrap `<ui-simple-list>` inside `<ui-card>`. If a card wrapper is needed for elevation or background, place the card around the list in the consuming template. Cards and card-like components go *inside* list items, not around the list itself.
+
+#### UiSimpleListItemComponent
+
+The simple list item provides a single row with:
+
+- `selected` signal input (`boolean`, default: `false`) — applies `.selected` host class → `--color-accent-subtle` background, medium font weight
+- `disabled` signal input (`boolean`, default: `false`) — applies `.disabled` host class → reduced opacity, no hover, `pointer-events: none`
+- `border-block-end` separator between rows (removed on the last child)
+- hover background: `var(--surface-hover)`
+- `padding-inline: var(--padding-md)`, `padding-block: var(--padding-sm)` for text content rows
+- automatic card-child detection via CSS `:has()`: when the item contains a `ui-notification-card` or `ui-card`, inline padding is removed, block padding is reduced to `var(--gap-sm)`, the separator border is removed, and hover/selected backgrounds are suppressed — the card manages its own visuals
+- RTL/LTR safe with CSS logical properties
+
+**Inputs:**
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `selected` | `boolean` | `false` | Marks the item as selected (accent background) |
+| `disabled` | `boolean` | `false` | Marks the item as non-interactive (reduced opacity) |
+
+**Usage:**
+
+```html
+<!-- Text items -->
+<ui-simple-list>
+  <ui-simple-list-item [selected]="true">Selected item</ui-simple-list-item>
+  <ui-simple-list-item>Default item</ui-simple-list-item>
+  <ui-simple-list-item [disabled]="true">Disabled item</ui-simple-list-item>
+</ui-simple-list>
+
+<!-- Items containing cards (padding/border suppressed automatically) -->
+<ui-simple-list style="height: 320px;">
+  @for (n of notifications; track n.id) {
+    <ui-simple-list-item>
+      <ui-notification-card [severity]="n.severity" [title]="n.title" [text]="n.text" />
+    </ui-simple-list-item>
+  }
+</ui-simple-list>
+```
+
+**RTL/LTR Behavior:**
+- Layout and separators use CSS logical properties (`padding-inline`, `padding-block`, `border-block-end`)
+- Renders correctly for both LTR and RTL without any per-item direction attribute
 
 ### Grid List Components
 

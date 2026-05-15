@@ -499,6 +499,22 @@ For card components, keep the story-book pages updated when changing:
 - RTL/LTR layout behavior
 - icon or trend indicator integration
 
+For scroll container, keep the story-book page updated when changing:
+
+- orientation options
+- auto-hide behavior
+- programmatic scroll API
+- RTL/LTR drag or wheel behavior
+- any scroll event output
+
+For simple list, keep the story-book page updated when changing:
+
+- item states (selected, disabled)
+- card-child composition behavior
+- height-activated scroll behavior
+- RTL/LTR behavior
+- API inputs
+
 **RTL/LTR Storybook Guidelines:**
 
 - Never hardcode `dir="rtl"` or `dir="ltr"` on preview containers
