@@ -30,6 +30,7 @@ Current shared components include:
 - `icon/`
 - `scroll-container/`
 - `simple-list/`
+- `list-with-pagination/`
 - `tag/`
 - `tag-group/`
 - `grid-list/`
@@ -50,6 +51,7 @@ Current story-book pages for shared UI components include:
 - `apps/erp-web/src/app/dev-tools/story-book/pages/icon/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/scroll-container/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/simple-list/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/list-with-pagination/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/tag/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/grid-system/`
 
@@ -445,6 +447,70 @@ The simple list item provides a single row with:
 **RTL/LTR Behavior:**
 - Layout and separators use CSS logical properties (`padding-inline`, `padding-block`, `border-block-end`)
 - Renders correctly for both LTR and RTL without any per-item direction attribute
+
+### List with Pagination Component
+
+The list with pagination component is implemented in:
+
+- `libs/shared/ui/src/lib/components/list-with-pagination/`
+
+Its interactive documentation is implemented in:
+
+- `apps/erp-web/src/app/dev-tools/story-book/pages/list-with-pagination/`
+
+#### UiListWithPaginationComponent
+
+The list with pagination component provides a stateless client-side pagination wrapper with:
+
+- content projection via `ng-content` — the consumer provides the list items
+- previous/next navigation buttons using `UiButtonComponent`
+- page indicator displaying current page and total pages (`Page X of Y`)
+- computed `totalPages` derived from `totalItems` and `pageSize`
+- boundary-aware disable logic: previous disabled at page 0, next disabled at last page
+- `pageChange` event emission with `{ pageIndex, pageSize }` payload
+- empty state when `totalItems` is 0, with configurable or default translated message
+- pagination footer shown only when `totalPages > 1`
+- token-driven styling with `UiSimpleListComponent` as the inner scroll container
+- fully RTL/LTR safe with CSS logical properties
+- `OnPush` change detection and signal-based inputs/outputs
+
+**Inputs:**
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `pageSize` | `number` | `20` | Number of items per page |
+| `pageIndex` | `number` | `0` | Zero-based current page index |
+| `totalItems` | `number` | `0` | Total number of items across all pages |
+| `emptyMessage` | `string` | `''` | Custom empty-state message; falls back to `DS_LIST_PAGINATION_EMPTY` translation |
+
+**Outputs:**
+
+| Output | Payload | Description |
+|---|---|---|
+| `pageChange` | `{ pageIndex: number; pageSize: number }` | Emitted when the user navigates to a different page |
+
+**Usage:**
+
+```html
+<ui-list-with-pagination
+  [pageIndex]="_pageIndex()"
+  [pageSize]="_pageSize"
+  [totalItems]="_allItems().length"
+  (pageChange)="_onPageChange($event)"
+  style="height: 26rem;">
+  @for (item of _pagedItems(); track item.id) {
+    <ui-simple-list-item>...</ui-simple-list-item>
+  }
+</ui-list-with-pagination>
+```
+
+The consumer is responsible for managing page state and slicing the data. The component is stateless — it only emits `pageChange` and renders whatever items are projected into `ng-content`.
+
+**RTL/LTR Behavior:**
+- Previous/next button order and footer layout adapt automatically via CSS logical properties
+- No hardcoded direction attributes needed in the consuming template
+
+Use `UiListWithPaginationComponent` whenever a list needs client-side previous/next pagination without managing scroll or item rendering internally.
 
 ### Grid List Components
 
