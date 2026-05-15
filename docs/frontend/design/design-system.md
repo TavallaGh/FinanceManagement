@@ -271,7 +271,6 @@ Use the typography scale and font variables.
 Examples:
 
 - `--font-family-primary`
-- `--font-size-xxs`
 - `--font-size-xs`
 - `--font-size-sm`
 - `--font-size-base`
@@ -285,8 +284,8 @@ Examples:
 Current shared typography tokens in `public/styles/tokens/_typography.scss` are intentionally compact for ERP data-entry surfaces:
 
 - `--font-family-primary` and `--font-family-secondary` both start with `Vazirmatn`
-- `--font-size-xxs` is `0.625rem`
-- `--font-size-xs` and `--font-size-sm` are both `0.75rem`
+- `--font-size-xs` is `0.625rem`
+- `--font-size-sm` is `0.75rem`
 - `--font-size-base` is `0.875rem`
 - `--font-size-md` is `1rem`
 - `--line-height-none` is used for floated labels and dense micro-copy when needed

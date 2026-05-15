@@ -163,7 +163,8 @@ Duplicate single-word or two-word values across components are forbidden — use
 **Navigation:**
 ```json
 "DS_STORY_BOOK_ITEM_INPUT": "Input",
-"DS_STORY_BOOK_ITEM_CHECKBOX": "Checkbox"
+"DS_STORY_BOOK_ITEM_CHECKBOX": "Checkbox",
+"DS_STORY_BOOK_ITEM_LIST_PAGINATION": "List with Pagination"
 ```
 
 **Component title and description:**
@@ -229,6 +230,32 @@ When adding a new design system component:
 - [ ] Add component-specific keys only for values not covered by shared keys
 - [ ] Add all keys to **both** `public/assets/i18n/en.json` and `public/assets/i18n/fa.json`
 - [ ] Test in both RTL and LTR modes
+
+### Component-Specific Key Families
+
+New `DS_[COMPONENT]_*` key families introduced by implemented components:
+
+**`DS_LIST_PAGINATION_*` — list with pagination component (AC-73):**
+
+| Key | EN | FA |
+|---|---|---|
+| `DS_LIST_PAGINATION_TITLE` | List with Pagination | لیست با صفحه‌بندی |
+| `DS_LIST_PAGINATION_LEAD` | A stateless list container with previous/next pagination controls. | کامپوننت لیست بدون حالت داخلی با کنترل‌های صفحه‌بندی. |
+| `DS_LIST_PAGINATION_PREV` | Previous | قبلی |
+| `DS_LIST_PAGINATION_NEXT` | Next | بعدی |
+| `DS_LIST_PAGINATION_PAGE` | Page | صفحه |
+| `DS_LIST_PAGINATION_OF` | of | از |
+| `DS_LIST_PAGINATION_EMPTY` | No items to display | هیچ موردی برای نمایش وجود ندارد |
+| `DS_LIST_PAGINATION_SECTION_NOTIFICATIONS` | Notification Cards | کارت‌های اعلان |
+| `DS_LIST_PAGINATION_SECTION_EMPTY` | Empty State | حالت خالی |
+| `DS_LIST_PAGINATION_SECTION_RTL` | RTL Layout | چیدمان RTL |
+| `DS_LIST_PAGINATION_API_PAGE_SIZE` | Number of items per page. | تعداد آیتم‌ها در هر صفحه. |
+| `DS_LIST_PAGINATION_API_PAGE_INDEX` | Zero-based current page index. | ایندکس صفحه جاری (از صفر). |
+| `DS_LIST_PAGINATION_API_TOTAL_ITEMS` | Total number of items. | تعداد کل آیتم‌ها. |
+| `DS_LIST_PAGINATION_API_EMPTY_MSG` | Custom empty-state message. | پیام سفارشی حالت خالی. |
+| `DS_LIST_PAGINATION_API_PAGE_CHANGE` | Emitted on page navigation. | هنگام تغییر صفحه ارسال می‌شود. |
+
+Navigation sidebar key: `DS_STORY_BOOK_ITEM_LIST_PAGINATION`
 
 ## Checklist
 
