@@ -1,0 +1,868 @@
+{
+  "info": {
+    "_postman_id": "nt-notification-system",
+    "name": "NT Notification System",
+    "description": "Postman collection for NT Notification Service API endpoints including Email, SMS, Push, Web, Templates, Providers, and OTP/Security management.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "12345678"
+  },
+  "item": [
+    {
+      "name": "Environment Setup",
+      "item": [
+        {
+          "name": "BFF Configuration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bff_base_url}}/api/health",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Test BFF connectivity and authorization"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Email Notifications",
+      "item": [
+        {
+          "name": "Send Raw Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              } 
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"recipient@example.com\",\n  \"subject\": \"Email Subject\",\n  \"rawContent\": \"<html><body>Email HTML content</body></html>\"\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/email/send/raw",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "email",
+                "send",
+                "raw"
+              ]
+            },
+            "description": "Send raw email notification with HTML content"
+          }
+        },
+        {
+          "name": "Send Template Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"recipient@example.com\",\n  \"subject\": \"Template Email\",\n  \"templateId\": \"00000000-0000-0000-0000-000000000001\",\n  \"templateModel\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"activationLink\": \"https://example.com/activate\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/email/send/template",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "email",
+                "send",
+                "template"
+              ]
+            },
+            "description": "Send email using predefined template with model parameters"
+          }
+        },
+        {
+          "name": "Send Bulk Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"to\": \"user1@example.com\",\n    \"subject\": \"Newsletter\",\n    \"rawContent\": \"<html><body>Newsletter content</body></html>\"\n  },\n  {\n    \"to\": \"user2@example.com\",\n    \"subject\": \"Newsletter\",\n    \"rawContent\": \"<html><body>Newsletter content</body></html>\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/email/collection/send",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "email",
+                "collection",
+                "send"
+              ]
+            },
+            "description": "Send bulk email notifications to multiple recipients"
+          }
+        }
+      ]
+    },
+    {
+      "name": "SMS Notifications",
+      "item": [
+        {
+          "name": "Send Raw SMS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+1234567890\",\n  \"rawContent\": \"Your verification code is: 123456\",\n  \"customerId\": \"00000000-0000-0000-0000-000000000001\"\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/sms/send/raw",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "sms",
+                "send",
+                "raw"
+              ]
+            },
+            "description": "Send raw SMS notification with custom message content"
+          }
+        },
+        {
+          "name": "Send Template SMS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"+1234567890\",\n  \"templateId\": \"00000000-0000-0000-0000-000000000002\",\n  \"templateParameters\": {\n    \"code\": \"123456\",\n    \"expiryMinutes\": \"5\"\n  },\n  \"customerId\": \"00000000-0000-0000-0000-000000000001\"\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/sms/send/template",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "sms",
+                "send",
+                "template"
+              ]
+            },
+            "description": "Send SMS using predefined template with parameters"
+          }
+        },
+        {
+          "name": "Send Bulk SMS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"phoneNumber\": \"+1234567890\",\n    \"rawContent\": \"Promotion message\",\n    \"customerId\": \"00000000-0000-0000-0000-000000000001\"\n  },\n  {\n    \"phoneNumber\": \"+9876543210\",\n    \"rawContent\": \"Promotion message\",\n    \"customerId\": \"00000000-0000-0000-0000-000000000001\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/sms/collection/send",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "sms",
+                "collection",
+                "send"
+              ]
+            },
+            "description": "Send bulk SMS notifications to multiple recipients"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notification Templates",
+      "item": [
+        {
+          "name": "Create Template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Welcome Email\",\n  \"description\": \"Welcome email for new users\",\n  \"notificationType\": \"Email\",\n  \"subject\": \"Welcome to {{app_name}}\",\n  \"body\": \"<html><body>Welcome {{firstName}}!</body></html>\",\n  \"variables\": [\"app_name\", \"firstName\"],\n  \"isDefault\": false\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/templates",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "template"
+              ]
+            },
+            "description": "Create new notification template"
+          }
+        },
+        {
+          "name": "Update Template",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Welcome Email Updated\",\n  \"description\": \"Updated welcome email template\",\n  \"subject\": \"Welcome to {{app_name}} - Updated\",\n  \"body\": \"<html><body>Welcome {{firstName}}! Thank you for joining.</body></html>\",\n  \"variables\": [\"app_name\", \"firstName\"],\n  \"isDefault\": true\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/templates/00000000-0000-0000-0000-000000000010",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "template",
+                "00000000-0000-0000-0000-000000000010"
+              ]
+            },
+            "description": "Update existing notification template"
+          }
+        },
+        {
+          "name": "Set Template as Default",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "true"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/templates/00000000-0000-0000-0000-000000000010/default",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "template",
+                "00000000-0000-0000-0000-000000000010",
+                "default"
+              ]
+            },
+            "description": "Set template as default for notification type"
+          }
+        },
+        {
+          "name": "Get All Templates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/templates",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "template"
+              ]
+            },
+            "description": "Get all notification templates"
+          }
+        },
+        {
+          "name": "Get Active Template",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/templates/active",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "template",
+                "active"
+              ]
+            },
+            "description": "Get active/default notification templates"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notification Providers",
+      "item": [
+        {
+          "name": "Create Provider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SendGrid Email\",\n  \"description\": \"SendGrid email provider\",\n  \"providerType\": \"Email\",\n  \"priority\": 1,\n  \"isActive\": true,\n  \"configurations\": {\n    \"apiUrl\": \"https://api.sendgrid.com/v3\",\n    \"fromEmail\": \"noreply@example.com\",\n    \"fromName\": \"Example App\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/providers",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "provider"
+              ]
+            },
+            "description": "Create new notification provider"
+          }
+        },
+        {
+          "name": "Get All Providers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/providers",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "provider"
+              ]
+            },
+            "description": "Get all notification providers"
+          }
+        },
+        {
+          "name": "Get Provider by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/providers/00000000-0000-0000-0000-000000000020",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "provider",
+                "00000000-0000-0000-0000-000000000020"
+              ]
+            },
+            "description": "Get provider by ID"
+          }
+        },
+        {
+          "name": "Get Default Provider",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/providers/default",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "provider",
+                "default"
+              ]
+            },
+            "description": "Get default notification provider"
+          }
+        },
+        {
+          "name": "Set Default Provider",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/providers/00000000-0000-0000-0000-000000000020/default",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "provider",
+                "00000000-0000-0000-0000-000000000020",
+                "default"
+              ]
+            },
+            "description": "Set provider as default"
+          }
+        },
+        {
+          "name": "Publish Provider",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"publishedVersion\": \"1.0.0\",\n  \"notes\": \"Provider published for production use\"\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/providers/00000000-0000-0000-0000-000000000020/publish",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "provider",
+                "00000000-0000-0000-0000-000000000020",
+                "publish"
+              ]
+            },
+            "description": "Publish provider to production"
+          }
+        },
+        {
+          "name": "Update Provider",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"SendGrid Email Updated\",\n  \"description\": \"Updated SendGrid provider\",\n  \"priority\": 1,\n  \"isActive\": true,\n  \"configurations\": {\n    \"apiUrl\": \"https://api.sendgrid.com/v3\",\n    \"fromEmail\": \"support@example.com\",\n    \"fromName\": \"Example Support\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/providers/00000000-0000-0000-0000-000000000020",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "provider",
+                "00000000-0000-0000-0000-000000000020"
+              ]
+            },
+            "description": "Update provider configuration"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Security & OTP",
+      "item": [
+        {
+          "name": "Send OTP Code (Anonymous)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient\": \"user@example.com\",\n  \"useDefaultTemplate\": true\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/security/send-code/anonymous/Email",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "security",
+                "send-code",
+                "anonymous",
+                "Email"
+              ]
+            },
+            "description": "Send OTP code via specified channel (Email, SMS, etc.) - Anonymous access"
+          }
+        },
+        {
+          "name": "Send Time-Based OTP (Anonymous)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient\": \"user@example.com\",\n  \"useDefaultTemplate\": true\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/security/send-time-base-code/anonymous/Email",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "security",
+                "send-time-base-code",
+                "anonymous",
+                "Email"
+              ]
+            },
+            "description": "Send time-based OTP code - Anonymous access"
+          }
+        },
+        {
+          "name": "Validate OTP (Anonymous)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{bffCookie}}",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF",
+                "value": "{{xcsrfToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userIdentifier\": \"user@example.com\",\n  \"code\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{bff_base_url}}/api/v1/notification/security/otp/validate/anonymous",
+              "host": [
+                "{{bff_base_url}}"
+              ],
+              "path": [
+                "api",
+                "notification",
+                "security",
+                "otp",
+                "validate",
+                "anonymous"
+              ]
+            },
+            "description": "Validate OTP code - Anonymous access"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "bff_base_url",
+      "value": "https://localhost:7283",
+      "type": "string",
+      "description": "Base URL for BFF (Backend For Frontend) server"
+    },
+    {
+      "key": "auth_token",
+      "value": "your_jwt_token_here",
+      "type": "string",
+      "description": "JWT Bearer token for authentication"
+    },
+    {
+      "key": "bffCookie",
+      "value": "",
+      "type": "string",
+      "description": "BFF Session cookie value for __Host-bff cookie"
+    },
+    {
+      "key": "xcsrfToken",
+      "value": "",
+      "type": "string",
+      "description": "CSRF token for X-CSRF header"
+    }
+  ]
+}
+
+
+
+
+
