@@ -31,6 +31,8 @@ npm run start
 - Use `rxResource` for server state.
 - Keep components small and focused.
 - Keep HTTP logic out of components.
+- **Always use existing project components first.** Check `libs/shared/ui/src/lib/components/` before creating anything new. Do not create a new component if an existing one covers the need.
+- **Story-book update is mandatory.** Every new component, variant, or feature must have its story-book page created or updated before the task is considered complete.
 
 ## File Naming
 
@@ -142,12 +144,32 @@ npm run graph
 - Current shared showcase routes include `/story-book/card`, `/story-book/notification-card`, `/story-book/action-card`, `/story-book/checkbox`, `/story-book/date-time-picker`, `/story-book/icon`, `/story-book/scroll-container`, `/story-book/simple-list`, `/story-book/tag`, `/story-book/grid-system`, and `/story-book/list-with-pagination`.
 - Do not place design-system preview pages under `apps/erp-web/src/app/features/`.
 
+## Story Book Code Blocks
+
+When writing or updating a story-book page:
+
+- Always set `[showCode]="false"` on `<app-story-book-preview>` for any component that renders dynamic data or complex structures (tables, paginators, lists, dialogs). Never rely on the auto-extracted DOM snapshot for those.
+- Always add an `<app-story-book-code-block>` with explicit code snippets for every example section.
+- Provide a TypeScript tab whenever the component requires TypeScript setup (column definitions, data arrays, signals, action handlers). Use the `[snippets]` input:
+
+  ```html
+  <app-story-book-code-block [snippets]="[
+    { label: 'TypeScript', code: _myTsSnippet },
+    { label: 'HTML',       code: _myHtmlSnippet }
+  ]" />
+  ```
+
+- Define all code snippet strings as `protected readonly` properties in the component class.
+
 ## Quality Checklist
 
 - No hardcoded UI text
 - No `any`
 - No deprecated Angular patterns
 - No direct `HttpClient` usage in components
+- Existing project components used (checked `libs/shared/ui` before creating anything new)
+- Story-book page created or updated for every new shared component, variant, or feature
+- All story-book previews for complex components use `[showCode]="false"` with explicit `<app-story-book-code-block>` snippets
 - No RTL-breaking CSS
 - No unrelated structural changes
 

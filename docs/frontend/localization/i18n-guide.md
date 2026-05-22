@@ -235,6 +235,48 @@ When adding a new design system component:
 
 New `DS_[COMPONENT]_*` key families introduced by implemented components:
 
+**`DS_TABLE_*` — table component (AC-72):**
+
+| Key | EN | FA |
+|---|---|---|
+| `DS_TABLE_TITLE` | Table | جدول |
+| `DS_TABLE_ADD` | New | جدید |
+| `DS_TABLE_SEARCH` | Search... | جستجو... |
+| `DS_TABLE_SELECTED` | selected | انتخاب شده |
+| `DS_TABLE_EXPORT` | Export | خروجی |
+| `DS_TABLE_SETTINGS` | Settings | تنظیمات |
+| `DS_TABLE_ACTIONS` | Actions | عملیات |
+| `DS_TABLE_CLEAR_SELECTION` | Clear selection | پاک کردن انتخاب |
+| `DS_TABLE_PAGE_SIZE` | Rows per page: | تعداد در صفحه: |
+| `DS_TABLE_PAGE` | Page | صفحه |
+| `DS_TABLE_OF` | of | از |
+| `DS_TABLE_SHOWING` | Showing | نمایش |
+| `DS_TABLE_TO` | to | تا |
+| `DS_TABLE_ROWS` | rows | ردیف |
+| `DS_TABLE_RECORDS` | records | رکورد |
+| `DS_TABLE_FIRST_PAGE` | First page | صفحه اول |
+| `DS_TABLE_PREV_PAGE` | Previous page | صفحه قبل |
+| `DS_TABLE_NEXT_PAGE` | Next page | صفحه بعد |
+| `DS_TABLE_LAST_PAGE` | Last page | صفحه آخر |
+| `DS_TABLE_FILTER` | Search... | جستجو... |
+| `DS_TABLE_FILTER_ALL` | All | همه |
+| `DS_TABLE_GROUP_BY` | Drag column headers here to group | هدر ستون را برای گروه‌بندی اینجا بکشید |
+| `DS_TABLE_PIN_LEFT` | Pin left | پین چپ |
+| `DS_TABLE_PIN_RIGHT` | Pin right | پین راست |
+| `DS_TABLE_UNPIN` | Unpin | حذف پین |
+| `DS_TABLE_COLUMN_SETTINGS` | Show / Hide columns | نمایش / مخفی ستون‌ها |
+| `DS_TABLE_DOWNLOAD_SAMPLE` | Download sample | دانلود نمونه |
+| `DS_TABLE_IMPORT` | Import | ورودی |
+| `DS_TABLE_EXPAND_ALL` | Expand all | باز کردن همه |
+| `DS_TABLE_COLLAPSE_ALL` | Collapse all | بستن همه |
+| `DS_TABLE_REMOVE_GROUP` | Remove group | حذف گروه |
+| `DS_TABLE_EMPTY` | No records found | رکوردی یافت نشد |
+| `DS_TABLE_APPLY_FILTER` | Apply filter | اعمال فیلتر |
+| `DS_TABLE_CLEAR_FILTER` | Clear filter | پاک کردن فیلتر |
+| `DS_TABLE_TOGGLE_COLUMN` | Show / Hide column | نمایش / مخفی ستون |
+
+All 35 keys are consumed internally by `UiTableComponent`. Consumers do **not** need to pass label inputs; the component auto-resolves them. Navigation sidebar key: `DS_STORY_BOOK_ITEM_TABLE`
+
 **`DS_LIST_PAGINATION_*` — list with pagination component (AC-73):**
 
 | Key | EN | FA |

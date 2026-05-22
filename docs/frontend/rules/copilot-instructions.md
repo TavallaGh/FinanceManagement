@@ -417,6 +417,21 @@ After building or extending any UI library, you MUST update Storybook:
 
 5. **Clean base usage**: Each variation must show minimal, clean markup that developers can copy directly into their code.
 
+6. **Story-book update is mandatory for every new or changed feature**: When you add a new component, a new variant, or a new feature to an existing component, you MUST update (or create) its story-book page. This is not optional. The task is not complete until the story-book reflects the change.
+
+7. **Always set `[showCode]="false"` on `StoryBookPreviewComponent` for complex components**: Never rely on the auto-extracted DOM output for components that render dynamic data, rows, paginated content, or any structure larger than a single self-contained widget. Always set `[showCode]="false"` on `<app-story-book-preview>` and provide explicit code snippets via `<app-story-book-code-block>`.
+
+8. **Code blocks must have explicit TypeScript + HTML tabs**: Whenever a component requires TypeScript setup (column definitions, data arrays, signal declarations, action handlers, etc.), the code block must include a TypeScript tab alongside the HTML tab. Use the `[snippets]` input on `StoryBookCodeBlockComponent`:
+
+   ```html
+   <app-story-book-code-block [snippets]="[
+     { label: 'TypeScript', code: _myTsSnippet },
+     { label: 'HTML',       code: _myHtmlSnippet }
+   ]" />
+   ```
+
+   A single HTML-only code block is only acceptable when the component has no required TypeScript setup.
+
 **Storybook Checklist:**
 
 - [ ] Menu link added to `StoryBookComponent.menuItems`
@@ -424,6 +439,9 @@ After building or extending any UI library, you MUST update Storybook:
 - [ ] Story component created or extended
 - [ ] Each item has copy-to-clipboard functionality
 - [ ] Base markup is clean and minimal
+- [ ] Story-book page updated for every new feature or variant added
+- [ ] All `<app-story-book-preview>` elements on complex components have `[showCode]="false"`
+- [ ] Every example section has an `<app-story-book-code-block>` with both TypeScript and HTML tabs where applicable
 
 ---
 
@@ -450,7 +468,21 @@ Reusable presentational components shared across features or apps must be added 
 Feature-specific repeated blocks must be extracted into local reusable components inside that feature’s `components/` folder.
 
 Do not solve repeated UI patterns with long utility-class chains or duplicated HTML structures.
+### Always Use Existing Project Components
 
+Before writing any new component or importing any third-party UI element, you MUST check whether the project already provides a component that covers the requirement:
+
+1. Check `libs/shared/ui/src/lib/components/` first — this is the canonical design-system library.
+2. Check `apps/erp-web/src/app/shared/` for any app-scoped shared components.
+3. Check the target feature's own `components/` folder for existing local compositions.
+
+Do NOT:
+- Create a new component if an existing one in `libs/shared/ui` already covers the need
+- Import Angular Material or any third-party component library if the project's own design system provides an equivalent
+- Define a one-off inline component when an existing shared component can be reused with different inputs
+- Copy-paste a component's template structure instead of reusing the component itself
+
+This rule applies everywhere: feature components, page layouts, story-book pages, and infrastructure. If you discover that an existing component is missing a required variant or input, extend the existing component — do not create a parallel one.
 Angular Material is allowed when it fits the project and no existing workspace UI component already covers the requirement.
 
 When using Angular Material:

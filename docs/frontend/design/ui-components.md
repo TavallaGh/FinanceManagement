@@ -34,6 +34,7 @@ Current shared components include:
 - `tag/`
 - `tag-group/`
 - `grid-list/`
+- `table/` (includes `UiTableComponent` and `UiPaginatorComponent`)
 
 ### Story Book Surface
 
@@ -54,6 +55,8 @@ Current story-book pages for shared UI components include:
 - `apps/erp-web/src/app/dev-tools/story-book/pages/list-with-pagination/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/tag/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/grid-system/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/table/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/paginator/`
 
 ### Story Book Shell Layout
 
@@ -552,6 +555,77 @@ Place `UiCardComponent` with `class="ui-fill"` inside the tile to get a card tha
 **RTL/LTR Behavior:**
 - Grid layout inherits direction from `<html dir>` attribute automatically
 - No manual direction overrides needed
+
+### Table Component
+
+The shared table is implemented in:
+
+- `libs/shared/ui/src/lib/components/table/`
+
+Its interactive documentation is implemented in:
+
+- `apps/erp-web/src/app/dev-tools/story-book/pages/table/`
+
+The table supports:
+
+- column definitions via `TableColumnDef[]` with type, label, sortable, filterable, summarizable flags
+- multi-row checkbox selection via `selectable` input
+- per-row action buttons via `actions` input (`TableRowAction[]`)
+- bulk actions on selected rows via `bulkActions` input (`TableBulkAction[]`)
+- server-side or client-side pagination via `paginator` and `pageSize` inputs
+- client-side column filtering with filter chip display via `showColumnFilters` and `showFilterChips`
+- column sorting with sort indicator
+- drag-and-drop column reordering via `reorderableColumns`
+- sticky column pinning (start/end) via `pinnableColumns`
+- column visibility panel (show/hide columns) via `columnVisibility`
+- column grouping via `groupable`
+- summary row for numeric/summarizable columns via `showSummaryRow`
+- skeleton loading state via `loading` and `skeletonRows`
+- empty state with custom icon (`emptyIcon`) and message
+- drag-and-drop row reordering via `rowReorderable`
+- size variants: `'sm' | 'md' | 'lg'`
+- striped row style via `striped`
+- full RTL/LTR support with reactive direction detection
+- translatable story-book examples for Persian and English
+
+#### Auto-Translation via DS_TABLE_* Keys
+
+All UI labels inside the table (empty message, pagination labels, group labels, column settings panel title, etc.) are auto-translated through `DS_TABLE_*` i18n keys. Consumers do **not** need to pass label inputs; the component reads the current language and resolves all labels internally.
+
+Label inputs (`emptyMessage`, `noResultsMessage`, `groupByLabel`, etc.) still exist but default to `null`. When `null`, the component falls back to the auto-translated `DS_TABLE_*` key. Only pass a label input when you need to override the default translation for a specific instance.
+
+#### Column Visibility Panel
+
+The column visibility panel uses the following shared components internally:
+
+- `UiCardComponent` / `UiCardHeaderDirective` — panel container
+- `UiSimpleListComponent` / `UiSimpleListItemComponent` — item list
+- `UiCheckboxComponent` — per-column toggle
+
+Consumers do not need to configure the panel; it renders automatically when `[columnVisibility]="true"`.
+
+#### Group Row Count
+
+Group header rows display the item count as a `<ui-tag severity="primary">` badge.
+
+#### Sticky Cell Background
+
+Sticky (pinned) column cells use a `--_cell-bg` CSS custom property pattern. Each row state sets the property:
+
+```scss
+.ui-table__row {
+  --_cell-bg: var(--bg-table-row);
+  &:hover { --_cell-bg: var(--bg-table-row-hover); }
+  &--selected { --_cell-bg: color-mix(in srgb, var(--bg-brand-primary) 30%, var(--bg-table-row)); }
+  &--selected:hover { --_cell-bg: var(--bg-brand-secondary); }
+  &--summary { --_cell-bg: var(--bg-table-header); }
+}
+.ui-table__row--group-header { --_cell-bg: var(--bg-secondary); }
+```
+
+Sticky cells read `background: var(--_cell-bg)` so they always render fully opaque regardless of the row state, including partially transparent selected rows.
+
+Use `UiTableComponent` for all data-grid needs in the ERP application. Do not build local table components.
 
 ## Update Rule
 
