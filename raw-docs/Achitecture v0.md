@@ -2,7 +2,8 @@
 
 Version: 0.2  
 Status: Approved (MVP Baseline)  
-Architecture Style: Modular Monolith + Vertical Slice  
+Architecture Style: Microservices (SSO + BFF + Accounting API + Notification Service)  
+Accounting API Internal Style: Modular Monolith + Vertical Slice  
 Evolution Path: Selective SoA (post-MVP)
 
 ---
@@ -27,14 +28,16 @@ Primary goals:
 
 ## 2) Technology Baseline
 
-- Backend: .NET 10 + ASP.NET Minimal API
-- Frontend: Blazor WebAssembly (Hosted)
+- Backend: .NET 10 + ASP.NET Minimal API (Accounting API)
+- Frontend: Angular SPA (separate repo: `Accounting-Frontend`), backed by BFF
+- BFF: Backend-for-Frontend — handles sessions, cookies, token refresh, API proxying
+- SSO Service: `accounting-sso` — owns user management, roles, permissions, token issuance/revocation
+- Notification Service: `accounting-notification` — handles email, SMS, OTP; consumed by SSO and other services
 - Primary Database: SQL Server
 - Read Acceleration: Redis
-- Identity: Duende IdentityServer + Microsoft Identity
 - Logging: Serilog to ELK
 - Health/Metrics: Liveness, Readiness, operational KPIs
-- Application Pattern: CQRS + MediatR
+- Application Pattern: CQRS + MediatR (within Accounting API)
 - Quality Strategy: TDD + BDD
 
 ---
@@ -54,12 +57,15 @@ Primary goals:
 ## 4) High-Level Design
 
 Flow:
-1. User works in Blazor UI.
-2. UI calls API Host.
-3. Host routes to module endpoints.
-4. Each module executes command/query via application layer.
-5. Writes go to SQL Server; read-heavy paths can use read-model + Redis.
-6. Observability is captured end-to-end with logs, traces, metrics, health.
+1. User works in Angular SPA.
+2. Angular SPA calls BFF.
+3. BFF manages session/token and proxies to Accounting API Host.
+4. SSO Service handles authentication, user management, roles, and permissions.
+5. Host routes to module endpoints inside the Accounting API.
+6. Each module executes command/query via application layer.
+7. Writes go to SQL Server; read-heavy paths can use read-model + Redis.
+8. Observability is captured end-to-end with logs, traces, metrics, health.
+9. Notification Service (`accounting-notification`) handles outbound communication (email, SMS, OTP) and is consumed by SSO.
 
 Diagram file: `Achitecture v0.svg`
 
@@ -122,9 +128,24 @@ Redis governance:
 
 ---
 
-## 8) IDP (Access Control) Model
+## 8) Authentication & Authorization Model
 
-3-layer model:
+SSO Service (`accounting-sso`) owns:
+- User management (create, update, deactivate)
+- Role and permission management
+- Token issuance and revocation
+- Notification delivery (via `accounting-notification` service)
+
+BFF owns:
+- Session management (HttpOnly cookies)
+- Token refresh orchestration
+- API proxying to Accounting API
+
+Accounting API owns:
+- Token validation (JWT signature, issuer, audience, expiry) — does NOT issue tokens
+- `UserManagement` module: Accounting-scoped user context (company/fiscal linkage, local user references)
+
+3-layer access control model (enforced via claims in token from SSO):
 - Layer 1: Form/Data scope
 - Layer 2: Operation permission (View/Edit/Delete/Approve)
 - Layer 3: Document type permission (Opening/Normal/Closing)
@@ -135,9 +156,9 @@ Additional controls:
 - Fiscal period lock gate
 
 Implementation anchors:
-- Policy + Claims in API Host
-- Permission matrix in DB
-- Permission evaluator in application layer
+- Policy + Claims in Accounting API Host (from token issued by SSO)
+- Permission matrix managed in SSO DB
+- Permission evaluator in Accounting application layer
 - Audit log for allow/deny decisions
 
 ---
@@ -226,13 +247,15 @@ Mitigations:
 
 ## 14) Final Decision Snapshot
 
-- Architecture: Modular Monolith
+- Architecture: Microservices (SSO + BFF + Accounting API + Notification Service)
+- Accounting API Internal: Modular Monolith + Vertical Slice
 - Delivery shape: Vertical Slice
-- Data model: Single DB + module ownership
-- App pattern: CQRS + MediatR
+- Data model: Single DB per service + module ownership within Accounting API
+- App pattern: CQRS + MediatR (within Accounting API)
 - API: Minimal API
-- UI: Blazor WASM
-- Security: IdentityServer + Policy-based authorization
+- UI: Angular SPA + BFF
+- Auth: SSO Service (accounting-sso) + JWT token validation in Accounting API
+- Notifications: accounting-notification microservice
 - Observability: Serilog + ELK + Health/Metrics
 - Quality: TDD/BDD mandatory
 

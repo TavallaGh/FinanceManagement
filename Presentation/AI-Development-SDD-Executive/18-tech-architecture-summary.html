@@ -93,7 +93,7 @@
 
               <rect class="flow-node core" x="566" y="84" rx="12" ry="12" width="250" height="90"></rect>
               <text class="flow-text" x="691" y="116" text-anchor="middle">Tech Stack Baseline</text>
-              <text class="flow-text" x="691" y="136" text-anchor="middle">.NET + Minimal API + Blazor</text>
+              <text class="flow-text" x="691" y="136" text-anchor="middle">.NET + Minimal API + Angular/BFF</text>
               <text class="flow-text" x="691" y="156" text-anchor="middle">SQL + Redis + ELK + Identity</text>
 
               <rect class="flow-node" x="852" y="84" rx="12" ry="12" width="204" height="90"></rect>
@@ -122,7 +122,7 @@
             <div class="stack-item">
               <h3>Frontend + Data</h3>
               <ul class="list-compact">
-                <li>Blazor WebAssembly (Hosted)</li>
+              <li>Angular SPA + BFF Architecture</li>
                 <li>SQL Server (OLTP)</li>
                 <li>Redis برای Read Caching</li>
               </ul>
@@ -130,7 +130,8 @@
             <div class="stack-item">
               <h3>Security + Observability</h3>
               <ul class="list-compact">
-                <li>Duende IdentityServer + Microsoft Identity</li>
+                <li>SSO Service (<code>accounting-sso</code>) + JWT Validation</li>
+                <li>Notification: <code>accounting-notification</code> (Email/SMS/OTP)</li>
                 <li>Serilog -> ELK</li>
                 <li>Health Checks + Metrics</li>
               </ul>

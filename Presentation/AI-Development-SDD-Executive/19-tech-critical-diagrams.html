@@ -26,7 +26,7 @@
       <header class="slide-header">
         <div>
           <h1>High-Level System Diagram (L1)</h1>
-          <p class="subtitle">نسخه اجرایی مسیر سیستم: User -> Blazor WASM -> API Host -> Modules -> SQL/Redis</p>
+          <p class="subtitle">نسخه اجرایی مسیر سیستم: User -> Angular SPA -> BFF -> API Host -> Modules -> SQL/Redis</p>
         </div>
         <span class="badge">High-Level Architecture</span>
       </header>
@@ -45,14 +45,16 @@
               <text x="100" y="204" text-anchor="middle">User</text>
 
               <rect class="node" x="210" y="170" rx="12" ry="12" width="170" height="56" />
-              <text x="295" y="204" text-anchor="middle">Blazor WASM</text>
+              <text x="295" y="198" text-anchor="middle">Angular SPA</text>
+              <text x="295" y="214" text-anchor="middle">(via BFF)</text>
 
               <rect class="node pulse" x="430" y="150" rx="12" ry="12" width="250" height="96" />
               <text x="555" y="188" text-anchor="middle">Accounting.Api Host</text>
               <text x="555" y="212" text-anchor="middle">Minimal API</text>
 
               <rect class="node soft" x="740" y="40" rx="12" ry="12" width="250" height="56" />
-              <text x="865" y="74" text-anchor="middle">Duende IdentityServer + MS Identity</text>
+              <text x="865" y="67" text-anchor="middle">SSO Service</text>
+              <text x="865" y="84" text-anchor="middle">(accounting-sso)</text>
 
               <rect class="node" x="740" y="120" rx="12" ry="12" width="140" height="56" />
               <text x="810" y="154" text-anchor="middle">Modules</text>
