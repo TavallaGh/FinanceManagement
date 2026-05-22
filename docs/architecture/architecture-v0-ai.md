@@ -15,19 +15,20 @@ Mandatory security policy reference:
 
 Accounting v0 is a modular financial system built using:
 
-* .NET (Backend)
-* Blazor WebAssembly (Frontend)
+* .NET (Backend — Accounting API)
+* Angular SPA (Frontend) backed by a BFF (Backend-for-Frontend)
+* SSO Service (separate microservice — owns user management, roles, permissions, token issuance/revocation)
+* Notification Service (`accounting-notification` — separate microservice for email, SMS, OTP; consumed by SSO and other services)
 * SQL Server (Primary Database)
 * Redis (Caching Layer)
 * CQRS with Handlers
 * Minimal API
-* Duende IdentityServer + Microsoft Identity
 * Serilog + ELK
 * Health Checks + Metrics Monitoring
 
 The system is designed as:
 
-> Modular Monolith (MVP) with future migration path to SoA.
+> Microservices ecosystem (SSO + BFF + Accounting API + Notification Service) with the Accounting API itself following a Modular Monolith + Vertical Slice pattern internally.
 
 ---
 
@@ -52,11 +53,19 @@ AI Agents MUST respect these constraints:
 
 ```mermaid
 flowchart TB
-  User --> BlazorWASM
-  BlazorWASM --> API
+  User --> AngularSPA
+  AngularSPA --> BFF
+  BFF --> SSO
+  BFF --> API
 
-  subgraph Host
-    API --> Identity
+  SSO --> NotificationService
+  SSO --> SSODb[(SSO DB)]
+
+  NotificationService --> Email
+  NotificationService --> SMS
+  NotificationService --> OTP
+
+  subgraph AccountingHost
     API --> RegisterModules
     API --> Logging
     API --> Health
@@ -66,6 +75,7 @@ flowchart TB
     RegisterModules --> Ledgers
     RegisterModules --> Journals
     RegisterModules --> Treasury
+    RegisterModules --> UserManagement
     RegisterModules --> Workflow
     RegisterModules --> Reporting
   end
@@ -73,6 +83,7 @@ flowchart TB
   Ledgers --> Handlers
   Journals --> Handlers
   Treasury --> Handlers
+  UserManagement --> Handlers
 
   Handlers --> Services
   Services --> SQL
@@ -90,7 +101,6 @@ Target structure:
 ```
 /src
   Accounting.Api                ← Host (Composition Root)
-  Accounting.Blazor             ← Frontend
   Accounting.SharedKernel       ← Minimal Shared Types
   /Frameworks
     /Accounting.Frameworks      ← Shared cross-cutting patterns (Result/Option)
@@ -101,15 +111,16 @@ Target structure:
     /Treasury
     /Workflow
     /Reporting
-    /IdentityAccess
+    /UserManagement              ← Accounting-scoped user concerns (token validation, user context)
 ```
+
+Note: The Angular frontend lives in a **separate repository** (`Accounting-Frontend`). The BFF is a separate service. The SSO service lives in `accounting-sso`. The notification service lives in `accounting-notification`.
 
 Current workspace mapping (`projects/Accounting-Project/src`):
 
 ```
 /src
   Accounting.Api
-  Accounting.Blazor
   Accounting.SharedKernel
   Frameworks
 
@@ -132,8 +143,8 @@ Current workspace mapping (`projects/Accounting-Project/src`):
       /Features
       /Infrastructure
       /Services
-    /IdentityServer
-      /Accounting.Modules.Idp
+    /UserManagement
+      /Accounting.Modules.UserManagement
         /Domains
         /Handlers
         /Infrastructures
@@ -362,19 +373,23 @@ NoSQL introduction requires architectural review.
 
 # 12. Authentication & Authorization
 
-Authentication:
+Authentication model:
 
-* Duende IdentityServer
-* Microsoft Identity
+* The **SSO Service** (`accounting-sso`) is the sole authority for:
+  * User management (create, update, roles, permissions)
+  * Token issuance and revocation
+  * Role and permission management
+* The **BFF** handles sessions, cookies, and proxies authenticated requests to the Accounting API.
+* The **Accounting API** validates the token forwarded by the BFF (signature, issuer, audience, expiry). It does **not** issue or manage tokens.
+* The **Accounting `UserManagement` module** handles Accounting-scoped user concerns only (e.g. user context within accounting domain, local user references, fiscal/company scope linking).
 
-Authorization:
+Authorization in the Accounting API:
 
 * Policy-based
-* Role-based
-* Scope-based (Company / FiscalYear / Office)
+* Claims/scope-based (Company / FiscalYear / Office — carried in token issued by SSO)
 * Ownership-based (Document level)
 
-All endpoints MUST require authentication.
+All endpoints MUST require authentication (token validation via configured JWT middleware).
 
 Security enforcement note:
 
@@ -400,7 +415,8 @@ Mandatory:
 * API health
 * SQL connectivity
 * Redis connectivity
-* Identity availability
+* SSO service availability
+* Notification service availability (for services that depend on it)
 
 ## Metrics
 
@@ -415,14 +431,17 @@ Must include:
 
 # 14. Frontend Architecture
 
-Frontend: Blazor WebAssembly (Hosted)
+Frontend: Angular SPA (separate repository: `Accounting-Frontend`)
+Runtime: Angular SPA → BFF → Accounting API (token managed by SSO, session by BFF)
 
 Rules:
 
-* UI must call backend APIs only
-* No direct database logic
-* Token-based authentication
-* API-first design
+* Angular SPA calls BFF endpoints only — never directly calls backend APIs or SSO
+* BFF handles session (HttpOnly cookies), token refresh, and API proxying
+* SSO Service handles login, logout, token issuance
+* No bearer tokens stored in browser storage (all token storage is BFF-side)
+* Nx monorepo with Angular signals, zone-less patterns, RTL/LTR (Persian/English) support
+* API-first design; Angular receives response keys and resolves them client-side
 
 ---
 
@@ -509,9 +528,10 @@ These rules apply to both AI code generation and AI code review.
 
 This system is:
 
-* Modular
+* Microservices ecosystem (SSO + BFF + Accounting API + Notification Service)
+* Accounting API is internally Modular Monolith + Vertical Slice
 * API-first
-* CQRS-based
+* CQRS-based (within Accounting API)
 * Handlers-facade based internally
 * Cache-aware
 * Observability-first

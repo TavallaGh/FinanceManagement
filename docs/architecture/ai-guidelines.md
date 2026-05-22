@@ -152,11 +152,11 @@ Domain structure standard (mandatory):
 
 DDD.Domain inheritance standard (mandatory):
 
-- Use `NT.DDD.Domain` base entities/contracts for non-IDP modules.
+- Use `NT.DDD.Domain` base entities/contracts for all Accounting modules.
 - Choose audit base class by behavior scope (`CreationAuditedEntity`, `ModificationAuditedEntity`, `AuditedEntity`, `FullAuditedEntity`).
 - Audit timestamps must use `CreatedOnUtc`, `UpdatedOnUtc`, `DeletedOnUtc`.
 - Audit aliases such as `CreatedAt`, `UpdatedAt`, and `DeletedAt` are forbidden for domain audit contracts.
-- For IDP modules, keep identity framework inheritance and apply the same audit naming shape defined in `docs/architecture/ddd-domain-conventions.md`.
+- For the `UserManagement` module, apply the same audit naming shape defined in `docs/architecture/ddd-domain-conventions.md`.
 
 Commons structure standard (mandatory):
 
@@ -318,10 +318,12 @@ Endpoint creation review checklist (mandatory):
 
 # 9. Authentication & Authorization
 
-- Use Duende IdentityServer.
-- Use policy-based authorization.
-- Apply scope filtering where required.
+- The **SSO Service** (`accounting-sso`) is the sole authority for token issuance, user management, roles, and permissions.
+- The Accounting API validates the JWT token forwarded by the BFF. It does NOT issue or manage tokens.
+- Use policy-based authorization based on claims in the validated JWT.
+- Apply scope filtering where required (Company / FiscalYear / Office).
 - NEVER bypass authorization checks.
+- NEVER manually parse or validate JWT in endpoint handlers — rely on configured JWT middleware.
 
 Security implementation and review rules are mandatory:
 
@@ -350,7 +352,7 @@ Health checks MUST include:
 
 - SQL connectivity
 - Redis connectivity
-- Identity server availability
+- SSO service availability
 
 Metrics MUST capture:
 

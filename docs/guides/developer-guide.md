@@ -36,5 +36,5 @@ This guide explains how developers implement tasks in alignment with Jira/GitLab
 - Use UTC audit member names from `NT.DDD.Domain` only:
   - `CreatedOnUtc`, `UpdatedOnUtc`, `DeletedOnUtc`.
 - `CreatedAt`, `UpdatedAt`, `DeletedAt`, `deletedAt`, and similar alternatives are not allowed for auditing contracts.
-- IDP domain entities must preserve IdentityServer inheritance while keeping the same audit member naming shape.
+- The `UserManagement` module in the Accounting API handles Accounting-scoped user concerns. SSO Service owns authentication, tokens, roles, and permissions.
 - Full details and examples: `docs/architecture/ddd-domain-conventions.md`.

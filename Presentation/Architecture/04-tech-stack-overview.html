@@ -53,11 +53,12 @@
         <article class="card small">
           <h2>Security & Observability</h2>
           <ul class="list-compact">
-            <li>Auth: Duende IdentityServer + Microsoft Identity</li>
+            <li>Auth: SSO Service (<code>accounting-sso</code>) + JWT Validation در Accounting API</li>
+            <li>Notifications: <code>accounting-notification</code> (Email/SMS/OTP)</li>
             <li>Logs: Serilog → ELK</li>
             <li>Health/Metrics: کامل</li>
           </ul>
-          <p>IdentityServer + ELK + Health/Metrics نیز در مسیر سرویس‌دهی قرار دارند.</p>
+          <p>SSO Service + Notification Service + ELK + Health/Metrics نیز در مسیر سرویس‌دهی قرار دارند.</p>
           <div class="chip-row">
             <span class="kpi">Security</span>
             <span class="kpi">Observability</span>

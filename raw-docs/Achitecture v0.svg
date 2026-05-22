@@ -29,15 +29,16 @@
   <rect x="0" y="0" width="2752" height="1536" fill="url(#bg)" />
 
   <text x="96" y="90" class="title">Architecture v0 — Accounting MVP</text>
-  <text x="96" y="130" class="subtitle">Modular Monolith + Vertical Slice + CQRS + Observability</text>
+  <text x="96" y="130" class="subtitle">Microservices: SSO + BFF + Accounting API + Notification | Accounting API: Modular Monolith + Vertical Slice + CQRS</text>
 
   <rect class="box" x="96" y="190" width="500" height="130" />
   <text x="136" y="245" class="node-title">User / Browser</text>
   <text x="136" y="280" class="node-sub">Financial staff, managers, admins</text>
 
   <rect class="box" x="730" y="190" width="500" height="130" />
-  <text x="770" y="245" class="node-title">Blazor WASM (Hosted)</text>
-  <text x="770" y="280" class="node-sub">Single UI entry for MVP workflows</text>
+  <text x="770" y="235" class="node-title">Angular SPA</text>
+  <text x="770" y="265" class="node-sub">(via BFF)</text>
+  <text x="770" y="295" class="node-sub">Accounting-Frontend repo</text>
 
   <rect class="box" x="1360" y="190" width="630" height="130" />
   <text x="1400" y="245" class="node-title">API Host (ASP.NET Minimal API)</text>
@@ -57,8 +58,8 @@
   <text x="1730" y="510" class="node-sub">Cash, payment, settlement flows</text>
 
   <rect class="module" x="2020" y="420" width="300" height="130" />
-  <text x="2060" y="475" class="node-title">Access Control</text>
-  <text x="2060" y="510" class="node-sub">Role, policy, ownership gates</text>
+  <text x="2060" y="475" class="node-title">UserManagement</text>
+  <text x="2060" y="510" class="node-sub">Accounting user context &amp; token validation</text>
 
   <rect class="module" x="2350" y="420" width="300" height="130" />
   <text x="2390" y="475" class="node-title">System Settings</text>
@@ -91,8 +92,8 @@
 
   <text x="1080" y="735" class="section">Security &amp; Operations</text>
   <rect class="box" x="1080" y="770" width="500" height="120" />
-  <text x="1120" y="825" class="node-title">Identity &amp; Authorization</text>
-  <text x="1120" y="858" class="node-sub">Duende + MS Identity + Policy/Claims</text>
+  <text x="1120" y="815" class="node-title">SSO Service</text>
+  <text x="1120" y="845" class="node-sub">(accounting-sso) Auth/Tokens/Roles/Permissions</text>
 
   <rect class="box" x="1620" y="770" width="500" height="120" />
   <text x="1660" y="825" class="node-title">Observability</text>
@@ -111,7 +112,7 @@
   <rect class="chipbox" x="1264" y="1045" width="560" height="60" />
   <text x="1294" y="1083" class="chip">MVP first, selective SoA by measurable pressure</text>
 
-  <text x="96" y="1200" class="small">MVP Scope: General Ledger, Treasury, Access Control, System Settings</text>
-  <text x="96" y="1230" class="small">Decision Snapshot: Modular Monolith now, controlled evolution path later</text>
+  <text x="96" y="1200" class="small">MVP Scope: General Ledger, Treasury, UserManagement, System Settings | SSO (accounting-sso) | BFF | Notification (accounting-notification)</text>
+  <text x="96" y="1230" class="small">Decision Snapshot: Microservices ecosystem, Accounting API = Modular Monolith, controlled evolution path later</text>
   <text x="96" y="1260" class="small">Source baseline: raw-docs/slides.md + raw-docs/infographic.png</text>
 </svg>

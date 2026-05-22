@@ -43,20 +43,21 @@ Note: if you need user navigation properties (for example `CreatorUser`), use th
 - `AuditedEntity<TPrimaryKey, TUser, TUserKey>`
 - `FullAuditedEntity<TPrimaryKey, TUser, TUserKey>`
 
-## IDP Domain Special Rule
+## UserManagement Module Domain Rule
 
-IDP domain entities that must inherit from IdentityServer/identity framework base entities follow this rule:
+The `UserManagement` module in the Accounting API handles Accounting-scoped user concerns only (company/fiscal context, local user references). It does **not** own authentication or token management — those are owned by the SSO Service.
 
-1. Keep identity inheritance as primary (do not break identity framework inheritance).
-2. Apply the same audit naming and UTC conventions from `NT.DDD.Domain`.
-3. When direct inheritance from `AuditedEntity*` is not possible (single inheritance limitation), implement compatible auditing contract shape using the same member names:
+For `UserManagement` module entities that need to integrate with identity-framework-derived types:
+
+1. Apply the same audit naming and UTC conventions from `NT.DDD.Domain`.
+2. When direct inheritance is not possible (single inheritance limitation), implement compatible auditing contract shape using the same member names:
    - `CreatedOnUtc`
    - `UpdatedOnUtc`
    - `DeletedOnUtc`
    - `CreatorUserId`
    - `LastModifierUserId`
    - `DeleterUserId`
-4. If a custom IDP user type is needed for domain audit relations, align it with `IAuditedUser<TUserKey>` semantics.
+3. If a custom user type is needed for domain audit relations, align it with `IAuditedUser<TUserKey>` semantics.
 
 ## Quick Examples
 
@@ -78,10 +79,10 @@ public class Voucher : FullAuditedEntity<long, int>
 }
 ```
 
-### IDP-Compatible Entity Shape
+### UserManagement-Compatible Entity Shape
 
 ```csharp
-public class IdentitySession
+public class UserContext
 {
     public DateTimeOffset CreatedOnUtc { get; set; }
     public DateTimeOffset? UpdatedOnUtc { get; set; }

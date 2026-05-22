@@ -142,9 +142,10 @@ Slide 5
 
 ## Frontend & Experience
 
-- Blazor WebAssembly (Hosted)
-- یکپارچه با API Host برای توسعه سریع MVP
-- آماده برای توسعه تدریجی قابلیت‌ها
+- Angular SPA + BFF Architecture
+- Nx Monorepo، Modern Angular (Signals، Zone-less)
+- Design System با Token-based Styling
+- RTL/LTR کامل (فارسی/انگلیسی)
 
 ## Data & Performance
 
@@ -154,11 +155,12 @@ Slide 5
 
 ## Security & Observability
 
-- Auth: Duende IdentityServer + Microsoft Identity
+- Auth: SSO Service (accounting-sso) + JWT Validation در Accounting API
+- Notification: accounting-notification Microservice (Email/SMS/OTP)
 - Logs: Serilog → ELK
 - Health/Metrics: کامل
 
-IdentityServer + ELK + Health/Metrics نیز در مسیر سرویس‌دهی قرار دارند.
+SSO Service + Notification Service + ELK + Health/Metrics نیز در مسیر سرویس‌دهی قرار دارند.
 
 Security
 Observability
@@ -182,18 +184,22 @@ Reliability
 
 # High-Level System Diagram (L1)
 
-User → Blazor WASM → API Host → Modules → SQL/Redis
+User → Angular SPA → BFF → API Host → Modules → SQL/Redis
 
 Slide 6
 
 User
 
-Blazor WASM
+Angular SPA
+
+BFF (Backend-for-Frontend)
 
 Accounting.Api Host
 Minimal API
 
-Duende IdentityServer + MS Identity
+SSO Service (accounting-sso)
+
+Notification Service (accounting-notification)
 
 Modules
 
@@ -246,13 +252,13 @@ IDP (Access Control)
 
 # Container Diagram (C4-L2)
 
-چیدمان ستونی برای توضیح ساده‌تر: ستون 1 UI (Blazor)، ستون 2 API Host، ستون 3 ماژول‌ها + Identity، ستون 4 زیرساخت داده و مانیتورینگ
+چیدمان ستونی برای توضیح ساده‌تر: ستون 1 Angular SPA + BFF، ستون 2 API Host، ستون 3 ماژول‌ها + SSO + Notification، ستون 4 زیرساخت داده و مانیتورینگ
 
 Slide 8
 
 ## Accounting Containers
 
-ستون 1: Blazor UI
+ستون 1: Angular SPA + BFF
 
 ستون 2: API Host
 
@@ -260,7 +266,7 @@ Slide 8
 
 ستون 4: DB / Cache / Ops
 
-Blazor WASM UI
+Angular SPA + BFF
 
 API Host (Minimal API)
 AuthN/AuthZ + Endpoints
@@ -312,7 +318,7 @@ Accounting Host (Modular Monolith)
 
 Cross-Cutting Layer: AuthZ | Validation | Logging | Monitoring | Caching Policies
 
-Presentation Layer (Shared): Blazor UI + Shared Components
+Presentation Layer (Shared): Angular SPA + BFF + Shared Components
 
 Shared Domain Layer: Common Value Objects, Policies, Contracts
 
@@ -884,8 +890,8 @@ Data: Single DB + Ownership
 Performance: Redis + Query Layer
 Application: CQRS + MediatR
 API: Minimal API
-UI: Blazor WASM
-Security: IdentityServer
+UI: Angular SPA + BFF
+Security: SSO Service (accounting-sso)
 Observability: Serilog + ELK
 Quality: TDD/BDD
 
@@ -927,7 +933,7 @@ Slide 23
 | Scope Planner | Ledger, Treasury, Access, Settings | فرآیندهای مالی پایه | HQ + شعب + Cloud | Finance, Admin, Manager | دوره مالی و تقویم عملیات | یکپارچگی و کنترل مالی |
 | Business Model Owner | مالکیت داده هر ماژول | ثبت سند، پرداخت، کنترل دسترسی | جریان بین واحدها | نقش‌ها و سطح دسترسی | چرخه تایید و بستن دوره | کاهش خطا و افزایش سرعت |
 | System Model Designer | SQL + Read Models + Cache | CQRS + Vertical Slice | API Host + External Services | Identity + Authorization | Jobها، Eventها، SLA | پایداری، نگهداشت‌پذیری |
-| Technology Model Builder | SQL Server / Redis | .NET + Minimal API + MediatR | Hosted Blazor + API | Duende + Microsoft Identity | Release / Monitoring cadence | تحویل سریع MVP |
+| Technology Model Builder | SQL Server / Redis | .NET + Minimal API + MediatR | Angular SPA + BFF | SSO Service (accounting-sso) | Release / Monitoring cadence | تحویل سریع MVP |
 
 این جدول کمک می‌کند تیم روی یک زبان مشترک معماری هم‌راستا شود: در هر سطح (از دید کسب‌وکار تا فناوری)
 دقیقاً مشخص می‌شود «چه داده‌ای»، «چه کاری»، «توسط چه کسی»، «در چه زمانی» و «با چه هدفی» باید انجام شود.
@@ -1032,11 +1038,12 @@ Latency خواندن
 
 .NET 10
 ASP.NET Minimal API
-Blazor Hosted (WASM + API)
+Angular SPA + BFF
 SQL Server
 Redis
 Serilog + ELK
-IdentityServer
+SSO Service (accounting-sso)
+Notification Service (accounting-notification)
 
 ### اهداف این Deck
 
