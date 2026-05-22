@@ -61,6 +61,32 @@ Shared story-book utilities are organized by responsibility under:
 - `apps/erp-web/src/app/dev-tools/story-book/shared/services/`
 - `apps/erp-web/src/app/dev-tools/story-book/shared/styles/`
 
+### Mandatory Reuse Of Existing Story-Book Components
+
+If a component already exists under `story-book/shared/components/`, you MUST use it. Never recreate an equivalent component at the page level.
+
+Currently available shared story-book components:
+
+- `StoryBookCodeBlockComponent` — renders copyable, syntax-highlighted code snippets (single or tabbed). Import from `../../shared/components/code-block/story-book-code-block.component`.
+- `StoryBookPreviewComponent` — wraps a live component preview with an optional toggle to show its source code. Import from `../../shared/components/preview/story-book-preview.component`.
+
+Rule: every story-book page must use `StoryBookCodeBlockComponent` for all code samples and `StoryBookPreviewComponent` for all live previews. Inline `<pre>` blocks or ad-hoc preview wrappers are not allowed.
+
+### Mandatory Reuse Of Existing Design-System Components
+
+Before writing any new component or using any third-party UI element, you MUST check whether the project already provides a component that covers the requirement:
+
+1. Check `libs/shared/ui/src/lib/components/` first — this is the canonical design-system library.
+2. Check `apps/erp-web/src/app/shared/` for app-scoped shared components.
+3. Check the target feature's own `components/` folder for local compositions.
+
+Do NOT:
+- Create a new component if an existing one in `libs/shared/ui` already covers the need
+- Import Angular Material or any third-party UI element if the project's own design system provides an equivalent
+- Define an ad-hoc inline component when an existing shared component can be reused with different inputs
+
+If an existing component is missing a variant or input needed by the task, extend the existing component. Do not create a parallel one.
+
 Each documented page must align with the existing shell and route structure in:
 
 - `apps/erp-web/src/app/dev-tools/story-book/story-book.routes.ts`
@@ -188,6 +214,24 @@ If the example needs more than one file view, provide tabbed snippets such as:
 - `ts`
 - `html`
 - `scss` when it adds real value
+
+**Code block requirements:**
+
+- Always set `[showCode]="false"` on `<app-story-book-preview>` whenever the component renders dynamic data, rows, paginators, lists, or any structure larger than a simple self-contained widget. Never rely on the auto-extracted DOM output for complex components.
+- Always provide explicit code snippets in a separate `<app-story-book-code-block>` element.
+- Whenever the component requires TypeScript setup (column definitions, data arrays, signal declarations, action handlers, etc.), include a TypeScript tab alongside the HTML tab:
+
+  ```html
+  <app-story-book-code-block [snippets]="[
+    { label: 'TypeScript', code: _myTsSnippet },
+    { label: 'HTML',       code: _myHtmlSnippet }
+  ]" />
+  ```
+
+- A single HTML-only code block is only acceptable when the component has no required TypeScript setup.
+- Story-book code snippets must be defined as `protected readonly` string properties in the component class — not inlined in the template.
+
+**Story-book update is mandatory for every new or changed feature.** Adding a new input, output, variant, or behaviour to a shared component without updating its story-book page is not acceptable. The task is not complete until the story-book reflects every change.
 
 ### 6. Translations
 
