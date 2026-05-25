@@ -1,10 +1,10 @@
 ---
-description: Generate full functional & business documentation, for one or more UI page source files. Requires at least one file attachment. Saves output to the same folder as the attached file(s). PAGENAME comes from the first attached file or a user-supplied name argument. ZERO technical advice — business and user-facing content only.
+description: Generate full functional & business documentation (bilingual FA/EN, two separate files) for one or more UI page source files. Requires at least one file attachment. Saves output to the same folder as the attached file(s). PAGENAME comes from the first attached file or a user-supplied name argument. ZERO technical advice — business and user-facing content only.
 ---
 
-# /speckit.page-docs-en
+# /speckit.page-docs
 
-Generate comprehensive, functional and business documentation for the attached UI page(s).
+Generate comprehensive, bilingual (Persian + English) functional and business documentation for the attached UI page(s).
 
 ---
 
@@ -91,9 +91,10 @@ Do not mention, infer, or reference the programming language, framework, or runt
 Generate **exactly two separate Markdown files**:
 
 1. **English version:** `USER-DOCS-{PAGENAME}-EN.md`
+2. **Persian version:** `USER-DOCS-{PAGENAME}-FA.md`
 
 **`{PAGENAME}` derivation rules (in priority order):**
-1. If the user provides an explicit name as an input argument (e.g., `/speckit.page-docs-en MyReportName`), use that name (uppercased, spaces replaced with hyphens).
+1. If the user provides an explicit name as an input argument (e.g., `/speckit.page-docs MyReportName`), use that name (uppercased, spaces replaced with hyphens).
 2. Otherwise, use the **first attached file's name** (without extension, uppercased, spaces replaced with hyphens) — regardless of how many files are attached.
 
 ### Output Folder
@@ -114,7 +115,7 @@ Do **not** create a new subfolder. Do **not** use `project-docs-mvp-*` paths.
 
 ## Document Structure
 
-The file must contain **all 8 sections** listed below, fully written in its own language with no mixed-language content.
+Each file (EN and FA) must contain **all 8 sections** listed below, fully written in its own language with no mixed-language content.
 
 ---
 
@@ -299,9 +300,9 @@ Each item should follow:
 2. **Determine the output folder:** the parent directory of the first attached file (or the attached folder itself).
 3. **Determine `{PAGENAME}`:** use the explicit name argument if provided; otherwise use the first attached file's name (no extension, uppercased, hyphens for spaces).
 5. **Read all attached files thoroughly** before writing anything.
-6. **Draft all 8 sections** for final file carefully.
+6. **Draft all 8 sections** for both language files simultaneously.
 7. **Self-review:** Before saving, re-read every sentence and remove any technical term, code reference, or implementation advice. Replace with business-observable language.
-7. **Save** `USER-DOCS-{PAGENAME}-EN.md` to the output folder (same directory as the first attached file).
+7. **Save** `USER-DOCS-{PAGENAME}-EN.md` and `USER-DOCS-{PAGENAME}-FA.md` to the output folder (same directory as the first attached file).
 9. **Confirm** to the user: list both file paths created, the output folder, and a one-line summary of what was documented.
 
 ---
