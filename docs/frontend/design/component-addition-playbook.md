@@ -67,8 +67,8 @@ If a component already exists under `story-book/shared/components/`, you MUST us
 
 Currently available shared story-book components:
 
-- `StoryBookCodeBlockComponent` — renders copyable, syntax-highlighted code snippets (single or tabbed). Import from `../../shared/components/code-block/story-book-code-block.component`.
-- `StoryBookPreviewComponent` — wraps a live component preview with an optional toggle to show its source code. Import from `../../shared/components/preview/story-book-preview.component`.
+- `StoryBookCodeBlockComponent` — renders copyable, syntax-highlighted code snippets (single or tabbed via `[snippets]`). Import from `../../shared/components/code-block/story-book-code-block.component`.
+- `StoryBookPreviewComponent` — wraps a live component preview with an auto-extracted or custom code block below it. Supports `[code]` for a single custom snippet, `[snippets]` for a tabbed multi-file view (e.g. HTML + TypeScript), and `[showCode]` to hide the code block entirely. Import from `../../shared/components/preview/story-book-preview.component`.
 
 Rule: every story-book page must use `StoryBookCodeBlockComponent` for all code samples and `StoryBookPreviewComponent` for all live previews. Inline `<pre>` blocks or ad-hoc preview wrappers are not allowed.
 

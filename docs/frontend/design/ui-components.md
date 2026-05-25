@@ -35,6 +35,7 @@ Current shared components include:
 - `tag-group/`
 - `grid-list/`
 - `table/` (includes `UiTableComponent` and `UiPaginatorComponent`)
+- `tree-view/` (includes `UiTreeViewComponent`, `UiTreeViewNodeComponent`, and `UiTreeViewGridComponent`)
 
 ### Story Book Surface
 
@@ -57,6 +58,7 @@ Current story-book pages for shared UI components include:
 - `apps/erp-web/src/app/dev-tools/story-book/pages/grid-system/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/table/`
 - `apps/erp-web/src/app/dev-tools/story-book/pages/paginator/`
+- `apps/erp-web/src/app/dev-tools/story-book/pages/tree-view/`
 
 ### Story Book Shell Layout
 
@@ -102,6 +104,25 @@ The base card provides a flexible container with:
 - automatic RTL/LTR layout support
 
 Use the base card for generic content grouping and as the foundation for specialized card variants.
+
+#### CSS Custom Properties for Overriding Card Layout
+
+The base card exposes CSS custom properties so data-container components (such as table and tree-view-grid) can suppress internal padding without `::ng-deep`. Set these on the consuming component's `:host`:
+
+| Property | Default | Description |
+|---|---|---|
+| `--ui-card-header-padding-inline` | `var(--spacing-4)` | Header inline padding |
+| `--ui-card-header-padding-block` | `var(--spacing-2)` | Header block padding |
+| `--ui-card-header-min-height` | `40px` | Header minimum height |
+| `--ui-card-body-padding-inline` | `var(--spacing-4)` | Body inline padding |
+| `--ui-card-body-padding-block` | `var(--spacing-4)` | Body block padding |
+| `--ui-card-body-gap` | `var(--spacing-2)` | Body flex gap |
+| `--ui-card-body-overflow` | `unset` | Body overflow behavior |
+| `--ui-card-footer-padding-inline` | `var(--spacing-4)` | Footer inline padding |
+| `--ui-card-footer-padding-block` | `var(--spacing-3)` | Footer block padding |
+| `--ui-card-footer-border-start` | `1px solid var(--border-tertiary)` | Footer top border |
+
+CSS custom properties cascade through Angular's emulated ViewEncapsulation naturally — they are not affected by specificity ordering unlike `::ng-deep` overrides.
 
 #### Stat Card (UiStatCardComponent)
 
@@ -157,7 +178,7 @@ The action card presents actionable prompts with:
 Use the action card for call-to-action sections, empty states, and user prompts.
 
 **Styling Notes:**
-- Footer border removed via `::ng-deep .ui-card__footer { border-block-start: none !important; }`
+- Footer border removed by setting `--ui-card-footer-border-start: none` on `:host`
 - Maintains consistent spacing and token usage with base card
 
 ### Checkbox Component
@@ -625,9 +646,96 @@ Sticky (pinned) column cells use a `--_cell-bg` CSS custom property pattern. Eac
 
 Sticky cells read `background: var(--_cell-bg)` so they always render fully opaque regardless of the row state, including partially transparent selected rows.
 
+#### Card-Based Layout
+
+The table wraps all of its content inside `UiCardComponent`:
+
+- Toolbar row → `[uiCardHeader]` slot
+- Scroll table area → default card body slot
+- Paginator → `[uiCardFooter]` slot (wrapped in a `.ui-table__footer` div)
+
+Internal card padding is suppressed via CSS custom properties on `:host` (`--ui-card-header-padding-inline: 0px`, `--ui-card-body-padding-inline: 0px`, etc.) so the table content and toolbar extend edge-to-edge.
+
 Use `UiTableComponent` for all data-grid needs in the ERP application. Do not build local table components.
 
-## Update Rule
+### Tree View Component
+
+The shared tree view is implemented in:
+
+- `libs/shared/ui/src/lib/components/tree-view/`
+
+The family includes three components:
+
+- `ui-tree-view.component` — Root container that renders a flat list of root-level `UiTreeViewNodeComponent` instances
+- `ui-tree-view-node.component` — Recursive node that renders its label, a collapse/expand toggle, and its children
+- `ui-tree-view-grid.component` — Complete tree management panel combining toolbar, search, and `UiTreeViewComponent` in a card layout
+
+Its interactive documentation is implemented in:
+
+- `apps/erp-web/src/app/dev-tools/story-book/pages/tree-view/`
+
+The tree view supports:
+
+- recursive, arbitrarily deep node trees
+- expand/collapse toggle per branch node
+- pre-expanded nodes via `expanded: true` on the `UiTreeNode` data object
+- node selection via `(nodeSelected)` output emitting the selected node `id`
+- depth-based indentation using a `--tree-node-depth` CSS custom property
+- full RTL/LTR support: collapsed arrow reacts to the active language via `TranslateService` — shows `chevron-left` in RTL (Persian) and `chevron-right` in LTR
+- token-driven styling
+- `OnPush` change detection
+
+**Component API:**
+
+`UiTreeViewComponent` inputs/outputs:
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `nodes` | `UiTreeNode[]` | `[]` | Array of root nodes to render |
+| `(nodeSelected)` | `string \| number` | — | Emitted with the selected node `id` when a label is clicked |
+
+`UiTreeNode` interface:
+
+| Property | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string \| number` | Yes | Unique identifier; emitted on selection |
+| `label` | `string` | Yes | Display text rendered for the node |
+| `children` | `UiTreeNode[]` | No | Nested child nodes; absence means leaf node |
+| `expanded` | `boolean` | No | Initial expand state; defaults to `false` |
+
+**RTL/LTR Behavior:**
+- The collapse chevron switches between `chevron-right` (LTR) and `chevron-left` (RTL) reactively via `toSignal(translateService.onLangChange)` inside `UiTreeViewNodeComponent`
+- Depth indentation uses `padding-inline-start` (logical property) so it automatically mirrors in RTL
+- No manual `dir` attribute or CSS `transform` overrides are needed in consuming templates
+
+### UiTreeViewGridComponent
+
+A complete tree management panel that combines toolbar, search, and `UiTreeViewComponent` inside a `UiCardComponent` wrapper.
+
+**Implemented in:** `libs/shared/ui/src/lib/components/tree-view/`
+
+**Story-book:** section within `apps/erp-web/src/app/dev-tools/story-book/pages/tree-view/`
+
+Features:
+
+- Toolbar with "Add Root" button, expand/collapse all, and a search field via `UiInputComponent`
+- Export buttons (download sample, upload, spreadsheet)
+- Uses `UiCardComponent` with toolbar in `[uiCardHeader]` and tree body in the default slot
+- Search filters nodes reactively
+- Expand all is triggered automatically when a new root node is added
+- Version counter pattern for expand/collapse all: `signal<{ expand: boolean; version: number } | null>` ensures repeated same-direction clicks always trigger change detection
+- Full RTL/LTR support; empty state with `git-branch` icon and translated message
+
+**Inputs and outputs mirror `UiTreeViewComponent`** plus:
+
+| Name | Type | Description |
+|---|---|---|
+| `(nodeDelete)` | `string \| number` | Emitted with the node `id` when the delete button is clicked |
+| `(nodeAdd)` | `void` | Emitted when the "Add Root" button is clicked |
+
+Use `UiTreeViewGridComponent` for all tree management panels. Do not build local toolbar + tree combinations.
+
+Use `UiTreeViewComponent` for all hierarchical tree or category-navigation needs. Do not build local recursive tree components.
 
 Update this document whenever:
 

@@ -134,6 +134,23 @@ Example:
 }
 ```
 
+### Card Override Pattern
+
+When a data-container component (such as a table or tree-view-grid) wraps its content inside `UiCardComponent` and needs edge-to-edge layout, suppress the card's default internal padding using CSS custom properties rather than `::ng-deep`:
+
+```scss
+:host {
+  --ui-card-header-padding-inline: 0px;
+  --ui-card-header-padding-block: 0px;
+  --ui-card-body-padding-inline: 0px;
+  --ui-card-body-padding-block: 0px;
+  --ui-card-body-gap: 0px;
+  --ui-card-body-overflow: hidden;
+}
+```
+
+Do not use `::ng-deep` for this purpose. CSS custom properties cascade naturally through Angular's emulated ViewEncapsulation. Unlike `::ng-deep` overrides — which generate attribute selectors of equal specificity — CSS custom properties always cascade from the nearest ancestor that sets them and are not subject to source-order specificity conflicts.
+
 ## Tokens by Category
 
 ### Colors
