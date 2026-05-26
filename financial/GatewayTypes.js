@@ -1,7 +1,7 @@
 /* Filename: financial/GatewayTypes.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo, useRef } = React;
+  const { useState, useEffect, useRef } = React;
   
   const { 
     Button, PageHeader, Modal, 
@@ -106,11 +106,15 @@
 
     const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
     const [isPartyLoading, setIsPartyLoading] = useState(false);
-    const [partyFormData, setPartyFormData] = useState({
-      code: '',
+    const [quickPartyData, setQuickPartyData] = useState({
+      partyType: 'legal',
       companyName: '',
+      code: '',
+      firstName: '',
+      lastName: '',
       nationalId: '',
       mobile: '',
+      email: '',
       roles: ['vendor']
     });
 
@@ -287,36 +291,60 @@
       }
     };
 
-    const handleSaveParty = async () => {
-      if (!partyFormData.code || !partyFormData.companyName) return;
+    const handleSaveQuickParty = async () => {
+      const isLegal = quickPartyData.partyType === 'legal';
+      if (!quickPartyData.code || (isLegal && !quickPartyData.companyName) || (!isLegal && (!quickPartyData.firstName || !quickPartyData.lastName))) {
+         alert(t('لطفاً فیلدهای ستاره‌دار را تکمیل کنید.', 'Please fill required fields.'));
+         return;
+      }
+      
       setIsPartyLoading(true);
       try {
         const payload = {
-          code: partyFormData.code,
-          party_type: 'legal',
-          company_name: partyFormData.companyName,
-          national_id: partyFormData.nationalId,
-          mobile: partyFormData.mobile,
-          roles: partyFormData.roles,
-          is_active: true
+          party_type: quickPartyData.partyType,
+          code: quickPartyData.code,
+          first_name: isLegal ? null : quickPartyData.firstName,
+          last_name: isLegal ? null : quickPartyData.lastName,
+          company_name: isLegal ? quickPartyData.companyName : null,
+          national_id: quickPartyData.nationalId,
+          mobile: quickPartyData.mobile,
+          email: quickPartyData.email,
+          roles: Array.from(new Set([...quickPartyData.roles, 'vendor'])), 
+          is_active: true,
+          created_at: new Date().toISOString()
         };
-        
+
         const { data: newPartyData, error } = await supabase.from('parties').insert([payload]).select();
-        if (error) throw error;
+        
+        if (error) {
+           if (error.code === '23505') {
+             alert(t('کد شخص یا شناسه ملی تکراری است.', 'Duplicate party code or national ID.'));
+           } else {
+             throw error;
+           }
+           return;
+        }
         
         if (newPartyData && newPartyData.length > 0) {
            const newParty = newPartyData[0];
+           const partyLabel = isLegal 
+                ? `${newParty.company_name} (${newParty.code})`
+                : `${newParty.first_name} ${newParty.last_name} (${newParty.code})`;
+
            setProviders(prev => [...prev, { 
              id: newParty.id, 
-             label: formatPartyName(newParty),
+             label: partyLabel,
              code: newParty.code || '---',
              mobile: newParty.mobile || '---' 
            }].sort((a,b) => a.label.localeCompare(b.label)));
+           
            setFormData(prev => ({ ...prev, providerId: newParty.id }));
            setIsPartyModalOpen(false);
+           setQuickPartyData({ partyType: 'legal', companyName: '', code: '', firstName: '', lastName: '', nationalId: '', mobile: '', email: '', roles: ['vendor'] });
         }
       } catch (err) {
         console.error('Save Party Error:', err);
+        alert(t('خطا در ذخیره اطلاعات شخص.', 'Error saving party.'));
       } finally {
         setIsPartyLoading(false);
       }
@@ -470,9 +498,7 @@
                 isRtl={isRtl} 
                 required 
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              
               <div className="flex items-end gap-2">
                 <LOVField 
                   wrapperClassName="flex-1"
@@ -490,13 +516,14 @@
                   size="sm" 
                   icon={Plus} 
                   onClick={() => {
-                    setPartyFormData({ code: '', companyName: '', nationalId: '', mobile: '', roles: ['vendor'] });
+                    setQuickPartyData({ partyType: 'legal', companyName: '', code: '', firstName: '', lastName: '', nationalId: '', mobile: '', email: '', roles: ['vendor'] });
                     setIsPartyModalOpen(true);
                   }}
-                  title={t('تعریف شرکت جدید', 'New Party')}
+                  title={t('تعریف شخص جدید', 'New Party')}
                   className="mb-[1px] h-8 w-8 px-0 shrink-0"
                 />
               </div>
+
               <SearchableAccountSelect 
                 accounts={accounts}
                 value={formData.accountId} 
@@ -504,9 +531,7 @@
                 isRtl={isRtl} 
                 placeholder={t('جستجوی حساب...', 'Search Account...')}
               />
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <CurrencyField 
                 size="sm" 
                 label={t('کف مبلغ تراکنش', 'Min Amount')} 
@@ -521,15 +546,14 @@
                 onChange={val => setFormData({...formData, maxAmount: val})} 
                 isRtl={isRtl} 
               />
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DatePicker 
                 size="sm" 
                 label={t('از تاریخ (اعتبار)', 'Valid From')} 
                 value={formData.validFrom} 
                 onChange={val => setFormData({...formData, validFrom: val})} 
                 isRtl={isRtl} 
+                dir="ltr"
               />
               <DatePicker 
                 size="sm" 
@@ -537,10 +561,9 @@
                 value={formData.validTo} 
                 onChange={val => setFormData({...formData, validTo: val})} 
                 isRtl={isRtl} 
+                dir="ltr"
               />
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
               <SelectField 
                 size="sm" 
                 label={t('نوع ارز', 'Currency')} 
@@ -550,7 +573,7 @@
                 isRtl={isRtl} 
                 required
               />
-              <div className="flex items-center pb-1">
+              <div className="flex items-center mt-6">
                 <ToggleField 
                   size="sm" 
                   label={t('وضعیت فعال', 'Active Status')} 
@@ -568,73 +591,73 @@
           </div>
         </Modal>
 
-        <Modal 
-          isOpen={isPartyModalOpen} onClose={() => setIsPartyModalOpen(false)} 
-          title={t('تعریف سریع تامین‌کننده (شرکت)', 'Quick Add Provider (Legal)')}
-          width="max-w-md"
+        <Modal
+          isOpen={isPartyModalOpen}
+          onClose={() => setIsPartyModalOpen(false)}
+          title={t('تعریف سریع شخص / شرکت', 'Quick Add Party')}
+          width="max-w-3xl"
           language={language}
         >
           <div className="p-4 flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <TextField 
-                size="sm" 
-                label={t('کد شخص/شرکت', 'Code')} 
-                value={partyFormData.code} 
-                onChange={e => setPartyFormData({...partyFormData, code: e.target.value})} 
-                isRtl={isRtl} 
-                dir="ltr"
-                required 
-              />
-              <TextField 
-                size="sm" 
-                label={t('شناسه ملی', 'National ID')} 
-                value={partyFormData.nationalId} 
-                onChange={e => setPartyFormData({...partyFormData, nationalId: e.target.value})} 
-                isRtl={isRtl} 
-                dir="ltr" 
-              />
+            <div className="mb-2">
+               <SelectField 
+                  size="sm" 
+                  label={t('نوع شخص', 'Party Type')} 
+                  value={quickPartyData.partyType} 
+                  onChange={e => setQuickPartyData({...quickPartyData, partyType: e.target.value, companyName: '', firstName: '', lastName: '', roles: ['vendor']})} 
+                  isRtl={isRtl}
+                  options={[
+                    { value: 'real', label: t('حقیقی (فرد)', 'Real Person') },
+                    { value: 'legal', label: t('حقوقی (شرکت)', 'Legal Entity') }
+                  ]}
+               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <TextField size="sm" label={t('کد شخص/شرکت', 'Party Code')} value={quickPartyData.code} onChange={e => setQuickPartyData({...quickPartyData, code: e.target.value})} isRtl={isRtl} required dir="ltr" />
+              
+              {quickPartyData.partyType === 'real' ? (
+                  <>
+                    <TextField size="sm" label={t('نام', 'First Name')} value={quickPartyData.firstName} onChange={e => setQuickPartyData({...quickPartyData, firstName: e.target.value})} isRtl={isRtl} required />
+                    <TextField size="sm" label={t('نام خانوادگی', 'Last Name')} value={quickPartyData.lastName} onChange={e => setQuickPartyData({...quickPartyData, lastName: e.target.value})} isRtl={isRtl} required />
+                  </>
+              ) : (
+                  <div className="md:col-span-2">
+                    <TextField size="sm" label={t('نام شرکت', 'Company Name')} value={quickPartyData.companyName} onChange={e => setQuickPartyData({...quickPartyData, companyName: e.target.value})} isRtl={isRtl} required />
+                  </div>
+              )}
+
+              <TextField size="sm" label={quickPartyData.partyType === 'real' ? t('کد ملی', 'National ID') : t('شناسه ملی / ثبت', 'Registration ID')} value={quickPartyData.nationalId} onChange={e => setQuickPartyData({...quickPartyData, nationalId: e.target.value})} isRtl={isRtl} dir="ltr" />
+              <TextField size="sm" label={t('موبایل / تلفن', 'Mobile / Phone')} value={quickPartyData.mobile} onChange={e => setQuickPartyData({...quickPartyData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" />
+              <TextField size="sm" label={t('ایمیل', 'Email')} value={quickPartyData.email} onChange={e => setQuickPartyData({...quickPartyData, email: e.target.value})} isRtl={isRtl} dir="ltr" />
             </div>
             
-            <TextField 
-              size="sm" 
-              label={t('نام کامل شرکت', 'Company Name')} 
-              value={partyFormData.companyName} 
-              onChange={e => setPartyFormData({...partyFormData, companyName: e.target.value})} 
-              isRtl={isRtl} 
-              required 
-            />
-
-            <TextField 
-              size="sm" 
-              label={t('موبایل / تلفن همراه', 'Mobile')} 
-              value={partyFormData.mobile} 
-              onChange={e => setPartyFormData({...partyFormData, mobile: e.target.value})} 
-              isRtl={isRtl} 
-              dir="ltr" 
-            />
-
-            <div className="mt-2">
-              <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-2 block">{t('نقش‌های مرتبط', 'Associated Roles')}</label>
-              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                {AVAILABLE_ROLES.map(role => (
-                  <CheckboxField 
-                    key={role.value}
-                    label={isRtl ? role.label_fa : role.label_en}
-                    checked={partyFormData.roles.includes(role.value)}
-                    onChange={(checked) => {
-                        let newRoles = [...partyFormData.roles];
-                        if (checked) newRoles.push(role.value);
-                        else newRoles = newRoles.filter(r => r !== role.value);
-                        setPartyFormData({...partyFormData, roles: newRoles});
-                    }}
-                  />
-                ))}
-              </div>
+            <div className="mt-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+               <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-3 block">{t('نقش‌های مرتبط', 'Associated Roles')}</label>
+               <div className="flex flex-wrap gap-4 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                 {AVAILABLE_ROLES.map(role => (
+                   <CheckboxField 
+                     key={role.value} 
+                     size="sm" 
+                     label={isRtl ? role.label_fa : role.label_en} 
+                     checked={quickPartyData.roles.includes(role.value)} 
+                     disabled={role.value === 'vendor'} 
+                     onChange={(checked) => {
+                       if (role.value === 'vendor') return;
+                       setQuickPartyData(prev => ({
+                         ...prev,
+                         roles: checked ? [...prev.roles, role.value] : prev.roles.filter(r => r !== role.value)
+                       }));
+                     }} 
+                     isRtl={isRtl} 
+                   />
+                 ))}
+               </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
               <Button variant="outline" size="sm" onClick={() => setIsPartyModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" icon={Users} onClick={handleSaveParty} isLoading={isPartyLoading}>{t('ثبت شخص/شرکت', 'Save Party')}</Button>
+              <Button variant="primary" size="sm" icon={Save} onClick={handleSaveQuickParty} isLoading={isPartyLoading}>{t('ذخیره و انتخاب', 'Save & Select')}</Button>
             </div>
           </div>
         </Modal>
