@@ -11,7 +11,8 @@
   
   const { 
     User, Settings, Shield, CreditCard, Save, 
-    Key, Building2, Fingerprint, Camera, Loader2
+    Key, Building2, Fingerprint, Camera, Loader2,
+    Sun, Moon, Monitor
   } = window.LucideIcons || {};
   
   const supabase = window.supabase;
