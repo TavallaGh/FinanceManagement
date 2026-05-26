@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سیستم یکپارچه سازمانی (جدید)</title>
+    <link rel="icon" href="data:,">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap" rel="stylesheet">
+    
+    <script>
+        const savedTheme = window.localStorage.getItem('fm_theme') || 'light';
+        if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <script>
+        window.react = window.React;
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/lucide-react@0.344.0/dist/umd/lucide-react.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+
+    <script>
+        window.LucideIcons = window.lucideReact || window.LucideReact || {};
+    </script>
+
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif !important; margin: 0; overflow: hidden; background-color: #f8fafc; color: #1e293b; }
+        body.dark { background-color: #0f172a; color: #f1f5f9; }
+        .font-mono { font-family: 'Fira Code', monospace; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Custom Scrollbar for Dark Mode */
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        #root { width: 100vw; height: 100vh; overflow: hidden; }
+    </style>
+</head>
+<body class="transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="react" src="./supabaseConfig.js"></script>
+
+    <script type="text/babel" data-presets="react" src="./designsystem/DSCore.js"></script>
+    <script type="text/babel" data-presets="react" src="./designsystem/DSForms.js"></script>
+    <script type="text/babel" data-presets="react" src="./designsystem/DSFeedback.js"></script>
+    <script type="text/babel" data-presets="react" src="./designsystem/DSGrid.js"></script>
+    <script type="text/babel" data-presets="react" src="./designsystem/DSTree.js"></script>
+    <script type="text/babel" data-presets="react" src="./designsystem/DSOverlays.js"></script>
+    <script type="text/babel" data-presets="react" src="./designsystem/DSCharts.js"></script>
+    
+    <script type="text/babel" data-presets="react" src="./DesignSystem.js"></script>
+    
+    <script type="text/babel" data-presets="react" src="./NotificationSidebar.js"></script>
+
+    <script type="text/babel" data-presets="react" src="./financial/AutoNumbering.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/CostTypes.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/IncomeTypes.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/ChartOfAccountsMain.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/ChartOfAccounts.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/GatewayTypes.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/BrokerContract.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/BrokerManagement.js"></script>
+
+    <script type="text/babel" data-presets="react" src="./general/OrgChart.js"></script>
+    <script type="text/babel" data-presets="react" src="./general/CurrencyHistory.js"></script>
+    <script type="text/babel" data-presets="react" src="./general/CurrencySettings.js"></script>
+    <script type="text/babel" data-presets="react" src="./general/Parties.js"></script>
+    <script type="text/babel" data-presets="react" src="./general/OrganizationInfo.js"></script>
+    <script type="text/babel" data-presets="react" src="./general/ComponentShowcase.js"></script>
+
+    <script type="text/babel" data-presets="react" src="./security/SystemLog.js"></script>
+    <script type="text/babel" data-presets="react" src="./security/RoleAccess.js"></script>
+    <script type="text/babel" data-presets="react" src="./security/RoleManagement.js"></script>
+    <script type="text/babel" data-presets="react" src="./security/UserAccess.js"></script>
+    <script type="text/babel" data-presets="react" src="./security/UserManagement.js"></script>
+    <script type="text/babel" data-presets="react" src="./security/SecurityContext.js"></script>
+
+    <script type="text/babel" data-presets="react" src="./workflow/WorkflowEngine.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/WorkflowDesign.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/WorkflowManagement.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/WorkflowCartable.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/WorkflowTasks.js"></script>
+
+    <script type="text/babel" data-presets="react" src="./budgeting/BudgetRequest.js"></script>
+    
+    <script type="text/babel" data-presets="react" src="./NavigationDocs.js"></script>
+    <script type="text/babel" data-presets="react" src="./NavigationSystem.js"></script>
+    <script type="text/babel" data-presets="react" src="./UserProfile.js"></script>
+    <script type="text/babel" data-presets="react" src="./UserLogin.js"></script>
+    <script type="text/babel" data-presets="react" src="./app.js"></script>
+</body>
+</html>
