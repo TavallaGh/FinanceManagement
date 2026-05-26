@@ -1,10 +1,10 @@
-/* Filename: Parties.js */
+/* Filename: general/Parties.js */
 (() => {
   const React = window.React;
   const { useState, useEffect, useMemo } = React;
   
   const { 
-    Button, PageHeader, Modal, AdvancedFilter, DataGrid, 
+    Button, PageHeader, Modal, DataGrid, 
     TextField, ToggleField, Badge, CheckboxField
   } = window.DesignSystem || {};
   
@@ -20,7 +20,6 @@
     
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [filters, setFilters] = useState({});
     
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentRecord, setCurrentRecord] = useState(null);
@@ -50,15 +49,12 @@
     const viewConfig = {
       pageId: 'parties_main',
       currentState: () => ({ 
-        filters,
         gridState
       }),
       onApplyState: (state) => {
         if (state) {
-          if (state.filters) setFilters(state.filters);
           if (state.gridState) setGridState(state.gridState);
         } else {
-          setFilters({});
           setGridState(null);
         }
       }
@@ -290,30 +286,6 @@
       }
     ];
 
-    const filteredData = useMemo(() => {
-      let result = [...data];
-      if (filters.role) {
-         result = result.filter(c => c.roles && c.roles.includes(filters.role));
-      }
-      return result;
-    }, [data, filters]);
-
-    const filterFields = [
-      { 
-        name: 'role', 
-        label: t('نقش', 'Role'), 
-        type: 'select', 
-        options: [
-          {value: 'customer', label: t('مشتری', 'Customer')},
-          {value: 'vendor', label: t('تامین‌کننده', 'Vendor')},
-          {value: 'employee', label: t('کارمند', 'Employee')},
-          {value: 'shareholder', label: t('سهامدار', 'Shareholder')},
-          {value: 'system_user', label: t('کاربر سیستم', 'System User')},
-          {value: 'exchange', label: t('صرافی', 'Exchange')}
-        ]
-      }
-    ];
-
     return (
       <div className="flex flex-col h-full p-4 bg-[#f8fafc] dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <PageHeader 
@@ -326,17 +298,9 @@
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">
-          <AdvancedFilter 
-            fields={filterFields}
-            initialValues={filters}
-            onFilter={setFilters}
-            onClear={() => setFilters({})}
-            language={language}
-          />
-
           <div className="flex-1 min-h-0 mt-1">
             <DataGrid 
-              data={filteredData}
+              data={data}
               columns={columns} 
               language={language}
               selectable={true}
