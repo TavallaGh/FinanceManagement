@@ -1,0 +1,410 @@
+/* Filename: financial/CostTypes.js */
+(() => {
+  const React = window.React;
+  const { useState, useEffect, useMemo, useCallback, useRef } = React;
+  
+  const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
+  const LucideIcons = window.LucideIcons || {};
+  const { 
+    Tags = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon, ListTree = FallbackIcon, AlertTriangle = FallbackIcon, Lock = FallbackIcon
+  } = LucideIcons;
+
+  const CostTypes = ({ language = 'fa', formCode = 'COST_TYPES' }) => {
+    const FallbackComponent = () => null;
+    
+    const Core = window.DSCore || window.DesignSystem || {};
+    const { Button = FallbackComponent, PageHeader = FallbackComponent, Card = FallbackComponent } = Core;
+    
+    const Forms = window.DSForms || window.DesignSystem || {};
+    const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent } = Forms;
+    
+    const Feedback = window.DSFeedback || window.DesignSystem || {};
+    const { Modal = FallbackComponent, Toast = FallbackComponent, Alert = FallbackComponent } = Feedback;
+    
+    const TreeSystem = window.DSTree || window.DesignSystem || {};
+    const { Tree = FallbackComponent } = TreeSystem;
+
+    const isRtl = language === 'fa';
+    const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
+
+    const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
+    const access = useMemo(() => {
+        const rawActions = securityCtx ? securityCtx.getActions(formCode) : null;
+        return rawActions || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
+    }, [securityCtx, formCode]);
+
+    const supabase = window.supabase;
+    const currentUser = window.NavigationSystem?.currentUser?.name || 'مدیر سیستم';
+
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, data: null });
+    const isFetching = useRef(false);
+
+    const [rawNodes, setRawNodes] = useState([]);
+    
+    const [selectedTreeNodeId, setSelectedTreeNodeId] = useState(null);
+    const [treeFormData, setTreeFormData] = useState({});
+    const [isCreatingNode, setIsCreatingNode] = useState(false);
+    const [newTargetParentId, setNewTargetParentId] = useState(null);
+
+    const showToast = useCallback((message, type = 'success') => {
+      setToast({ isVisible: true, message, type });
+      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
+    }, []);
+
+    const logAction = useCallback(async (entityType, recordId, action, details = '') => {
+      try {
+        if (!supabase) return;
+        await supabase.from('fm_record_logs').insert([{
+          entity_type: entityType, record_id: String(recordId), action: action, user_name: currentUser, details: details
+        }]);
+      } catch (err) {
+        console.error('Failed to log action:', err);
+      }
+    }, [supabase, currentUser]);
+
+    const fetchData = useCallback(async (retainNodeId = null) => {
+      if (isFetching.current) return;
+      isFetching.current = true;
+      try {
+        if (!supabase) return;
+        const { data, error } = await supabase.from('fm_cost_types').select('*').order('created_at', { ascending: true });
+        if (error) throw error;
+
+        const mappedNodes = (data || []).map(n => ({
+          id: n.id,
+          parentId: n.parent_id,
+          titleFa: n.title_fa,
+          titleEn: n.title_en,
+          code: n.code,
+          isActive: n.is_active
+        }));
+        
+        const isEffectivelyInactive = (nodeId, nodesList) => {
+          const node = nodesList.find(n => n.id === nodeId);
+          if (!node) return false;
+          if (!node.isActive) return true;
+          if (node.parentId) {
+            return isEffectivelyInactive(node.parentId, nodesList);
+          }
+          return false;
+        };
+
+        mappedNodes.forEach(n => {
+          const baseTitle = isRtl ? n.titleFa : (n.titleEn || n.titleFa);
+          const inactive = isEffectivelyInactive(n.id, mappedNodes);
+          n.title = inactive ? `${baseTitle} ${isRtl ? '(غیرفعال)' : '(Inactive)'}` : baseTitle;
+        });
+        
+        setRawNodes(mappedNodes);
+
+        if (retainNodeId) {
+          const target = mappedNodes.find(n => n.id === retainNodeId);
+          if (target) {
+             setSelectedTreeNodeId(target.id);
+             setTreeFormData({ ...target });
+             setIsCreatingNode(false);
+             setNewTargetParentId(null);
+          }
+        }
+      } catch (err) {
+        showToast(t('خطا در دریافت اطلاعات انواع هزینه', 'Error fetching cost types'), 'error');
+        console.error('Fetch error:', err);
+      } finally {
+        isFetching.current = false;
+      }
+    }, [supabase, showToast, t, isRtl]);
+
+    useEffect(() => {
+      let mounted = true;
+      if (mounted && access.canView) {
+        fetchData();
+      }
+      return () => { mounted = false; };
+    }, [fetchData, access.canView]);
+
+    const handleSelectTreeNode = (node) => {
+      setSelectedTreeNodeId(node.id);
+      setTreeFormData({ ...node });
+      setIsCreatingNode(false);
+      setNewTargetParentId(null);
+    };
+
+    const handleAddTreeRoot = async () => {
+      setSelectedTreeNodeId(null);
+      setIsCreatingNode(true);
+      setNewTargetParentId(null);
+      
+      let nextCode = '';
+      if (window.AutoNumberingService) {
+        const preview = await window.AutoNumberingService.previewNext('COST_TYPE');
+        if (preview) nextCode = preview.formattedCode;
+      }
+      
+      setTreeFormData({ code: nextCode, titleFa: '', titleEn: '', parentId: null, isActive: true });
+    };
+
+    const handleAddTreeChild = async (parentNode) => {
+      setSelectedTreeNodeId(null);
+      setIsCreatingNode(true);
+      setNewTargetParentId(parentNode.id);
+      
+      let nextCode = '';
+      if (window.AutoNumberingService) {
+        const preview = await window.AutoNumberingService.previewNext('COST_TYPE');
+        if (preview) nextCode = preview.formattedCode;
+      }
+      
+      setTreeFormData({ code: nextCode, titleFa: '', titleEn: '', parentId: parentNode.id, isActive: true });
+    };
+
+    const handleCancelTreeForm = () => {
+      if (isCreatingNode) {
+        setIsCreatingNode(false);
+        if (newTargetParentId) {
+          const parent = rawNodes.find(n => n.id === newTargetParentId);
+          if (parent) handleSelectTreeNode(parent);
+        } else {
+          setSelectedTreeNodeId(null); 
+          setTreeFormData({});
+        }
+      } else {
+        const originalNode = rawNodes.find(n => n.id === selectedTreeNodeId);
+        if (originalNode) setTreeFormData({ ...originalNode });
+      }
+    };
+
+    const validateUniqueness = () => {
+      const parentIdToCheck = treeFormData.parentId || null;
+      const siblings = rawNodes.filter(n => n.parentId === parentIdToCheck && n.id !== treeFormData.id);
+      
+      const duplicateFa = siblings.some(n => (n.titleFa || '').trim() === (treeFormData.titleFa || '').trim());
+      if (duplicateFa) {
+        showToast(t('عنوان فارسی در این سطح تکراری است.', 'Persian title is duplicated at this level.'), 'error');
+        return false;
+      }
+
+      const enVal = (treeFormData.titleEn || '').trim();
+      if (enVal !== '') {
+        const duplicateEn = siblings.some(n => (n.titleEn || '').trim() === enVal);
+        if (duplicateEn) {
+          showToast(t('عنوان انگلیسی در این سطح تکراری است.', 'English title is duplicated at this level.'), 'error');
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    const handleSaveTreeForm = async () => {
+      if (!treeFormData.titleFa) {
+        return showToast(t('عنوان فارسی الزامی است', 'Persian title is required'), 'error');
+      }
+
+      if (!validateUniqueness()) return;
+
+      try {
+        const payload = {
+          code: treeFormData.code,
+          title_fa: treeFormData.titleFa,
+          title_en: treeFormData.titleEn,
+          parent_id: treeFormData.parentId || null,
+          is_active: treeFormData.isActive
+        };
+
+        let targetNodeId = null;
+
+        if (isCreatingNode) {
+          const { data, error } = await supabase.from('fm_cost_types').insert([payload]).select();
+          if (error) throw error;
+          
+          if (window.AutoNumberingService) {
+             await window.AutoNumberingService.consumeNext('COST_TYPE');
+          }
+          
+          if (data && data[0]) {
+            targetNodeId = data[0].id;
+            await logAction('انواع هزینه', targetNodeId, 'create', `ایجاد نوع هزینه جدید: ${payload.title_fa}`);
+          }
+        } else {
+          if (treeFormData.parentId === selectedTreeNodeId) {
+             return showToast(t('گره نمی‌تواند زیرمجموعه خودش باشد', 'Cannot be parent to itself'), 'error');
+          }
+          const { error } = await supabase.from('fm_cost_types').update(payload).eq('id', selectedTreeNodeId);
+          if (error) throw error;
+          targetNodeId = selectedTreeNodeId;
+          await logAction('انواع هزینه', targetNodeId, 'update', `ویرایش نوع هزینه: ${payload.title_fa}`);
+        }
+        
+        await fetchData(targetNodeId);
+        showToast(t('عملیات با موفقیت انجام شد', 'Operation successful'));
+      } catch (err) {
+        showToast(t('خطا در ذخیره اطلاعات', 'Error saving data'), 'error');
+        console.error('Save error:', err);
+      }
+    };
+
+    const getDescendantIds = (nodes, parentId) => {
+      let ids = [];
+      const children = nodes.filter(n => n.parentId === parentId);
+      children.forEach(child => {
+        ids.push(child.id);
+        ids = ids.concat(getDescendantIds(nodes, child.id));
+      });
+      return ids;
+    };
+
+    const handleDeleteTreeNode = (node) => {
+      const descendants = getDescendantIds(rawNodes, node.id);
+      if (descendants.length > 0) {
+        return showToast(t('این نود دارای زیرمجموعه است و قابل حذف نیست', 'Node has children and cannot be deleted'), 'error');
+      }
+      setDeleteConfirm({ isOpen: true, data: node });
+    };
+
+    const executeDelete = async () => {
+      if (!deleteConfirm.data) return;
+      try {
+        const targetId = deleteConfirm.data.id;
+        const targetTitle = deleteConfirm.data.titleFa;
+
+        const { error } = await supabase.from('fm_cost_types').delete().eq('id', targetId);
+        if (error) throw error;
+        
+        await logAction('انواع هزینه', targetId, 'delete', `حذف نوع هزینه: ${targetTitle}`);
+        
+        const newRawNodes = rawNodes.filter(n => n.id !== targetId);
+        setRawNodes(newRawNodes);
+
+        if (selectedTreeNodeId === targetId) {
+           const parentId = deleteConfirm.data.parentId;
+           if (parentId) {
+              const parent = newRawNodes.find(n => n.id === parentId);
+              if (parent) handleSelectTreeNode(parent);
+              else { setSelectedTreeNodeId(null); setTreeFormData({}); setIsCreatingNode(false); }
+           } else {
+              setSelectedTreeNodeId(null); setTreeFormData({}); setIsCreatingNode(false);
+           }
+        }
+
+        showToast(t('عملیات حذف با موفقیت انجام شد', 'Deletion successful'));
+        setDeleteConfirm({ isOpen: false, data: null });
+      } catch (err) {
+        showToast(t('امکان حذف رکورد دارای وابستگی وجود ندارد', 'Cannot delete record with relations'), 'error');
+        setDeleteConfirm({ isOpen: false, data: null });
+        console.error('Delete error:', err);
+      }
+    };
+
+    const parentNodeOptions = useMemo(() => {
+        return rawNodes
+            .filter(n => n.id !== treeFormData.id) 
+            .map(n => ({ value: n.id, label: isRtl ? n.titleFa : (n.titleEn || n.titleFa) }));
+    }, [rawNodes, treeFormData.id, isRtl]);
+
+    return (
+      <div className="p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
+        <PageHeader 
+          title={t('تعریف انواع هزینه', 'Cost Types Management')}
+          icon={Tags} language={language}
+          description={t('مدیریت و دسته‌بندی درختی هزینه‌های سیستم', 'Manage and categorize system costs hierarchically')}
+          breadcrumbs={[{ label: t('مدیریت مالی', 'Financial Management') }, { label: t('انواع هزینه', 'Cost Types') }]}
+        />
+
+        <div className="flex-1 flex gap-4 min-h-0 overflow-hidden mt-3 animate-in fade-in duration-300">
+          
+          <div className="w-full md:w-[40%] h-full min-h-0 shadow-sm overflow-auto">
+            <Tree 
+              data={rawNodes} language={language} formCode={formCode}
+              idField="id" parentField="parentId" displayField="title" secondaryField="code" activeField="isActive"
+              selectedId={selectedTreeNodeId}
+              onSelect={handleSelectTreeNode}
+              onAddRoot={access.canCreate ? handleAddTreeRoot : undefined}
+              onAddChild={access.canCreate ? handleAddTreeChild : undefined}
+              onDelete={access.canDelete ? handleDeleteTreeNode : undefined}
+            />
+          </div>
+
+          <div className="w-full md:w-[60%] h-full min-h-0 flex flex-col">
+            <Card 
+              title={isCreatingNode ? (newTargetParentId ? t('ایجاد زیرمجموعه جدید', 'Create New Child') : t('ایجاد هزینه ریشه', 'Create Root Cost')) : (selectedTreeNodeId ? t('ویرایش مشخصات نوع هزینه', 'Edit Cost Type Details') : t('اطلاعات جزئی', 'Details'))}
+              className="h-full border border-slate-200 dark:border-slate-700 shadow-sm"
+              headerClassName="bg-slate-50/80 dark:bg-slate-900/50"
+              action={
+                (selectedTreeNodeId && !isCreatingNode && access.canDelete) && (
+                  <Button size="sm" variant="ghost" icon={Trash2} className="!text-red-500 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/30" onClick={() => handleDeleteTreeNode(rawNodes.find(n => n.id === selectedTreeNodeId))} title={t('حذف', 'Delete')}/>
+                )
+              }
+            >
+              {(selectedTreeNodeId || isCreatingNode) ? (
+                <div className="flex flex-col h-full">
+                  <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1">
+                    {isCreatingNode && newTargetParentId && (
+                      <Alert 
+                        type="info" 
+                        message={<span>{t('در حال تعریف زیرمجموعه برای:', 'Defining sub-cost for:')} <strong className="dark:text-indigo-300">{rawNodes.find(n => n.id === newTargetParentId)?.titleFa}</strong></span>} 
+                      />
+                    )}
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <TextField size="sm" formCode={formCode} label={t('کد هزینه', 'Cost Code')} value={treeFormData.code || ''} onChange={(e) => setTreeFormData({...treeFormData, code: e.target.value})} isRtl={isRtl} dir="ltr" />
+                        <SelectField size="sm" formCode={formCode} label={t('مجموعه والد', 'Parent Node')} value={treeFormData.parentId || ''} onChange={(e) => setTreeFormData({...treeFormData, parentId: e.target.value})} options={[{value: '', label: t('بدون والد (سطح ریشه)', 'Root Level (No Parent)')}, ...parentNodeOptions]} isRtl={isRtl} disabled={isCreatingNode && newTargetParentId !== null} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <TextField size="sm" formCode={formCode} label={t('عنوان فارسی', 'Persian Title')} value={treeFormData.titleFa || ''} onChange={(e) => setTreeFormData({...treeFormData, titleFa: e.target.value})} isRtl={isRtl} required />
+                        <TextField size="sm" formCode={formCode} label={t('عنوان انگلیسی', 'English Title')} value={treeFormData.titleEn || ''} onChange={(e) => setTreeFormData({...treeFormData, titleEn: e.target.value})} isRtl={isRtl} dir="ltr" />
+                    </div>
+
+                    <div className="pt-2">
+                        <ToggleField size="sm" formCode={formCode} label={t('وضعیت فعال بودن', 'Active Status')} checked={treeFormData.isActive !== false} onChange={(v) => setTreeFormData({...treeFormData, isActive: v})} isRtl={isRtl} wrapperClassName="pt-2" />
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mr-8">
+                            {t('هزینه‌های غیرفعال در لیست‌های انتخاب فرم‌های عملیاتی نمایش داده نمی‌شوند.', 'Inactive costs will not appear in selection dropdowns.')}
+                        </p>
+                    </div>
+
+                  </div>
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-end gap-2 shrink-0">
+                    <Button size="sm" variant="ghost" onClick={handleCancelTreeForm}>{t('لغو', 'Cancel')}</Button>
+                    {access.canEdit && (
+                        <Button size="sm" variant="primary" icon={Save} onClick={handleSaveTreeForm}>{t('ذخیره تغییرات', 'Save Changes')}</Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500 gap-3 text-[12px] font-medium">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full"><ListTree size={24} className="text-slate-300 dark:text-slate-600"/></div>
+                  <span>{t('برای مشاهده یا ویرایش اطلاعات، یک گره را از درخت انتخاب کنید.', 'Select a node from the tree to view or edit details.')}</span>
+                </div>
+              )}
+            </Card>
+          </div>
+          
+        </div>
+
+        <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
+          <div className="p-4 flex flex-col gap-3 items-center text-center">
+            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1">
+               <AlertTriangle size={22} />
+            </div>
+            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1">
+               <Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            </div>
+            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-2">
+              {t(`آیا از حذف نوع هزینه "${deleteConfirm.data?.titleFa}" اطمینان دارید؟`, `Are you sure you want to delete "${deleteConfirm.data?.titleEn || deleteConfirm.data?.titleFa}"?`)}
+            </p>
+            <div className="flex gap-2 mt-5 w-full">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, data: null })}>{t('انصراف', 'Cancel')}</Button>
+              <Button variant="primary" size="sm" onClick={executeDelete} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 border-red-600 dark:border-red-500 shadow-lg shadow-red-100 dark:shadow-none">{t('تایید حذف', 'Delete Now')}</Button>
+            </div>
+          </div>
+        </Modal>
+
+        <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
+      </div>
+    );
+  };
+
+  CostTypes.formCode = 'COST_TYPES';
+  window.CostTypes = CostTypes;
+})();
