@@ -389,7 +389,7 @@
                       <span className="text-[12.5px] font-black text-slate-800 dark:text-slate-100">{actionDisplay}</span>
                       <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600">{log.user_name}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[10.5px] font-mono font-medium" dir="ltr">
+                    <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[10.5px] font-sans font-medium" dir="ltr">
                       <div className="flex items-center gap-1.5"><Calendar size={12} /> <span>{dateStr}</span></div>
                       <div className="flex items-center gap-1.5"><Clock size={12} /> <span>{timeStr}</span></div>
                       <div className={`text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-indigo-500' : ''}`}>

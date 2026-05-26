@@ -194,7 +194,7 @@
 
             <div className={`flex items-center gap-2 truncate flex-1 min-w-0 ${!isNodeActive ? 'opacity-60' : ''}`}>
               {secondaryField && node[secondaryField] && (
-                  <span className="font-mono text-[12px] font-bold bg-white/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 px-1 rounded shrink-0 text-slate-600 dark:text-slate-400">
+                  <span className="font-sans text-[12px] font-bold bg-white/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 px-1 rounded shrink-0 text-slate-600 dark:text-slate-400">
                     <HighlightText text={node[secondaryField]} term={searchTerm} />
                   </span>
               )}
@@ -619,7 +619,7 @@
                           ) : (
                             col.render ? col.render(row[col.field], row) : (
                                col.type === 'date' ? (
-                                   <span dir="ltr" className="font-mono text-[12px] font-medium text-slate-800 dark:text-slate-200">
+                                   <span dir="ltr" className="font-sans text-[12px] font-medium text-slate-800 dark:text-slate-200">
                                        {formatGlobalDate ? formatGlobalDate(row[col.field], globalMode) : row[col.field]}
                                    </span>
                                ) : <HighlightText text={row[col.field]} term={searchTerm} />

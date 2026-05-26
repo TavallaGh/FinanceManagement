@@ -571,7 +571,7 @@
       if (col.type === 'toggle') return <ToggleField checked={!!val} disabled isRtl={isRtl} wrapperClassName="pointer-events-none" />;
       if (col.type === 'checkbox') return <CheckboxField checked={!!val} disabled isRtl={isRtl} wrapperClassName="pointer-events-none" />;
       if (col.type === 'badge') return <Badge variant={col.badgeColor ? col.badgeColor(val) : 'gray'}>{val}</Badge>;
-      if (col.type === 'date') return <span dir="ltr" className="font-mono text-[12px] font-medium text-slate-800 dark:text-slate-200 block truncate" title={val ? formatGlobalDate(val, globalMode) : ''}>{formatGlobalDate(val, globalMode)}</span>;
+      if (col.type === 'date') return <span dir="ltr" className="font-sans text-[12px] font-medium text-slate-800 dark:text-slate-200 block truncate" title={val ? formatGlobalDate(val, globalMode) : ''}>{formatGlobalDate(val, globalMode)}</span>;
       
       if (val === null || val === undefined) return '';
       if (typeof val === 'string' || typeof val === 'number') {
