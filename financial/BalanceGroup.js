@@ -7,7 +7,8 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     Scale = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, List = FallbackIcon, Shield = FallbackIcon,
-    Save = FallbackIcon, AlertTriangle = FallbackIcon, Lock = FallbackIcon, Users = FallbackIcon
+    Save = FallbackIcon, AlertTriangle = FallbackIcon, Lock = FallbackIcon, Users = FallbackIcon,
+    Plus = FallbackIcon, X = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -46,25 +47,21 @@
 
     // Modal States
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-    
     const [isAccountsModalOpen, setIsAccountsModalOpen] = useState(false);
-    const [isAccountFormModalOpen, setIsAccountFormModalOpen] = useState(false);
-    
     const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
-    const [isAccessFormModalOpen, setIsAccessFormModalOpen] = useState(false);
     const [accessViewMode, setAccessViewMode] = useState('assign');
-    
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, target: null, data: null });
 
-    // Current Edit States
+    // Current Group
     const [selectedGroup, setSelectedGroup] = useState(null);
     const [currentGroup, setCurrentGroup] = useState({ id: null, code: '', title_fa: '', title_en: '', description: '', is_active: true });
     
+    // Inline Forms inside Modals
     const [groupAccounts, setGroupAccounts] = useState([]);
-    const [editAccountForm, setEditAccountForm] = useState({ id: null, account_id: '', account_obj: null, valid_from: new Date().toISOString().split('T')[0], valid_to: '', is_active: true });
+    const [accountForm, setAccountForm] = useState({ id: null, account_id: '', account_obj: null, valid_from: new Date().toISOString().split('T')[0], valid_to: '', is_active: true });
 
     const [groupAccesses, setGroupAccesses] = useState([]);
-    const [editAccessForm, setEditAccessForm] = useState({ id: null, grantee_type: 'USER', grantee_id: '', grantee_obj: null });
+    const [accessForm, setAccessForm] = useState({ id: null, grantee_type: 'USER', grantee_id: '', grantee_obj: null });
 
     const viewConfig = {
       pageId: 'balance_group_main',
@@ -89,7 +86,7 @@
       try {
         const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes] = await Promise.all([
           supabase.from('fm_balance_groups')
-            .select('*, accounts:fm_balance_group_accounts(id), access:fm_balance_group_access(grantee_type, grantee_id)')
+            .select('*, accounts:fm_balance_group_accounts(id, account_id), access:fm_balance_group_access(grantee_type, grantee_id)')
             .order('created_at', { ascending: false }),
           supabase.from('fm_coa_accounts').select('id, code, title_fa, parent_id, is_active'),
           supabase.from('sec_users').select('id, full_name, username').eq('is_active', true),
@@ -111,7 +108,7 @@
       }
     };
 
-    // Calculate leaf accounts and their full path
+    // Correctly calculate ONLY leaf accounts (nodes with no children)
     const leafAccounts = useMemo(() => {
       if (!coaAccounts.length) return [];
       const parentIds = new Set(coaAccounts.map(a => a.parent_id).filter(Boolean));
@@ -196,11 +193,16 @@
       }
     };
 
-    // --- Related Accounts Modal & CRUD ---
+    // --- Related Accounts Modal & CRUD (Inline Add/Edit) ---
     const openAccountsModal = (group) => {
       setSelectedGroup(group);
+      resetAccountForm();
       setIsAccountsModalOpen(true);
       fetchGroupAccounts(group.id);
+    };
+
+    const resetAccountForm = () => {
+      setAccountForm({ id: null, account_id: '', account_obj: null, valid_from: new Date().toISOString().split('T')[0], valid_to: '', is_active: true });
     };
 
     const fetchGroupAccounts = async (groupId) => {
@@ -219,36 +221,34 @@
       }
     };
 
-    const openAccountForm = (row = null) => {
-      if (row) {
-        const accObj = leafAccounts.find(a => a.id === row.account_id) || null;
-        setEditAccountForm({ id: row.id, account_id: row.account_id, account_obj: accObj, valid_from: row.valid_from, valid_to: row.valid_to || '', is_active: row.is_active });
-      } else {
-        setEditAccountForm({ id: null, account_id: '', account_obj: null, valid_from: new Date().toISOString().split('T')[0], valid_to: '', is_active: true });
+    const handleSaveAccountInline = async () => {
+      if (!accountForm.account_id || !accountForm.valid_from) return;
+      
+      // Duplicate Check
+      if (!accountForm.id && groupAccounts.some(a => a.account_id === accountForm.account_id)) {
+         alert(t('این حساب قبلاً به گروه افزوده شده است.', 'This account is already added to the group.'));
+         return;
       }
-      setIsAccountFormModalOpen(true);
-    };
 
-    const handleSaveAccount = async () => {
-      if (!editAccountForm.account_id || !editAccountForm.valid_from) return;
       setModalLoading(true);
       try {
         const payload = {
           group_id: selectedGroup.id,
-          account_id: editAccountForm.account_id,
-          valid_from: editAccountForm.valid_from,
-          valid_to: editAccountForm.valid_to || null,
-          is_active: editAccountForm.is_active
+          account_id: accountForm.account_id,
+          valid_from: accountForm.valid_from,
+          valid_to: accountForm.valid_to || null,
+          is_active: accountForm.is_active
         };
 
-        if (editAccountForm.id) {
-          const { error } = await supabase.from('fm_balance_group_accounts').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', editAccountForm.id);
+        if (accountForm.id) {
+          const { error } = await supabase.from('fm_balance_group_accounts').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', accountForm.id);
           if (error) throw error;
         } else {
           const { error } = await supabase.from('fm_balance_group_accounts').insert([payload]);
           if (error) throw error;
         }
-        setIsAccountFormModalOpen(false);
+        
+        resetAccountForm();
         fetchGroupAccounts(selectedGroup.id);
         fetchInitialData();
       } catch (error) {
@@ -258,22 +258,17 @@
       }
     };
 
-    const handleToggleAccountActive = async (row, newValue) => {
-      try {
-        const { error } = await supabase.from('fm_balance_group_accounts').update({ is_active: newValue, updated_at: new Date().toISOString() }).eq('id', row.id);
-        if (error) throw error;
-        setGroupAccounts(prev => prev.map(item => item.id === row.id ? { ...item, is_active: newValue } : item));
-      } catch (err) {
-        console.error("Toggle Error:", err);
-      }
-    };
-
-    // --- Access Modal & CRUD ---
+    // --- Access Modal & CRUD (Inline Add/Edit) ---
     const openAccessModal = (group) => {
       setSelectedGroup(group);
       setAccessViewMode('assign');
+      resetAccessForm();
       setIsAccessModalOpen(true);
       fetchGroupAccess(group.id);
+    };
+
+    const resetAccessForm = () => {
+      setAccessForm({ id: null, grantee_type: 'USER', grantee_id: '', grantee_obj: null });
     };
 
     const fetchGroupAccess = async (groupId) => {
@@ -289,24 +284,26 @@
       }
     };
 
-    const openAccessForm = () => {
-      setEditAccessForm({ id: null, grantee_type: 'USER', grantee_id: '', grantee_obj: null });
-      setIsAccessFormModalOpen(true);
-    };
+    const handleSaveAccessInline = async () => {
+      if (!accessForm.grantee_id) return;
 
-    const handleSaveAccess = async () => {
-      if (!editAccessForm.grantee_id) return;
+      // Duplicate Check
+      if (!accessForm.id && groupAccesses.some(a => a.grantee_type === accessForm.grantee_type && a.grantee_id === accessForm.grantee_id)) {
+         alert(t('این دسترسی قبلاً افزوده شده است.', 'This access is already added.'));
+         return;
+      }
+
       setModalLoading(true);
       try {
         const payload = {
           group_id: selectedGroup.id,
-          grantee_type: editAccessForm.grantee_type,
-          grantee_id: editAccessForm.grantee_id
+          grantee_type: accessForm.grantee_type,
+          grantee_id: accessForm.grantee_id
         };
         const { error } = await supabase.from('fm_balance_group_access').insert([payload]);
         if (error) throw error;
         
-        setIsAccessFormModalOpen(false);
+        resetAccessForm();
         fetchGroupAccess(selectedGroup.id);
         fetchInitialData();
       } catch (error) {
@@ -316,7 +313,7 @@
       }
     };
 
-    // Derived Lists for Access
+    // Derived Lists for Access Dropdowns
     const availableUsersForAccess = useMemo(() => {
       return users.filter(u => !groupAccesses.some(ga => ga.grantee_type === 'USER' && ga.grantee_id === u.id));
     }, [users, groupAccesses]);
@@ -325,6 +322,7 @@
       return roles.filter(r => !groupAccesses.some(ga => ga.grantee_type === 'ROLE' && ga.grantee_id === r.id));
     }, [roles, groupAccesses]);
 
+    // Aggregated Users Logic
     const aggregatedUsersList = useMemo(() => {
       if (accessViewMode !== 'aggregate') return [];
       const resultMap = new Map();
@@ -386,30 +384,21 @@
     };
 
     // --- Columns Definitions ---
-    
-    // Shared LOV Column for Accounts (Used in Filter & Forms)
     const lovAccountColumns = [
       { field: 'code', header_fa: 'کد حساب', width: '100px' },
       { 
         field: 'title_fa', 
         header_fa: 'عنوان حساب',
-        width: '250px',
+        width: '300px',
         render: (val, row) => (
           <div className="flex flex-col py-0.5">
              <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-             {row.fullPath && <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5" dir="rtl">{row.fullPath}</span>}
+             {row.fullPath && <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 whitespace-normal leading-relaxed" dir="rtl">{t('مسیر: ', 'Path: ')}{row.fullPath}</span>}
           </div>
         )
-      },
-      {
-        field: 'is_active',
-        header_fa: 'وضعیت',
-        width: '80px',
-        render: (val) => <Badge variant={val ? 'emerald' : 'slate'} size="sm" className="text-[10px]">{val ? t('فعال', 'Active') : t('غیرفعال', 'Inactive')}</Badge>
       }
     ];
 
-    // Main Group DataGrid
     const groupColumns = [
       { field: 'code', header_fa: 'کد گروه', header_en: 'Group Code', width: '120px', render: (val) => <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span> },
       { field: 'title_fa', header_fa: 'عنوان (فارسی)', header_en: 'Title (FA)', width: 'auto' },
@@ -444,25 +433,25 @@
       { name: 'role_id', label: t('دسترسی نقش', 'Role Access'), type: 'lov', lovData: roles, lovColumns: [{field: 'code', header_fa: 'کد نقش'}, {field: 'title', header_fa: 'عنوان نقش'}] }
     ];
 
-    // Accounts Modal DataGrid
+    // Accounts Grid in Modal
     const accountColumns = [
       { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '120px', render: (_, row) => <span className="font-bold text-slate-800 dark:text-slate-200">{row.fm_coa_accounts?.code}</span> },
       { field: 'title', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (_, row) => row.fm_coa_accounts?.title_fa },
       { field: 'valid_from', header_fa: 'از تاریخ', header_en: 'Valid From', width: '120px', type: 'date' },
       { field: 'valid_to', header_fa: 'تا تاریخ', header_en: 'Valid To', width: '120px', type: 'date', render: (val) => val || <span className="text-[10px] text-slate-400">{t('تا کنون', 'Present')}</span> },
-      { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', width: '90px', type: 'toggle', onToggle: (row, val) => handleToggleAccountActive(row, val) }
+      { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', width: '80px', render: (val) => <Badge variant={val ? 'emerald' : 'slate'} size="sm" className="text-[10px]">{val ? t('فعال', 'Active') : t('غیرفعال', 'Inactive')}</Badge> }
     ];
 
     const accountActions = [
-      { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => openAccountForm(row) },
+      { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => {
+          const accObj = leafAccounts.find(a => a.id === row.account_id) || null;
+          setAccountForm({ id: row.id, account_id: row.account_id, account_obj: accObj, valid_from: row.valid_from, valid_to: row.valid_to || '', is_active: row.is_active });
+        } 
+      },
       { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', target: 'account', data: row }), className: 'hover:text-red-600' }
     ];
 
-    const accountBulkActions = [
-      { label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', target: 'account', data: ids }) }
-    ];
-
-    // Access Modal DataGrids
+    // Access Grid in Modal
     const accessColumns = [
       { field: 'grantee_type', header_fa: 'نوع دسترسی', header_en: 'Type', width: '120px', render: (val) => (
         <Badge variant={val === 'USER' ? 'indigo' : 'emerald'} size="sm" className="text-[10px]">
@@ -484,13 +473,10 @@
       { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', target: 'access', data: row }), className: 'hover:text-red-600' }
     ];
 
-    const accessBulkActions = [
-      { label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', target: 'access', data: ids }) }
-    ];
-
+    // Aggregated View Grid
     const aggregateColumns = [
       { 
-        field: 'full_name', header_fa: 'کاربر', width: '250px', 
+        field: 'full_name', header_fa: 'کاربر', width: '300px', 
         render: (_, row) => (
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
@@ -507,7 +493,7 @@
         field: 'sources', header_fa: 'منابع دسترسی', width: 'auto',
         render: (val) => (
           <div className="flex flex-wrap gap-1">
-            {val.map((src, idx) => <Badge key={idx} variant="slate" size="sm" className="text-[10px]">{src}</Badge>)}
+            {val.map((src, idx) => <Badge key={idx} variant="slate" size="sm" className="text-[10px] px-2 py-0.5">{src}</Badge>)}
           </div>
         )
       }
@@ -515,7 +501,7 @@
 
     const accessTabs = [
       { id: 'assign', label: t('تخصیص دسترسی', 'Access Assignment') },
-      { id: 'aggregate', label: t('مشاهده تجمیعی', 'Aggregated View') }
+      { id: 'aggregate', label: t('مشاهده تجمیع دسترسی‌ها', 'Aggregated Access View') }
     ];
 
     return (
@@ -573,93 +559,127 @@
           </div>
         </Modal>
 
-        {/* Modal: Related Accounts Grid */}
-        <Modal isOpen={isAccountsModalOpen} onClose={() => setIsAccountsModalOpen(false)} title={`${t('مدیریت حساب‌های مرتبط', 'Manage Accounts')} - ${selectedGroup?.title_fa || ''}`} width="max-w-4xl" language={language}>
-          <div className="flex flex-col h-[60vh] min-h-[400px]">
-            <DataGrid 
-              data={groupAccounts} 
-              columns={accountColumns} 
-              actions={accountActions} 
-              bulkActions={accountBulkActions}
-              language={language} 
-              selectable={true}
-              isLoading={modalLoading} 
-              onAdd={() => openAccountForm()}
-              onRowDoubleClick={(row) => openAccountForm(row)}
-            />
-          </div>
-        </Modal>
+        {/* Modal: Related Accounts (Inline Add/Edit) */}
+        <Modal isOpen={isAccountsModalOpen} onClose={() => setIsAccountsModalOpen(false)} title={`${t('مدیریت حساب‌های مرتبط', 'Manage Accounts')} - ${selectedGroup?.title_fa || ''}`} width="max-w-5xl" language={language}>
+          <div className="flex flex-col h-[70vh] min-h-[500px] bg-slate-50 dark:bg-slate-900 p-4 gap-3">
+            
+            {/* Inline Add/Edit Form Block */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm flex flex-col gap-3 shrink-0">
+               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/50 pb-2 mb-1">
+                  <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200">
+                    {accountForm.id ? t('ویرایش حساب', 'Edit Account') : t('افزودن حساب جدید', 'Add New Account')}
+                  </span>
+                  {accountForm.id && (
+                    <Button variant="ghost" size="sm" onClick={resetAccountForm} icon={Plus} className="text-indigo-600">{t('ثبت جدید', 'New Entry')}</Button>
+                  )}
+               </div>
+               <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                  <div className="lg:col-span-6">
+                    <LOVField 
+                      size="sm" label={t('انتخاب حساب', 'Select Account')} required
+                      data={leafAccounts} columns={lovAccountColumns} dropdownWidth="min-w-[450px]"
+                      displayValue={accountForm.account_obj ? `${accountForm.account_obj.code} - ${accountForm.account_obj.title_fa}` : ''}
+                      onChange={(row) => setAccountForm({...accountForm, account_id: row?.id || '', account_obj: row})}
+                    />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <DatePicker size="sm" label={t('از تاریخ', 'Valid From')} value={accountForm.valid_from} onChange={(v) => setAccountForm({...accountForm, valid_from: v})} required isRtl={isRtl} />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <DatePicker size="sm" label={t('تا تاریخ', 'Valid To')} value={accountForm.valid_to} onChange={(v) => setAccountForm({...accountForm, valid_to: v})} isRtl={isRtl} />
+                  </div>
+                  <div className="lg:col-span-2 flex flex-col justify-end gap-1">
+                    <ToggleField size="sm" label={t('وضعیت فعال', 'Active')} checked={accountForm.is_active} onChange={v => setAccountForm({...accountForm, is_active: v})} isRtl={isRtl} />
+                    <Button variant="primary" size="sm" icon={accountForm.id ? Save : Plus} onClick={handleSaveAccountInline} isLoading={modalLoading} disabled={!accountForm.account_id || !accountForm.valid_from} className="w-full">
+                      {accountForm.id ? t('بروزرسانی', 'Update') : t('افزودن', 'Add')}
+                    </Button>
+                  </div>
+               </div>
+            </div>
 
-        {/* Sub-Modal: Add/Edit Account Form */}
-        <Modal isOpen={isAccountFormModalOpen} onClose={() => setIsAccountFormModalOpen(false)} title={editAccountForm.id ? t('ویرایش حساب مرتبط', 'Edit Account') : t('افزودن حساب', 'Add Account')} width="max-w-2xl" language={language}>
-          <div className="p-4 flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <LOVField 
-                size="sm" label={t('انتخاب حساب', 'Select Account')} required wrapperClassName="md:col-span-2"
-                data={leafAccounts} columns={lovAccountColumns} dropdownWidth="min-w-[450px]"
-                displayValue={editAccountForm.account_obj ? `${editAccountForm.account_obj.code} - ${editAccountForm.account_obj.title_fa}` : ''}
-                onChange={(row) => setEditAccountForm({...editAccountForm, account_id: row?.id || '', account_obj: row})}
+            <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+              <DataGrid 
+                data={groupAccounts} 
+                columns={accountColumns} 
+                actions={accountActions} 
+                language={language} 
+                isLoading={modalLoading} 
+                exportable={false}
+                importable={false}
+                disableExport={true}
+                disableImport={true}
+                hideToolbar={true} // Hide toolbar to remove generic add/export buttons as we have inline form
               />
-              <DatePicker size="sm" label={t('از تاریخ', 'Valid From')} value={editAccountForm.valid_from} onChange={(v) => setEditAccountForm({...editAccountForm, valid_from: v})} required isRtl={isRtl} wrapperClassName="md:col-span-1" />
-              <DatePicker size="sm" label={t('تا تاریخ', 'Valid To')} value={editAccountForm.valid_to} onChange={(v) => setEditAccountForm({...editAccountForm, valid_to: v})} isRtl={isRtl} wrapperClassName="md:col-span-1" />
-              <div className="md:col-span-2 flex items-center pt-2">
-                 <ToggleField size="sm" label={t('وضعیت فعال', 'Active Status')} checked={editAccountForm.is_active} onChange={v => setEditAccountForm({...editAccountForm, is_active: v})} isRtl={isRtl} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-              <Button variant="outline" size="sm" onClick={() => setIsAccountFormModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" icon={Save} onClick={handleSaveAccount} isLoading={modalLoading} disabled={!editAccountForm.account_id || !editAccountForm.valid_from}>{t('ذخیره اطلاعات', 'Save')}</Button>
             </div>
           </div>
         </Modal>
 
-        {/* Modal: Access Grid & Aggregation */}
+        {/* Modal: Access Grid & Aggregation (Inline Add/Edit) */}
         <Modal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} title={`${t('مدیریت دسترسی‌ها', 'Manage Access')} - ${selectedGroup?.title_fa || ''}`} width="max-w-4xl" language={language}>
-          <div className="flex flex-col h-[60vh] min-h-[400px]">
-            <Tabs tabs={accessTabs} activeTab={accessViewMode} onChange={setAccessViewMode} />
-            <div className="flex-1 min-h-0 mt-2">
+          <div className="flex flex-col h-[70vh] min-h-[500px] bg-slate-50 dark:bg-slate-900 p-4 gap-3">
+            <Tabs tabs={accessTabs} activeTab={accessViewMode} onChange={setAccessViewMode} className="shrink-0" />
+            
+            <div className="flex-1 flex flex-col min-h-0">
               {accessViewMode === 'assign' ? (
-                <DataGrid 
-                  data={groupAccesses} 
-                  columns={accessColumns} 
-                  actions={accessActions} 
-                  bulkActions={accessBulkActions}
-                  language={language} 
-                  selectable={true}
-                  isLoading={modalLoading}
-                  onAdd={() => openAccessForm()}
-                />
-              ) : (
-                <DataGrid 
-                  data={aggregatedUsersList} 
-                  columns={aggregateColumns} 
-                  language={language} 
-                  isLoading={modalLoading}
-                />
-              )}
-            </div>
-          </div>
-        </Modal>
+                <>
+                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm flex flex-col gap-3 shrink-0 mb-3">
+                     <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700/50 pb-2 mb-1">
+                        {t('تخصیص دسترسی جدید', 'Assign New Access')}
+                     </span>
+                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div className="md:col-span-3">
+                          <SelectField size="sm" label={t('نوع دسترسی', 'Access Type')} required
+                            options={[{value:'USER', label:t('کاربر سیستم', 'User')}, {value:'ROLE', label:t('نقش سیستمی', 'Role')}]}
+                            value={accessForm.grantee_type} onChange={(e) => setAccessForm({...accessForm, grantee_type: e.target.value, grantee_id: '', grantee_obj: null})} isRtl={isRtl}
+                          />
+                        </div>
+                        <div className="md:col-span-7">
+                          <LOVField 
+                            size="sm" label={t('انتخاب شخص / نقش', 'Select Grantee')} required
+                            data={accessForm.grantee_type === 'USER' ? availableUsersForAccess : availableRolesForAccess} 
+                            columns={accessForm.grantee_type === 'USER' ? [{field:'username',header_fa:'نام کاربری'},{field:'full_name',header_fa:'نام'}] : [{field:'code',header_fa:'کد'},{field:'title',header_fa:'عنوان'}]}
+                            displayValue={accessForm.grantee_obj ? (accessForm.grantee_type === 'USER' ? `${accessForm.grantee_obj.full_name} (${accessForm.grantee_obj.username})` : `${accessForm.grantee_obj.title} (${accessForm.grantee_obj.code})`) : ''}
+                            onChange={(row) => setAccessForm({...accessForm, grantee_id: row?.id || '', grantee_obj: row})}
+                          />
+                        </div>
+                        <div className="md:col-span-2 flex flex-col justify-end">
+                          <Button variant="primary" size="sm" icon={Plus} onClick={handleSaveAccessInline} isLoading={modalLoading} disabled={!accessForm.grantee_id} className="w-full">
+                            {t('افزودن', 'Add')}
+                          </Button>
+                        </div>
+                     </div>
+                  </div>
 
-        {/* Sub-Modal: Add Access Form */}
-        <Modal isOpen={isAccessFormModalOpen} onClose={() => setIsAccessFormModalOpen(false)} title={t('افزودن دسترسی', 'Add Access')} width="max-w-xl" language={language}>
-          <div className="p-4 flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-3">
-              <SelectField size="sm" label={t('نوع دسترسی', 'Access Type')} required
-                options={[{value:'USER', label:t('کاربر سیستم', 'User')}, {value:'ROLE', label:t('نقش سیستمی', 'Role')}]}
-                value={editAccessForm.grantee_type} onChange={(e) => setEditAccessForm({...editAccessForm, grantee_type: e.target.value, grantee_id: '', grantee_obj: null})} isRtl={isRtl}
-              />
-              <LOVField 
-                size="sm" label={t('انتخاب شخص / نقش', 'Select Grantee')} required
-                data={editAccessForm.grantee_type === 'USER' ? availableUsersForAccess : availableRolesForAccess} 
-                columns={editAccessForm.grantee_type === 'USER' ? [{field:'username',header_fa:'نام کاربری'},{field:'full_name',header_fa:'نام'}] : [{field:'code',header_fa:'کد'},{field:'title',header_fa:'عنوان'}]}
-                displayValue={editAccessForm.grantee_obj ? (editAccessForm.grantee_type === 'USER' ? `${editAccessForm.grantee_obj.full_name} (${editAccessForm.grantee_obj.username})` : `${editAccessForm.grantee_obj.title} (${editAccessForm.grantee_obj.code})`) : ''}
-                onChange={(row) => setEditAccessForm({...editAccessForm, grantee_id: row?.id || '', grantee_obj: row})}
-              />
-            </div>
-            <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-              <Button variant="outline" size="sm" onClick={() => setIsAccessFormModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" icon={Save} onClick={handleSaveAccess} isLoading={modalLoading} disabled={!editAccessForm.grantee_id}>{t('تخصیص دسترسی', 'Assign')}</Button>
+                  <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <DataGrid 
+                      data={groupAccesses} 
+                      columns={accessColumns} 
+                      actions={accessActions} 
+                      language={language} 
+                      isLoading={modalLoading}
+                      exportable={false}
+                      importable={false}
+                      disableExport={true}
+                      disableImport={true}
+                      hideToolbar={true}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <DataGrid 
+                    data={aggregatedUsersList} 
+                    columns={aggregateColumns} 
+                    language={language} 
+                    isLoading={modalLoading}
+                    exportable={false}
+                    importable={false}
+                    disableExport={true}
+                    disableImport={true}
+                    hideToolbar={true}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </Modal>
