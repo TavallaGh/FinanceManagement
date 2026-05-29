@@ -37,10 +37,11 @@
     // Master Data
     const [groups, setGroups] = useState([]);
     const [coaAccounts, setCoaAccounts] = useState([]);
-    const [users, setUsers] = useState([]);
+    const [rawUsers, setRawUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [userRoles, setUserRoles] = useState([]);
     const [charts, setCharts] = useState([]);
+    const [parties, setParties] = useState([]);
 
     // Grid & Filter State
     const [filters, setFilters] = useState({});
@@ -88,7 +89,7 @@
     const fetchInitialData = async () => {
       setLoading(true);
       try {
-        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes] = await Promise.all([
+        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes, partiesRes] = await Promise.all([
           supabase.from('fm_balance_groups')
             .select('*, accounts:fm_balance_group_accounts(id, account_id), access:fm_balance_group_access(grantee_type, grantee_id)')
             .order('created_at', { ascending: false }),
@@ -96,23 +97,49 @@
           supabase.from('sec_users').select('*'),
           supabase.from('sec_roles').select('id, title, code'),
           supabase.from('sec_user_roles').select('user_id, role_id'),
-          supabase.from('fm_coa_charts').select('id, title')
+          supabase.from('fm_coa_charts').select('id, title'),
+          supabase.from('parties').select('id, first_name, last_name, company_name, party_type')
         ]);
 
         if (groupsRes.error) throw groupsRes.error;
         
         setGroups(groupsRes.data || []);
         setCoaAccounts(accountsRes.data || []);
-        setUsers(usersRes.data || []);
+        setRawUsers(usersRes.data || []);
         setRoles(rolesRes.data || []);
         setUserRoles(userRolesRes.data || []);
         setCharts(chartsRes.data || []);
+        setParties(partiesRes.data || []);
       } catch (error) {
         console.error('Error fetching initial data:', error);
       } finally {
         setLoading(false);
       }
     };
+
+    // Calculate formatted Users with properly resolved names from parties table
+    const users = useMemo(() => {
+      return rawUsers.map(user => {
+        const userParty = parties.find(p => String(p.id) === String(user.party_id || user.person_id));
+        let fNameStr = '';
+        if (userParty) {
+            if (userParty.party_type === 'legal' && userParty.company_name) {
+                fNameStr = userParty.company_name;
+            } else {
+                fNameStr = `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
+            }
+        }
+        if (!fNameStr || fNameStr === '') {
+            const fname = user.first_name || user.name || '';
+            const lname = user.last_name || user.family || '';
+            fNameStr = (fname || lname) ? `${fname} ${lname}`.trim() : '---';
+        }
+        return {
+          ...user,
+          full_name: fNameStr
+        };
+      });
+    }, [rawUsers, parties]);
 
     const leafAccounts = useMemo(() => {
       if (!coaAccounts.length) return [];
@@ -150,10 +177,10 @@
         result = result.filter(g => g.accounts?.some(a => a.account_id === filters.account_id.id));
       }
       if (filters.user_id && filters.user_id.id) {
-        result = result.filter(g => g.access?.some(a => a.grantee_type === 'USER' && a.grantee_id === filters.user_id.id));
+        result = result.filter(g => g.access?.some(a => a.grantee_type?.toLowerCase() === 'user' && a.grantee_id === filters.user_id.id));
       }
       if (filters.role_id && filters.role_id.id) {
-        result = result.filter(g => g.access?.some(a => a.grantee_type === 'ROLE' && a.grantee_id === filters.role_id.id));
+        result = result.filter(g => g.access?.some(a => a.grantee_type?.toLowerCase() === 'role' && a.grantee_id === filters.role_id.id));
       }
       return result;
     }, [groups, filters]);
@@ -318,7 +345,7 @@
       if (inlineAccessEdit) return;
       setInlineAccessEdit({
         id: 'new',
-        data: { grantee_type: 'USER', grantee_id: '', grantee_obj: null }
+        data: { grantee_type: 'user', grantee_id: '', grantee_obj: null }
       });
     };
 
@@ -326,7 +353,7 @@
       const form = inlineAccessEdit.data;
       if (!form.grantee_id) return;
 
-      if (inlineAccessEdit.id === 'new' && groupAccesses.some(a => a.grantee_type === form.grantee_type && String(a.grantee_id) === String(form.grantee_id))) {
+      if (inlineAccessEdit.id === 'new' && groupAccesses.some(a => a.grantee_type?.toLowerCase() === form.grantee_type?.toLowerCase() && String(a.grantee_id) === String(form.grantee_id))) {
          alert(t('این دسترسی قبلاً افزوده شده است.', 'This access is already added.'));
          return;
       }
@@ -360,11 +387,11 @@
     }, [groupAccesses, inlineAccessEdit]);
 
     const availableUsersForAccess = useMemo(() => {
-      return users.filter(u => !groupAccesses.some(ga => ga.grantee_type === 'USER' && String(ga.grantee_id) === String(u.id)));
+      return users.filter(u => !groupAccesses.some(ga => ga.grantee_type?.toLowerCase() === 'user' && String(ga.grantee_id) === String(u.id)));
     }, [users, groupAccesses]);
 
     const availableRolesForAccess = useMemo(() => {
-      return roles.filter(r => !groupAccesses.some(ga => ga.grantee_type === 'ROLE' && String(ga.grantee_id) === String(r.id)));
+      return roles.filter(r => !groupAccesses.some(ga => ga.grantee_type?.toLowerCase() === 'role' && String(ga.grantee_id) === String(r.id)));
     }, [roles, groupAccesses]);
 
     const aggregatedUsersList = useMemo(() => {
@@ -374,13 +401,15 @@
       users.forEach(user => {
         const reasons = [];
 
-        const directPerm = groupAccesses.find(p => p.grantee_type === 'USER' && String(p.grantee_id) === String(user.id));
+        // Direct Access Check (Case Insensitive)
+        const directPerm = groupAccesses.find(p => p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(user.id));
         if (directPerm) {
           reasons.push(t('دسترسی مستقیم', 'Direct Access'));
         }
 
+        // Role-based Access Check (Case Insensitive)
         const userRoleIds = userRoles.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
-        const rolePerms = groupAccesses.filter(p => p.grantee_type === 'ROLE' && userRoleIds.includes(String(p.grantee_id)));
+        const rolePerms = groupAccesses.filter(p => p.grantee_type?.toLowerCase() === 'role' && userRoleIds.includes(String(p.grantee_id)));
 
         rolePerms.forEach(rp => {
           const roleObj = roles.find(r => String(r.id) === String(rp.grantee_id));
@@ -389,12 +418,10 @@
         });
 
         if (reasons.length > 0) {
-          const fNameStr = user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ') || '---';
-          
           result.push({
             id: user.id,
             username: user.username || user.email || '---',
-            full_name: fNameStr,
+            full_name: user.full_name,
             sources: reasons
           });
         }
@@ -608,7 +635,7 @@
                <div onClick={(e)=>e.stopPropagation()}>
                  <SelectField 
                    size="sm" 
-                   options={[{value:'USER', label:t('کاربر سیستم', 'User')}, {value:'ROLE', label:t('نقش سیستمی', 'Role')}]}
+                   options={[{value:'user', label:t('کاربر سیستم', 'User')}, {value:'role', label:t('نقش سیستمی', 'Role')}]}
                    value={inlineAccessEdit.data.grantee_type} 
                    onChange={(e) => setInlineAccessEdit(prev => ({...prev, data: {...prev.data, grantee_type: e.target.value, grantee_id: '', grantee_obj: null}}))} 
                    isRtl={isRtl}
@@ -616,9 +643,10 @@
                </div>
              )
           }
+          const normVal = val?.toLowerCase();
           return (
-            <Badge variant={val === 'USER' ? 'indigo' : 'emerald'} size="sm" className="text-[10px]">
-              {val === 'USER' ? t('کاربر', 'User') : t('نقش', 'Role')}
+            <Badge variant={normVal === 'user' ? 'indigo' : 'emerald'} size="sm" className="text-[10px]">
+              {normVal === 'user' ? t('کاربر', 'User') : t('نقش', 'Role')}
             </Badge>
           );
         }
@@ -630,7 +658,7 @@
         width: 'auto', 
         render: (val, row) => {
           if (inlineAccessEdit?.id === row.id) {
-            const isUser = inlineAccessEdit.data.grantee_type === 'USER';
+            const isUser = inlineAccessEdit.data.grantee_type === 'user';
             return (
               <div onClick={(e)=>e.stopPropagation()}>
                 <LOVField 
@@ -643,9 +671,9 @@
               </div>
             )
           }
-          if (row.grantee_type === 'USER') {
+          if (row.grantee_type?.toLowerCase() === 'user') {
             const u = users.find(x => String(x.id) === String(val));
-            return u ? `${u.full_name || [u.first_name, u.last_name].filter(Boolean).join(' ')} (${u.username})` : t('نامشخص', 'Unknown');
+            return u ? `${u.full_name} (${u.username})` : t('نامشخص', 'Unknown');
           } else {
             const r = roles.find(x => String(x.id) === String(val));
             return r ? `${r.title} (${r.code})` : t('نامشخص', 'Unknown');
