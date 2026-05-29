@@ -134,6 +134,14 @@
       }
     };
 
+    const handleAddBgClick = () => {
+        if (inlineBgEdit) return;
+        setInlineBgEdit({
+            id: 'new',
+            data: { group_id: '', group_obj: null, valid_from: new Date().toISOString().split('T')[0], valid_to: '', is_active: true }
+        });
+    };
+
     const handleSaveBgInline = async () => {
       const form = inlineBgEdit.data;
       if (!form.group_id || !selectedNodeId) return;
