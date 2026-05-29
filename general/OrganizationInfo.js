@@ -1,4 +1,4 @@
-/* Filename: OrganizationInfo.js */
+/* Filename: general/OrganizationInfo.js */
 (() => {
   const React = window.React;
   const { useState, useEffect } = React;
@@ -17,6 +17,7 @@
   const OrganizationInfo = ({ isAdmin, language = 'fa' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
+    const FORM_CODE = 'organization_info_main';
     
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +43,7 @@
     const [gridState, setGridState] = useState(null);
 
     const viewConfig = {
-      pageId: 'organization_info_main',
+      pageId: FORM_CODE,
       currentState: () => ({ 
         gridState
       }),
@@ -250,21 +251,21 @@
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <TextField size="sm" label={t('کد سازمان', 'Code')} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} required dir="ltr" />
-              <TextField size="sm" label={t('نام سازمان', 'Name')} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} isRtl={isRtl} required />
-              <TextField size="sm" label={t('شماره ثبت', 'Reg No')} value={formData.regNo} onChange={e => setFormData({...formData, regNo: e.target.value})} isRtl={isRtl} dir="ltr" />
+              <TextField size="sm" label={t('کد سازمان', 'Code')} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} required dir="ltr" formCode={FORM_CODE} />
+              <TextField size="sm" label={t('نام سازمان', 'Name')} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} isRtl={isRtl} required formCode={FORM_CODE} />
+              <TextField size="sm" label={t('شماره ثبت', 'Reg No')} value={formData.regNo} onChange={e => setFormData({...formData, regNo: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
               <div className="flex items-center mt-6">
-                <ToggleField size="sm" label={t('فعال', 'Active')} checked={formData.isActive} onChange={v => setFormData({...formData, isActive: v})} isRtl={isRtl} />
+                <ToggleField size="sm" label={t('فعال', 'Active')} checked={formData.isActive} onChange={v => setFormData({...formData, isActive: v})} isRtl={isRtl} formCode={FORM_CODE} />
               </div>
-              <TextField size="sm" label={t('تلفن', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" />
-              <TextField size="sm" label={t('فکس', 'Fax')} value={formData.fax} onChange={e => setFormData({...formData, fax: e.target.value})} isRtl={isRtl} dir="ltr" />
+              <TextField size="sm" label={t('تلفن', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
+              <TextField size="sm" label={t('فکس', 'Fax')} value={formData.fax} onChange={e => setFormData({...formData, fax: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
             </div>
 
             <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 mt-2">
                <label className="text-[12px] font-bold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-1.5"><MapPin size={14} className="text-indigo-500"/> {t('مدیریت آدرس‌ها', 'Manage Addresses')}</label>
                <div className="flex gap-2 mb-3">
                  <div className="flex-1">
-                   <TextField size="sm" placeholder={t('آدرس جدید را وارد کنید...', 'New address...')} value={newAddress} onChange={e => setNewAddress(e.target.value)} isRtl={isRtl} wrapperClassName="m-0" />
+                   <TextField size="sm" placeholder={t('آدرس جدید را وارد کنید...', 'New address...')} value={newAddress} onChange={e => setNewAddress(e.target.value)} isRtl={isRtl} wrapperClassName="m-0" formCode={FORM_CODE} />
                  </div>
                  <Button variant="secondary" size="sm" icon={Plus} onClick={() => {
                    if(!newAddress.trim()) return;
@@ -279,24 +280,15 @@
                      <div className="flex items-center gap-2 flex-1 min-w-0">
                        <span className="text-slate-700 dark:text-slate-300 leading-relaxed truncate">{a.text}</span>
                      </div>
-                     <div className="flex items-center gap-2 shrink-0">
+                     <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                        {a.isDefault ? (
                          <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 px-1">{t('پیش‌فرض', 'Default')}</span>
                        ) : (
-                         <button 
-                           onClick={() => handleSetDefaultAddress(a.id)} 
-                           className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition-colors px-1"
-                         >
-                           {t('پیش‌فرض', 'Default')}
-                         </button>
+                         <Button variant="ghost" size="sm" className="!h-6 !text-[10px] !px-2 text-slate-400 hover:text-indigo-600" onClick={() => handleSetDefaultAddress(a.id)}>
+                           {t('انتخاب پیش‌فرض', 'Set Default')}
+                         </Button>
                        )}
-                       <button 
-                         onClick={() => setFormData({...formData, addresses: formData.addresses.filter(x => x.id !== a.id)})} 
-                         className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                         title={t('حذف', 'Delete')}
-                       >
-                         <Trash2 size={12}/>
-                       </button>
+                       <Button variant="ghost" size="sm" className="!h-6 !w-6 !p-0 text-slate-300 hover:text-red-500" icon={Trash2} onClick={() => setFormData({...formData, addresses: formData.addresses.filter(x => x.id !== a.id)})} title={t('حذف', 'Delete')} />
                      </div>
                    </div>
                  ))}
