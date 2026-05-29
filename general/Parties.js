@@ -361,18 +361,18 @@
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                 {/* Row 1: Identity */}
-                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('کد اختصاصی *', 'Code *')} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} required dir="ltr" />
+                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('کد', 'Code')} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} required dir="ltr" />
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={formData.partyType === 'real' ? t('کد ملی', 'National ID') : t('شناسه ملی', 'National ID')} value={formData.nationalId} onChange={e => setFormData({...formData, nationalId: e.target.value})} isRtl={isRtl} dir="ltr" />
                 
                 {formData.partyType === 'real' ? (
                   <>
                     <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام', 'First Name')} value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} isRtl={isRtl} />
-                    <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام خانوادگی *', 'Last Name *')} value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} isRtl={isRtl} required />
+                    <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام خانوادگی', 'Last Name')} value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} isRtl={isRtl} required />
                   </>
                 ) : (
                   <>
                     <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('کد اقتصادی', 'Economic Code')} value={formData.economicCode} onChange={e => setFormData({...formData, economicCode: e.target.value})} isRtl={isRtl} dir="ltr" />
-                    <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام کامل شرکت *', 'Company Name *')} value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} isRtl={isRtl} required />
+                    <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام کامل شرکت', 'Company Name')} value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} isRtl={isRtl} required />
                   </>
                 )}
 
