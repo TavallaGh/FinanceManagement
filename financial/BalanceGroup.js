@@ -10,16 +10,19 @@
     Save = FallbackIcon, Plus = FallbackIcon, AlertTriangle = FallbackIcon, Lock = FallbackIcon
   } = LucideIcons;
 
-  const Core = window.DSCore || window.DesignSystem || {};
-  const {
-    PageHeader = () => null, Modal = () => null, Button = () => null, TextField = () => null,
-    SelectField = () => null, ToggleField = () => null, DatePicker = () => null, Badge = () => null
-  } = Core;
-
-  const Grid = window.DSGrid || window.DesignSystem || {};
-  const {
-    DataGrid = () => null, AdvancedFilter = () => null, LOVField = () => null
-  } = Grid;
+  // Robust Component Imports to prevent "null" rendering issues
+  const DS = window.DesignSystem || {};
+  const Button = DS.Button || window.DSCore?.Button || (() => null);
+  const PageHeader = DS.PageHeader || window.DSCore?.PageHeader || (() => null);
+  const Modal = DS.Modal || window.DSFeedback?.Modal || (() => null);
+  const DataGrid = DS.DataGrid || window.DSGrid?.DataGrid || (() => null);
+  const AdvancedFilter = DS.AdvancedFilter || window.DSGrid?.AdvancedFilter || (() => null);
+  const LOVField = DS.LOVField || window.DSGrid?.LOVField || (() => null);
+  const TextField = DS.TextField || window.DSForms?.TextField || (() => null);
+  const ToggleField = DS.ToggleField || window.DSForms?.ToggleField || (() => null);
+  const SelectField = DS.SelectField || window.DSForms?.SelectField || (() => null);
+  const DatePicker = DS.DatePicker || window.DSForms?.DatePicker || (() => null);
+  const Badge = DS.Badge || window.DSCore?.Badge || (() => null);
 
   const supabase = window.supabase;
 
@@ -145,6 +148,16 @@
         const { error } = await supabase.from('fm_balance_groups').update({ is_active: newValue, updated_at: new Date().toISOString() }).eq('id', row.id);
         if (error) throw error;
         setGroups(prev => prev.map(item => item.id === row.id ? { ...item, is_active: newValue } : item));
+      } catch (err) {
+        console.error("Toggle Error:", err);
+      }
+    };
+
+    const handleToggleAccountActive = async (row, newValue) => {
+      try {
+        const { error } = await supabase.from('fm_balance_group_accounts').update({ is_active: newValue, updated_at: new Date().toISOString() }).eq('id', row.id);
+        if (error) throw error;
+        setGroupAccounts(prev => prev.map(item => item.id === row.id ? { ...item, is_active: newValue } : item));
       } catch (err) {
         console.error("Toggle Error:", err);
       }
@@ -283,10 +296,10 @@
     ];
 
     const groupActions = [
-      { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => { setCurrentGroup(row); setIsGroupModalOpen(true); }, className: 'text-slate-400 hover:text-indigo-600' },
-      { icon: List, tooltip: t('حساب‌های مرتبط', 'Related Accounts'), onClick: (row) => openAccountsModal(row), className: 'text-slate-400 hover:text-indigo-600' },
-      { icon: Shield, tooltip: t('مدیریت دسترسی‌ها', 'Access Management'), onClick: (row) => openAccessModal(row), className: 'text-slate-400 hover:text-indigo-600' },
-      { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', target: 'group', data: row }), className: 'text-slate-400 hover:text-red-600' }
+      { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => { setCurrentGroup(row); setIsGroupModalOpen(true); } },
+      { icon: List, tooltip: t('حساب‌های مرتبط', 'Related Accounts'), onClick: (row) => openAccountsModal(row) },
+      { icon: Shield, tooltip: t('مدیریت دسترسی‌ها', 'Access Management'), onClick: (row) => openAccessModal(row) },
+      { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', target: 'group', data: row }), className: 'hover:text-red-600' }
     ];
 
     const groupBulkActions = [
@@ -304,15 +317,15 @@
       { field: 'title', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (_, row) => row.fm_coa_accounts?.title_fa },
       { field: 'valid_from', header_fa: 'از تاریخ', header_en: 'Valid From', width: '120px', type: 'date' },
       { field: 'valid_to', header_fa: 'تا تاریخ', header_en: 'Valid To', width: '120px', type: 'date', render: (val) => val || <span className="text-slate-400 text-[10px]">{t('تا کنون', 'Present')}</span> },
-      { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', width: '90px', type: 'toggle' }
+      { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', width: '90px', type: 'toggle', onToggle: (row, val) => handleToggleAccountActive(row, val) }
     ];
 
     const accountActions = [
       { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => {
         const acc = coaAccounts.find(a => a.id === row.account_id);
         setCurrentAccountMap({ id: row.id, account_id: row.account_id, account_obj: acc, valid_from: row.valid_from, valid_to: row.valid_to || '', is_active: row.is_active });
-      }, className: 'text-slate-400 hover:text-indigo-600' },
-      { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', target: 'account', data: row }), className: 'text-slate-400 hover:text-red-600' }
+      } },
+      { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', target: 'account', data: row }), className: 'hover:text-red-600' }
     ];
 
     const accessColumns = [
@@ -333,7 +346,7 @@
     ];
 
     const accessActions = [
-      { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', target: 'access', data: row }), className: 'text-slate-400 hover:text-red-600' }
+      { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', target: 'access', data: row }), className: 'hover:text-red-600' }
     ];
 
     return (
@@ -355,7 +368,7 @@
             onClear={() => setFilters({})} 
             language={language} 
           />
-          <div className="flex-1 min-h-0 mt-1">
+          <div className="flex-1 min-h-0 mt-1 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
             <DataGrid 
               data={filteredGroups}
               columns={groupColumns} 
@@ -375,16 +388,17 @@
         </div>
 
         {/* Modal: Group Definition */}
-        <Modal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} title={currentGroup.id ? t('ویرایش گروه بالانس', 'Edit Balance Group') : t('ایجاد گروه بالانس', 'New Balance Group')} width="max-w-2xl" language={language}>
+        <Modal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} title={currentGroup.id ? t('ویرایش گروه بالانس', 'Edit Balance Group') : t('ایجاد گروه بالانس', 'New Balance Group')} width="max-w-3xl" language={language}>
           <div className="p-4 flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <TextField size="sm" label={t('کد گروه', 'Group Code')} value={currentGroup.code} onChange={(e) => setCurrentGroup({...currentGroup, code: e.target.value})} isRtl={isRtl} required wrapperClassName="md:col-span-1" dir="ltr" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <TextField size="sm" label={t('کد گروه', 'Group Code')} value={currentGroup.code} onChange={(e) => setCurrentGroup({...currentGroup, code: e.target.value})} isRtl={isRtl} required dir="ltr" wrapperClassName="md:col-span-1" />
+              <TextField size="sm" label={t('عنوان (فارسی)', 'Title (FA)')} value={currentGroup.title_fa} onChange={(e) => setCurrentGroup({...currentGroup, title_fa: e.target.value})} isRtl={isRtl} required wrapperClassName="md:col-span-1" />
+              <TextField size="sm" label={t('عنوان (انگلیسی)', 'Title (EN)')} value={currentGroup.title_en} onChange={(e) => setCurrentGroup({...currentGroup, title_en: e.target.value})} isRtl={isRtl} dir="ltr" wrapperClassName="md:col-span-1" />
+              
+              <TextField size="sm" label={t('توضیحات', 'Description')} value={currentGroup.description} onChange={(e) => setCurrentGroup({...currentGroup, description: e.target.value})} isRtl={isRtl} wrapperClassName="md:col-span-2" />
               <div className="md:col-span-1 flex items-center pt-5">
                  <ToggleField size="sm" label={t('وضعیت فعال', 'Active Status')} checked={currentGroup.is_active} onChange={v => setCurrentGroup({...currentGroup, is_active: v})} isRtl={isRtl} />
               </div>
-              <TextField size="sm" label={t('عنوان (فارسی)', 'Title (FA)')} value={currentGroup.title_fa} onChange={(e) => setCurrentGroup({...currentGroup, title_fa: e.target.value})} isRtl={isRtl} required wrapperClassName="md:col-span-1" />
-              <TextField size="sm" label={t('عنوان (انگلیسی)', 'Title (EN)')} value={currentGroup.title_en} onChange={(e) => setCurrentGroup({...currentGroup, title_en: e.target.value})} isRtl={isRtl} dir="ltr" wrapperClassName="md:col-span-1" />
-              <TextField size="sm" label={t('توضیحات', 'Description')} value={currentGroup.description} onChange={(e) => setCurrentGroup({...currentGroup, description: e.target.value})} isRtl={isRtl} wrapperClassName="md:col-span-2" />
             </div>
             <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
               <Button variant="outline" size="sm" onClick={() => setIsGroupModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
@@ -394,10 +408,10 @@
         </Modal>
 
         {/* Modal: Accounts Mapping */}
-        <Modal isOpen={isAccountModalOpen} onClose={() => setIsAccountModalOpen(false)} title={`${t('مدیریت حساب‌های گروه', 'Manage Accounts')} - ${selectedGroup?.title_fa || ''}`} width="max-w-5xl" language={language}>
-          <div className="p-4 flex flex-col gap-4 h-[600px]">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
-              <div className="md:col-span-4">
+        <Modal isOpen={isAccountModalOpen} onClose={() => setIsAccountModalOpen(false)} title={`${t('مدیریت حساب‌های گروه', 'Manage Accounts')} - ${selectedGroup?.title_fa || ''}`} width="max-w-4xl" language={language}>
+          <div className="p-4 flex flex-col gap-4 h-[500px]">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+              <div className="md:col-span-2">
                  <LOVField 
                    size="sm" label={t('انتخاب حساب', 'Select Account')} required
                    data={coaAccounts} columns={[{field:'code', header_fa:'کد حساب'},{field:'title_fa', header_fa:'عنوان حساب'}]} 
@@ -405,15 +419,15 @@
                    onChange={(row) => setCurrentAccountMap({...currentAccountMap, account_id: row?.id || '', account_obj: row})}
                  />
               </div>
-              <div className="md:col-span-3">
+              <div className="md:col-span-1">
                  <DatePicker size="sm" label={t('از تاریخ', 'Valid From')} value={currentAccountMap.valid_from} onChange={(v) => setCurrentAccountMap({...currentAccountMap, valid_from: v})} required isRtl={isRtl} />
               </div>
-              <div className="md:col-span-3">
+              <div className="md:col-span-1">
                  <DatePicker size="sm" label={t('تا تاریخ', 'Valid To')} value={currentAccountMap.valid_to} onChange={(v) => setCurrentAccountMap({...currentAccountMap, valid_to: v})} isRtl={isRtl} />
               </div>
-              <div className="md:col-span-2 flex items-end justify-between pb-0.5">
-                 <ToggleField size="sm" label={t('فعال', 'Active')} checked={currentAccountMap.is_active} onChange={v => setCurrentAccountMap({...currentAccountMap, is_active: v})} isRtl={isRtl} wrapperClassName="mb-1" />
-                 <Button variant="primary" size="sm" icon={currentAccountMap.id ? Save : Plus} onClick={handleSaveAccountMap} disabled={!currentAccountMap.account_id || !currentAccountMap.valid_from || loading}>
+              <div className="md:col-span-1 flex flex-col justify-end gap-1.5">
+                 <ToggleField size="sm" label={t('فعال', 'Active')} checked={currentAccountMap.is_active} onChange={v => setCurrentAccountMap({...currentAccountMap, is_active: v})} isRtl={isRtl} />
+                 <Button variant="primary" size="sm" icon={currentAccountMap.id ? Save : Plus} onClick={handleSaveAccountMap} disabled={!currentAccountMap.account_id || !currentAccountMap.valid_from || loading} className="w-full">
                    {currentAccountMap.id ? t('ویرایش', 'Edit') : t('افزودن', 'Add')}
                  </Button>
               </div>
@@ -427,14 +441,14 @@
         {/* Modal: Access Mapping */}
         <Modal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} title={`${t('مدیریت دسترسی‌ها', 'Manage Access')} - ${selectedGroup?.title_fa || ''}`} width="max-w-4xl" language={language}>
           <div className="p-4 flex flex-col gap-4 h-[500px]">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
-              <div className="md:col-span-3">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+              <div className="md:col-span-1">
                  <SelectField size="sm" label={t('نوع دسترسی', 'Access Type')} required
                    options={[{value:'USER', label:t('کاربر سیستم', 'User')}, {value:'ROLE', label:t('نقش سیستمی', 'Role')}]}
                    value={currentAccessMap.grantee_type} onChange={(e) => setCurrentAccessMap({...currentAccessMap, grantee_type: e.target.value, grantee_id: '', grantee_obj: null})} isRtl={isRtl}
                  />
               </div>
-              <div className="md:col-span-7">
+              <div className="md:col-span-3">
                  <LOVField 
                    size="sm" label={t('انتخاب شخص / نقش', 'Select Grantee')} required
                    data={currentAccessMap.grantee_type === 'USER' ? users : roles} 
@@ -443,7 +457,7 @@
                    onChange={(row) => setCurrentAccessMap({...currentAccessMap, grantee_id: row?.id || '', grantee_obj: row})}
                  />
               </div>
-              <div className="md:col-span-2 flex items-end pb-0.5">
+              <div className="md:col-span-1 flex flex-col justify-end">
                  <Button variant="primary" size="sm" icon={Plus} onClick={handleSaveAccessMap} disabled={!currentAccessMap.grantee_id || loading} className="w-full">
                    {t('تخصیص', 'Assign')}
                  </Button>
