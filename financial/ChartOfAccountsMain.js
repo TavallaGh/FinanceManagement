@@ -278,7 +278,6 @@
       if (!validateNodeUniqueness()) return;
 
       try {
-        // Explicitly format data payload to prevent 400 Bad Request
         const payload = {
           chart_id: chart.id,
           parent_id: nodeFormData.parentId || null,
@@ -286,9 +285,9 @@
           title_fa: nodeFormData.titleFa?.trim(),
           title_en: nodeFormData.titleEn?.trim() || null,
           currency_id: nodeFormData.currencyId || null,
-          is_active: nodeFormData.isActive !== false, // forces explicit boolean
-          account_type: nodeFormData.accountType || 'main', // forces explicit string
-          control_inventory: !!nodeFormData.controlInventory // forces explicit boolean
+          is_active: nodeFormData.isActive !== false,
+          account_type: nodeFormData.accountType || 'main',
+          control_inventory: !!nodeFormData.controlInventory
         };
 
         let targetId = null;
@@ -425,27 +424,27 @@
                       <div className="flex flex-col h-full min-h-0 animate-in fade-in duration-200">
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
                           
-                          <div className="flex flex-col md:flex-row items-stretch gap-3 shrink-0 h-[68px]">
-                            <div className="flex items-center gap-3 px-4 bg-blue-50/60 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 rounded-xl shrink-0 w-auto min-w-[200px]">
-                               <Info size={18} className="text-blue-500" />
-                               <div className="flex flex-col justify-center">
-                                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mb-0.5">{t('سطح گره جاری', 'Current Level')}</span>
-                                  <span className="text-[13px] font-black text-blue-800 dark:text-blue-300">{levelLabels[nodeDepth]}</span>
+                          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 shrink-0 lg:h-[60px]">
+                            <div className="lg:col-span-1 flex items-center gap-3 px-4 py-2 bg-blue-50/60 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 rounded-xl h-full shadow-sm">
+                               <Info size={18} className="text-blue-500 shrink-0" />
+                               <div className="flex flex-col justify-center overflow-hidden">
+                                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mb-0.5 whitespace-nowrap">{t('سطح گره جاری', 'Current Level')}</span>
+                                  <span className="text-[13px] font-black text-blue-800 dark:text-blue-300 truncate">{levelLabels[nodeDepth]}</span>
                                </div>
                             </div>
 
                             {!isCreatingNode && (
-                              <div className="flex-1 flex items-center justify-between gap-6 px-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl">
-                                 <div className="flex flex-col justify-center">
-                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">{t(`بالانس در لحظه (به ${getNodeCurrencyName()})`, `Real-time Balance (${getNodeCurrencyName()})`)}</span>
-                                    <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right">
+                              <div className="lg:col-span-2 lg:col-start-3 flex items-center justify-between gap-4 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl h-full shadow-sm">
+                                 <div className="flex flex-col justify-center flex-1">
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 truncate">{t(`بالانس در لحظه (به ${getNodeCurrencyName()})`, `Real-time Balance (${getNodeCurrencyName()})`)}</span>
+                                    <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right truncate">
                                        0.00 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">{getNodeCurrencyCode()}</span>
                                     </div>
                                  </div>
-                                 <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
-                                 <div className="flex-col justify-center hidden sm:flex">
-                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">{t('معادل ارزی پایه (دلار)', 'Base Currency Eq (USD)')}</span>
-                                    <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right">
+                                 <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 hidden sm:block shrink-0"></div>
+                                 <div className="flex-col justify-center hidden sm:flex flex-1">
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 truncate">{t('معادل ارزی پایه (دلار)', 'Base Currency Eq (USD)')}</span>
+                                    <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right truncate">
                                        0.00 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">USD</span>
                                     </div>
                                  </div>

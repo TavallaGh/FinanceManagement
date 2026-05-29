@@ -11,7 +11,7 @@
   } = LucideIcons;
 
   const Core = window.DSCore || window.DesignSystem || {};
-  const { Button = () => null, Badge = () => null } = Core;
+  const { Button = () => null, Badge = () => null, Tabs = () => null } = Core;
 
   const Forms = window.DSForms || window.DesignSystem || {};
   const { SelectField = () => null, ToggleField = () => null, DatePicker = () => null } = Forms;
@@ -20,7 +20,7 @@
   const { DataGrid = () => null, LOVField = () => null } = Grid;
 
   const Feedback = window.DSFeedback || window.DesignSystem || {};
-  const { Modal = () => null, Alert = () => null } = Feedback;
+  const { Modal = () => null, Alert = () => null, Toast = () => null } = Feedback;
 
   const supabase = window.supabase;
 
@@ -38,6 +38,7 @@
 
     const [accessViewMode, setAccessViewMode] = useState('assign');
     const [isLoading, setIsLoading] = useState(false);
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
 
     const [accountPermissions, setAccountPermissions] = useState([]);
@@ -48,11 +49,8 @@
     const [bgAccessModal, setBgAccessModal] = useState({ isOpen: false, groupTitle: '', data: [] });
 
     const showToast = useCallback((message, type = 'success') => {
-        if (window.DSFeedback && window.DSFeedback.toast) {
-            window.DSFeedback.toast[type === 'error' ? 'error' : 'success'](message);
-        } else {
-            console.log(`[${type}] ${message}`);
-        }
+      setToast({ isVisible: true, message, type });
+      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
     }, []);
 
     const fetchNodePermissions = useCallback(async () => {
@@ -310,6 +308,11 @@
       return systemRoles.filter(r => !accountPermissions.some(p => p.grantee_type === 'role' && String(p.grantee_id) === String(r.id)));
     }, [systemRoles, accountPermissions]);
 
+    const availableBalanceGroups = useMemo(() => {
+      const assignedIds = accountBalanceGroups.map(g => String(g.group_id));
+      return balanceGroupsMaster.filter(bg => !assignedIds.includes(String(bg.id)));
+    }, [balanceGroupsMaster, accountBalanceGroups]);
+
     const permColumns = [
       {
         field: 'grantee_type', header_fa: 'نوع دسترسی', width: '150px',
@@ -406,7 +409,7 @@
                 if (inlineBgEdit?.id === row.id) {
                     return (
                         <div onClick={(e)=>e.stopPropagation()}>
-                            <LOVField size="sm" data={balanceGroupsMaster} 
+                            <LOVField size="sm" data={availableBalanceGroups} 
                                 columns={[
                                     { field: 'code', header_fa: 'کد گروه', width: '100px' },
                                     { field: 'title_fa', header_fa: 'عنوان', width: 'auto' },
@@ -487,7 +490,7 @@
                             {t('تخصیص دسترسی', 'Assign Access')}
                         </button>
                         <button onClick={() => setAccessViewMode('aggregate')} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all flex items-center gap-1.5 ${accessViewMode === 'aggregate' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                            {t('کاربران مجاز', 'Authorized Users')}
+                            {t('کل کاربران مجاز', 'All Authorized Users')}
                         </button>
                     </div>
                 </div>
@@ -503,7 +506,6 @@
                     </div>
                     ) : (
                     <div className="flex-1 min-h-0 flex flex-col gap-2">
-                        <Alert type="warning" icon={Shield} message={t('لیست زیر مجموع تمامی کاربرانی است که به صورت مستقیم یا از طریق تفویض نقش‌های خود، اجازه تعامل با این حساب را کسب کرده‌اند.', 'Consolidated aggregate list of all operators with computed effective system access level.')} />
                         <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
                         <DataGrid key="grid-perm-aggregate" data={consolidatedUsersList} columns={consolidatedColumns} language={language} hideImport={true} hideExport={true} hideToolbar={true} />
                         </div>
@@ -557,6 +559,7 @@
                     </div>
                 </div>
             </Modal>
+            <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </div>
     );
   };
