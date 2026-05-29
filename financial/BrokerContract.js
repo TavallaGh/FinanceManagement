@@ -28,7 +28,8 @@
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     
     const [inlineEdit, setInlineEdit] = useState(null);
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, data: null });
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
 
     const showToast = useCallback((message, type = 'error') => {
         setToast({ isVisible: true, message, type });
@@ -145,12 +146,25 @@
     const executeDelete = async () => {
         setIsLoading(true);
         try {
-            const { error } = await supabase.from('fm_broker_contracts').delete().eq('id', deleteConfirm.data.id);
-            if (error) throw error;
+            if (deleteConfirm.type === 'bulk') {
+                const validIds = deleteConfirm.data.filter(id => id !== 'new');
+                if (validIds.length > 0) {
+                    const { error } = await supabase.from('fm_broker_contracts').delete().in('id', validIds);
+                    if (error) throw error;
+                }
+                if (deleteConfirm.data.includes('new')) {
+                    setInlineEdit(null);
+                }
+                setSelectedIds([]);
+                showToast(t('قراردادهای انتخاب‌شده با موفقیت حذف شدند.', 'Selected contracts deleted successfully.'), 'success');
+            } else {
+                const { error } = await supabase.from('fm_broker_contracts').delete().eq('id', deleteConfirm.data.id);
+                if (error) throw error;
+                showToast(t('قرارداد با موفقیت حذف شد.', 'Contract deleted successfully.'), 'success');
+            }
             
-            showToast(t('قرارداد با موفقیت حذف شد.', 'Contract deleted successfully.'), 'success');
             fetchContracts(broker.id);
-            setDeleteConfirm({ isOpen: false, data: null });
+            setDeleteConfirm({ isOpen: false, type: null, data: null });
         } catch (err) {
             console.error("Delete error:", err);
             showToast(t('خطا در حذف اطلاعات.', 'Deletion error.'), 'error');
@@ -370,7 +384,7 @@
         { 
             icon: Trash2, tooltip: t('حذف ردیف', 'Delete Tier'), 
             hidden: (row) => inlineEdit?.id === row.id || row._isNew, 
-            onClick: (row) => setDeleteConfirm({ isOpen: true, data: row }), 
+            onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), 
             className: 'text-slate-400 hover:text-red-600' 
         }
     ];
@@ -395,11 +409,23 @@
                         hideImport={true}
                         hideExport={true}
                         onAdd={handleAddClick}
+                        selectable={true}
+                        selectedIds={selectedIds}
+                        onSelectChange={setSelectedIds}
+                        bulkActions={[
+                            {
+                                id: 'delete',
+                                icon: Trash2,
+                                label: t('حذف انتخاب‌شده‌ها', 'Delete Selected'),
+                                className: '!text-rose-600 !border-rose-200 hover:!bg-rose-50 dark:!border-rose-800/50 dark:hover:!bg-rose-900/30',
+                                onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids })
+                            }
+                        ]}
                     />
                 </div>
             </div>
 
-            <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
+            <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
                 <div className="p-4 flex flex-col gap-3 items-center text-center">
                     <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1">
                         <AlertTriangle size={22} />
@@ -408,10 +434,13 @@
                         <Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
                     </div>
                     <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-                        {t(`آیا از حذف این رکورد اطمینان دارید؟`, `Are you sure you want to delete this record?`)}
+                        {deleteConfirm.type === 'bulk'
+                            ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
+                            : t(`آیا از حذف این رکورد اطمینان دارید؟`, `Are you sure you want to delete this record?`)
+                        }
                     </p>
                     <div className="flex gap-2 mt-4 w-full">
-                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
                         <Button variant="primary" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 border-red-600 dark:border-red-500">{t('تایید حذف', 'Delete')}</Button>
                     </div>
                 </div>

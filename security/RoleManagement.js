@@ -201,6 +201,17 @@
             if (error) throw error;
             setAssignedUsers(prev => prev.filter(u => u.id !== deleteConfirm.data.id));
             fetchInitialData();
+        } else if (deleteConfirm.type === 'bulk_user_role') {
+            const validIds = deleteConfirm.data.filter(id => id !== 'new');
+            if (validIds.length > 0) {
+                const { error } = await supabase.from('sec_user_roles').delete().eq('role_id', userModal.role.id).in('user_id', validIds);
+                if (error) throw error;
+            }
+            setAssignedUsers(prev => prev.filter(u => !deleteConfirm.data.includes(u.id)));
+            if (deleteConfirm.data.includes('new')) {
+                setInlineUserEdit(null);
+            }
+            fetchInitialData();
         }
         setDeleteConfirm({ isOpen: false, type: null, data: null });
       } catch (err) {
@@ -535,6 +546,16 @@
                         hideImport={true}
                         hideExport={true}
                         onAdd={handleAddUserClick}
+                        selectable={true}
+                        bulkActions={[
+                            {
+                                id: 'delete',
+                                icon: Trash2,
+                                label: t('حذف انتخاب‌شده‌ها', 'Delete Selected'),
+                                className: '!text-rose-600 !border-rose-200 hover:!bg-rose-50 dark:!border-rose-800/50 dark:hover:!bg-rose-900/30',
+                                onClick: (selectedIds) => setDeleteConfirm({ isOpen: true, type: 'bulk_user_role', data: selectedIds })
+                            }
+                        ]}
                     />
                 </div>
             </div>
@@ -548,6 +569,8 @@
             <p className="text-slate-600 dark:text-slate-300 text-[13px] leading-relaxed">
               {deleteConfirm.type === 'role'
                 ? t(`آیا از حذف نقش "${deleteConfirm.data?.title}" اطمینان دارید؟ تمامی دسترسی‌های این نقش حذف خواهد شد.`, `Are you sure you want to delete role "${deleteConfirm.data?.title}"? All permissions will be lost.`)
+                : deleteConfirm.type === 'bulk_user_role'
+                ? t(`آیا از حذف ${deleteConfirm.data?.length} کاربر انتخاب‌شده از این نقش اطمینان دارید؟`, `Are you sure you want to remove ${deleteConfirm.data?.length} selected users from this role?`)
                 : t(`آیا از حذف این کاربر از نقش فعلی اطمینان دارید؟`, `Are you sure you want to remove this user from the role?`)
               }
             </p>
