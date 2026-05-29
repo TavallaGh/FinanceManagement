@@ -1,4 +1,3 @@
-```javascript
 /* Filename: financial/BalanceGroup.js */
 (() => {
   const React = window.React;
@@ -868,5 +867,3 @@
 
   window.BalanceGroup = BalanceGroup;
 })();
-
-```
