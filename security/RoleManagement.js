@@ -314,8 +314,8 @@
 
     const assignedUsersColumns = [
         { 
-            field: 'user', header_fa: 'کاربر', header_en: 'User', width: 'auto', 
-            render: (_, row) => {
+            field: 'fullName', header_fa: 'نام و نام خانوادگی', header_en: 'Full Name', width: 'auto', 
+            render: (val, row) => {
                 if (inlineUserEdit?.id === row.id) {
                     return (
                         <div onClick={(e)=>e.stopPropagation()}>
@@ -327,18 +327,22 @@
                                     { field: 'fullName', header_fa: 'نام و نام خانوادگی', width: '250px' }
                                 ]} 
                                 dropdownWidth="min-w-[400px]"
-                                displayValue={inlineUserEdit.data.user_obj ? `${inlineUserEdit.data.user_obj.fullName} (${inlineUserEdit.data.user_obj.username})` : ''}
+                                displayValue={inlineUserEdit.data.user_obj ? inlineUserEdit.data.user_obj.fullName : ''}
                                 onChange={(r) => setInlineUserEdit(prev => ({...prev, data: {...prev.data, user_id: r?.id, user_obj: r}}))}
                             />
                         </div>
                     );
                 }
-                return (
-                    <div className="flex flex-col">
-                        <span className="font-bold text-slate-700 dark:text-slate-200 text-[11px]">{row.fullName}</span>
-                        <span className="text-[10px] text-slate-400 dir-ltr text-left inline-block">{row.username}</span>
-                    </div>
-                );
+                return <span className="font-bold text-slate-700 dark:text-slate-200 text-[11px]">{val}</span>;
+            }
+        },
+        {
+            field: 'username', header_fa: 'نام کاربری', header_en: 'Username', width: '150px',
+            render: (val, row) => {
+                if (inlineUserEdit?.id === row.id) {
+                    return <span className="text-[11px] text-slate-500 dir-ltr inline-block">{inlineUserEdit.data.user_obj?.username || '-'}</span>;
+                }
+                return <span className="text-[11px] text-slate-500 dir-ltr inline-block">{val}</span>;
             }
         },
         { 
