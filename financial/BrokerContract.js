@@ -78,21 +78,29 @@
         if (inlineEdit) return;
         setInlineEdit({
             id: 'new',
-            data: { currencyId: '', fromDate: '', toDate: '', minAmount: 0, maxAmount: 0, commissionPct: 0 }
+            data: { currencyId: '', fromDate: '', toDate: '', minAmount: 0, maxAmount: '', commissionPct: 0 }
         });
     };
 
     const handleSaveInline = async () => {
-        const form = inlineEdit.data;
+        const form = inlineEdit?.data;
+        if (!form) return;
         
-        if (!form.fromDate || form.commissionPct === null || form.commissionPct === '') {
-            showToast(t('فیلدهای تاریخ شروع و درصد کارمزد الزامی هستند.', 'From Date and Commission fields are required.'), 'error');
+        if (!form.fromDate) {
+            showToast(t('وارد کردن تاریخ شروع الزامی است.', 'From Date is required.'), 'error');
             return;
         }
 
-        const commissionValue = Number(form.commissionPct);
+        const sanitizeAmount = (val) => {
+            if (val === null || val === undefined || val === '') return null;
+            const cleanStr = String(val).replace(/,/g, '');
+            const num = Number(cleanStr);
+            return isNaN(num) ? null : num;
+        };
+
+        const commissionValue = sanitizeAmount(form.commissionPct) || 0;
         if (commissionValue > 100 || commissionValue < 0) {
-            showToast(t('درصد کارمزد نمی‌تواند بیشتر از 100 یا کمتر از صفر باشد.', 'Commission percentage cannot be greater than 100 or less than 0.'), 'error');
+            showToast(t('درصد کارمزد نامعتبر است (بین ۰ تا ۱۰۰).', 'Invalid commission percentage.'), 'error');
             return;
         }
 
@@ -112,10 +120,9 @@
                 currency_id: form.currencyId || null,
                 from_date: form.fromDate,
                 to_date: form.toDate || null,
-                min_amount: form.minAmount || 0,
-                max_amount: form.maxAmount || null,
-                commission_pct: commissionValue,
-                updated_at: new Date().toISOString()
+                min_amount: sanitizeAmount(form.minAmount) || 0,
+                max_amount: sanitizeAmount(form.maxAmount),
+                commission_pct: commissionValue
             };
 
             const { error } = inlineEdit.id !== 'new'
@@ -172,7 +179,7 @@
             field: 'status',
             header_fa: 'وضعیت',
             header_en: 'Status',
-            width: '90px',
+            width: '80px',
             render: (_, row) => {
                 if (inlineEdit?.id === row.id && row._isNew) {
                     return <Badge variant="indigo" size="sm">{t('جدید', 'New')}</Badge>;
@@ -189,7 +196,7 @@
             field: 'currency_id', 
             header_fa: 'ارز', 
             header_en: 'Currency', 
-            width: '140px',
+            width: '100px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -200,7 +207,7 @@
                                 onChange={e => setInlineEdit(prev => ({...prev, data: {...prev.data, currencyId: e.target.value}}))} 
                                 isRtl={isRtl}
                                 options={[
-                                    { value: '', label: t('همه ارزها', 'All Currencies') },
+                                    { value: '', label: t('همه', 'All') },
                                     ...currencies.map(c => ({ value: c.id, label: c.title }))
                                 ]}
                             />
@@ -208,15 +215,15 @@
                     );
                 }
                 return val ? 
-                    <Badge variant="indigo" size="sm">{getCurrencyName(val)}</Badge> : 
-                    <Badge variant="slate" size="sm">{t('همه ارزها', 'All Currencies')}</Badge>;
+                    <Badge variant="indigo" size="sm" className="whitespace-nowrap">{getCurrencyName(val)}</Badge> : 
+                    <Badge variant="slate" size="sm" className="whitespace-nowrap">{t('همه', 'All')}</Badge>;
             }
         },
         { 
             field: 'from_date', 
             header_fa: 'از تاریخ', 
             header_en: 'From Date', 
-            width: '140px',
+            width: '110px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -231,14 +238,14 @@
                         </div>
                     );
                 }
-                return val ? <span className="text-[12px] text-slate-700 dark:text-slate-300" dir="ltr">{formatGlobalDate(val, globalMode)}</span> : '-';
+                return val ? <span className="text-[11px] text-slate-700 dark:text-slate-300" dir="ltr">{formatGlobalDate(val, globalMode)}</span> : '-';
             }
         },
         { 
             field: 'to_date', 
             header_fa: 'تا تاریخ', 
             header_en: 'To Date', 
-            width: '140px',
+            width: '110px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -253,14 +260,14 @@
                         </div>
                     );
                 }
-                return val ? <span className="text-[12px] text-slate-700 dark:text-slate-300" dir="ltr">{formatGlobalDate(val, globalMode)}</span> : <span className="text-[10px] text-slate-400">{t('تا کنون', 'Present')}</span>;
+                return val ? <span className="text-[11px] text-slate-700 dark:text-slate-300" dir="ltr">{formatGlobalDate(val, globalMode)}</span> : <span className="text-[10px] text-slate-400">{t('تا کنون', 'Present')}</span>;
             }
         },
         { 
             field: 'min_amount', 
             header_fa: 'از مبلغ', 
             header_en: 'Min Amount', 
-            width: '140px',
+            width: '130px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -274,14 +281,14 @@
                         </div>
                     );
                 }
-                return <span dir="ltr" className="font-medium text-[12px] text-slate-700 dark:text-slate-300">{Number(val || 0).toLocaleString()}</span>;
+                return <span dir="ltr" className="font-medium text-[11px] text-slate-700 dark:text-slate-300">{Number(val || 0).toLocaleString()}</span>;
             }
         },
         { 
             field: 'max_amount', 
             header_fa: 'تا مبلغ', 
             header_en: 'Max Amount', 
-            width: '140px',
+            width: '130px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -295,14 +302,14 @@
                         </div>
                     );
                 }
-                return <span dir="ltr" className="font-medium text-[12px] text-slate-700 dark:text-slate-300">{val ? Number(val).toLocaleString() : '∞'}</span>;
+                return <span dir="ltr" className="font-medium text-[11px] text-slate-700 dark:text-slate-300">{val ? Number(val).toLocaleString() : '∞'}</span>;
             }
         },
         { 
             field: 'commission_pct', 
             header_fa: 'درصد کارمزد', 
             header_en: 'Commission %', 
-            width: '100px',
+            width: '90px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -326,7 +333,7 @@
                         </div>
                     );
                 }
-                return <Badge variant="sky" size="sm" className="font-bold">{val} %</Badge>;
+                return <Badge variant="sky" size="sm" className="font-bold whitespace-nowrap">{val} %</Badge>;
             }
         }
     ];
@@ -354,7 +361,7 @@
                     fromDate: row.from_date ? row.from_date.substring(0, 10) : '',
                     toDate: row.to_date ? row.to_date.substring(0, 10) : '',
                     minAmount: row.min_amount || 0,
-                    maxAmount: row.max_amount || 0,
+                    maxAmount: row.max_amount || '',
                     commissionPct: row.commission_pct || 0
                 }
             }), 
@@ -376,10 +383,10 @@
                 </div>
             )}
             
-            <div className="p-4 bg-white dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 shrink-0">
-                <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-bold">
-                    <Briefcase size={18} />
-                    <span>{brokerName}</span>
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 shrink-0">
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium text-[13px]">
+                    <Briefcase size={16} className="text-indigo-600 dark:text-indigo-400" />
+                    <span>{t('ویرایش قراردادهای بروکر:', 'Edit Broker Contracts:')} <strong className="text-indigo-700 dark:text-indigo-300 font-bold ml-1">{brokerName}</strong></span>
                 </div>
             </div>
 
