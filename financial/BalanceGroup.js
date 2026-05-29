@@ -1,3 +1,4 @@
+```javascript
 /* Filename: financial/BalanceGroup.js */
 (() => {
   const React = window.React;
@@ -117,7 +118,6 @@
       }
     };
 
-    // Calculate formatted Users with properly resolved names from parties table
     const users = useMemo(() => {
       return rawUsers.map(user => {
         const userParty = parties.find(p => String(p.id) === String(user.party_id || user.person_id));
@@ -185,7 +185,6 @@
       return result;
     }, [groups, filters]);
 
-    // --- Main Group CRUD ---
     const openGroupForm = (group = null) => {
       if (group) {
         setCurrentGroup(group);
@@ -233,7 +232,6 @@
       }
     };
 
-    // --- Related Accounts Modal & CRUD (Inline Add/Edit) ---
     const openAccountsModal = (group) => {
       setSelectedGroup(group);
       setInlineAccountEdit(null);
@@ -319,7 +317,6 @@
        return data;
     }, [groupAccounts, inlineAccountEdit]);
 
-    // --- Access Modal & CRUD (Inline Add/Edit) ---
     const openAccessModal = (group) => {
       setSelectedGroup(group);
       setAccessViewMode('assign');
@@ -345,7 +342,7 @@
       if (inlineAccessEdit) return;
       setInlineAccessEdit({
         id: 'new',
-        data: { grantee_type: 'user', grantee_id: '', grantee_obj: null }
+        data: { grantee_type: 'USER', grantee_id: '', grantee_obj: null }
       });
     };
 
@@ -353,7 +350,7 @@
       const form = inlineAccessEdit.data;
       if (!form.grantee_id) return;
 
-      if (inlineAccessEdit.id === 'new' && groupAccesses.some(a => a.grantee_type?.toLowerCase() === form.grantee_type?.toLowerCase() && String(a.grantee_id) === String(form.grantee_id))) {
+      if (inlineAccessEdit.id === 'new' && groupAccesses.some(a => a.grantee_type?.toUpperCase() === form.grantee_type?.toUpperCase() && String(a.grantee_id) === String(form.grantee_id))) {
          alert(t('این دسترسی قبلاً افزوده شده است.', 'This access is already added.'));
          return;
       }
@@ -401,13 +398,11 @@
       users.forEach(user => {
         const reasons = [];
 
-        // Direct Access Check (Case Insensitive)
         const directPerm = groupAccesses.find(p => p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(user.id));
         if (directPerm) {
           reasons.push(t('دسترسی مستقیم', 'Direct Access'));
         }
 
-        // Role-based Access Check (Case Insensitive)
         const userRoleIds = userRoles.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
         const rolePerms = groupAccesses.filter(p => p.grantee_type?.toLowerCase() === 'role' && userRoleIds.includes(String(p.grantee_id)));
 
@@ -430,7 +425,6 @@
       return result;
     }, [groupAccesses, accessViewMode, users, roles, userRoles, t]);
 
-    // --- Shared Delete Action ---
     const executeDelete = async () => {
       setLoading(true);
       setModalLoading(true);
@@ -462,7 +456,6 @@
       }
     };
 
-    // --- Columns Definitions ---
     const lovAccountColumns = [
       { field: 'structure_name', header_fa: 'نام ساختار', width: '140px' },
       { field: 'code', header_fa: 'کد حساب', width: '100px' },
@@ -519,11 +512,10 @@
 
     const filterFields = [
       { name: 'account_id', label: t('دارای حساب', 'Contains Account'), type: 'lov', lovData: leafAccounts, lovColumns: lovAccountColumns, dropdownWidth: 'min-w-[650px]' },
-      { name: 'user_id', label: t('دسترسی کاربر', 'User Access'), type: 'lov', lovData: users, lovColumns: [{field: 'username', header_fa: 'نام کاربری'}, {field: 'full_name', header_fa: 'نام'}] },
+      { name: 'user_id', label: t('دسترسی کاربر', 'User Access'), type: 'lov', lovData: rawUsers, lovColumns: [{field: 'username', header_fa: 'نام کاربری'}, {field: 'full_name', header_fa: 'نام'}] },
       { name: 'role_id', label: t('دسترسی نقش', 'Role Access'), type: 'lov', lovData: roles, lovColumns: [{field: 'code', header_fa: 'کد نقش'}, {field: 'title', header_fa: 'عنوان نقش'}] }
     ];
 
-    // Accounts Grid in Modal (Inline Edit)
     const accountColumns = [
       { 
         field: 'account', 
@@ -622,7 +614,6 @@
       { label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', target: 'account', data: ids }) }
     ];
 
-    // Access Grid in Modal (Inline Edit)
     const accessColumns = [
       { 
         field: 'grantee_type', 
@@ -635,7 +626,7 @@
                <div onClick={(e)=>e.stopPropagation()}>
                  <SelectField 
                    size="sm" 
-                   options={[{value:'user', label:t('کاربر سیستم', 'User')}, {value:'role', label:t('نقش سیستمی', 'Role')}]}
+                   options={[{value:'USER', label:t('کاربر سیستم', 'User')}, {value:'ROLE', label:t('نقش سیستمی', 'Role')}]}
                    value={inlineAccessEdit.data.grantee_type} 
                    onChange={(e) => setInlineAccessEdit(prev => ({...prev, data: {...prev.data, grantee_type: e.target.value, grantee_id: '', grantee_obj: null}}))} 
                    isRtl={isRtl}
@@ -658,7 +649,7 @@
         width: 'auto', 
         render: (val, row) => {
           if (inlineAccessEdit?.id === row.id) {
-            const isUser = inlineAccessEdit.data.grantee_type === 'user';
+            const isUser = inlineAccessEdit.data.grantee_type?.toLowerCase() === 'user';
             return (
               <div onClick={(e)=>e.stopPropagation()}>
                 <LOVField 
@@ -707,7 +698,6 @@
       { label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', target: 'access', data: ids }) }
     ];
 
-    // Aggregated View Grid
     const aggregateColumns = [
       { 
         field: 'full_name', header_fa: 'نام و نام خانوادگی', width: '250px', 
@@ -775,7 +765,6 @@
           </div>
         </div>
 
-        {/* Modal: Group Form */}
         <Modal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} title={currentGroup.id ? t('ویرایش گروه بالانس', 'Edit Balance Group') : t('ایجاد گروه بالانس', 'New Balance Group')} width="max-w-2xl" language={language}>
           <div className="p-4 flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -794,7 +783,6 @@
           </div>
         </Modal>
 
-        {/* Modal: Related Accounts (Inline Add/Edit) */}
         <Modal isOpen={isAccountsModalOpen} onClose={() => setIsAccountsModalOpen(false)} title={`${t('مدیریت حساب‌های مرتبط', 'Manage Accounts')} - ${selectedGroup?.title_fa || ''}`} width="max-w-6xl" language={language}>
           <div className="flex flex-col h-[70vh] min-h-[500px] bg-slate-50 dark:bg-slate-900 p-4 gap-3">
             <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -814,7 +802,6 @@
           </div>
         </Modal>
 
-        {/* Modal: Access Grid & Aggregation (Inline Add/Edit) */}
         <Modal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} title={`${t('مدیریت دسترسی‌ها', 'Manage Access')} - ${selectedGroup?.title_fa || ''}`} width="max-w-4xl" language={language}>
           <div className="flex flex-col h-[70vh] min-h-[500px] bg-slate-50 dark:bg-slate-900 p-4 gap-3">
             <Tabs tabs={accessTabs} activeTab={accessViewMode} onChange={setAccessViewMode} className="shrink-0" />
@@ -854,7 +841,6 @@
           </div>
         </Modal>
 
-        {/* Shared Modal: Delete Confirmation */}
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, target: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
           <div className="p-4 flex flex-col gap-3 items-center text-center">
             <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1">
@@ -882,3 +868,5 @@
 
   window.BalanceGroup = BalanceGroup;
 })();
+
+```
