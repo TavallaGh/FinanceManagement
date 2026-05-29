@@ -395,40 +395,72 @@
     }, [roles, groupAccesses]);
 
     const aggregatedUsersList = useMemo(() => {
-      if (accessViewMode !== 'aggregate') return [];
-      const result = [];
+  if (accessViewMode !== 'aggregate') return [];
+  const result = [];
 
-      users.forEach(user => {
-        const reasons = [];
+  // --- نقطه دیباگ ۱: آیا اصلاً دیتای پایه به این تابع می‌رسه؟ ---
+  console.log("🔴 DEBUG 1 [Data Entry]:", {
+    usersCount: users.length,
+    groupAccessesCount: groupAccesses.length,
+    groupAccessesData: groupAccesses
+  });
 
-        // Direct Access Check (Case Insensitive)
-        const directPerm = groupAccesses.find(p => p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(user.id));
-        if (directPerm) {
-          reasons.push(t('دسترسی مستقیم', 'Direct Access'));
-        }
+  if (groupAccesses.length === 0) {
+    console.warn("⚠️ هشدار: لیست دسترسی‌های این گروه خالی است! پس طبیعیه که تجمیع هم خالی باشه.");
+  }
 
-        // Role-based Access Check (Case Insensitive)
-        const userRoleIds = userRoles.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
-        const rolePerms = groupAccesses.filter(p => p.grantee_type?.toLowerCase() === 'role' && userRoleIds.includes(String(p.grantee_id)));
+  users.forEach(user => {
+    const reasons = [];
 
-        rolePerms.forEach(rp => {
-          const roleObj = roles.find(r => String(r.id) === String(rp.grantee_id));
-          const rTitle = roleObj ? (roleObj.title || roleObj.code) : t('نقش سیستمی', 'System Role');
-          reasons.push(`${t('ارث‌بری از نقش:', 'Inherited via Role:')} ${rTitle}`);
-        });
+    // --- نقطه دیباگ ۲: بررسی دقیق تطابق‌ها ---
+    const directPerm = groupAccesses.find(p => {
+      const typeStr = p.grantee_type ? String(p.grantee_type).trim().toLowerCase() : '';
+      const pId = String(p.grantee_id).trim();
+      const uId = String(user.id).trim();
+      
+      const typeMatch = (typeStr === 'user');
+      const idMatch = (pId === uId);
 
-        if (reasons.length > 0) {
-          result.push({
-            id: user.id,
-            username: user.username || user.email || '---',
-            full_name: user.full_name,
-            sources: reasons
-          });
-        }
+      // اگر می‌خوای ریزِ بررسی هر رکورد رو ببینی (کنسول خیلی شلوغ میشه، فقط در صورت نیاز از کامنت در بیار)
+      // console.log(`🔍 چک کاربر [${user.username}]: دیتابیس(type='${typeStr}', id='${pId}') <=> مقایسه با(id='${uId}'). نتیجه -> typeMatch:${typeMatch}, idMatch:${idMatch}`);
+
+      return typeMatch && idMatch;
+    });
+
+    if (directPerm) {
+      reasons.push(t('دسترسی مستقیم', 'Direct Access'));
+    }
+
+    const userRoleIds = userRoles.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
+    const rolePerms = groupAccesses.filter(p => p.grantee_type?.toLowerCase() === 'role' && userRoleIds.includes(String(p.grantee_id)));
+
+    if (rolePerms.length > 0) {
+       // --- نقطه دیباگ ۳: آیا از طریق نقش دسترسی پیدا کرد؟ ---
+       console.log(`🟡 DEBUG 3 [Role Match]: نقش‌های پیدا شده برای ${user.username}`, rolePerms);
+    }
+
+    rolePerms.forEach(rp => {
+      const roleObj = roles.find(r => String(r.id) === String(rp.grantee_id));
+      const rTitle = roleObj ? (roleObj.title || roleObj.code) : t('نقش سیستمی', 'System Role');
+      reasons.push(`${t('ارث‌بری از نقش:', 'Inherited via Role:')} ${rTitle}`);
+    });
+
+    if (reasons.length > 0) {
+      // --- نقطه دیباگ ۴: کاربر با موفقیت به لیست اضافه شد ---
+      console.log(`🟢 DEBUG 4 [Success]: کاربر ${user.username} اضافه شد. دلایل:`, reasons);
+      result.push({
+        id: user.id,
+        username: user.username || user.email || '---',
+        full_name: user.full_name,
+        sources: reasons
       });
+    }
+  });
 
-      return result;
-    }, [groupAccesses, accessViewMode, users, roles, userRoles, t]);
+  // --- نقطه دیباگ ۵: خروجی نهایی ---
+  console.log("🏁 DEBUG 5 [Final Output]: آرایه نهایی تجمیع", result);
+  return result;
+}, [groupAccesses, accessViewMode, users, roles, userRoles, t]);
 
     // --- Shared Delete Action ---
     const executeDelete = async () => {
