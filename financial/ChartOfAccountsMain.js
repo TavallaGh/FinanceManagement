@@ -364,6 +364,13 @@
       return c ? c.code : 'IRR';
     };
 
+    const getNodeCurrencyName = () => {
+      if (!nodeFormData.currencyId) return isRtl ? 'ریال' : 'IRR';
+      const c = lookups.currencies.find(x => String(x.id) === String(nodeFormData.currencyId));
+      if (!c) return isRtl ? 'ریال' : 'IRR';
+      return isRtl ? (c.title_fa || c.title || c.code) : (c.title_en || c.title || c.code);
+    };
+
     return (
       <div className="p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
@@ -417,23 +424,29 @@
                       <div className="flex flex-col h-full min-h-0 animate-in fade-in duration-200">
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
                           
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                              <Alert type="info" icon={Info} message={<span>{t('سطح گره جاری:', 'Current Element Hierarchy Level:')} <strong className="text-indigo-600 dark:text-indigo-300">{levelLabels[nodeDepth]}</strong></span>} className="flex-1" />
-                          </div>
+                          <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
+                            <div className="flex-1">
+                               <Alert type="info" icon={Info} message={<span>{t('سطح گره جاری:', 'Current Element Hierarchy Level:')} <strong className="text-indigo-600 dark:text-indigo-300">{levelLabels[nodeDepth]}</strong></span>} className="h-full" />
+                            </div>
 
-                          {!isCreatingNode && (
-                              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex flex-wrap items-center justify-between shadow-sm gap-4">
-                                 <div className="flex flex-col">
-                                    <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mb-1">{t('بالانس در لحظه (ارز حساب)', 'Real-time Balance (Account Currency)')}</div>
-                                    <div className="text-xl font-black text-emerald-900 dark:text-emerald-300">0.00 <span className="text-xs ml-1">{getNodeCurrencyCode()}</span></div>
+                            {!isCreatingNode && (
+                              <div className="flex items-center justify-between gap-6 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shrink-0">
+                                 <div className="flex flex-col justify-center">
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">{t(`بالانس در لحظه (به ${getNodeCurrencyName()})`, `Real-time Balance (${getNodeCurrencyName()})`)}</span>
+                                    <div className="text-[13px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right">
+                                       0.00 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">{getNodeCurrencyCode()}</span>
+                                    </div>
                                  </div>
-                                 <div className="hidden sm:block h-10 w-px bg-emerald-200 dark:bg-emerald-800/50 mx-2"></div>
-                                 <div className="flex flex-col">
-                                    <div className="text-[11px] font-bold text-teal-600 dark:text-teal-400 mb-1">{t('معادل ارزی پایه (دلار)', 'Base Currency Equivalent (USD)')}</div>
-                                    <div className="text-xl font-black text-teal-900 dark:text-teal-300">0.00 <span className="text-xs ml-1">USD</span></div>
+                                 <div className="w-px h-8 bg-slate-200 dark:bg-slate-700"></div>
+                                 <div className="flex flex-col justify-center">
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">{t('معادل ارزی پایه (دلار)', 'Base Currency Eq (USD)')}</span>
+                                    <div className="text-[13px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right">
+                                       0.00 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">USD</span>
+                                    </div>
                                  </div>
                               </div>
-                          )}
+                            )}
+                          </div>
                           
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <TextField size="sm" formCode={formCode} label={t('کد حساب (ترکیبی اتوماتیک)', 'Account Code')} value={nodeFormData.code || ''} onChange={(e) => setNodeFormData({ ...nodeFormData, code: e.target.value })} isRtl={isRtl} required dir="ltr" />
