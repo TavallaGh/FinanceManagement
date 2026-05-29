@@ -40,6 +40,7 @@
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [userRoles, setUserRoles] = useState([]);
+    const [charts, setCharts] = useState([]);
 
     // Grid & Filter State
     const [filters, setFilters] = useState({});
@@ -84,14 +85,15 @@
     const fetchInitialData = async () => {
       setLoading(true);
       try {
-        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes] = await Promise.all([
+        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes] = await Promise.all([
           supabase.from('fm_balance_groups')
             .select('*, accounts:fm_balance_group_accounts(id, account_id), access:fm_balance_group_access(grantee_type, grantee_id)')
             .order('created_at', { ascending: false }),
-          supabase.from('fm_coa_accounts').select('id, code, title_fa, parent_id, is_active'),
-          supabase.from('sec_users').select('id, full_name, username').eq('is_active', true),
-          supabase.from('sec_roles').select('id, title, code').eq('is_active', true),
-          supabase.from('sec_user_roles').select('user_id, role_id')
+          supabase.from('fm_coa_accounts').select('id, code, title_fa, parent_id, is_active, chart_id'),
+          supabase.from('sec_users').select('id, full_name, username'),
+          supabase.from('sec_roles').select('id, title, code'),
+          supabase.from('sec_user_roles').select('user_id, role_id'),
+          supabase.from('fm_coa_charts').select('id, title')
         ]);
 
         if (groupsRes.error) throw groupsRes.error;
@@ -101,6 +103,7 @@
         setUsers(usersRes.data || []);
         setRoles(rolesRes.data || []);
         setUserRoles(userRolesRes.data || []);
+        setCharts(chartsRes.data || []);
       } catch (error) {
         console.error('Error fetching initial data:', error);
       } finally {
@@ -112,6 +115,7 @@
       if (!coaAccounts.length) return [];
       const parentIds = new Set(coaAccounts.map(a => a.parent_id).filter(Boolean));
       const accMap = new Map(coaAccounts.map(a => [a.id, a]));
+      const chartsMap = new Map(charts.map(c => [String(c.id), c.title]));
       
       const leaves = coaAccounts.filter(a => !parentIds.has(a.id));
       
@@ -124,13 +128,18 @@
           rootNode = curr;
           curr = accMap.get(curr.parent_id);
         }
+        pathParts.push(leaf.title_fa);
+        
+        const chartTitle = chartsMap.get(String(leaf.chart_id)) || chartsMap.get(String(rootNode.chart_id)) || rootNode.title_fa || '';
+        
         return { 
           ...leaf, 
           fullPath: pathParts.join(' / '),
+          structure_name: chartTitle,
           displayLabel: `${leaf.code} - ${leaf.title_fa}`
         };
       }).sort((a, b) => a.code.localeCompare(b.code));
-    }, [coaAccounts]);
+    }, [coaAccounts, charts]);
 
     const filteredGroups = useMemo(() => {
       let result = [...groups];
@@ -206,7 +215,7 @@
       setModalLoading(true);
       try {
         const { data, error } = await supabase.from('fm_balance_group_accounts')
-          .select(`id, group_id, account_id, valid_from, valid_to, is_active, fm_coa_accounts ( code, title_fa )`)
+          .select(`id, group_id, account_id, valid_from, valid_to, is_active, fm_coa_accounts ( code, title_fa, chart_id )`)
           .eq('group_id', groupId)
           .order('valid_from', { ascending: false });
         if (error) throw error;
@@ -228,7 +237,7 @@
 
     const handleEditAccountClick = (row) => {
       if (inlineAccountEdit) return;
-      const accObj = leafAccounts.find(a => a.id === row.account_id) || null;
+      const accObj = leafAccounts.find(a => String(a.id) === String(row.account_id)) || null;
       setInlineAccountEdit({
         id: row.id,
         data: { account_id: row.account_id, account_obj: accObj, valid_from: row.valid_from, valid_to: row.valid_to || '', is_active: row.is_active }
@@ -239,7 +248,7 @@
       const form = inlineAccountEdit.data;
       if (!form.account_id || !form.valid_from) return;
       
-      if (inlineAccountEdit.id === 'new' && groupAccounts.some(a => a.account_id === form.account_id)) {
+      if (inlineAccountEdit.id === 'new' && groupAccounts.some(a => String(a.account_id) === String(form.account_id))) {
          alert(t('این حساب قبلاً به گروه افزوده شده است.', 'This account is already added to the group.'));
          return;
       }
@@ -314,7 +323,7 @@
       const form = inlineAccessEdit.data;
       if (!form.grantee_id) return;
 
-      if (inlineAccessEdit.id === 'new' && groupAccesses.some(a => a.grantee_type === form.grantee_type && a.grantee_id === form.grantee_id)) {
+      if (inlineAccessEdit.id === 'new' && groupAccesses.some(a => a.grantee_type === form.grantee_type && String(a.grantee_id) === String(form.grantee_id))) {
          alert(t('این دسترسی قبلاً افزوده شده است.', 'This access is already added.'));
          return;
       }
@@ -348,35 +357,41 @@
     }, [groupAccesses, inlineAccessEdit]);
 
     const availableUsersForAccess = useMemo(() => {
-      return users.filter(u => !groupAccesses.some(ga => ga.grantee_type === 'USER' && ga.grantee_id === u.id));
+      return users.filter(u => !groupAccesses.some(ga => ga.grantee_type === 'USER' && String(ga.grantee_id) === String(u.id)));
     }, [users, groupAccesses]);
 
     const availableRolesForAccess = useMemo(() => {
-      return roles.filter(r => !groupAccesses.some(ga => ga.grantee_type === 'ROLE' && ga.grantee_id === r.id));
+      return roles.filter(r => !groupAccesses.some(ga => ga.grantee_type === 'ROLE' && String(ga.grantee_id) === String(r.id)));
     }, [roles, groupAccesses]);
 
     const aggregatedUsersList = useMemo(() => {
       if (accessViewMode !== 'aggregate') return [];
       const resultMap = new Map();
-      const rolesMap = new Map(roles.map(r => [r.id, r]));
-      const usersMap = new Map(users.map(u => [u.id, u]));
+      const rolesMap = new Map(roles.map(r => [String(r.id), r]));
+      const usersMap = new Map(users.map(u => [String(u.id), u]));
 
       groupAccesses.forEach(acc => {
         if (acc.grantee_type === 'USER') {
-          const u = usersMap.get(acc.grantee_id);
+          const u = usersMap.get(String(acc.grantee_id));
           if (u) {
-            if (!resultMap.has(u.id)) resultMap.set(u.id, { id: u.id, full_name: u.full_name, username: u.username, sources: [] });
-            resultMap.get(u.id).sources.push(t('دسترسی مستقیم', 'Direct Access'));
+            const userIdStr = String(u.id);
+            if (!resultMap.has(userIdStr)) {
+              resultMap.set(userIdStr, { id: u.id, full_name: u.full_name, username: u.username, sources: [] });
+            }
+            resultMap.get(userIdStr).sources.push(t('دسترسی مستقیم', 'Direct Access'));
           }
         } else if (acc.grantee_type === 'ROLE') {
-          const roleTitle = rolesMap.get(acc.grantee_id)?.title || t('نامشخص', 'Unknown');
-          const usersInRole = userRoles.filter(ur => ur.role_id === acc.grantee_id);
+          const roleTitle = rolesMap.get(String(acc.grantee_id))?.title || t('نامشخص', 'Unknown');
+          const usersInRole = userRoles.filter(ur => String(ur.role_id) === String(acc.grantee_id));
           
           usersInRole.forEach(ur => {
-            const u = usersMap.get(ur.user_id);
+            const u = usersMap.get(String(ur.user_id));
             if (!u) return;
-            if (!resultMap.has(u.id)) resultMap.set(u.id, { id: u.id, full_name: u.full_name, username: u.username, sources: [] });
-            resultMap.get(u.id).sources.push(`${t('نقش:', 'Role:')} ${roleTitle}`);
+            const userIdStr = String(u.id);
+            if (!resultMap.has(userIdStr)) {
+              resultMap.set(userIdStr, { id: u.id, full_name: u.full_name, username: u.username, sources: [] });
+            }
+            resultMap.get(userIdStr).sources.push(`${t('نقش:', 'Role:')} ${roleTitle}`);
           });
         }
       });
@@ -417,23 +432,28 @@
 
     // --- Columns Definitions ---
     const lovAccountColumns = [
+      { field: 'structure_name', header_fa: 'نام ساختار', width: '140px' },
       { field: 'code', header_fa: 'کد حساب', width: '100px' },
       { 
         field: 'title_fa', 
         header_fa: 'عنوان حساب',
         width: 'auto',
         render: (val, row) => (
-          <div className="flex flex-col max-w-[280px]">
-             <span className="truncate">{val}</span>
-             {row.fullPath && <span className="text-[10px] text-slate-400 truncate mt-0.5" dir="rtl">{row.fullPath}</span>}
+          <div className="flex flex-col my-0 py-0 leading-tight">
+             <span className="font-medium text-slate-800 dark:text-slate-200">{val}</span>
+             {row.fullPath && <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis" dir="rtl">{row.fullPath}</span>}
           </div>
         )
       },
       { 
         field: 'is_active', 
         header_fa: 'وضعیت', 
-        width: '80px', 
-        render: (val) => val ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') 
+        width: '90px', 
+        render: (val) => (
+          <Badge variant={val ? 'emerald' : 'slate'} size="sm" className="text-[10px]">
+            {val ? t('فعال', 'Active') : t('غیرفعال', 'Inactive')}
+          </Badge>
+        )
       }
     ];
 
@@ -466,7 +486,7 @@
     ];
 
     const filterFields = [
-      { name: 'account_id', label: t('دارای حساب', 'Contains Account'), type: 'lov', lovData: leafAccounts, lovColumns: lovAccountColumns, dropdownWidth: 'min-w-[600px]' },
+      { name: 'account_id', label: t('دارای حساب', 'Contains Account'), type: 'lov', lovData: leafAccounts, lovColumns: lovAccountColumns, dropdownWidth: 'min-w-[650px]' },
       { name: 'user_id', label: t('دسترسی کاربر', 'User Access'), type: 'lov', lovData: users, lovColumns: [{field: 'username', header_fa: 'نام کاربری'}, {field: 'full_name', header_fa: 'نام'}] },
       { name: 'role_id', label: t('دسترسی نقش', 'Role Access'), type: 'lov', lovData: roles, lovColumns: [{field: 'code', header_fa: 'کد نقش'}, {field: 'title', header_fa: 'عنوان نقش'}] }
     ];
@@ -486,7 +506,7 @@
                    size="sm" 
                    data={leafAccounts} 
                    columns={lovAccountColumns} 
-                   dropdownWidth="min-w-[600px]"
+                   dropdownWidth="min-w-[650px]"
                    displayValue={inlineAccountEdit.data.account_obj ? `${inlineAccountEdit.data.account_obj.code} - ${inlineAccountEdit.data.account_obj.title_fa}` : ''}
                    onChange={(r) => setInlineAccountEdit(prev => ({...prev, data: {...prev.data, account_id: r?.id, account_obj: r}}))}
                  />
@@ -619,10 +639,10 @@
             )
           }
           if (row.grantee_type === 'USER') {
-            const u = users.find(x => x.id === val);
+            const u = users.find(x => String(x.id) === String(val));
             return u ? `${u.full_name} (${u.username})` : t('نامشخص', 'Unknown');
           } else {
-            const r = roles.find(x => x.id === val);
+            const r = roles.find(x => String(x.id) === String(val));
             return r ? `${r.title} (${r.code})` : t('نامشخص', 'Unknown');
           }
         }
@@ -669,7 +689,7 @@
       },
       { 
         field: 'username', header_fa: 'نام کاربری', width: '150px', 
-        render: (_, row) => <span className="text-[12px] text-slate-600 dark:text-slate-400" dir="ltr">{row.username}</span>
+        render: (val) => <span className="text-[12px] text-slate-600 dark:text-slate-400" dir="ltr">{val}</span>
       },
       { 
         field: 'sources', header_fa: 'نوع دسترسی', width: 'auto',
@@ -757,6 +777,8 @@
                 importable={false}
                 disableExport={true}
                 disableImport={true}
+                showImport={false}
+                showExport={false}
                 onAdd={handleAddAccountClick}
               />
             </div>
@@ -783,6 +805,8 @@
                     importable={false}
                     disableExport={true}
                     disableImport={true}
+                    showImport={false}
+                    showExport={false}
                     onAdd={handleAddAccessClick}
                   />
                 </div>
@@ -797,6 +821,8 @@
                     importable={false}
                     disableExport={true}
                     disableImport={true}
+                    showImport={false}
+                    showExport={false}
                     hideToolbar={true}
                   />
                 </div>
