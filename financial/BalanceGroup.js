@@ -127,7 +127,6 @@
         return { 
           ...leaf, 
           fullPath: pathParts.join(' / '),
-          structure_name: rootNode.title_fa,
           displayLabel: `${leaf.code} - ${leaf.title_fa}`
         };
       }).sort((a, b) => a.code.localeCompare(b.code));
@@ -418,7 +417,6 @@
 
     // --- Columns Definitions ---
     const lovAccountColumns = [
-      { field: 'structure_name', header_fa: 'نام ساختار', width: '120px' },
       { field: 'code', header_fa: 'کد حساب', width: '100px' },
       { 
         field: 'title_fa', 
