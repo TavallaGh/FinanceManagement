@@ -41,7 +41,6 @@
     const [roles, setRoles] = useState([]);
     const [userRoles, setUserRoles] = useState([]);
     const [charts, setCharts] = useState([]);
-    const [parties, setParties] = useState([]);
 
     // Grid & Filter State
     const [filters, setFilters] = useState({});
@@ -65,6 +64,9 @@
     const [groupAccesses, setGroupAccesses] = useState([]);
     const [inlineAccessEdit, setInlineAccessEdit] = useState(null);
 
+    const globalMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : 'jalali';
+    const formatDate = (val) => val && window.DSCore?.formatGlobalDate ? window.DSCore.formatGlobalDate(val, globalMode) : val;
+
     const viewConfig = {
       pageId: 'balance_group_main',
       currentState: () => ({ gridState, filters }),
@@ -86,7 +88,7 @@
     const fetchInitialData = async () => {
       setLoading(true);
       try {
-        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes, partiesRes] = await Promise.all([
+        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes] = await Promise.all([
           supabase.from('fm_balance_groups')
             .select('*, accounts:fm_balance_group_accounts(id, account_id), access:fm_balance_group_access(grantee_type, grantee_id)')
             .order('created_at', { ascending: false }),
@@ -94,8 +96,7 @@
           supabase.from('sec_users').select('*'),
           supabase.from('sec_roles').select('id, title, code'),
           supabase.from('sec_user_roles').select('user_id, role_id'),
-          supabase.from('fm_coa_charts').select('id, title'),
-          supabase.from('parties').select('id, first_name, last_name, company_name, party_type')
+          supabase.from('fm_coa_charts').select('id, title')
         ]);
 
         if (groupsRes.error) throw groupsRes.error;
@@ -106,7 +107,6 @@
         setRoles(rolesRes.data || []);
         setUserRoles(userRolesRes.data || []);
         setCharts(chartsRes.data || []);
-        setParties(partiesRes.data || []);
       } catch (error) {
         console.error('Error fetching initial data:', error);
       } finally {
@@ -374,13 +374,11 @@
       users.forEach(user => {
         const reasons = [];
 
-        // Direct Access Check
         const directPerm = groupAccesses.find(p => p.grantee_type === 'USER' && String(p.grantee_id) === String(user.id));
         if (directPerm) {
           reasons.push(t('دسترسی مستقیم', 'Direct Access'));
         }
 
-        // Role-based Access Check
         const userRoleIds = userRoles.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
         const rolePerms = groupAccesses.filter(p => p.grantee_type === 'ROLE' && userRoleIds.includes(String(p.grantee_id)));
 
@@ -391,20 +389,7 @@
         });
 
         if (reasons.length > 0) {
-          const userParty = parties.find(p => String(p.id) === String(user.party_id || user.person_id));
-          let fNameStr = '';
-          if (userParty) {
-              if (userParty.party_type === 'legal' && userParty.company_name) {
-                  fNameStr = userParty.company_name;
-              } else {
-                  fNameStr = `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
-              }
-          }
-          if (!fNameStr || fNameStr === '') {
-              const fname = user.first_name || user.name || '';
-              const lname = user.last_name || user.family || '';
-              fNameStr = (fname || lname) ? `${fname} ${lname}`.trim() : '---';
-          }
+          const fNameStr = user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ') || '---';
           
           result.push({
             id: user.id,
@@ -416,7 +401,7 @@
       });
 
       return result;
-    }, [groupAccesses, accessViewMode, users, roles, userRoles, parties, t]);
+    }, [groupAccesses, accessViewMode, users, roles, userRoles, t]);
 
     // --- Shared Delete Action ---
     const executeDelete = async () => {
@@ -550,7 +535,7 @@
           if (inlineAccountEdit?.id === row.id) {
              return <div onClick={(e)=>e.stopPropagation()}><DatePicker size="sm" value={inlineAccountEdit.data.valid_from} onChange={(v) => setInlineAccountEdit(prev => ({...prev, data: {...prev.data, valid_from: v}}))} isRtl={isRtl} /></div>
           }
-          return val;
+          return <span className="text-[12px]" dir="ltr">{formatDate(val)}</span>;
         }
       },
       { 
@@ -562,7 +547,7 @@
           if (inlineAccountEdit?.id === row.id) {
              return <div onClick={(e)=>e.stopPropagation()}><DatePicker size="sm" value={inlineAccountEdit.data.valid_to} onChange={(v) => setInlineAccountEdit(prev => ({...prev, data: {...prev.data, valid_to: v}}))} isRtl={isRtl} /></div>
           }
-          return val || <span className="text-[10px] text-slate-400">{t('تا کنون', 'Present')}</span>;
+          return val ? <span className="text-[12px]" dir="ltr">{formatDate(val)}</span> : <span className="text-[10px] text-slate-400">{t('تا کنون', 'Present')}</span>;
         } 
       },
       { 
@@ -660,7 +645,7 @@
           }
           if (row.grantee_type === 'USER') {
             const u = users.find(x => String(x.id) === String(val));
-            return u ? `${u.full_name} (${u.username})` : t('نامشخص', 'Unknown');
+            return u ? `${u.full_name || [u.first_name, u.last_name].filter(Boolean).join(' ')} (${u.username})` : t('نامشخص', 'Unknown');
           } else {
             const r = roles.find(x => String(x.id) === String(val));
             return r ? `${r.title} (${r.code})` : t('نامشخص', 'Unknown');
