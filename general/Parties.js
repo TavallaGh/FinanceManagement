@@ -354,12 +354,13 @@
                </div>
             </div>
 
-            {/* Bento Panel 2: Basic Identity Info (Compact Line) */}
+            {/* Bento Panel 2: Combined Identity & Contact Info (2 Rows, 4 Columns) */}
             <div className="flex flex-col gap-2.5 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
               <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Briefcase size={12}/> {t('اطلاعات هویتی پایه', 'Basic Identity Info')}
+                <Briefcase size={12}/> {t('اطلاعات هویتی و تماس', 'Identity & Contact Info')}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                {/* Row 1: Identity */}
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('کد اختصاصی *', 'Code *')} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} required dir="ltr" />
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={formData.partyType === 'real' ? t('کد ملی', 'National ID') : t('شناسه ملی', 'National ID')} value={formData.nationalId} onChange={e => setFormData({...formData, nationalId: e.target.value})} isRtl={isRtl} dir="ltr" />
                 
@@ -374,18 +375,11 @@
                     <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام کامل شرکت *', 'Company Name *')} value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} isRtl={isRtl} required />
                   </>
                 )}
-              </div>
-            </div>
 
-            {/* Bento Panel 3: Contact Info (Compact Line) */}
-            <div className="flex flex-col gap-2.5 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <MapPin size={12}/> {t('اطلاعات تماس', 'Contact Info')}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                <TextField size="sm" wrapperClassName="sm:col-span-4 !m-0" label={t('شماره موبایل', 'Mobile')} value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <TextField size="sm" wrapperClassName="sm:col-span-4 !m-0" label={t('تلفن ثابت', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <TextField size="sm" wrapperClassName="sm:col-span-4 !m-0" label={t('پست الکترونیک', 'Email')} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} isRtl={isRtl} dir="ltr" />
+                {/* Row 2: Contact */}
+                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('شماره موبایل', 'Mobile')} value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" />
+                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('تلفن ثابت', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" />
+                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('پست الکترونیک', 'Email')} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} isRtl={isRtl} dir="ltr" />
               </div>
             </div>
 
