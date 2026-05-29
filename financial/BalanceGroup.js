@@ -41,6 +41,7 @@
     const [roles, setRoles] = useState([]);
     const [userRoles, setUserRoles] = useState([]);
     const [charts, setCharts] = useState([]);
+    const [parties, setParties] = useState([]);
 
     // Grid & Filter State
     const [filters, setFilters] = useState({});
@@ -85,15 +86,16 @@
     const fetchInitialData = async () => {
       setLoading(true);
       try {
-        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes] = await Promise.all([
+        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes, partiesRes] = await Promise.all([
           supabase.from('fm_balance_groups')
             .select('*, accounts:fm_balance_group_accounts(id, account_id), access:fm_balance_group_access(grantee_type, grantee_id)')
             .order('created_at', { ascending: false }),
           supabase.from('fm_coa_accounts').select('id, code, title_fa, parent_id, is_active, chart_id'),
-          supabase.from('sec_users').select('id, full_name, username'),
+          supabase.from('sec_users').select('*'),
           supabase.from('sec_roles').select('id, title, code'),
           supabase.from('sec_user_roles').select('user_id, role_id'),
-          supabase.from('fm_coa_charts').select('id, title')
+          supabase.from('fm_coa_charts').select('id, title'),
+          supabase.from('parties').select('id, first_name, last_name, company_name, party_type')
         ]);
 
         if (groupsRes.error) throw groupsRes.error;
@@ -104,6 +106,7 @@
         setRoles(rolesRes.data || []);
         setUserRoles(userRolesRes.data || []);
         setCharts(chartsRes.data || []);
+        setParties(partiesRes.data || []);
       } catch (error) {
         console.error('Error fetching initial data:', error);
       } finally {
@@ -366,37 +369,54 @@
 
     const aggregatedUsersList = useMemo(() => {
       if (accessViewMode !== 'aggregate') return [];
-      const resultMap = new Map();
-      const rolesMap = new Map(roles.map(r => [String(r.id), r]));
-      const usersMap = new Map(users.map(u => [String(u.id), u]));
+      const result = [];
 
-      groupAccesses.forEach(acc => {
-        if (acc.grantee_type === 'USER') {
-          const u = usersMap.get(String(acc.grantee_id));
-          if (u) {
-            const userIdStr = String(u.id);
-            if (!resultMap.has(userIdStr)) {
-              resultMap.set(userIdStr, { id: u.id, full_name: u.full_name, username: u.username, sources: [] });
-            }
-            resultMap.get(userIdStr).sources.push(t('دسترسی مستقیم', 'Direct Access'));
+      users.forEach(user => {
+        const reasons = [];
+
+        // Direct Access Check
+        const directPerm = groupAccesses.find(p => p.grantee_type === 'USER' && String(p.grantee_id) === String(user.id));
+        if (directPerm) {
+          reasons.push(t('دسترسی مستقیم', 'Direct Access'));
+        }
+
+        // Role-based Access Check
+        const userRoleIds = userRoles.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
+        const rolePerms = groupAccesses.filter(p => p.grantee_type === 'ROLE' && userRoleIds.includes(String(p.grantee_id)));
+
+        rolePerms.forEach(rp => {
+          const roleObj = roles.find(r => String(r.id) === String(rp.grantee_id));
+          const rTitle = roleObj ? (roleObj.title || roleObj.code) : t('نقش سیستمی', 'System Role');
+          reasons.push(`${t('ارث‌بری از نقش:', 'Inherited via Role:')} ${rTitle}`);
+        });
+
+        if (reasons.length > 0) {
+          const userParty = parties.find(p => String(p.id) === String(user.party_id || user.person_id));
+          let fNameStr = '';
+          if (userParty) {
+              if (userParty.party_type === 'legal' && userParty.company_name) {
+                  fNameStr = userParty.company_name;
+              } else {
+                  fNameStr = `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
+              }
           }
-        } else if (acc.grantee_type === 'ROLE') {
-          const roleTitle = rolesMap.get(String(acc.grantee_id))?.title || t('نامشخص', 'Unknown');
-          const usersInRole = userRoles.filter(ur => String(ur.role_id) === String(acc.grantee_id));
+          if (!fNameStr || fNameStr === '') {
+              const fname = user.first_name || user.name || '';
+              const lname = user.last_name || user.family || '';
+              fNameStr = (fname || lname) ? `${fname} ${lname}`.trim() : '---';
+          }
           
-          usersInRole.forEach(ur => {
-            const u = usersMap.get(String(ur.user_id));
-            if (!u) return;
-            const userIdStr = String(u.id);
-            if (!resultMap.has(userIdStr)) {
-              resultMap.set(userIdStr, { id: u.id, full_name: u.full_name, username: u.username, sources: [] });
-            }
-            resultMap.get(userIdStr).sources.push(`${t('نقش:', 'Role:')} ${roleTitle}`);
+          result.push({
+            id: user.id,
+            username: user.username || user.email || '---',
+            full_name: fNameStr,
+            sources: reasons
           });
         }
       });
-      return Array.from(resultMap.values());
-    }, [groupAccesses, accessViewMode, users, roles, userRoles, t]);
+
+      return result;
+    }, [groupAccesses, accessViewMode, users, roles, userRoles, parties, t]);
 
     // --- Shared Delete Action ---
     const executeDelete = async () => {
@@ -692,7 +712,7 @@
         render: (val) => <span className="text-[12px] text-slate-600 dark:text-slate-400" dir="ltr">{val}</span>
       },
       { 
-        field: 'sources', header_fa: 'نوع دسترسی', width: 'auto',
+        field: 'sources', header_fa: 'انواع دسترسی (نحوه ارث‌بری)', width: 'auto',
         render: (val) => (
           <div className="flex flex-wrap gap-1">
             {val.map((src, idx) => <Badge key={idx} variant="slate" size="sm" className="text-[10px] px-2 py-0.5">{src}</Badge>)}
@@ -773,12 +793,8 @@
                 selectable={true}
                 language={language} 
                 isLoading={modalLoading} 
-                exportable={false}
-                importable={false}
-                disableExport={true}
-                disableImport={true}
-                showImport={false}
-                showExport={false}
+                hideImport={true}
+                hideExport={true}
                 onAdd={handleAddAccountClick}
               />
             </div>
@@ -801,12 +817,8 @@
                     selectable={true}
                     language={language} 
                     isLoading={modalLoading}
-                    exportable={false}
-                    importable={false}
-                    disableExport={true}
-                    disableImport={true}
-                    showImport={false}
-                    showExport={false}
+                    hideImport={true}
+                    hideExport={true}
                     onAdd={handleAddAccessClick}
                   />
                 </div>
@@ -817,12 +829,8 @@
                     columns={aggregateColumns} 
                     language={language} 
                     isLoading={modalLoading}
-                    exportable={false}
-                    importable={false}
-                    disableExport={true}
-                    disableImport={true}
-                    showImport={false}
-                    showExport={false}
+                    hideImport={true}
+                    hideExport={true}
                     hideToolbar={true}
                   />
                 </div>

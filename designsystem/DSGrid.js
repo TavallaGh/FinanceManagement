@@ -201,7 +201,11 @@
                 if (f.type === 'toggle') return <ToggleField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
                 if (f.type === 'checkbox') return <CheckboxField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
                 if (f.type === 'lov') {
-                  const displayStr = values[f.name] && typeof values[f.name] === 'object' ? (values[f.name].title || values[f.name].name || values[f.name].label || Object.values(values[f.name])[0]) : values[f.name];
+                  let displayStr = values[f.name];
+                  if (values[f.name] && typeof values[f.name] === 'object') {
+                      const v = values[f.name];
+                      displayStr = v.displayLabel || v.title_fa || v.full_name || v.username || v.title || v.name || v.label || v.code || (Object.keys(v).length > 1 ? v[Object.keys(v)[1]] : v[Object.keys(v)[0]]);
+                  }
                   return <LOVField key={idx} size="sm" label={f.label} isRtl={isRtl} data={f.lovData} columns={f.lovColumns} displayValue={displayStr} onChange={(row) => handleChange(f.name, row)} dropdownWidth={f.dropdownWidth} />;
                 }
                 if (f.type === 'date') return <DatePicker key={idx} size="sm" label={f.label} isRtl={isRtl} language={language} value={values[f.name] || ''} onChange={(val) => handleChange(f.name, val)} />;
@@ -223,7 +227,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, onImport, formCode }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, onImport, formCode }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -690,7 +694,7 @@
                 <input id="grid-import-input" type="file" className="hidden" accept=".csv" onChange={(e) => { if (onImport && e.target.files.length > 0) { onImport(e.target.files[0]); e.target.value = ''; } }} />
               </>
             )}
-            {access.canPrint && (
+            {!hideExport && access.canPrint && (
               <button onClick={exportCSV} title={t('خروجی اکسل', 'Export')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileSpreadsheet size={16} /></button>
             )}
           </div>
