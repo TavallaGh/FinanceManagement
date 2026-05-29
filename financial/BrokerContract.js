@@ -1,7 +1,7 @@
 /* Filename: financial/BrokerContract.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo } = React;
+  const { useState, useEffect, useMemo, useCallback } = React;
   
   const { 
     Button, DataGrid, Modal,
@@ -18,27 +18,22 @@
 
   const BrokerContract = ({ broker, brokerName, language = 'fa' }) => {
     const isRtl = language === 'fa';
-    const t = (fa, en) => isRtl ? fa : en;
+    const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const globalMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : 'jalali';
     const formatGlobalDate = window.DSCore?.formatGlobalDate || ((v) => v);
     
     const [currencies, setCurrencies] = useState([]);
     const [contractsData, setContractsData] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     
     const [inlineEdit, setInlineEdit] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, data: null });
 
-    const showToast = (message, type = 'error') => {
-        console.warn(`Toast [${type}]:`, message);
-        if (window.DSFeedback && window.DSFeedback.toast) {
-            window.DSFeedback.toast[type === 'error' ? 'error' : 'success'](message);
-        } else {
-            setToast({ show: true, message, type });
-            setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
-        }
-    };
+    const showToast = useCallback((message, type = 'error') => {
+        setToast({ isVisible: true, message, type });
+        setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 4000);
+    }, []);
 
     useEffect(() => {
       const initCurrencies = async () => {
@@ -52,7 +47,7 @@
          }
       };
       initCurrencies();
-    }, []);
+    }, [supabase, showToast, t]);
 
     useEffect(() => {
       if (broker?.id) {
@@ -382,12 +377,6 @@
 
     return (
         <div className="flex flex-col h-[60vh] min-h-[500px] w-full relative bg-slate-50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
-            {toast.show && (
-                <div className={`fixed bottom-4 ${isRtl ? 'right-4' : 'left-4'} z-[2147483647]`}>
-                    <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />
-                </div>
-            )}
-            
             <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 shrink-0">
                 <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium text-[12px]">
                     <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
@@ -427,6 +416,8 @@
                     </div>
                 </div>
             </Modal>
+
+            <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </div>
     );
   };
