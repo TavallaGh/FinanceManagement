@@ -305,6 +305,7 @@
               data={charts} columns={chartColumns} language={language} formCode={formCode}
               gridState={chartsGridState} onGridStateChange={setChartsGridState}
               onAdd={access.canCreate ? () => handleOpenChartModal() : undefined}
+              onRowDoubleClick={access.canEdit ? (row) => handleOpenChartModal(row) : undefined}
               actions={[
                 { id: 'design', icon: Network, tooltip: t('طراحی درخت حساب‌ها', 'Design Tree Structure'), onClick: (row) => handleOpenDesigner(row), className: 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50' },
                 { id: 'copy', icon: Copy, tooltip: t('کپی ساختار', 'Duplicate Entire Structure'), onClick: (row) => handleOpenCopyModal(row), className: 'text-emerald-600 dark:text-emerald-400' },
