@@ -11,7 +11,7 @@
   } = LucideIcons;
 
   const Core = window.DSCore || window.DesignSystem || {};
-  const { Button = () => null, Badge = () => null, Tabs = () => null } = Core;
+  const { Button = () => null, Badge = () => null } = Core;
 
   const Forms = window.DSForms || window.DesignSystem || {};
   const { SelectField = () => null, ToggleField = () => null, DatePicker = () => null } = Forms;
@@ -20,7 +20,7 @@
   const { DataGrid = () => null, LOVField = () => null } = Grid;
 
   const Feedback = window.DSFeedback || window.DesignSystem || {};
-  const { Modal = () => null, Toast = () => null, Alert = () => null } = Feedback;
+  const { Modal = () => null, Alert = () => null } = Feedback;
 
   const supabase = window.supabase;
 
@@ -38,7 +38,6 @@
 
     const [accessViewMode, setAccessViewMode] = useState('assign');
     const [isLoading, setIsLoading] = useState(false);
-    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
 
     const [accountPermissions, setAccountPermissions] = useState([]);
@@ -49,8 +48,11 @@
     const [bgAccessModal, setBgAccessModal] = useState({ isOpen: false, groupTitle: '', data: [] });
 
     const showToast = useCallback((message, type = 'success') => {
-      setToast({ isVisible: true, message, type });
-      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
+        if (window.DSFeedback && window.DSFeedback.toast) {
+            window.DSFeedback.toast[type === 'error' ? 'error' : 'success'](message);
+        } else {
+            console.log(`[${type}] ${message}`);
+        }
     }, []);
 
     const fetchNodePermissions = useCallback(async () => {
@@ -64,7 +66,6 @@
         if (error) throw error;
         setAccountPermissions(data || []);
       } catch (err) {
-        console.error(err);
         showToast(t('خطا در دریافت دسترسی‌ها', 'Error fetching permissions'), 'error');
       } finally {
         setIsLoading(false);
@@ -85,7 +86,6 @@
         if (error) throw error;
         setAccountBalanceGroups(data || []);
       } catch (err) {
-        console.error(err);
         showToast(t('خطا در دریافت گروه‌های بالانس', 'Error fetching balance groups'), 'error');
       } finally {
         setIsLoading(false);
@@ -477,7 +477,7 @@
         <div className="flex flex-col h-full min-h-0 animate-in fade-in duration-200">
             {activeTab === 'access' && (
                 <div className="flex flex-col h-full min-h-0 gap-3">
-                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 px-2 h-[46px] rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
                     <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 px-2 flex items-center gap-1">
                         {accessViewMode === 'assign' ? <Shield size={14} className="text-indigo-500"/> : <Users size={14} className="text-indigo-500"/>}
                         {accessViewMode === 'assign' ? t('مدیریت مستقیم دسترسی‌های این حساب', 'Direct Access Management') : t('نمای تجمیعی تمامی دسترسی‌های موثر', 'Consolidated Effective Access')}
@@ -515,7 +515,7 @@
 
             {activeTab === 'balance_groups' && (
                 <div className="flex flex-col h-full min-h-0 gap-3">
-                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 px-2 h-[46px] rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
                     <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 px-2 flex items-center gap-1">
                         <Scale size={14} className="text-indigo-500"/>
                         {t('مدیریت گروه‌های بالانس مرتبط با این حساب', 'Manage Balance Groups Associated with this Account')}
@@ -557,7 +557,6 @@
                     </div>
                 </div>
             </Modal>
-            <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </div>
     );
   };

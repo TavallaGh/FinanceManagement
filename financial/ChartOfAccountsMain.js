@@ -21,7 +21,7 @@
     const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent } = Forms;
 
     const Feedback = window.DSFeedback || window.DesignSystem || {};
-    const { Modal = FallbackComponent, Toast = FallbackComponent, Alert = FallbackComponent } = Feedback;
+    const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
 
     const TreeSystem = window.DSTree || window.DesignSystem || {};
     const { Tree = FallbackComponent } = TreeSystem;
@@ -278,16 +278,17 @@
       if (!validateNodeUniqueness()) return;
 
       try {
+        // Explicitly format data payload to prevent 400 Bad Request
         const payload = {
           chart_id: chart.id,
           parent_id: nodeFormData.parentId || null,
-          code: nodeFormData.code,
-          title_fa: nodeFormData.titleFa,
-          title_en: nodeFormData.titleEn,
+          code: nodeFormData.code?.trim(),
+          title_fa: nodeFormData.titleFa?.trim(),
+          title_en: nodeFormData.titleEn?.trim() || null,
           currency_id: nodeFormData.currencyId || null,
-          is_active: nodeFormData.isActive,
-          account_type: nodeFormData.accountType,
-          control_inventory: nodeFormData.controlInventory
+          is_active: nodeFormData.isActive !== false, // forces explicit boolean
+          account_type: nodeFormData.accountType || 'main', // forces explicit string
+          control_inventory: !!nodeFormData.controlInventory // forces explicit boolean
         };
 
         let targetId = null;
@@ -374,7 +375,7 @@
     return (
       <div className="p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-          <div className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 p-2 flex items-center justify-between shrink-0">
+          <div className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 p-2 flex items-center justify-between shrink-0 h-12">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" icon={isRtl ? ArrowRight : ArrowLeft} onClick={onBack}>{t('بازگشت به لیست', 'Back')}</Button>
               <div className="h-4 w-px bg-slate-300 dark:bg-slate-600"></div>
@@ -403,17 +404,17 @@
             <div className="flex-1 flex flex-col overflow-auto p-4 gap-3 bg-slate-50/50 dark:bg-slate-900/20">
               {selectedNodeId || isCreatingNode ? (
                 <Card noPadding={true} className="flex-1 border border-slate-200 dark:border-slate-700 flex flex-col min-h-0 bg-white dark:bg-slate-800 shadow-sm h-full">
-                  <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 px-3 pt-2 gap-1 shrink-0">
-                    <button onClick={() => setActiveTab('details')} className={`px-4 py-2 font-bold text-xs border-b-2 transition-all ${activeTab === 'details' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                  <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 px-3 pt-2 gap-1 shrink-0 h-10">
+                    <button onClick={() => setActiveTab('details')} className={`px-4 py-2 h-full font-bold text-xs border-b-2 transition-all ${activeTab === 'details' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
                       {t('مشخصات حساب', 'Account Parameters')}
                     </button>
                     {!isCreatingNode && (
-                      <button onClick={() => setActiveTab('access')} className={`px-4 py-2 font-bold text-xs border-b-2 transition-all ${activeTab === 'access' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                      <button onClick={() => setActiveTab('access')} className={`px-4 py-2 h-full font-bold text-xs border-b-2 transition-all ${activeTab === 'access' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
                         {t('تنظیمات دسترسی', 'Access Configuration')}
                       </button>
                     )}
                     {!isCreatingNode && (
-                      <button onClick={() => setActiveTab('balance_groups')} className={`px-4 py-2 font-bold text-xs border-b-2 transition-all ${activeTab === 'balance_groups' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                      <button onClick={() => setActiveTab('balance_groups')} className={`px-4 py-2 h-full font-bold text-xs border-b-2 transition-all ${activeTab === 'balance_groups' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
                         {t('گروه‌های بالانس', 'Balance Groups')}
                       </button>
                     )}
@@ -424,23 +425,27 @@
                       <div className="flex flex-col h-full min-h-0 animate-in fade-in duration-200">
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
                           
-                          <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
-                            <div className="flex-1">
-                               <Alert type="info" icon={Info} message={<span>{t('سطح گره جاری:', 'Current Element Hierarchy Level:')} <strong className="text-indigo-600 dark:text-indigo-300">{levelLabels[nodeDepth]}</strong></span>} className="h-full" />
+                          <div className="flex flex-col md:flex-row items-stretch gap-3 shrink-0 h-[68px]">
+                            <div className="flex items-center gap-3 px-4 bg-blue-50/60 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 rounded-xl shrink-0 w-auto min-w-[200px]">
+                               <Info size={18} className="text-blue-500" />
+                               <div className="flex flex-col justify-center">
+                                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mb-0.5">{t('سطح گره جاری', 'Current Level')}</span>
+                                  <span className="text-[13px] font-black text-blue-800 dark:text-blue-300">{levelLabels[nodeDepth]}</span>
+                               </div>
                             </div>
 
                             {!isCreatingNode && (
-                              <div className="flex items-center justify-between gap-6 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg shrink-0">
+                              <div className="flex-1 flex items-center justify-between gap-6 px-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl">
                                  <div className="flex flex-col justify-center">
                                     <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">{t(`بالانس در لحظه (به ${getNodeCurrencyName()})`, `Real-time Balance (${getNodeCurrencyName()})`)}</span>
-                                    <div className="text-[13px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right">
+                                    <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right">
                                        0.00 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">{getNodeCurrencyCode()}</span>
                                     </div>
                                  </div>
-                                 <div className="w-px h-8 bg-slate-200 dark:bg-slate-700"></div>
-                                 <div className="flex flex-col justify-center">
+                                 <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+                                 <div className="flex-col justify-center hidden sm:flex">
                                     <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">{t('معادل ارزی پایه (دلار)', 'Base Currency Eq (USD)')}</span>
-                                    <div className="text-[13px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right">
+                                    <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right">
                                        0.00 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">USD</span>
                                     </div>
                                  </div>
