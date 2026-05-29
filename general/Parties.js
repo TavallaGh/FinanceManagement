@@ -1,3 +1,23 @@
+/*
+  =============================================================================
+  UX/UI Designer Notes (Bento Grid & Compact Design Implementation):
+  =============================================================================
+  کاملاً حق با شماست. در مانیتورهای استاندارد ۱۵ اینچی لپ‌تاپ، ارتفاع مودال قبلی 
+  باعث ایجاد اسکرول غیرضروری و کاهش سرعت کار کاربر (UX Friction) می‌شد. 
+  برای رسیدن به یکپارچگی کامل (Uniformity) و پیروی دقیق از استایل Bento Grid:
+  
+  ۱. پدینگ‌ها و فاصله‌ها: از p-4 و gap-4 به p-3 و gap-2.5 کاهش یافتند.
+  ۲. چیدمان خطی (Inline Layout): فیلدهای اصلی (کد، نام، شناسه) و اطلاعات تماس 
+     به جای اشغال چندین سطر، با استفاده از grid-cols-12 در یک خط (Compact Row) فشرده شدند.
+  ۳. نقش‌ها (Roles): چک‌باکس‌ها از حالت لیستی عمودی به حالت افقی (flex-wrap) 
+     تغییر یافتند تا فضای مرده (White Space) به صفر برسد.
+  ۴. آدرس‌ها: پنل آدرس بهینه‌سازی شد و با محدود کردن ارتفاع (max-h-[110px])، 
+     طول مودال کاملا کنترل شده است و هرگز از صفحه بیرون نمی‌زند.
+     
+  این ساختارِ کامپکتِ جدید، الگوی استاندارد ما برای تمام فرم‌های عملیاتی خواهد بود.
+  =============================================================================
+*/
+
 /* Filename: general/Parties.js */
 (() => {
   const React = window.React;
@@ -10,7 +30,8 @@
   
   const { 
     Users, User, Building, Edit, Trash2, Save, 
-    AlertTriangle, Lock, MapPin, Plus, CheckCircle2 
+    AlertTriangle, Lock, MapPin, Plus, CheckCircle2,
+    Briefcase
   } = window.LucideIcons || {};
   const supabase = window.supabase;
 
@@ -328,90 +349,96 @@
         <Modal 
           isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} 
           title={currentRecord ? t('ویرایش مشخصات', 'Edit Party') : t('تعریف شخص/شرکت جدید', 'New Party')}
-          width="max-w-4xl"
+          width="max-w-5xl"
           language={language}
         >
-          <div className="p-4 flex flex-col gap-4 bg-slate-50 dark:bg-slate-900/50">
-            <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-900/50">
+            
+            {/* Bento Panel 1: Configuration / Type */}
+            <div className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
                <div className="flex items-center gap-6">
-                 <span className="text-[12px] font-black text-slate-500 dark:text-slate-400">{t('نوع موجودیت:', 'Entity Type:')}</span>
+                 <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 px-2">{t('نوع موجودیت:', 'Entity Type:')}</span>
                  <label className="flex items-center gap-2 cursor-pointer group">
-                   <input type="radio" name="partyType" value="real" checked={formData.partyType === 'real'} onChange={() => setFormData({...formData, partyType: 'real'})} className="text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer" />
-                   <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"><User size={16}/> {t('شخص حقیقی', 'Real Person')}</span>
+                   <input type="radio" name="partyType" value="real" checked={formData.partyType === 'real'} onChange={() => setFormData({...formData, partyType: 'real'})} className="text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer" />
+                   <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"><User size={14}/> {t('شخص حقیقی', 'Real Person')}</span>
                  </label>
                  <label className="flex items-center gap-2 cursor-pointer group">
                    <input type="radio" name="partyType" value="legal" checked={formData.partyType === 'legal'} 
                           onChange={() => setFormData({...formData, partyType: 'legal', roles: formData.roles.filter(r => r !== 'system_user' && r !== 'employee')})} 
-                          className="text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer" />
-                   <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"><Building size={16}/> {t('شخص حقوقی', 'Legal Entity')}</span>
+                          className="text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer" />
+                   <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"><Building size={14}/> {t('شخص حقوقی', 'Legal Entity')}</span>
                  </label>
                </div>
-               <div className="flex items-center gap-2">
+               <div className="flex items-center pr-4 border-r border-slate-100 dark:border-slate-700">
                  <ToggleField size="sm" label={t('وضعیت فعال', 'Active Status')} checked={formData.isActive} onChange={v => setFormData({...formData, isActive: v})} isRtl={isRtl} wrapperClassName="!m-0" />
                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-7 flex flex-col gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-700/50">
-                  <User size={14}/> {t('اطلاعات هویتی پایه', 'Basic Identity Info')}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <TextField size="sm" label={t('کد اختصاصی *', 'Code *')} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} required dir="ltr" />
-                  <TextField size="sm" label={formData.partyType === 'real' ? t('کد ملی', 'National ID') : t('شناسه ملی', 'National ID')} value={formData.nationalId} onChange={e => setFormData({...formData, nationalId: e.target.value})} isRtl={isRtl} dir="ltr" />
-                  
-                  {formData.partyType === 'real' ? (
-                    <>
-                      <TextField size="sm" label={t('نام', 'First Name')} value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} isRtl={isRtl} />
-                      <TextField size="sm" label={t('نام خانوادگی *', 'Last Name *')} value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} isRtl={isRtl} required />
-                    </>
-                  ) : (
-                    <>
-                      <TextField size="sm" label={t('نام کامل شرکت *', 'Company Name *')} value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} isRtl={isRtl} required wrapperClassName="sm:col-span-2" />
-                      <TextField size="sm" label={t('کد اقتصادی', 'Economic Code')} value={formData.economicCode} onChange={e => setFormData({...formData, economicCode: e.target.value})} isRtl={isRtl} dir="ltr" wrapperClassName="sm:col-span-2" />
-                    </>
-                  )}
-                </div>
+            {/* Bento Panel 2: Basic Identity Info (Compact Line) */}
+            <div className="flex flex-col gap-2.5 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Briefcase size={12}/> {t('اطلاعات هویتی پایه', 'Basic Identity Info')}
               </div>
-
-              <div className="lg:col-span-5 flex flex-col gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-700/50">
-                  <MapPin size={14}/> {t('اطلاعات تماس', 'Contact Info')}
-                </div>
-                <div className="flex flex-col gap-4">
-                  <TextField size="sm" label={t('شماره موبایل', 'Mobile')} value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" />
-                  <TextField size="sm" label={t('تلفن ثابت', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" />
-                  <TextField size="sm" label={t('پست الکترونیک', 'Email')} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} isRtl={isRtl} dir="ltr" />
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('کد اختصاصی *', 'Code *')} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} required dir="ltr" />
+                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={formData.partyType === 'real' ? t('کد ملی', 'National ID') : t('شناسه ملی', 'National ID')} value={formData.nationalId} onChange={e => setFormData({...formData, nationalId: e.target.value})} isRtl={isRtl} dir="ltr" />
+                
+                {formData.partyType === 'real' ? (
+                  <>
+                    <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام', 'First Name')} value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} isRtl={isRtl} />
+                    <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام خانوادگی *', 'Last Name *')} value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} isRtl={isRtl} required />
+                  </>
+                ) : (
+                  <>
+                    <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('کد اقتصادی', 'Economic Code')} value={formData.economicCode} onChange={e => setFormData({...formData, economicCode: e.target.value})} isRtl={isRtl} dir="ltr" />
+                    <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('نام کامل شرکت *', 'Company Name *')} value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} isRtl={isRtl} required />
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-4 flex flex-col gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                  <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-700/50">
-                    <Users size={14}/> {t('نقش‌های سیستمی', 'System Roles')}
+            {/* Bento Panel 3: Contact Info (Compact Line) */}
+            <div className="flex flex-col gap-2.5 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin size={12}/> {t('اطلاعات تماس', 'Contact Info')}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <TextField size="sm" wrapperClassName="sm:col-span-4 !m-0" label={t('شماره موبایل', 'Mobile')} value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" />
+                <TextField size="sm" wrapperClassName="sm:col-span-4 !m-0" label={t('تلفن ثابت', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" />
+                <TextField size="sm" wrapperClassName="sm:col-span-4 !m-0" label={t('پست الکترونیک', 'Email')} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} isRtl={isRtl} dir="ltr" />
+              </div>
+            </div>
+
+            {/* Layout Split: Roles (Left) & Addresses (Right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              
+              {/* Roles Panel (Horizontal Flow) */}
+              <div className="flex flex-col p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-700/50">
+                    <Users size={12}/> {t('نقش‌های سیستمی', 'System Roles')}
                   </div>
-                  <div className="flex flex-col gap-3">
-                      <CheckboxField size="sm" label={t('مشتری', 'Customer')} checked={formData.roles.includes('customer')} onChange={() => toggleRole('customer')} isRtl={isRtl} wrapperClassName="!m-0" />
-                      <CheckboxField size="sm" label={t('تامین‌کننده', 'Vendor')} checked={formData.roles.includes('vendor')} onChange={() => toggleRole('vendor')} isRtl={isRtl} wrapperClassName="!m-0" />
-                      <CheckboxField size="sm" label={t('سهامدار', 'Shareholder')} checked={formData.roles.includes('shareholder')} onChange={() => toggleRole('shareholder')} isRtl={isRtl} wrapperClassName="!m-0" />
-                      <CheckboxField size="sm" label={t('صرافی', 'Exchange')} checked={formData.roles.includes('exchange')} onChange={() => toggleRole('exchange')} isRtl={isRtl} wrapperClassName="!m-0" />
+                  <div className="flex flex-wrap gap-x-6 gap-y-3 pt-3">
+                      <CheckboxField size="sm" wrapperClassName="!m-0" label={t('مشتری', 'Customer')} checked={formData.roles.includes('customer')} onChange={() => toggleRole('customer')} isRtl={isRtl} />
+                      <CheckboxField size="sm" wrapperClassName="!m-0" label={t('تامین‌کننده', 'Vendor')} checked={formData.roles.includes('vendor')} onChange={() => toggleRole('vendor')} isRtl={isRtl} />
+                      <CheckboxField size="sm" wrapperClassName="!m-0" label={t('سهامدار', 'Shareholder')} checked={formData.roles.includes('shareholder')} onChange={() => toggleRole('shareholder')} isRtl={isRtl} />
+                      <CheckboxField size="sm" wrapperClassName="!m-0" label={t('صرافی', 'Exchange')} checked={formData.roles.includes('exchange')} onChange={() => toggleRole('exchange')} isRtl={isRtl} />
+                      
                       {formData.partyType === 'real' && (
-                        <>
-                          <div className="w-full h-px bg-slate-100 dark:bg-slate-700/50 my-1"></div>
-                          <CheckboxField size="sm" label={t('کارمند', 'Employee')} checked={formData.roles.includes('employee')} onChange={() => toggleRole('employee')} isRtl={isRtl} wrapperClassName="!m-0" />
-                          <CheckboxField size="sm" label={t('کاربر سیستم', 'System User')} checked={formData.roles.includes('system_user')} onChange={() => toggleRole('system_user')} isRtl={isRtl} wrapperClassName="!m-0" />
-                        </>
+                        <div className="w-full flex flex-wrap gap-x-6 gap-y-3 mt-1 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                          <CheckboxField size="sm" wrapperClassName="!m-0" label={t('کارمند', 'Employee')} checked={formData.roles.includes('employee')} onChange={() => toggleRole('employee')} isRtl={isRtl} />
+                          <CheckboxField size="sm" wrapperClassName="!m-0" label={t('کاربر سیستم', 'System User')} checked={formData.roles.includes('system_user')} onChange={() => toggleRole('system_user')} isRtl={isRtl} />
+                        </div>
                       )}
                   </div>
               </div>
 
-              <div className="lg:col-span-8 flex flex-col gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                 <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-700/50">
-                   <MapPin size={14}/> {t('مدیریت آدرس‌ها', 'Manage Addresses')}
+              {/* Addresses Panel (Compact List) */}
+              <div className="flex flex-col p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-700/50">
+                   <MapPin size={12}/> {t('مدیریت آدرس‌ها', 'Manage Addresses')}
                  </div>
                  
-                 <div className="flex gap-2">
+                 <div className="flex gap-2 pt-2">
                    <div className="flex-1">
                      <TextField size="sm" placeholder={t('آدرس جدید را وارد کنید...', 'Enter new address...')} value={newAddress} onChange={e => setNewAddress(e.target.value)} isRtl={isRtl} wrapperClassName="!m-0" />
                    </div>
@@ -419,38 +446,40 @@
                      if(!newAddress.trim()) return;
                      setFormData({...formData, addresses: [...formData.addresses, { id: Date.now(), text: newAddress.trim(), isDefault: formData.addresses.length === 0 }]});
                      setNewAddress('');
-                   }} className="h-8">{t('افزودن', 'Add')}</Button>
+                   }} className="h-[30px]">{t('افزودن', 'Add')}</Button>
                  </div>
                  
-                 <div className="space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-1 bg-slate-50 dark:bg-slate-900/30 p-2 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                 <div className="mt-2 space-y-1.5 max-h-[110px] overflow-y-auto custom-scrollbar pr-1 bg-slate-50 dark:bg-slate-900/30 p-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50">
                    {formData.addresses.map(a => (
-                     <div key={a.id} className={`flex justify-between items-center p-2.5 rounded-md border text-[12px] group shadow-sm transition-all ${a.isDefault ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800/50' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600'}`}>
+                     <div key={a.id} className={`flex justify-between items-center px-2.5 py-1.5 rounded-md border text-[11px] group shadow-sm transition-all ${a.isDefault ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800/50' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600'}`}>
                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                         {a.isDefault && <CheckCircle2 size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />}
-                         <span className="text-slate-700 dark:text-slate-300 leading-relaxed truncate">{a.text}</span>
+                         {a.isDefault && <CheckCircle2 size={12} className="text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                         <span className="text-slate-700 dark:text-slate-300 truncate">{a.text}</span>
                        </div>
                        <div className="flex items-center gap-3 shrink-0 pl-2">
                          {!a.isDefault && (
                            <button onClick={() => handleSetDefaultAddress(a.id)} className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100">
-                             {t('تنظیم به عنوان پیش‌فرض', 'Set Default')}
+                             {t('انتخاب پیش‌فرض', 'Set Default')}
                            </button>
                          )}
                          <button onClick={() => setFormData({...formData, addresses: formData.addresses.filter(x => x.id !== a.id)})} className="text-slate-300 hover:text-rose-500 transition-colors" title={t('حذف', 'Delete')}>
-                           <Trash2 size={14}/>
+                           <Trash2 size={12}/>
                          </button>
                        </div>
                      </div>
                    ))}
                    {formData.addresses.length === 0 && (
-                     <div className="text-center py-6">
-                        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{t('هیچ آدرسی ثبت نشده است.', 'No addresses found.')}</span>
+                     <div className="text-center py-4">
+                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{t('هیچ آدرسی ثبت نشده است.', 'No addresses found.')}</span>
                      </div>
                    )}
                  </div>
               </div>
+
             </div>
 
-            <div className="flex justify-end gap-2 mt-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700 mt-1">
               <Button variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
               <Button variant="primary" size="sm" icon={Save} onClick={handleSave} isLoading={isLoading}>{t('ذخیره اطلاعات', 'Save Changes')}</Button>
             </div>
