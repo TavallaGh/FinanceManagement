@@ -31,8 +31,13 @@
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, data: null });
 
     const showToast = (message, type = 'error') => {
-        setToast({ show: true, message, type });
-        setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
+        console.warn(`Toast [${type}]:`, message);
+        if (window.DSFeedback && window.DSFeedback.toast) {
+            window.DSFeedback.toast[type === 'error' ? 'error' : 'success'](message);
+        } else {
+            setToast({ show: true, message, type });
+            setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
+        }
     };
 
     useEffect(() => {
@@ -196,7 +201,7 @@
             field: 'currency_id', 
             header_fa: 'ارز', 
             header_en: 'Currency', 
-            width: '100px',
+            width: '85px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -223,7 +228,7 @@
             field: 'from_date', 
             header_fa: 'از تاریخ', 
             header_en: 'From Date', 
-            width: '110px',
+            width: '95px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -245,7 +250,7 @@
             field: 'to_date', 
             header_fa: 'تا تاریخ', 
             header_en: 'To Date', 
-            width: '110px',
+            width: '95px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
                     return (
@@ -378,14 +383,14 @@
     return (
         <div className="flex flex-col h-[60vh] min-h-[500px] w-full relative bg-slate-50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
             {toast.show && (
-                <div className={`fixed bottom-4 ${isRtl ? 'right-4' : 'left-4'} z-[9999]`}>
+                <div className={`fixed bottom-4 ${isRtl ? 'right-4' : 'left-4'} z-[2147483647]`}>
                     <Toast message={toast.message} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />
                 </div>
             )}
             
             <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 shrink-0">
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium text-[13px]">
-                    <Briefcase size={16} className="text-indigo-600 dark:text-indigo-400" />
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium text-[12px]">
+                    <Briefcase size={14} className="text-indigo-600 dark:text-indigo-400" />
                     <span>{t('ویرایش قراردادهای بروکر:', 'Edit Broker Contracts:')} <strong className="text-indigo-700 dark:text-indigo-300 font-bold ml-1">{brokerName}</strong></span>
                 </div>
             </div>
