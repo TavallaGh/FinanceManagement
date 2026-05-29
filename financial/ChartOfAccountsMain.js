@@ -8,20 +8,21 @@
   const {
     Network = FallbackIcon, Plus = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
     ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, AlertTriangle = FallbackIcon,
-    Lock = FallbackIcon, Shield = FallbackIcon, Info = FallbackIcon, RefreshCw = FallbackIcon
+    Lock = FallbackIcon, Shield = FallbackIcon, Info = FallbackIcon, RefreshCw = FallbackIcon,
+    X = FallbackIcon, Edit = FallbackIcon
   } = LucideIcons;
 
   const ChartOfAccountsMain = ({ chart, onBack, language = 'fa', formCode = 'CHART_OF_ACCOUNTS' }) => {
     const FallbackComponent = () => null;
 
     const Core = window.DSCore || window.DesignSystem || {};
-    const { Button = FallbackComponent, Card = FallbackComponent, Badge = FallbackComponent } = Core;
+    const { Button = FallbackComponent, Card = FallbackComponent, Badge = FallbackComponent, Tabs = FallbackComponent } = Core;
 
     const Forms = window.DSForms || window.DesignSystem || {};
     const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent } = Forms;
 
     const Grid = window.DSGrid || window.DesignSystem || {};
-    const { DataGrid = FallbackComponent } = Grid;
+    const { DataGrid = FallbackComponent, LOVField = FallbackComponent } = Grid;
 
     const Feedback = window.DSFeedback || window.DesignSystem || {};
     const { Modal = FallbackComponent, Toast = FallbackComponent, Alert = FallbackComponent } = Feedback;
@@ -42,6 +43,7 @@
     }, [securityCtx, formCode]);
 
     const [activeTab, setActiveTab] = useState('details');
+    const [accessViewMode, setAccessViewMode] = useState('assign');
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
 
@@ -58,7 +60,7 @@
     const [systemParties, setSystemParties] = useState([]);
 
     const [accountPermissions, setAccountPermissions] = useState([]);
-    const [permFormData, setPermFormData] = useState({ granteeType: 'user', granteeId: '', accessLevel: 'view' });
+    const [inlinePermEdit, setInlinePermEdit] = useState(null);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -220,6 +222,7 @@
       setSelectedNodeId(node.id);
       setNodeFormData({ ...node });
       setIsCreatingNode(false);
+      setInlinePermEdit(null);
       setNodeDepth(getNewNodeDepth(rawAccounts, node.parentId));
     };
 
@@ -366,27 +369,35 @@
       return accountPermissions.filter(p => String(p.account_id) === String(selectedNodeId));
     }, [accountPermissions, selectedNodeId]);
 
-    const handleAddPermission = async () => {
-      if (!permFormData.granteeId || !selectedNodeId) return;
-      const duplicate = activeNodePermissions.some(p => p.grantee_type === permFormData.granteeType && String(p.grantee_id) === String(permFormData.granteeId));
-      if (duplicate) {
+    const handleSavePermInline = async () => {
+      const form = inlinePermEdit.data;
+      if (!form.grantee_id || !selectedNodeId) return;
+
+      if (inlinePermEdit.id === 'new' && activeNodePermissions.some(p => p.grantee_type === form.grantee_type && String(p.grantee_id) === String(form.grantee_id))) {
         return showToast(t('این دسترسی قبلاً برای حساب ثبت شده است', 'Access role/user already specified'), 'error');
       }
 
       try {
-        const { error } = await supabase.from('fm_coa_permissions').insert([{
+        const payload = {
           account_id: selectedNodeId,
-          grantee_type: permFormData.granteeType,
-          grantee_id: permFormData.granteeId,
-          access_level: permFormData.accessLevel
-        }]);
-        if (error) throw error;
+          grantee_type: form.grantee_type,
+          grantee_id: form.grantee_id,
+          access_level: form.access_level
+        };
+
+        if (inlinePermEdit.id === 'new') {
+          const { error } = await supabase.from('fm_coa_permissions').insert([payload]);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('fm_coa_permissions').update(payload).eq('id', inlinePermEdit.id);
+          if (error) throw error;
+        }
 
         await fetchDesignerData(selectedNodeId);
-        setPermFormData({ granteeType: 'user', granteeId: '', accessLevel: 'view' });
-        showToast(t('دسترسی جدید اعمال شد', 'Permission granted'));
+        setInlinePermEdit(null);
+        showToast(t('دسترسی با موفقیت ذخیره شد', 'Permission saved'));
       } catch (err) {
-        showToast(t('خطا در ذخیره دسترسی', 'Error adding permission'), 'error');
+        showToast(t('خطا در ذخیره دسترسی', 'Error saving permission'), 'error');
       }
     };
 
@@ -446,45 +457,182 @@
       return result;
     }, [selectedNodeId, systemUsers, activeNodePermissions, userRolesMapping, systemRoles, systemParties, t]);
 
+    const permGridData = useMemo(() => {
+       const data = [...activeNodePermissions];
+       if (inlinePermEdit && inlinePermEdit.id === 'new') {
+         data.unshift({ id: 'new', _isNew: true, ...inlinePermEdit.data });
+       }
+       return data;
+    }, [activeNodePermissions, inlinePermEdit]);
+
+    const availableUsersForAccess = useMemo(() => {
+      return systemUsers.filter(u => !activeNodePermissions.some(p => p.grantee_type === 'user' && String(p.grantee_id) === String(u.id))).map(u => {
+          const userParty = systemParties.find(p => String(p.id) === String(u.party_id || u.person_id));
+          let fNameStr = '';
+          if (userParty) {
+              if (userParty.party_type === 'legal' && userParty.company_name) {
+                  fNameStr = userParty.company_name;
+              } else {
+                  fNameStr = `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
+              }
+          }
+          if (!fNameStr || fNameStr === '') {
+              const fname = u.first_name || u.name || '';
+              const lname = u.last_name || u.family || '';
+              fNameStr = (fname || lname) ? `${fname} ${lname}`.trim() : '---';
+          }
+          return { ...u, fullName: fNameStr };
+      });
+    }, [systemUsers, activeNodePermissions, systemParties]);
+
+    const availableRolesForAccess = useMemo(() => {
+      return systemRoles.filter(r => !activeNodePermissions.some(p => p.grantee_type === 'role' && String(p.grantee_id) === String(r.id)));
+    }, [systemRoles, activeNodePermissions]);
+
     const permColumns = [
       {
-        field: 'grantee_type', header_fa: 'نوع دسترسی', header_en: 'Type', width: '110px',
-        render: (v) => <Badge variant="slate" size="sm">{v === 'user' ? t('کاربر', 'User') : t('نقش', 'Role')}</Badge>
+        field: 'grantee_type', header_fa: 'نوع دسترسی', header_en: 'Type', width: '150px',
+        render: (val, row) => {
+          if (inlinePermEdit?.id === row.id) {
+             return (
+               <div onClick={(e)=>e.stopPropagation()}>
+                 <SelectField 
+                   size="sm" 
+                   options={[{value:'user', label:t('کاربر سیستم', 'User')}, {value:'role', label:t('نقش سیستمی', 'Role')}]}
+                   value={inlinePermEdit.data.grantee_type} 
+                   onChange={(e) => setInlinePermEdit(prev => ({...prev, data: {...prev.data, grantee_type: e.target.value, grantee_id: '', grantee_obj: null}}))} 
+                   isRtl={isRtl}
+                 />
+               </div>
+             )
+          }
+          return <Badge variant="slate" size="sm">{val === 'user' ? t('کاربر', 'User') : t('نقش', 'Role')}</Badge>;
+        }
       },
       {
-        field: 'grantee_id', header_fa: 'نام کاربری / عنوان نقش', header_en: 'Name/Title', width: '220px',
-        render: (v, row) => {
+        field: 'grantee_id', header_fa: 'نام کاربری / عنوان نقش', header_en: 'Name/Title', width: 'auto',
+        render: (val, row) => {
+          if (inlinePermEdit?.id === row.id) {
+            const isUser = inlinePermEdit.data.grantee_type === 'user';
+            return (
+              <div onClick={(e)=>e.stopPropagation()}>
+                <LOVField 
+                  size="sm" 
+                  data={isUser ? availableUsersForAccess : availableRolesForAccess} 
+                  columns={isUser ? [{field:'username',header_fa:'نام کاربری'},{field:'fullName',header_fa:'نام'}] : [{field:'code',header_fa:'کد'},{field:'title',header_fa:'عنوان'}]}
+                  dropdownWidth="min-w-[400px]"
+                  displayValue={inlinePermEdit.data.grantee_obj ? (isUser ? `${inlinePermEdit.data.grantee_obj.fullName} (${inlinePermEdit.data.grantee_obj.username})` : `${inlinePermEdit.data.grantee_obj.title} (${inlinePermEdit.data.grantee_obj.code})`) : ''}
+                  onChange={(r) => setInlinePermEdit(prev => ({...prev, data: {...prev.data, grantee_id: r?.id, grantee_obj: r}}))}
+                />
+              </div>
+            )
+          }
           if (row.grantee_type === 'user') {
-            const u = systemUsers.find(su => String(su.id) === String(v));
-            return u ? (u.username || u.name || u.email || v) : v;
+            const u = systemUsers.find(su => String(su.id) === String(val));
+            if (!u) return val;
+            const userParty = systemParties.find(p => String(p.id) === String(u.party_id || u.person_id));
+            let fNameStr = '';
+            if (userParty) {
+                if (userParty.party_type === 'legal' && userParty.company_name) fNameStr = userParty.company_name;
+                else fNameStr = `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
+            }
+            if (!fNameStr || fNameStr === '') {
+                fNameStr = (u.first_name || u.last_name) ? `${u.first_name || ''} ${u.last_name || ''}`.trim() : (u.name || '');
+            }
+            return fNameStr ? `${fNameStr} (${u.username || u.email || val})` : (u.username || u.email || val);
           } else {
-            const role = systemRoles.find(r => String(r.id) === String(v));
-            return role ? (role.title || role.name) : v;
+            const role = systemRoles.find(r => String(r.id) === String(val));
+            return role ? (role.title || role.name || val) : val;
           }
         }
       },
       {
-        field: 'access_level', header_fa: 'سطح دسترسی', header_en: 'Access Level', width: '130px',
+        field: 'access_level', header_fa: 'سطح دسترسی', header_en: 'Access Level', width: '150px',
+        render: (val, row) => {
+          if (inlinePermEdit?.id === row.id) {
+             return (
+               <div onClick={(e)=>e.stopPropagation()}>
+                 <SelectField 
+                   size="sm" 
+                   options={[{value:'view', label:t('فقط مشاهده', 'View Only')}, {value:'full', label:t('کامل', 'Full Access')}]}
+                   value={inlinePermEdit.data.access_level} 
+                   onChange={(e) => setInlinePermEdit(prev => ({...prev, data: {...prev.data, access_level: e.target.value}}))} 
+                   isRtl={isRtl}
+                 />
+               </div>
+             )
+          }
+          return (
+            <Badge variant={val === 'full' ? 'indigo' : 'amber'} size="sm">
+              {val === 'full' ? t('کامل (ویرایش و حذف)', 'Full Access') : t('فقط مشاهده', 'View Only')}
+            </Badge>
+          )
+        }
+      }
+    ];
+
+    const permActions = [
+      { 
+        icon: Save, tooltip: t('ذخیره', 'Save'), 
+        hidden: (row) => inlinePermEdit?.id !== row.id, 
+        onClick: () => handleSavePermInline(), 
+        className: '!text-emerald-600 hover:!text-emerald-800' 
+      },
+      { 
+        icon: X, tooltip: t('انصراف', 'Cancel'), 
+        hidden: (row) => inlinePermEdit?.id !== row.id, 
+        onClick: () => setInlinePermEdit(null), 
+        className: '!text-slate-500 hover:!text-slate-700' 
+      },
+      { 
+        icon: Edit, tooltip: t('ویرایش', 'Edit'), 
+        hidden: (row) => inlinePermEdit?.id === row.id || row._isNew, 
+        onClick: (row) => {
+          let granteeObj = null;
+          if (row.grantee_type === 'user') {
+              const u = systemUsers.find(x => String(x.id) === String(row.grantee_id));
+              if (u) {
+                  const userParty = systemParties.find(p => String(p.id) === String(u.party_id || u.person_id));
+                  let fNameStr = '';
+                  if (userParty) fNameStr = userParty.party_type === 'legal' && userParty.company_name ? userParty.company_name : `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
+                  if (!fNameStr || fNameStr === '') fNameStr = (u.first_name || u.last_name) ? `${u.first_name || ''} ${u.last_name || ''}`.trim() : (u.name || '');
+                  granteeObj = { ...u, fullName: fNameStr };
+              }
+          } else {
+              granteeObj = systemRoles.find(r => String(r.id) === String(row.grantee_id));
+          }
+          setInlinePermEdit({
+            id: row.id,
+            data: { grantee_type: row.grantee_type, grantee_id: row.grantee_id, grantee_obj: granteeObj, access_level: row.access_level }
+          });
+        },
+        className: 'text-slate-400 hover:text-indigo-500' 
+      },
+      { 
+        id: 'delete', icon: Trash2, tooltip: t('حذف دسترسی', 'Revoke Permission'), 
+        hidden: (row) => inlinePermEdit?.id === row.id || row._isNew,
+        onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'permission', data: row }), 
+        className: 'text-red-500 hover:text-red-600' 
+      }
+    ];
+
+    const consolidatedColumns = [
+      { field: 'username', header_fa: 'نام کاربری', header_en: 'Username', width: '130px', render: (val) => <span className="text-[12px] text-slate-600 dark:text-slate-400" dir="ltr">{val}</span> },
+      { field: 'fullName', header_fa: 'نام و نام خانوادگی', header_en: 'Full Name', width: '200px', render: (val) => <span className="font-bold text-slate-800 dark:text-slate-200 text-[12px]">{val}</span> },
+      {
+        field: 'accessLevel', header_fa: 'سطح دسترسی', header_en: 'Effective Access', width: '150px',
         render: (v) => (
           <Badge variant={v === 'full' ? 'indigo' : 'amber'} size="sm">
             {v === 'full' ? t('کامل (ویرایش و حذف)', 'Full Access') : t('فقط مشاهده', 'View Only')}
           </Badge>
         )
-      }
+      },
+      { field: 'reason', header_fa: 'نحوه ارث‌بری', header_en: 'Inheritance/Reason', width: 'auto', render: (val) => <span className="text-[11px] text-slate-500">{val}</span> }
     ];
 
-    const consolidatedColumns = [
-      { field: 'username', header_fa: 'نام کاربری', header_en: 'Username', width: '130px' },
-      { field: 'fullName', header_fa: 'نام و نام خانوادگی', header_en: 'Full Name', width: '160px' },
-      {
-        field: 'accessLevel', header_fa: 'سطح دسترسی', header_en: 'Effective Access', width: '150px',
-        render: (v) => (
-          <Badge variant={v === 'full' ? 'indigo' : 'amber'} size="sm">
-            {v === 'full' ? t('کامل', 'Full Access') : t('فقط مشاهده', 'View Only')}
-          </Badge>
-        )
-      },
-      { field: 'reason', header_fa: 'نحوه تخصیص و ارث‌بری', header_en: 'Inheritance/Reason', width: '300px' }
+    const accessTabs = [
+      { id: 'assign', label: t('تخصیص دسترسی', 'Access Assignment') },
+      { id: 'aggregate', label: t('مشاهده تجمیع دسترسی‌ها', 'Aggregated Access View') }
     ];
 
     const levelLabels = {
@@ -531,14 +679,9 @@
                       {t('مشخصات حساب', 'Account Parameters')}
                     </button>
                     {!isCreatingNode && (
-                      <>
-                        <button onClick={() => setActiveTab('permissions')} className={`px-4 py-2 font-bold text-xs border-b-2 transition-all ${activeTab === 'permissions' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-                          {t('قوانین دسترسی', 'Access Grantees')}
-                        </button>
-                        <button onClick={() => setActiveTab('summary')} className={`px-4 py-2 font-bold text-xs border-b-2 transition-all ${activeTab === 'summary' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-                          {t('مجموع کاربران مجاز حساب', 'Consolidated User Scope')}
-                        </button>
-                      </>
+                      <button onClick={() => setActiveTab('access')} className={`px-4 py-2 font-bold text-xs border-b-2 transition-all ${activeTab === 'access' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                        {t('تنظیمات دسترسی', 'Access Configuration')}
+                      </button>
                     )}
                   </div>
 
@@ -582,32 +725,43 @@
                       </div>
                     )}
 
-                    {activeTab === 'permissions' && (
-                      <div className="space-y-4 flex flex-col h-full min-h-0 animate-in fade-in duration-200">
-                        <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end shrink-0">
-                          <SelectField size="sm" label={t('نوع دسترسی', 'Grantee Type')} value={permFormData.granteeType} onChange={(e) => setPermFormData({ ...permFormData, granteeType: e.target.value, granteeId: '' })} options={[{ value: 'user', label: t('کاربر مشخص', 'Specific User') }, { value: 'role', label: t('نقش کاربر', 'User Role') }]} isRtl={isRtl} />
-                          
-                          <SelectField size="sm" label={t('انتخاب هدف', 'Select Target')} value={permFormData.granteeId} onChange={(e) => setPermFormData({ ...permFormData, granteeId: e.target.value })} options={[{ value: '', label: t('انتخاب کنید...', 'Select...') }, ...(permFormData.granteeType === 'user' ? systemUsers.map(u => ({ value: u.id, label: u.username || u.name || u.email || '---' })) : systemRoles.map(r => ({ value: r.id, label: r.title || r.name })))]} isRtl={isRtl} />
-                          
-                          <SelectField size="sm" label={t('محدوده سطح دسترسی', 'Access Level')} value={permFormData.accessLevel} onChange={(e) => setPermFormData({ ...permFormData, accessLevel: e.target.value })} options={[{ value: 'view', label: t('فقط مشاهده تراکنش‌ها', 'View Only') }, { value: 'full', label: t('کامل (ثبت، ویرایش و حذف)', 'Full Control') }]} isRtl={isRtl} />
-                          
-                          <Button size="sm" variant="primary" icon={Plus} onClick={handleAddPermission}>{t('افزودن دسترسی', 'Grant Access')}</Button>
-                        </div>
-
-                        <div className="flex-1 min-h-[250px]">
-                          <DataGrid
-                            data={activeNodePermissions} columns={permColumns} language={language} formCode={formCode} hideImport={true}
-                            actions={[{ id: 'delete', icon: Trash2, tooltip: t('حذف دسترسی', 'Revoke Permission'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'permission', data: row }), className: 'text-red-500 hover:text-red-600' }]}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {activeTab === 'summary' && (
-                      <div className="space-y-3 flex flex-col h-full min-h-0 animate-in fade-in duration-200">
-                        <Alert type="warning" icon={Shield} message={t('لیست زیر مجموع تمامی کاربرانی است که به صورت مستقیم یا از طریق تفویض نقش‌های خود، اجازه تعامل با این حساب را کسب کرده‌اند.', 'Consolidated aggregate list of all operators with computed effective system access level.')} />
-                        <div className="flex-1 min-h-[300px]">
-                          <DataGrid data={consolidatedUsersList} columns={consolidatedColumns} language={language} formCode={formCode} hideImport={true} />
+                    {activeTab === 'access' && (
+                      <div className="flex flex-col h-full min-h-0 animate-in fade-in duration-200 gap-3">
+                        <Tabs tabs={accessTabs} activeTab={accessViewMode} onChange={setAccessViewMode} className="shrink-0" />
+                        
+                        <div className="flex-1 flex flex-col min-h-0">
+                          {accessViewMode === 'assign' ? (
+                            <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+                              <DataGrid 
+                                key="grid-perm-assign"
+                                data={permGridData} 
+                                columns={permColumns} 
+                                actions={permActions} 
+                                language={language} 
+                                hideImport={true}
+                                hideExport={true}
+                                onAdd={() => {
+                                  if (inlinePermEdit) return;
+                                  setInlinePermEdit({ id: 'new', data: { grantee_type: 'user', grantee_id: '', grantee_obj: null, access_level: 'view' } });
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex-1 min-h-0 flex flex-col gap-2">
+                              <Alert type="warning" icon={Shield} message={t('لیست زیر مجموع تمامی کاربرانی است که به صورت مستقیم یا از طریق تفویض نقش‌های خود، اجازه تعامل با این حساب را کسب کرده‌اند.', 'Consolidated aggregate list of all operators with computed effective system access level.')} />
+                              <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <DataGrid 
+                                  key="grid-perm-aggregate"
+                                  data={consolidatedUsersList} 
+                                  columns={consolidatedColumns} 
+                                  language={language} 
+                                  hideImport={true}
+                                  hideExport={true}
+                                  hideToolbar={true}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -646,3 +800,4 @@
   ChartOfAccountsMain.formCode = 'CHART_OF_ACCOUNTS_MAIN';
   window.ChartOfAccountsMain = ChartOfAccountsMain;
 })();
+

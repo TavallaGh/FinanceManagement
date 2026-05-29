@@ -52,6 +52,7 @@
     const [copyFormData, setCopyFormData] = useState({ sourceId: null, code: '', title: '' });
     
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
+    const [activationConfirm, setActivationConfirm] = useState({ isOpen: false, pendingData: null });
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -101,27 +102,58 @@
       setIsChartModalOpen(true);
     };
 
+    const hasOtherActiveCharts = (excludeId) => {
+      return charts.some(c => c.is_active && c.id !== excludeId);
+    };
+
     const handleSaveChart = async () => {
       if (!chartFormData.code || !chartFormData.title) {
         return showToast(t('وارد کردن کد و عنوان اجباری است', 'Code and Title are required'), 'error');
       }
+
+      if (chartFormData.is_active && hasOtherActiveCharts(chartFormData.id)) {
+        setActivationConfirm({ isOpen: true, pendingData: chartFormData });
+        return;
+      }
+
+      await executeSaveChart(chartFormData, false);
+    };
+
+    const handleToggleActive = async (row, newValue) => {
+      if (newValue && hasOtherActiveCharts(row.id)) {
+        setActivationConfirm({ isOpen: true, pendingData: { ...row, is_active: newValue } });
+        return;
+      }
+      await executeSaveChart({ ...row, is_active: newValue }, false);
+    };
+
+    const executeSaveChart = async (dataToSave, deactivateOthers = false) => {
+      setIsLoading(true);
       try {
+        if (deactivateOthers) {
+          const activeIds = charts.filter(c => c.is_active && c.id !== dataToSave.id).map(c => c.id);
+          if (activeIds.length > 0) {
+            const { error: deactErr } = await supabase.from('fm_coa_charts').update({ is_active: false }).in('id', activeIds);
+            if (deactErr) throw deactErr;
+          }
+        }
+
         const payload = {
-          code: chartFormData.code,
-          title: chartFormData.title,
-          start_date: chartFormData.start_date || null,
-          end_date: chartFormData.end_date || null,
-          is_active: chartFormData.is_active,
-          len_group: parseInt(chartFormData.len_group || 1, 10),
-          len_general: parseInt(chartFormData.len_general || 2, 10),
-          len_subsidiary: parseInt(chartFormData.len_subsidiary || 3, 10),
-          len_detail: parseInt(chartFormData.len_detail || 4, 10)
+          code: dataToSave.code,
+          title: dataToSave.title,
+          start_date: dataToSave.start_date || null,
+          end_date: dataToSave.end_date || null,
+          is_active: dataToSave.is_active,
+          len_group: parseInt(dataToSave.len_group || 1, 10),
+          len_general: parseInt(dataToSave.len_general || 2, 10),
+          len_subsidiary: parseInt(dataToSave.len_subsidiary || 3, 10),
+          len_detail: parseInt(dataToSave.len_detail || 4, 10)
         };
 
-        if (chartFormData.id) {
-          const { error } = await supabase.from('fm_coa_charts').update(payload).eq('id', chartFormData.id);
+        if (dataToSave.id) {
+          const { error } = await supabase.from('fm_coa_charts').update(payload).eq('id', dataToSave.id);
           if (error) throw error;
-          await logAction('ساختار حساب‌ها', chartFormData.id, 'update', `ویرایش ساختار: ${payload.title}`);
+          await logAction('ساختار حساب‌ها', dataToSave.id, 'update', `ویرایش ساختار: ${payload.title}`);
         } else {
           const { data, error } = await supabase.from('fm_coa_charts').insert([payload]).select();
           if (error) throw error;
@@ -130,10 +162,13 @@
           }
         }
         setIsChartModalOpen(false);
+        setActivationConfirm({ isOpen: false, pendingData: null });
         fetchCharts();
         showToast(t('ساختار با موفقیت ذخیره شد', 'Structure saved successfully'));
       } catch (err) {
         showToast(t('خطا در ذخیره اطلاعات ساختار', 'Error saving chart definition'), 'error');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -154,7 +189,7 @@
           title: copyFormData.title,
           start_date: srcChart.start_date,
           end_date: srcChart.end_date,
-          is_active: srcChart.is_active,
+          is_active: false,
           len_group: srcChart.len_group,
           len_general: srcChart.len_general,
           len_subsidiary: srcChart.len_subsidiary,
@@ -224,7 +259,7 @@
       { field: 'title', header_fa: 'عنوان ساختار', header_en: 'Structure Title', width: '180px' },
       { field: 'start_date', header_fa: 'تاریخ شروع موثر', header_en: 'Effective Start', width: '120px', type: 'date' },
       { field: 'end_date', header_fa: 'تاریخ پایان موثر', header_en: 'Effective End', width: '120px', type: 'date' },
-      { field: 'is_active', header_fa: 'وضعیت', header_en: 'Active', type: 'toggle', width: '120px' }
+      { field: 'is_active', header_fa: 'وضعیت', header_en: 'Active', type: 'toggle', width: '120px', onToggle: (row, val) => handleToggleActive(row, val) }
     ];
 
     const viewConfig = useMemo(() => ({
@@ -305,7 +340,20 @@
 
             <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
               <Button size="sm" variant="outline" onClick={() => setIsChartModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-              {access.canEdit && <Button size="sm" variant="primary" icon={Save} onClick={handleSaveChart}>{t('ذخیره ساختار', 'Save Setup')}</Button>}
+              {access.canEdit && <Button size="sm" variant="primary" icon={Save} onClick={handleSaveChart} isLoading={isLoading}>{t('ذخیره ساختار', 'Save Setup')}</Button>}
+            </div>
+          </div>
+        </Modal>
+
+        <Modal isOpen={activationConfirm.isOpen} onClose={() => setActivationConfirm({ isOpen: false, pendingData: null })} title={t('تایید تغییر وضعیت فعال', 'Confirm Activation')} language={language} width="max-w-sm">
+          <div className="p-4 flex flex-col gap-3 items-center text-center">
+            <div className="w-11 h-11 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 dark:text-amber-400 mb-1"><AlertTriangle size={22} /></div>
+            <p className="text-slate-600 dark:text-slate-300 text-[13px] leading-relaxed mt-1">
+              {t('در هر زمان تنها یک ساختار حساب می‌تواند فعال باشد. آیا تایید می‌کنید که این ساختار فعال شده و سایر ساختارها غیرفعال شوند؟', 'Only one chart structure can be active at a time. Do you confirm activating this one and deactivating all others?')}
+            </p>
+            <div className="flex gap-2 mt-4 w-full">
+              <Button size="sm" variant="outline" className="flex-1" onClick={() => setActivationConfirm({ isOpen: false, pendingData: null })}>{t('انصراف', 'Cancel')}</Button>
+              <Button size="sm" variant="primary" onClick={() => executeSaveChart(activationConfirm.pendingData, true)} isLoading={isLoading} className="flex-1 shadow-sm">{t('تایید و فعال‌سازی', 'Confirm & Activate')}</Button>
             </div>
           </div>
         </Modal>
