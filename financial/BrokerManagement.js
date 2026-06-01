@@ -3,7 +3,6 @@
   const React = window.React;
   const { useState, useEffect, useMemo, useRef } = React;
   
-  // --- Safe Component Destructuring ---
   const Fallback = () => null;
   const DS = window.DesignSystem || {};
   const DSCore = window.DSCore || DS;
@@ -22,6 +21,7 @@
   const CheckboxField = DSForms.CheckboxField || DS.CheckboxField || Fallback;
   const DatePicker = DSForms.DatePicker || DS.DatePicker || Fallback;
   const LogTimeline = DSFeedback.LogTimeline || DS.LogTimeline || Fallback;
+  const EmptyState = DSCore.EmptyState || DS.EmptyState || Fallback;
   
   const LucideIcons = window.LucideIcons || {};
   const FallbackIcon = () => null;
@@ -36,65 +36,6 @@
   const History = LucideIcons.History || FallbackIcon;
   
   const supabase = window.supabase;
-
-  // --- کامپوننت محلی برای انتخاب حساب ---
-  const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placeholder, isRtl }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [search, setSearch] = useState('');
-    const wrapperRef = useRef(null);
-    
-    const selectedAcc = accounts.find(a => String(a.id) === String(value));
-    const displaySelected = selectedAcc ? `${selectedAcc.code} - ${isRtl ? selectedAcc.titleFa : selectedAcc.titleEn}` : '';
-
-    useEffect(() => {
-      const handleClickOutside = (event) => { 
-        if (wrapperRef.current && !wrapperRef.current.contains(event.target)) setIsOpen(false); 
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const filtered = accounts.filter(a => {
-        const searchLower = search.toLowerCase();
-        const codeStr = a.code || '';
-        const titleStr = (isRtl ? a.titleFa : a.titleEn) || '';
-        const pathStr = (isRtl ? a.pathFa : a.pathEn) || '';
-        return codeStr.includes(searchLower) || titleStr.includes(searchLower) || pathStr.includes(searchLower);
-    });
-
-    return (
-      <div className="relative w-full flex flex-col gap-1.5" ref={wrapperRef}>
-        <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300">
-          {isRtl ? 'حساب مرتبط (آخرین سطح)' : 'Linked Account'}
-        </label>
-        <div className="relative w-full">
-          <input 
-            type="text" 
-            className={`w-full h-8 px-2.5 bg-white dark:bg-slate-700/40 border border-slate-300 dark:border-slate-500 rounded-lg text-[12px] text-slate-800 dark:text-slate-100 outline-none transition-all focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-400/20 focus:border-indigo-400 disabled:bg-slate-100 dark:disabled:bg-slate-800/50 disabled:text-slate-500 cursor-pointer`}
-            value={isOpen ? search : displaySelected} 
-            onChange={e => { setSearch(e.target.value); setIsOpen(true); }} 
-            onFocus={() => { setIsOpen(true); setSearch(''); }} 
-            disabled={disabled} 
-            placeholder={placeholder} 
-            dir={isRtl ? 'rtl' : 'ltr'}
-          />
-          {isOpen && !disabled && (
-            <div className={`absolute z-[9999] w-[350px] mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar ${isRtl ? 'right-0' : 'left-0'}`}>
-              {filtered.length > 0 ? filtered.map(acc => (
-                <div key={acc.id} className="px-3 py-2 text-[12px] hover:bg-indigo-50 dark:hover:bg-indigo-500/20 cursor-pointer border-b border-slate-100 dark:border-slate-700 last:border-0" onMouseDown={(e) => { e.preventDefault(); onChange(acc.id); setIsOpen(false); }}>
-                  <div className="font-bold text-slate-800 dark:text-slate-200 text-right dir-ltr">{acc.code} - {isRtl ? acc.titleFa : acc.titleEn}</div>
-                  <div className="text-slate-500 dark:text-slate-400 truncate mt-0.5 text-[10px] text-right" title={isRtl ? acc.pathFa : acc.pathEn}>{isRtl ? acc.pathFa : acc.pathEn}</div>
-                </div>
-              )) : (
-                <div className="p-3 text-center text-slate-500 text-[12px]">{isRtl ? 'موردی یافت نشد' : 'No results'}</div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-  // -------------------------------------------------------------
 
   const BrokerManagement = ({ language = 'fa' }) => {
     const isRtl = language === 'fa';
@@ -514,6 +455,12 @@
       { field: 'mobile', header_fa: 'شماره موبایل', header_en: 'Mobile', width: '150px' }
     ];
 
+    const accountLovColumns = [
+      { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px' },
+      { field: 'titleFa', header_fa: 'عنوان حساب', header_en: 'Title', width: '150px' },
+      { field: 'pathFa', header_fa: 'مسیر', header_en: 'Path', width: '250px' }
+    ];
+
     return (
       <div className="flex flex-col h-full p-4 bg-[#f8fafc] dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <PageHeader 
@@ -586,12 +533,16 @@
               </div>
 
               <div>
-                <SearchableAccountSelect 
-                  accounts={accounts}
-                  value={formData.accountId} 
-                  onChange={val => setFormData({...formData, accountId: val})} 
+                <LOVField 
+                  wrapperClassName="w-full"
+                  size="sm" 
+                  label={isRtl ? 'حساب مرتبط (آخرین سطح)' : 'Linked Account'}
+                  data={accounts}
+                  columns={accountLovColumns}
+                  dropdownWidth="min-w-[500px]"
+                  displayValue={accounts.find(a => String(a.id) === String(formData.accountId))?.titleFa ? `${accounts.find(a => String(a.id) === String(formData.accountId))?.code} - ${accounts.find(a => String(a.id) === String(formData.accountId))?.titleFa}` : ''}
+                  onChange={row => setFormData({...formData, accountId: row ? row.id : ''})}
                   isRtl={isRtl} 
-                  placeholder={t('جستجوی حساب...', 'Search Account...')}
                 />
               </div>
 
@@ -727,24 +678,20 @@
         </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1">
-               <AlertTriangle size={22} />
-            </div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1">
-               <Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-              {deleteConfirm.type === 'bulk' 
-                ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
-                : t(`آیا از حذف این رکورد اطمینان دارید؟`, `Are you sure you want to delete this record?`)
-              }
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 border-red-600 dark:border-red-500">{t('تایید حذف', 'Delete')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'bulk' 
+              ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
+              : t(`آیا از حذف این رکورد اطمینان دارید؟`, `Are you sure you want to delete this record?`)
+            }
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
         </Modal>
         
       </div>
