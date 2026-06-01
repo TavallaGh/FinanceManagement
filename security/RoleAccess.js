@@ -15,7 +15,9 @@
   const { 
       Modal = () => null, 
       Button = () => null, 
-      Tree = () => null 
+      Tree = () => null,
+      CheckboxField = () => null,
+      EmptyState = () => null
   } = DesignSystem;
 
   const supabase = window.supabase;
@@ -333,14 +335,14 @@
                                                 const displayLabel = labelObj ? labelObj[isRtl ? 'fa' : 'en'] : actionId;
                                                 
                                                 return (
-                                                    <label key={actionId} onClick={() => toggleAction(actionId)} className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer border transition-all select-none ${isChecked ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 shadow-sm' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                                                        <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${isChecked ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600'}`}>
-                                                            {isChecked && <Check size={12} strokeWidth={3}/>}
-                                                        </div>
-                                                        <span className={`text-[12px] ${isChecked ? 'font-bold text-blue-900 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 font-medium'}`}>
-                                                            {displayLabel}
-                                                        </span>
-                                                    </label>
+                                                    <div key={actionId} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-2 rounded-xl">
+                                                        <CheckboxField
+                                                            label={displayLabel}
+                                                            checked={isChecked}
+                                                            onChange={() => toggleAction(actionId)}
+                                                            isRtl={isRtl}
+                                                        />
+                                                    </div>
                                                 )
                                             })}
                                         </div>
@@ -368,13 +370,17 @@
                                                         <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-[11px] font-black text-slate-700 dark:text-slate-300">
                                                             {displayLabel}
                                                         </div>
-                                                        <div className="p-3 flex flex-wrap gap-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                                        <div className="p-3 grid grid-cols-1 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
                                                             {scopeDataList.length > 0 ? scopeDataList.map(item => {
                                                                 const isSelected = tempPermissions[selectedMenu.id]?.scopes?.[scopeId]?.includes(item.id);
                                                                 return (
-                                                                    <div key={item.id} onClick={() => toggleScope(scopeId, item.id)} className={`px-2.5 py-1 text-[11px] rounded-full border cursor-pointer select-none transition-all flex items-center gap-1.5 ${isSelected ? 'bg-blue-500 border-blue-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-600'}`}>
-                                                                        {isSelected && <Check size={10} strokeWidth={3}/>}
-                                                                        {item.title}
+                                                                    <div key={item.id} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-2 py-1.5 rounded-lg">
+                                                                        <CheckboxField
+                                                                            label={item.title}
+                                                                            checked={isSelected}
+                                                                            onChange={() => toggleScope(scopeId, item.id)}
+                                                                            isRtl={isRtl}
+                                                                        />
                                                                     </div>
                                                                 )
                                                             }) : (
@@ -405,20 +411,19 @@
 
             {confirmModal.isOpen && (
                 <Modal isOpen={true} onClose={() => setConfirmModal({ isOpen: false, type: '', title: '', message: '', onConfirm: null })} title={confirmModal.title} width="max-w-sm" language={language}>
-                    <div className="p-4 flex flex-col gap-3 items-center text-center">
-                        <div className={`w-11 h-11 rounded-full flex items-center justify-center mb-1 ${confirmModal.type === 'remove' ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-500' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'}`}>
-                            <AlertTriangle size={22} />
-                        </div>
-                        <p className="text-slate-600 dark:text-slate-300 text-[13px] leading-relaxed font-bold">
-                            {confirmModal.message}
-                        </p>
-                        <div className="flex gap-2 mt-4 w-full">
-                            <Button variant="outline" size="sm" className="flex-1" onClick={() => setConfirmModal({ isOpen: false, type: '', title: '', message: '', onConfirm: null })}>{t('انصراف', 'Cancel')}</Button>
-                            <Button variant="primary" size="sm" onClick={confirmModal.onConfirm} className={`flex-1 ${confirmModal.type === 'remove' ? 'bg-rose-600 dark:bg-rose-500 hover:bg-rose-700 border-rose-600' : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 border-blue-600'}`}>
-                                {t('تایید عملیات', 'Confirm')}
-                            </Button>
-                        </div>
-                    </div>
+                    <EmptyState
+                        icon={AlertTriangle}
+                        title={confirmModal.title}
+                        description={confirmModal.message}
+                        action={
+                            <div className="flex gap-2 w-full mt-2 px-4">
+                                <Button variant="outline" size="sm" className="flex-1" onClick={() => setConfirmModal({ isOpen: false, type: '', title: '', message: '', onConfirm: null })}>{t('انصراف', 'Cancel')}</Button>
+                                <Button variant={confirmModal.type === 'remove' ? 'danger' : 'primary'} size="sm" onClick={confirmModal.onConfirm} className="flex-1">
+                                    {t('تایید عملیات', 'Confirm')}
+                                </Button>
+                            </div>
+                        }
+                    />
                 </Modal>
             )}
         </Modal>

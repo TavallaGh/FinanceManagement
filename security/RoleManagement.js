@@ -26,7 +26,8 @@
     TextField = () => null, 
     ToggleField = () => null, 
     DatePicker = () => null,
-    LOVField = () => null
+    LOVField = () => null,
+    EmptyState = () => null
   } = DesignSystem;
 
   const supabase = window.supabase;
@@ -562,23 +563,22 @@
         </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center text-rose-500 dark:text-rose-400 mb-1">
-               <AlertTriangle size={22} />
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-[13px] leading-relaxed">
-              {deleteConfirm.type === 'role'
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'role'
                 ? t(`آیا از حذف نقش "${deleteConfirm.data?.title}" اطمینان دارید؟ تمامی دسترسی‌های این نقش حذف خواهد شد.`, `Are you sure you want to delete role "${deleteConfirm.data?.title}"? All permissions will be lost.`)
                 : deleteConfirm.type === 'bulk_user_role'
                 ? t(`آیا از حذف ${deleteConfirm.data?.length} کاربر انتخاب‌شده از این نقش اطمینان دارید؟`, `Are you sure you want to remove ${deleteConfirm.data?.length} selected users from this role?`)
                 : t(`آیا از حذف این کاربر از نقش فعلی اطمینان دارید؟`, `Are you sure you want to remove this user from the role?`)
               }
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1 bg-rose-600 dark:bg-rose-500 hover:bg-rose-700 dark:hover:bg-rose-600 border-rose-600 dark:border-rose-500">{t('تایید حذف', 'Delete')}</Button>
-            </div>
-          </div>
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
         </Modal>
 
       </div>
