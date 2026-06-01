@@ -351,6 +351,49 @@
       }
     };
 
+    const handleExportTree = () => {
+      if (!rawAccounts || rawAccounts.length === 0) {
+         return showToast(t('داده‌ای برای خروجی وجود ندارد.', 'No data to export.'), 'warning');
+      }
+      
+      showToast(t('در حال آماده‌سازی فایل خروجی...', 'Preparing export file...'), 'info');
+      
+      try {
+        const headers = isRtl 
+          ? 'کد حساب,عنوان فارسی,عنوان انگلیسی,نوع حساب,ارز,کنترل موجودی,وضعیت' 
+          : 'Account Code,Persian Title,English Title,Account Type,Currency,Control Inventory,Status';
+        
+        const csvRows = rawAccounts.map(row => {
+          const code = row.code || '';
+          const titleFa = `"${(row.titleFa || '').replace(/"/g, '""')}"`;
+          const titleEn = `"${(row.titleEn || '').replace(/"/g, '""')}"`;
+          const type = row.accountType === 'main' ? (isRtl ? 'اصلی' : 'Main') : (isRtl ? 'واسط/کنترلی' : 'Intermediate');
+          
+          let currency = isRtl ? 'ریال' : 'IRR';
+          if (row.currencyId) {
+             const c = lookups.currencies.find(x => String(x.id) === String(row.currencyId));
+             if (c) currency = (isRtl ? (c.title_fa || c.code) : (c.title_en || c.code));
+          }
+          
+          const controlInv = row.controlInventory ? (isRtl ? 'بله' : 'Yes') : (isRtl ? 'خیر' : 'No');
+          const status = row.isActive ? (isRtl ? 'فعال' : 'Active') : (isRtl ? 'غیرفعال' : 'Inactive');
+
+          return `${code},${titleFa},${titleEn},${type},${currency},${controlInv},${status}`;
+        });
+
+        const csvContent = '\uFEFF' + headers + '\n' + csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `ChartOfAccounts_${chart?.code || 'Export'}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        showToast(t('خطا در تولید فایل خروجی', 'Error generating export file'), 'error');
+      }
+    };
+
     const levelLabels = {
       1: t('سطح ۱ - گروه حساب', 'Level 1 - Account Group'),
       2: t('سطح ۲ - حساب کل', 'Level 2 - General Ledger'),
@@ -404,7 +447,7 @@
                 onAddChild={access.canCreate ? handleAddTreeChild : undefined}
                 onDelete={access.canDelete ? handleDeleteNode : undefined}
                 onImport={(file) => showToast(t(`فایل ${file.name} جهت پردازش بارگذاری شد.`, `File ${file.name} uploaded for processing.`), 'info')}
-                onExport={() => showToast(t('در حال آماده‌سازی فایل خروجی...', 'Preparing export file...'), 'info')}
+                onExport={handleExportTree}
                 onDownloadSample={() => showToast(t('در حال دانلود نمونه فایل اکسل...', 'Downloading Excel Sample...'), 'info')}
               />
             </div>
