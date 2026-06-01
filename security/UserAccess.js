@@ -1,24 +1,24 @@
 /* Filename: security/UserAccess.js */
 (() => {
   const React = window.React;
-  const ReactDOM = window.ReactDOM;
-  const { useState, useEffect, useCallback, useMemo, useRef } = React;
+  const { useState, useEffect, useCallback, useMemo } = React;
   
   const FallbackIcon = ({ size = 16, className = '' }) => React.createElement('span', { className: `inline-block ${className}`, style: { width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const { 
-    Shield = FallbackIcon, Lock = FallbackIcon, Save = FallbackIcon, 
-    Check = FallbackIcon, AlertCircle = FallbackIcon, User = FallbackIcon,
-    Zap = FallbackIcon, X = FallbackIcon, Plus = FallbackIcon, ChevronLeft = FallbackIcon,
-    FileText = FallbackIcon, Info = FallbackIcon, Search = FallbackIcon, Trash2 = FallbackIcon,
-    Eye = FallbackIcon
+    Shield = FallbackIcon, Save = FallbackIcon, User = FallbackIcon,
+    Zap = FallbackIcon, X = FallbackIcon, Info = FallbackIcon, Trash2 = FallbackIcon, Eye = FallbackIcon
   } = LucideIcons;
 
   const DesignSystem = window.DesignSystem || window.DSCore || {};
   const { 
       Modal = () => null, 
       Button = () => null,
-      DataGrid = () => null
+      DataGrid = () => null,
+      SelectField = () => null,
+      CheckboxField = () => null,
+      Tabs = () => null,
+      Badge = () => null
   } = DesignSystem;
 
   const supabase = window.supabase;
@@ -26,82 +26,6 @@
   const SCOPE_DICT = {
     'docTypes': { fa: 'انواع سند مجاز', en: 'Allowed Document Types' },
     'branches': { fa: 'شعب مجاز', en: 'Allowed Branches' }
-  };
-
-  const InlineSearch = ({ term, setTerm, results, onSelect, onCancel, t, isRtl }) => {
-      const [rect, setRect] = useState(null);
-      const inputRef = useRef(null);
-
-      const updateRect = useCallback(() => {
-          if (inputRef.current) {
-              setRect(inputRef.current.getBoundingClientRect());
-          }
-      }, []);
-
-      useEffect(() => {
-          updateRect();
-          window.addEventListener('resize', updateRect);
-          window.addEventListener('scroll', updateRect, true);
-          return () => {
-              window.removeEventListener('resize', updateRect);
-              window.removeEventListener('scroll', updateRect, true);
-          };
-      }, [updateRect]);
-
-      const dropdownContent = (
-          <div 
-              style={{ 
-                  position: 'fixed', 
-                  top: rect ? rect.bottom + 4 : 0, 
-                  left: rect ? rect.left : 0, 
-                  width: rect ? rect.width : 'auto', 
-                  zIndex: 999999 
-              }}
-              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-lg max-h-56 overflow-y-auto custom-scrollbar"
-          >
-              {results.length > 0 ? results.map(f => (
-                  <div 
-                      key={f.id} 
-                      onClick={() => onSelect(f)} 
-                      className="p-3 hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer text-[12px] border-b border-slate-50 dark:border-slate-700 last:border-0 transition-colors"
-                  >
-                      <div className="font-bold text-slate-800 dark:text-slate-200">{f.label}</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">{f.fullPath}</div>
-                  </div>
-              )) : (
-                  <div className="p-4 text-[11px] text-slate-400 text-center">{t('موردی یافت نشد.', 'No items found.')}</div>
-              )}
-          </div>
-      );
-
-      return (
-          <div className="relative w-full flex items-center gap-2" onClick={e => e.stopPropagation()}>
-              <div className="relative flex-1">
-                  <div className={`absolute inset-y-0 flex items-center pointer-events-none text-slate-400 ${isRtl ? 'right-2' : 'left-2'}`}>
-                      <Search size={14}/>
-                  </div>
-                  <input
-                      ref={inputRef}
-                      autoFocus
-                      value={term}
-                      onChange={(e) => {
-                          setTerm(e.target.value);
-                          updateRect();
-                      }}
-                      placeholder={t('جستجوی نام فرم جهت افزودن...', 'Search form name...')}
-                      className={`w-full h-8 text-[11px] font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border-2 border-blue-400 dark:border-blue-500 rounded outline-none focus:ring-2 focus:ring-blue-500 shadow-inner ${isRtl ? 'pr-8 pl-2' : 'pl-8 pr-2'}`}
-                  />
-                  {term && rect && (ReactDOM ? ReactDOM.createPortal(dropdownContent, document.body) : <div className="absolute top-full left-0 right-0 z-50">{dropdownContent}</div>)}
-              </div>
-              <button 
-                  className="text-slate-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                  onClick={onCancel}
-                  title={t('انصراف', 'Cancel')}
-              >
-                  <X size={16}/>
-              </button>
-          </div>
-      );
   };
 
   const UserAccess = ({ isOpen, onClose, user, language = 'fa' }) => {
@@ -128,8 +52,7 @@
     const [activeSourceId, setActiveSourceId] = useState(null);
     const [gridSelectedIds, setGridSelectedIds] = useState([]);
 
-    const [isInlineAdding, setIsInlineAdding] = useState(false);
-    const [inlineSearchTerm, setInlineSearchTerm] = useState('');
+    const [isAddFormModalOpen, setIsAddFormModalOpen] = useState(false);
 
     useEffect(() => {
       if (isOpen && user) {
@@ -141,8 +64,7 @@
         setDirectPerms({});
         setDeletedPermIds([]);
         setGridSelectedIds([]);
-        setIsInlineAdding(false);
-        setInlineSearchTerm('');
+        setIsAddFormModalOpen(false);
         setHasChanges(false);
       }
     }, [isOpen, user]);
@@ -287,33 +209,13 @@
             }
         });
 
-        const list = Array.from(map.values());
-
-        if (isInlineAdding) {
-            list.unshift({
-                id: 'INLINE_NEW',
-                path: '',
-                name: '',
-                isNewRow: true,
-                breakdown: []
-            });
-        }
-
-        return list;
-    }, [assignedRoles, directPerms, allSystemForms, globalRolePerms, allRoles, t, isInlineAdding]);
+        return Array.from(map.values());
+    }, [assignedRoles, directPerms, allSystemForms, globalRolePerms, allRoles, t]);
 
     const currentDetailRow = useMemo(() => {
         if (!selectedMenuId) return null;
-        if (selectedMenuId === 'INLINE_NEW') return { id: 'INLINE_NEW', isNewRow: true, breakdown: [] };
         return effectivePermissions.find(r => r.id === selectedMenuId) || null;
     }, [selectedMenuId, effectivePermissions]);
-
-    const inlineFilteredForms = useMemo(() => {
-        if (!inlineSearchTerm) return [];
-        return allSystemForms
-            .filter(f => !directPerms[f.id] && f.fullPath.toLowerCase().includes(inlineSearchTerm.toLowerCase()))
-            .slice(0, 15);
-    }, [allSystemForms, directPerms, inlineSearchTerm]);
 
     const handleSavePermissions = async () => {
       if (!hasChanges) return;
@@ -395,8 +297,6 @@
             [form.id]: { id: null, actions: [], scopes: {} }
         }));
         
-        setIsInlineAdding(false);
-        setInlineSearchTerm('');
         setSelectedMenuId(form.id);
         setGridSelectedIds([form.id]);
         setActiveSourceId('direct');
@@ -499,56 +399,32 @@
         header_fa: 'مسیر و نام فرم', 
         header_en: 'Form Path & Name', 
         width: '350px',
-        render: (val, row) => {
-            if (row.isNewRow) {
-                return (
-                    <InlineSearch 
-                        term={inlineSearchTerm} 
-                        setTerm={setInlineSearchTerm} 
-                        results={inlineFilteredForms} 
-                        onSelect={handleAddDirectForm} 
-                        onCancel={() => { setIsInlineAdding(false); setInlineSearchTerm(''); }} 
-                        t={t} 
-                        isRtl={isRtl} 
-                    />
-                );
-            }
-            return (
-                <div className="flex flex-col py-0.5 w-full">
-                    <span className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{row.name}</span>
-                    <span className="text-[10px] text-slate-400 font-sans truncate">{row.path}</span>
-                </div>
-            )
-        }
+        render: (val, row) => (
+            <div className="flex flex-col py-0.5 w-full">
+                <span className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{row.name}</span>
+                <span className="text-[10px] text-slate-400 font-sans truncate">{row.path}</span>
+            </div>
+        )
       },
       { 
         field: 'source', 
         header_fa: 'نوع دسترسی', 
         header_en: 'Access Type', 
         width: '250px',
-        render: (val, row) => {
-           if (row.isNewRow) return <span className="text-slate-400 text-[10px] italic">{t('نام فرم را جستجو و انتخاب کنید...', 'Search and select form...')}</span>;
-           return (
-              <div className="flex items-center w-full min-h-[24px]">
-                 <div className="flex flex-wrap gap-1 flex-1 items-center">
-                     {row.breakdown.map((s, idx) => {
-                        const isDirect = s.type === 'direct';
-                        return (
-                            <span 
-                               key={idx} 
-                               className={`px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1
-                                   ${isDirect 
-                                      ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700' 
-                                      : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}
-                            >
-                               {isDirect ? <Zap size={10}/> : <Shield size={10}/>} {s.label}
-                            </span>
-                        )
-                     })}
-                 </div>
-              </div>
-           )
-        }
+        render: (val, row) => (
+          <div className="flex items-center w-full min-h-[24px]">
+             <div className="flex flex-wrap gap-1 flex-1 items-center">
+                 {row.breakdown.map((s, idx) => {
+                    const isDirect = s.type === 'direct';
+                    return (
+                        <Badge key={idx} variant={isDirect ? 'blue' : 'gray'} className="flex items-center gap-1">
+                           {isDirect ? <Zap size={10}/> : <Shield size={10}/>} {s.label}
+                        </Badge>
+                    )
+                 })}
+             </div>
+          </div>
+        )
       }
     ];
 
@@ -588,16 +464,15 @@
                         </div>
                     </div>
                     
-                    <div className="shrink-0 flex items-center bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded p-1">
-                        <select 
-                            className="bg-transparent text-[11px] font-medium text-slate-700 dark:text-slate-300 outline-none w-48 cursor-pointer"
-                            onChange={e => { if(e.target.value) handleAddRole(e.target.value); e.target.value = ''; }}
-                        >
-                            <option value="">{t('+ افزودن نقش جدید...', '+ Add new role...')}</option>
-                            {allRoles.filter(r => !assignedRoles.includes(r.id)).map(r => (
-                                <option key={r.id} value={r.id}>{r.title}</option>
-                            ))}
-                        </select>
+                    <div className="shrink-0 w-64">
+                        <SelectField 
+                            size="sm"
+                            placeholder={t('+ افزودن نقش جدید...', '+ Add new role...')}
+                            options={allRoles.filter(r => !assignedRoles.includes(r.id)).map(r => ({ value: r.id, label: r.title }))}
+                            value=""
+                            onChange={(e) => { if(e.target.value) handleAddRole(e.target.value); }}
+                            isRtl={isRtl}
+                        />
                     </div>
                 </div>
 
@@ -614,7 +489,6 @@
                                 onSelectChange={setGridSelectedIds}
                                 activeRowId={selectedMenuId}
                                 onRowClick={(row) => {
-                                    if (row.isNewRow) return;
                                     setSelectedMenuId(row.id);
                                     if (row.breakdown && row.breakdown.length > 0) {
                                         if (!activeSourceId || !row.breakdown.find(b => b.sourceId === activeSourceId)) {
@@ -624,12 +498,8 @@
                                         setActiveSourceId(null);
                                     }
                                 }}
-                                onAdd={() => {
-                                    setIsInlineAdding(true);
-                                    setInlineSearchTerm('');
-                                }}
+                                onAdd={() => setIsAddFormModalOpen(true)}
                                 onRowDoubleClick={(row) => {
-                                    if (row.isNewRow) return;
                                     setSelectedMenuId(row.id);
                                     if (row.breakdown.length > 0) setActiveSourceId(row.breakdown[0].sourceId);
                                 }}
@@ -638,7 +508,6 @@
                                         icon: Eye, 
                                         tooltip: t('مشاهده جزئیات', 'View Details'), 
                                         onClick: (row) => {
-                                            if (row.isNewRow) return;
                                             setSelectedMenuId(row.id);
                                             if (row.breakdown.length > 0) setActiveSourceId(row.breakdown[0].sourceId);
                                         },
@@ -647,7 +516,7 @@
                                     {
                                         icon: Trash2,
                                         tooltip: t('حذف دسترسی مستقیم', 'Delete Direct Access'),
-                                        hidden: (row) => row.isNewRow || !row.breakdown.some(b => b.type === 'direct'),
+                                        hidden: (row) => !row.breakdown.some(b => b.type === 'direct'),
                                         onClick: (row) => handleDeleteDirect(row.id),
                                         className: 'text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors'
                                     }
@@ -664,7 +533,7 @@
                         </div>
                     </div>
 
-                    {currentDetailRow && !currentDetailRow.isNewRow && (
+                    {currentDetailRow && (
                         <div className="w-full md:w-5/12 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 flex flex-col overflow-hidden animate-in slide-in-from-right-5 duration-200 relative z-10 shadow-sm">
                             <div className="absolute top-3 left-3">
                                 <button onClick={() => setSelectedMenuId(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors">
@@ -677,137 +546,106 @@
                                 <div className="text-[10px] text-slate-500 font-sans leading-tight">{currentDetailRow.path}</div>
                             </div>
 
-                            <div className="p-4 flex-1 overflow-y-auto space-y-4">
-                                
+                            <div className="flex-1 flex flex-col overflow-hidden">
                                 {currentDetailRow.breakdown.length > 1 && (
-                                    <div className="flex gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-                                        {currentDetailRow.breakdown.map((s, idx) => (
-                                            <button 
-                                                key={idx}
-                                                onClick={() => setActiveSourceId(s.sourceId)}
-                                                className={`px-3 py-1.5 rounded text-[11px] font-bold border transition-all flex items-center gap-1.5
-                                                ${activeSourceId === s.sourceId 
-                                                    ? 'bg-blue-100 text-blue-700 border-blue-300 shadow-sm dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-600' 
-                                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-blue-50 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 dark:hover:bg-slate-700'}`}
-                                            >
-                                                {s.type === 'direct' ? <Zap size={12}/> : <Shield size={12}/>}
-                                                {s.label}
-                                            </button>
-                                        ))}
+                                    <div className="px-4 pt-4 border-b border-slate-100 dark:border-slate-800">
+                                        <Tabs 
+                                            tabs={currentDetailRow.breakdown.map(s => ({ 
+                                                id: s.sourceId, 
+                                                label: s.label, 
+                                                icon: s.type === 'direct' ? Zap : Shield 
+                                            }))}
+                                            activeTab={activeSourceId}
+                                            onChange={setActiveSourceId}
+                                        />
                                     </div>
                                 )}
 
-                                {activeSource && (
-                                    <>
-                                        {!isReadOnly && (
-                                            <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800 p-2.5 rounded shadow-sm">
-                                                <Zap size={14} className="text-blue-600 dark:text-blue-400" />
-                                                <span className="font-bold text-[11px] text-blue-800 dark:text-blue-300">
-                                                    {t('شما در حال ویرایش دسترسی مستقیم هستید.', 'Editing Direct Access.')}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {isReadOnly && (
-                                            <div className="flex items-start gap-2 text-[10px] text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 p-2.5 rounded leading-relaxed border border-slate-200 dark:border-slate-700 shadow-sm">
-                                                <Info size={14} className="shrink-0 text-amber-500 mt-0.5"/>
-                                                {t('این دسترسی‌ها از نقش به ارث رسیده‌اند و در اینجا قابل تغییر نیستند. برای ویرایش باید به فرم مدیریت نقش‌ها بروید.', 'Inherited from role. To edit, please use the Role Management screen.')}
-                                            </div>
-                                        )}
-
-                                        <div className="space-y-3">
-                                            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider">
-                                                {t('عملیات مجاز (Actions)', 'Allowed Actions')}
-                                            </div>
-
-                                            {availActions.length === 0 ? (
-                                                <div className="text-[10px] text-slate-400 italic p-3 bg-slate-50 dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700">
-                                                    {t('عملیاتی برای این فرم تعریف نشده است.', 'No actions defined.')}
+                                <div className="p-4 flex-1 overflow-y-auto space-y-4">
+                                    {activeSource && (
+                                        <>
+                                            {!isReadOnly && (
+                                                <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800 p-2.5 rounded shadow-sm mb-4">
+                                                    <Zap size={14} className="text-blue-600 dark:text-blue-400" />
+                                                    <span className="font-bold text-[11px] text-blue-800 dark:text-blue-300">
+                                                        {t('شما در حال ویرایش دسترسی مستقیم هستید.', 'Editing Direct Access.')}
+                                                    </span>
                                                 </div>
-                                            ) : (
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                                                    {availActions.map(actId => {
-                                                        const isChecked = activeSource.actions.includes(actId);
-                                                        const labelObj = actionDictionary[actId];
-                                                        const lbl = labelObj ? labelObj[isRtl ? 'fa' : 'en'] : actId;
+                                            )}
 
-                                                        if (isReadOnly) {
-                                                            return (
-                                                                <div key={actId} className={`flex flex-col items-center justify-center text-center gap-1.5 p-2.5 rounded border bg-slate-50 dark:bg-slate-800 ${isChecked ? 'border-blue-200 dark:border-blue-800 opacity-100 shadow-sm' : 'border-slate-100 dark:border-slate-800 opacity-50'}`}>
-                                                                    <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'text-transparent border-slate-300'}`}>
-                                                                        <Check size={12} strokeWidth={3}/>
-                                                                    </div>
-                                                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 leading-tight">{lbl}</span>
-                                                                </div>
-                                                            );
-                                                        }
+                                            {isReadOnly && (
+                                                <div className="flex items-start gap-2 text-[10px] text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 p-2.5 rounded leading-relaxed border border-slate-200 dark:border-slate-700 shadow-sm mb-4">
+                                                    <Info size={14} className="shrink-0 text-amber-500 mt-0.5"/>
+                                                    {t('این دسترسی‌ها از نقش به ارث رسیده‌اند و در اینجا قابل تغییر نیستند. برای ویرایش باید به فرم مدیریت نقش‌ها بروید.', 'Inherited from role. To edit, please use the Role Management screen.')}
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-3">
+                                                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
+                                                    {t('عملیات مجاز (Actions)', 'Allowed Actions')}
+                                                </div>
+
+                                                {availActions.length === 0 ? (
+                                                    <div className="text-[10px] text-slate-400 italic p-3 bg-slate-50 dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700">
+                                                        {t('عملیاتی برای این فرم تعریف نشده است.', 'No actions defined.')}
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                                                        {availActions.map(actId => (
+                                                            <CheckboxField
+                                                                key={actId}
+                                                                label={actionDictionary[actId]?.[isRtl ? 'fa' : 'en'] || actId}
+                                                                checked={activeSource.actions.includes(actId)}
+                                                                onChange={() => handleUpdateDirectPermission(currentDetailRow.id, 'action', actId)}
+                                                                disabled={isReadOnly}
+                                                                isRtl={isRtl}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {availScopes.length > 0 && (
+                                                <div className="space-y-3 pt-6 border-t border-slate-200 dark:border-slate-800">
+                                                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
+                                                        {t('محدودیت دسترسی به داده‌ها', 'Data Scopes')}
+                                                    </div>
+                                                    
+                                                    {availScopes.map(scopeId => {
+                                                        const scopeDataList = scopesData[scopeId] || [];
+                                                        const displayLabel = SCOPE_DICT[scopeId]?.[isRtl ? 'fa' : 'en'] || scopeId;
 
                                                         return (
-                                                            <label 
-                                                                key={actId} 
-                                                                onClick={() => handleUpdateDirectPermission(currentDetailRow.id, 'action', actId)}
-                                                                className={`flex flex-col items-center justify-center text-center gap-1.5 p-2.5 rounded border cursor-pointer transition-all bg-white dark:bg-slate-800 ${isChecked ? 'border-blue-400 ring-1 ring-blue-100 dark:ring-0 dark:border-blue-500 shadow-sm' : 'border-slate-200 dark:border-slate-700 hover:border-blue-300'}`}
-                                                            >
-                                                                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 dark:border-slate-600'}`}>
-                                                                    {isChecked && <Check size={12} strokeWidth={3}/>}
+                                                            <div key={scopeId} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded overflow-hidden flex flex-col shadow-sm mb-3">
+                                                                <div className="px-3 py-2 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-600 dark:text-slate-400">
+                                                                    {displayLabel}
                                                                 </div>
-                                                                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 leading-tight">{lbl}</span>
-                                                            </label>
+                                                                <div className="p-3">
+                                                                    {scopeDataList.length > 0 ? (
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-40 overflow-y-auto">
+                                                                            {scopeDataList.map(item => (
+                                                                                <CheckboxField
+                                                                                    key={item.id}
+                                                                                    label={item.title}
+                                                                                    checked={activeSource.scopes?.[scopeId]?.includes(item.id)}
+                                                                                    onChange={() => handleUpdateDirectPermission(currentDetailRow.id, 'scope', scopeId, item.id)}
+                                                                                    disabled={isReadOnly}
+                                                                                    isRtl={isRtl}
+                                                                                />
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-slate-400 italic">{t('داده‌ای یافت نشد.', 'No data found.')}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
                                                         );
                                                     })}
                                                 </div>
                                             )}
-                                        </div>
-
-                                        {availScopes.length > 0 && (
-                                            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-                                                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider">
-                                                    {t('محدودیت دسترسی به داده‌ها', 'Data Scopes')}
-                                                </div>
-                                                
-                                                {availScopes.map(scopeId => {
-                                                    const scopeDataList = scopesData[scopeId] || [];
-                                                    const displayLabel = SCOPE_DICT[scopeId]?.[isRtl ? 'fa' : 'en'] || scopeId;
-
-                                                    return (
-                                                        <div key={scopeId} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded overflow-hidden flex flex-col shadow-sm">
-                                                            <div className="px-3 py-2 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-600 dark:text-slate-400">
-                                                                {displayLabel}
-                                                            </div>
-                                                            <div className="p-2.5 flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-                                                                {scopeDataList.length > 0 ? scopeDataList.map(item => {
-                                                                    const isSelected = activeSource.scopes?.[scopeId]?.includes(item.id);
-
-                                                                    if (isReadOnly) {
-                                                                        if (!isSelected) return null;
-                                                                        return (
-                                                                            <span key={item.id} className="px-2.5 py-1 text-[10px] rounded bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 font-bold flex items-center gap-1 shadow-sm">
-                                                                                <Check size={10} strokeWidth={3}/> {item.title}
-                                                                            </span>
-                                                                        );
-                                                                    }
-
-                                                                    return (
-                                                                        <div 
-                                                                            key={item.id} 
-                                                                            onClick={() => handleUpdateDirectPermission(currentDetailRow.id, 'scope', scopeId, item.id)}
-                                                                            className={`px-2.5 py-1 text-[10px] rounded border cursor-pointer select-none transition-all flex items-center gap-1 shadow-sm ${isSelected ? 'bg-blue-600 border-blue-600 text-white font-bold' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-blue-400'}`}
-                                                                        >
-                                                                            {isSelected && <Check size={10} strokeWidth={3}/>}
-                                                                            {item.title}
-                                                                        </div>
-                                                                    );
-                                                                }) : (
-                                                                    <span className="text-[10px] text-slate-400 italic">{t('داده‌ای یافت نشد.', 'No data found.')}</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </>
-                                )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -832,6 +670,23 @@
                     </div>
                 </div>
             </div>
+            <Modal isOpen={isAddFormModalOpen} onClose={() => setIsAddFormModalOpen(false)} title={t('افزودن دسترسی مستقیم', 'Add Direct Access')} width="max-w-md" language={language}>
+                <div className="p-4 flex flex-col gap-4 min-h-[250px]">
+                    <SelectField
+                        label={t('جستجو و انتخاب فرم', 'Search and select form')}
+                        options={allSystemForms.filter(f => !directPerms[f.id]).map(f => ({ value: f.id, label: f.fullPath }))}
+                        value=""
+                        onChange={(e) => {
+                            const f = allSystemForms.find(x => x.id === e.target.value);
+                            if(f) {
+                                handleAddDirectForm(f);
+                                setIsAddFormModalOpen(false);
+                            }
+                        }}
+                        isRtl={isRtl}
+                    />
+                </div>
+            </Modal>
         </Modal>
     );
   };

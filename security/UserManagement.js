@@ -5,8 +5,8 @@
   
   const { 
     Button, PageHeader, Modal, AdvancedFilter, DataGrid, 
-    TextField, SelectField, ToggleField, Badge, CheckboxField
-  } = window.DesignSystem || {};
+    TextField, SelectField, ToggleField, Badge, CheckboxField, EmptyState
+  } = window.DesignSystem || window.DSCore || {};
   
   const { 
     Users, Edit, Trash2, Save, 
@@ -746,39 +746,34 @@
         </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1">
-               <AlertTriangle size={22} />
-            </div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1">
-               <Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-              {deleteConfirm.type === 'bulk' 
-                ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
-                : t(`آیا از حذف کاربر "${deleteConfirm.data?.username}" اطمینان دارید؟`, `Delete this user?`)
-              }
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 border-red-600 dark:border-red-500">{t('تایید حذف', 'Delete')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'bulk' 
+              ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
+              : t(`آیا از حذف کاربر "${deleteConfirm.data?.username}" اطمینان دارید؟`, `Delete this user?`)
+            }
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
         </Modal>
 
         <Modal isOpen={resetConfirm.isOpen} onClose={() => setResetConfirm({ isOpen: false, data: null })} title={t('بازنشانی رمز عبور', 'Reset Password')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 dark:text-amber-400 mb-1">
-               <RefreshCw size={22} />
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-              {t(`آیا از بازنشانی رمز عبور کاربر "${resetConfirm.data?.username}" به 123456 اطمینان دارید؟`, `Are you sure you want to reset password to 123456?`)}
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setResetConfirm({ isOpen: false, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeResetPassword} isLoading={isLoading} className="flex-1">{t('تایید بازنشانی', 'Confirm Reset')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={RefreshCw}
+            title={t('بازنشانی رمز عبور', 'Reset Password')}
+            description={t(`آیا از بازنشانی رمز عبور کاربر "${resetConfirm.data?.username}" به 123456 اطمینان دارید؟`, `Are you sure you want to reset password to 123456?`)}
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setResetConfirm({ isOpen: false, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="primary" size="sm" onClick={executeResetPassword} isLoading={isLoading} className="flex-1">{t('تایید بازنشانی', 'Confirm Reset')}</Button>
+              </div>
+            }
+          />
         </Modal>
         
         {window.UserAccess && (
