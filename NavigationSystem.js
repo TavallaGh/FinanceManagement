@@ -27,7 +27,7 @@
           </div>
           <h3 className="text-[16px] font-black text-slate-800 dark:text-slate-100 mb-2">خطا در بارگذاری فرم</h3>
           <p className="text-[14px] text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 p-3 rounded-lg mt-2 font-sans">
-            کامپوننت <br/><strong className="text-red-600 dark:text-red-400 font-mono">{componentName}</strong><br/> در سیستم یافت نشد (لطفاً بررسی کنید که فایل آن آپلود شده باشد).
+            کامپوننت <br/><strong className="text-red-600 dark:text-red-400 font-sans">{componentName}</strong><br/> در سیستم یافت نشد (لطفاً بررسی کنید که فایل آن آپلود شده باشد).
           </p>
         </div>
       );

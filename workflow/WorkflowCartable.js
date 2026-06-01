@@ -180,7 +180,7 @@
                     React.createElement('td', { className: 'p-4 text-center text-slate-400' }, index + 1),
                     React.createElement('td', { className: 'p-4 font-medium text-slate-900' }, wfDef.title || 'فرآیند ناشناس'),
                     React.createElement('td', { className: 'p-4' }, React.createElement(Badge, { variant: 'warning', className: 'text-xs' }, task.node_id)),
-                    React.createElement('td', { className: 'p-4 text-center' }, React.createElement(Badge, { variant: 'neutral', className: 'font-mono text-xs' }, wfInstance.entity_type)),
+                    React.createElement('td', { className: 'p-4 text-center' }, React.createElement(Badge, { variant: 'neutral', className: 'font-sans text-xs' }, wfInstance.entity_type)),
                     React.createElement('td', { className: 'p-4 text-slate-600' }, wfInstance.created_by),
                     React.createElement('td', { className: 'p-4 text-slate-500 text-xs text-left' }, new Date(task.created_at).toLocaleString('fa-IR')),
                     React.createElement(

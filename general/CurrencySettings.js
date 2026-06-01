@@ -229,7 +229,7 @@
         options: [{value: 'auto', label: t('اتوماتیک', 'Auto')}, {value: 'manual', label: t('دستی', 'Manual')}],
         render: (v) => <Badge variant={v === 'auto' ? 'emerald' : 'slate'} className="text-[10px]">{v === 'auto' ? t('اتوماتیک', 'Auto') : t('دستی', 'Manual')}</Badge>
       },
-      { field: 'decimal_places', header_fa: 'اعشار', header_en: 'Decimals', width: '70px', render: (v) => <span className="text-slate-500 dark:text-slate-400 font-mono">{v}</span> },
+      { field: 'decimal_places', header_fa: 'اعشار', header_en: 'Decimals', width: '70px', render: (v) => <span className="text-slate-500 dark:text-slate-400 font-sans">{v}</span> },
       { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', type: 'toggle', width: '90px' },
     ];
 

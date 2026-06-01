@@ -151,7 +151,7 @@
                 <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{getEntityDisplay(v)}</span>
             </div>
         )},
-        { field: 'version', header_fa: 'نسخه', header_en: 'Version', width: '80px', render: (v) => <Badge variant="slate" size="sm" className="font-mono">v{v}.0</Badge> },
+        { field: 'version', header_fa: 'نسخه', header_en: 'Version', width: '80px', render: (v) => <Badge variant="slate" size="sm" className="font-sans">v{v}.0</Badge> },
         { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', width: '100px', render: (v, row) => (
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => toggleStatus(row.id, v)}>
                 <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${v ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>

@@ -390,7 +390,7 @@
     ];
 
     const lineItemColumns = [
-      { field: 'id', header_fa: 'ردیف', header_en: 'Row', width: '60px', render: (val, row, idx) => <span className="px-2 font-mono text-slate-600 dark:text-slate-400">{idx + 1}</span> },
+      { field: 'id', header_fa: 'ردیف', header_en: 'Row', width: '60px', render: (val, row, idx) => <span className="px-2 font-sans text-slate-600 dark:text-slate-400">{idx + 1}</span> },
       { 
         field: 'account', header_fa: 'حساب معین', header_en: 'Account', width: '200px', 
         render: (val, row) => editingLineItemId === row.id 

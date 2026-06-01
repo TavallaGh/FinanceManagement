@@ -204,7 +204,7 @@
           const startNum = r.startNumber || 1;
           const numLen = r.numberLength || 4;
           const paddedNum = String(startNum).padStart(numLen, 'X');
-          return <span className="font-mono text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded dir-ltr inline-block">{`${r.prefix || ''}${paddedNum}${r.suffix || ''}`}</span>;
+          return <span className="font-sans text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded dir-ltr inline-block">{`${r.prefix || ''}${paddedNum}${r.suffix || ''}`}</span>;
         }
       },
       { field: 'numberLength', header_fa: 'طول ارقام', header_en: 'Length', width: '100px' },
@@ -259,7 +259,7 @@
             
             <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-2">
               <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('پیش‌نمایش کد بعدی:', 'Next Code Preview:')}</span>
-              <div className="font-mono text-2xl font-black text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 px-6 py-2 rounded-lg shadow-sm border border-indigo-100 dark:border-indigo-900/50 dir-ltr tracking-widest">
+              <div className="font-sans text-2xl font-black text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 px-6 py-2 rounded-lg shadow-sm border border-indigo-100 dark:border-indigo-900/50 dir-ltr tracking-widest">
                 {generatePreview()}
               </div>
             </div>

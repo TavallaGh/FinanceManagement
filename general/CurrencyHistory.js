@@ -212,16 +212,16 @@
           return (
              <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
                <Calendar size={12} className="text-slate-400 dark:text-slate-500" />
-               <span className="font-mono text-[12px] font-medium" dir="ltr">{formattedDate}</span>
+               <span className="font-sans text-[12px] font-medium" dir="ltr">{formattedDate}</span>
                <Clock size={12} className="text-slate-400 dark:text-slate-500 ml-1" />
-               <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded" dir="ltr">{String(d.getHours()).padStart(2, '0')}:{String(d.getMinutes()).padStart(2, '0')}</span>
+               <span className="font-sans text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded" dir="ltr">{String(d.getHours()).padStart(2, '0')}:{String(d.getMinutes()).padStart(2, '0')}</span>
              </div>
           );
         }
       },
       { field: 'base_currency', header_fa: 'ارز پایه', header_en: 'Base', width: '100px', render: (v) => <span className="font-bold text-slate-800 dark:text-slate-200">{v}</span> },
       { field: 'target_currency', header_fa: 'ارز هدف', header_en: 'Target', width: '100px' },
-      { field: 'rate', header_fa: 'نرخ تبدیل', header_en: 'Rate', width: '150px', render: (v) => <span className="font-mono font-bold text-indigo-700 dark:text-indigo-400">{v.toLocaleString()}</span> },
+      { field: 'rate', header_fa: 'نرخ تبدیل', header_en: 'Rate', width: '150px', render: (v) => <span className="font-sans font-bold text-indigo-700 dark:text-indigo-400">{v.toLocaleString()}</span> },
       { field: 'source', header_fa: 'منبع', header_en: 'Source', width: '100px', render: (v) => <Badge variant={v === 'XE' ? 'emerald' : 'blue'} size="sm">{v}</Badge> }
     ];
 
@@ -317,7 +317,7 @@
               <div className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
                  <div className="flex items-center justify-between text-[14px]"><span className="text-slate-500 dark:text-slate-400 font-bold">{t('ارز پایه:', 'Base:')}</span><span className="font-black text-slate-800 dark:text-slate-200">{editingRate?.base_currency}</span></div>
                  <div className="flex items-center justify-between text-[14px]"><span className="text-slate-500 dark:text-slate-400 font-bold">{t('ارز هدف:', 'Target:')}</span><span className="font-black text-slate-800 dark:text-slate-200">{editingRate?.target_currency}</span></div>
-                 <div className="flex items-center justify-between text-[14px]"><span className="text-slate-500 dark:text-slate-400 font-bold">{t('تاریخ:', 'Date:')}</span><span className="font-black text-slate-800 dark:text-slate-200 font-mono" dir="ltr">{formatGlobalDate ? formatGlobalDate(editingRate?.rate_date, globalCalendarMode) : editingRate?.rate_date}</span></div>
+                 <div className="flex items-center justify-between text-[14px]"><span className="text-slate-500 dark:text-slate-400 font-bold">{t('تاریخ:', 'Date:')}</span><span className="font-black text-slate-800 dark:text-slate-200 font-sans" dir="ltr">{formatGlobalDate ? formatGlobalDate(editingRate?.rate_date, globalCalendarMode) : editingRate?.rate_date}</span></div>
               </div>
               <CurrencyField formCode={formCode} label={t('مبلغ نرخ', 'Rate Amount')} value={editingRate?.rate || ''} onChange={(v) => setEditingRate({...editingRate, rate: v})} isRtl={isRtl} size="md" required />
               <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
@@ -341,12 +341,12 @@
               {currentConvRate !== null && (
                  <div className="w-full mt-4 flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800/50 rounded-lg animate-in fade-in">
                     <span className="text-[12px] font-bold text-emerald-700 dark:text-emerald-400">{t('نرخ برابری:', 'Exchange Rate:')}</span>
-                    <span className="text-[14px] font-black font-mono text-emerald-800 dark:text-emerald-300" dir="ltr">1 {convFrom} = {currentConvRate.toLocaleString(undefined, { maximumFractionDigits: 10 })} {convTo}</span>
+                    <span className="text-[14px] font-black font-sans text-emerald-800 dark:text-emerald-300" dir="ltr">1 {convFrom} = {currentConvRate.toLocaleString(undefined, { maximumFractionDigits: 10 })} {convTo}</span>
                  </div>
               )}
               <div className="mt-6 w-full p-5 bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center gap-1 shadow-sm">
                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter">{t('حاصل تبدیل بر اساس تاریخ انتخابی', 'Conversion Result by Date')}</span>
-                 <div className="text-2xl font-black text-indigo-700 dark:text-indigo-400 font-mono tracking-tight" dir="ltr">{convResult === null ? t('نامشخص', 'Unknown') : convResult} <span className="text-sm text-slate-400 dark:text-slate-500 font-sans ml-1">{convTo}</span></div>
+                 <div className="text-2xl font-black text-indigo-700 dark:text-indigo-400 font-sans tracking-tight" dir="ltr">{convResult === null ? t('نامشخص', 'Unknown') : convResult} <span className="text-sm text-slate-400 dark:text-slate-500 font-sans ml-1">{convTo}</span></div>
               </div>
            </div>
         </Modal>
