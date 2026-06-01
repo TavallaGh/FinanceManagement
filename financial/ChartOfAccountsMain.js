@@ -404,6 +404,7 @@
                 onAddChild={access.canCreate ? handleAddTreeChild : undefined}
                 onDelete={access.canDelete ? handleDeleteNode : undefined}
                 onImport={(file) => showToast(t(`فایل ${file.name} جهت پردازش بارگذاری شد.`, `File ${file.name} uploaded for processing.`), 'info')}
+                onExport={() => showToast(t('در حال آماده‌سازی فایل خروجی...', 'Preparing export file...'), 'info')}
                 onDownloadSample={() => showToast(t('در حال دانلود نمونه فایل اکسل...', 'Downloading Excel Sample...'), 'info')}
               />
             </div>

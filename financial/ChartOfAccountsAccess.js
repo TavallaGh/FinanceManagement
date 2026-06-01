@@ -11,7 +11,7 @@
   } = LucideIcons;
 
   const Core = window.DSCore || window.DesignSystem || {};
-  const { Button = () => null, Badge = () => null, Tabs = () => null } = Core;
+  const { Button = () => null, Badge = () => null, Tabs = () => null, EmptyState = () => null } = Core;
 
   const Forms = window.DSForms || window.DesignSystem || {};
   const { SelectField = () => null, ToggleField = () => null, DatePicker = () => null } = Forms;
@@ -485,13 +485,21 @@
                         {accessViewMode === 'assign' ? <Shield size={14} className="text-indigo-500"/> : <Users size={14} className="text-indigo-500"/>}
                         {accessViewMode === 'assign' ? t('مدیریت مستقیم دسترسی‌های این حساب', 'Direct Access Management') : t('نمای تجمیعی تمامی دسترسی‌های موثر', 'Consolidated Effective Access')}
                     </span>
-                    <div className="flex items-center gap-1 bg-slate-200/50 dark:bg-slate-900/50 p-1 rounded-md">
-                        <button onClick={() => setAccessViewMode('assign')} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all flex items-center gap-1.5 ${accessViewMode === 'assign' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                    <div className="flex items-center gap-1 p-1">
+                        <Button 
+                            size="sm" 
+                            variant={accessViewMode === 'assign' ? 'primary' : 'outline'} 
+                            onClick={() => setAccessViewMode('assign')}
+                        >
                             {t('تخصیص دسترسی', 'Assign Access')}
-                        </button>
-                        <button onClick={() => setAccessViewMode('aggregate')} className={`px-3 py-1.5 text-[11px] font-bold rounded transition-all flex items-center gap-1.5 ${accessViewMode === 'aggregate' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                        </Button>
+                        <Button 
+                            size="sm" 
+                            variant={accessViewMode === 'aggregate' ? 'primary' : 'outline'} 
+                            onClick={() => setAccessViewMode('aggregate')}
+                        >
                             {t('کل کاربران مجاز', 'All Authorized Users')}
-                        </button>
+                        </Button>
                     </div>
                 </div>
                 
@@ -499,15 +507,26 @@
                     {accessViewMode === 'assign' ? (
                     <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
                         <DataGrid 
-                        key="grid-perm-assign" data={permGridData} columns={permColumns} actions={permActions} language={language} 
-                        hideImport={true} hideExport={true} isLoading={isLoading}
-                        onAdd={() => { if (!inlinePermEdit) setInlinePermEdit({ id: 'new', data: { grantee_type: 'user', grantee_id: '', grantee_obj: null, access_level: 'view' } }); }}
+                            key="grid-perm-assign" 
+                            data={permGridData} 
+                            columns={permColumns} 
+                            actions={permActions} 
+                            language={language} 
+                            hideImport={true} 
+                            isLoading={isLoading}
+                            onAdd={() => { if (!inlinePermEdit) setInlinePermEdit({ id: 'new', data: { grantee_type: 'user', grantee_id: '', grantee_obj: null, access_level: 'view' } }); }}
                         />
                     </div>
                     ) : (
                     <div className="flex-1 min-h-0 flex flex-col gap-2">
                         <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
-                        <DataGrid key="grid-perm-aggregate" data={consolidatedUsersList} columns={consolidatedColumns} language={language} hideImport={true} hideExport={true} hideToolbar={true} />
+                            <DataGrid 
+                                key="grid-perm-aggregate" 
+                                data={consolidatedUsersList} 
+                                columns={consolidatedColumns} 
+                                language={language} 
+                                hideImport={true} 
+                            />
                         </div>
                     </div>
                     )}
@@ -526,8 +545,14 @@
                 <div className="flex-1 flex flex-col min-h-0">
                     <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
                         <DataGrid 
-                        key="grid-bg-assign" data={bgGridData} columns={bgColumns} actions={bgActions} language={language} 
-                        hideImport={true} hideExport={true} isLoading={isLoading} onAdd={handleAddBgClick}
+                            key="grid-bg-assign" 
+                            data={bgGridData} 
+                            columns={bgColumns} 
+                            actions={bgActions} 
+                            language={language} 
+                            hideImport={true} 
+                            isLoading={isLoading} 
+                            onAdd={handleAddBgClick}
                         />
                     </div>
                 </div>
@@ -537,7 +562,13 @@
             <Modal isOpen={bgAccessModal.isOpen} onClose={() => setBgAccessModal({ isOpen: false, groupTitle: '', data: [] })} title={`${t('کاربران مجاز گروه بالانس:', 'Authorized Users for Balance Group:')} ${bgAccessModal.groupTitle}`} language={language} width="max-w-4xl">
                 <div className="p-4 flex flex-col gap-3 h-[60vh] min-h-[400px]">
                     <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
-                        <DataGrid key="grid-bg-modal-aggregate" data={bgAccessModal.data} columns={bgConsolidatedColumns} language={language} hideImport={true} hideExport={true} hideToolbar={true} />
+                        <DataGrid 
+                            key="grid-bg-modal-aggregate" 
+                            data={bgAccessModal.data} 
+                            columns={bgConsolidatedColumns} 
+                            language={language} 
+                            hideImport={true} 
+                        />
                     </div>
                     <div className="flex justify-end mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/50">
                         <Button size="sm" variant="outline" onClick={() => setBgAccessModal({ isOpen: false, groupTitle: '', data: [] })}>{t('بستن', 'Close')}</Button>
@@ -546,18 +577,20 @@
             </Modal>
 
             <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید حذف قطعی رکورد', 'Confirm Permanent Revocation')} language={language} width="max-w-sm">
-                <div className="p-4 flex flex-col gap-3 items-center text-center">
-                    <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1"><AlertTriangle size={22} /></div>
-                    <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1"><Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}</div>
-                    <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1">
-                    {deleteConfirm.type === 'permission' && t('آیا از حذف این ردیف دسترسی اطمینان دارید؟', 'Are you sure you want to revoke this explicit access right?')}
-                    {deleteConfirm.type === 'bg_account' && t('آیا از حذف این حساب از گروه بالانس اطمینان دارید؟', 'Are you sure you want to remove this account from the balance group?')}
-                    </p>
-                    <div className="flex gap-2 mt-4 w-full">
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-                    <Button size="sm" variant="primary" onClick={executeDelete} isLoading={isLoading} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 border-red-600 dark:border-red-500 shadow-lg">{t('تایید حذف نهایی', 'Delete Now')}</Button>
-                    </div>
-                </div>
+                <EmptyState
+                    icon={AlertTriangle}
+                    title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+                    description={
+                        deleteConfirm.type === 'permission' ? t('آیا از حذف این ردیف دسترسی اطمینان دارید؟', 'Are you sure you want to revoke this explicit access right?') :
+                        deleteConfirm.type === 'bg_account' ? t('آیا از حذف این حساب از گروه بالانس اطمینان دارید؟', 'Are you sure you want to remove this account from the balance group?') : ''
+                    }
+                    action={
+                        <div className="flex gap-2 w-full mt-2 px-4">
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                            <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف نهایی', 'Delete Now')}</Button>
+                        </div>
+                    }
+                />
             </Modal>
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </div>
