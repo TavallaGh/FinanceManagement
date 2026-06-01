@@ -1,78 +1,34 @@
 /* Filename: financial/GatewayTypes.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useRef } = React;
+  const { useState, useEffect } = React;
   
-  const { 
-    Button, PageHeader, Modal, 
-    TextField, ToggleField, SelectField, CurrencyField, DatePicker, CheckboxField
-  } = window.DesignSystem || window.DSCore || window.DSForms || {};
+  const DS = window.DesignSystem || {};
+  const DSCore = window.DSCore || DS;
+  const DSForms = window.DSForms || DS;
+  const DSGrid = window.DSGrid || DS;
+
+  const Button = DSCore.Button || DS.Button || (() => null);
+  const PageHeader = DSCore.PageHeader || DS.PageHeader || (() => null);
+  const Modal = window.DSFeedback?.Modal || DSCore.Modal || DS.Modal || (() => null);
+  const EmptyState = DSCore.EmptyState || DS.EmptyState || (() => null);
   
-  const { DataGrid, LOVField } = window.DSGrid || window.DesignSystem || {};
+  const TextField = DSForms.TextField || DS.TextField || (() => null);
+  const ToggleField = DSForms.ToggleField || DS.ToggleField || (() => null);
+  const SelectField = DSForms.SelectField || DS.SelectField || (() => null);
+  const CurrencyField = DSForms.CurrencyField || DS.CurrencyField || (() => null);
+  const DatePicker = DSForms.DatePicker || DS.DatePicker || (() => null);
+  const CheckboxField = DSForms.CheckboxField || DS.CheckboxField || (() => null);
+  
+  const DataGrid = DSGrid.DataGrid || DS.DataGrid || (() => null);
+  const LOVField = DSGrid.LOVField || DS.LOVField || (() => null);
 
   const { 
     CreditCard, Plus, Edit, Trash2, Save, 
-    AlertTriangle, Lock, Users
+    AlertTriangle, Lock
   } = window.LucideIcons || {};
   
   const supabase = window.supabase;
-
-  const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placeholder, isRtl }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [search, setSearch] = useState('');
-    const wrapperRef = useRef(null);
-    
-    const selectedAcc = accounts.find(a => String(a.id) === String(value));
-    const displaySelected = selectedAcc ? `${selectedAcc.code} - ${isRtl ? selectedAcc.titleFa : selectedAcc.titleEn}` : '';
-
-    useEffect(() => {
-      const handleClickOutside = (event) => { 
-        if (wrapperRef.current && !wrapperRef.current.contains(event.target)) setIsOpen(false); 
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const filtered = accounts.filter(a => {
-        const searchLower = search.toLowerCase();
-        const codeStr = a.code || '';
-        const titleStr = (isRtl ? a.titleFa : a.titleEn) || '';
-        const pathStr = (isRtl ? a.pathFa : a.pathEn) || '';
-        return codeStr.includes(searchLower) || titleStr.includes(searchLower) || pathStr.includes(searchLower);
-    });
-
-    return (
-      <div className="relative w-full flex flex-col gap-1.5" ref={wrapperRef}>
-        <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300">
-          {isRtl ? 'حساب مرتبط (آخرین سطح)' : 'Linked Account'}
-        </label>
-        <div className="relative w-full">
-          <input 
-            type="text" 
-            className={`w-full h-8 px-2.5 bg-white dark:bg-slate-700/40 border border-slate-300 dark:border-slate-500 rounded-lg text-[12px] text-slate-800 dark:text-slate-100 outline-none transition-all focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-400/20 focus:border-indigo-400 disabled:bg-slate-100 dark:disabled:bg-slate-800/50 disabled:text-slate-500 cursor-pointer`}
-            value={isOpen ? search : displaySelected} 
-            onChange={e => { setSearch(e.target.value); setIsOpen(true); }} 
-            onFocus={() => { setIsOpen(true); setSearch(''); }} 
-            disabled={disabled} 
-            placeholder={placeholder} 
-            dir={isRtl ? 'rtl' : 'ltr'}
-          />
-          {isOpen && !disabled && (
-            <div className={`absolute z-[9999] w-[350px] mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar ${isRtl ? 'right-0' : 'left-0'}`}>
-              {filtered.length > 0 ? filtered.map(acc => (
-                <div key={acc.id} className="px-3 py-2 text-[12px] hover:bg-indigo-50 dark:hover:bg-indigo-500/20 cursor-pointer border-b border-slate-100 dark:border-slate-700 last:border-0" onMouseDown={(e) => { e.preventDefault(); onChange(acc.id); setIsOpen(false); }}>
-                  <div className="font-bold text-slate-800 dark:text-slate-200 text-right dir-ltr">{acc.code} - {isRtl ? acc.titleFa : acc.titleEn}</div>
-                  <div className="text-slate-500 dark:text-slate-400 truncate mt-0.5 text-[10px] text-right" title={isRtl ? acc.pathFa : acc.pathEn}>{isRtl ? acc.pathFa : acc.pathEn}</div>
-                </div>
-              )) : (
-                <div className="p-3 text-center text-slate-500 text-[12px]">{isRtl ? 'موردی یافت نشد' : 'No results'}</div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   const GatewayTypes = ({ isAdmin, language = 'fa' }) => {
     const isRtl = language === 'fa';
@@ -411,14 +367,14 @@
         header_fa: 'کف تراکنش', 
         header_en: 'Min Amount', 
         width: '130px',
-        render: (row) => row.minAmount ? Number(row.minAmount).toLocaleString() : '0'
+        render: (val) => val ? Number(val).toLocaleString() : '0'
       },
       { 
         field: 'maxAmount', 
         header_fa: 'سقف تراکنش', 
         header_en: 'Max Amount', 
         width: '130px',
-        render: (row) => row.maxAmount ? Number(row.maxAmount).toLocaleString() : '0'
+        render: (val) => val ? Number(val).toLocaleString() : '0'
       },
       { 
         field: 'isActive', 
@@ -434,6 +390,12 @@
       { field: 'code', header_fa: 'کد تامین‌کننده', header_en: 'Code', width: '120px' },
       { field: 'label', header_fa: 'نام شخص/شرکت', header_en: 'Name', width: '250px' },
       { field: 'mobile', header_fa: 'شماره موبایل', header_en: 'Mobile', width: '150px' }
+    ];
+
+    const accountLovColumns = [
+      { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px' },
+      { field: 'titleFa', header_fa: 'عنوان حساب', header_en: 'Title', width: '150px' },
+      { field: 'pathFa', header_fa: 'مسیر', header_en: 'Path', width: '250px' }
     ];
 
     return (
@@ -524,13 +486,19 @@
                 />
               </div>
 
-              <SearchableAccountSelect 
-                accounts={accounts}
-                value={formData.accountId} 
-                onChange={val => setFormData({...formData, accountId: val})} 
-                isRtl={isRtl} 
-                placeholder={t('جستجوی حساب...', 'Search Account...')}
-              />
+              <div>
+                <LOVField 
+                  wrapperClassName="w-full"
+                  size="sm" 
+                  label={isRtl ? 'حساب مرتبط (آخرین سطح)' : 'Linked Account'}
+                  data={accounts}
+                  columns={accountLovColumns}
+                  dropdownWidth="min-w-[500px]"
+                  displayValue={accounts.find(a => String(a.id) === String(formData.accountId))?.titleFa ? `${accounts.find(a => String(a.id) === String(formData.accountId))?.code} - ${accounts.find(a => String(a.id) === String(formData.accountId))?.titleFa}` : ''}
+                  onChange={row => setFormData({...formData, accountId: row ? row.id : ''})}
+                  isRtl={isRtl} 
+                />
+              </div>
 
               <CurrencyField 
                 size="sm" 
@@ -663,24 +631,20 @@
         </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1">
-               <AlertTriangle size={22} />
-            </div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1">
-               <Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-              {deleteConfirm.type === 'bulk' 
-                ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
-                : t(`آیا از حذف درگاه "${deleteConfirm.data?.title}" اطمینان دارید؟`, `Delete gateway "${deleteConfirm.data?.title}"?`)
-              }
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 border-red-600 dark:border-red-500">{t('تایید حذف', 'Delete')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'bulk' 
+              ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
+              : t(`آیا از حذف درگاه "${deleteConfirm.data?.title}" اطمینان دارید؟`, `Delete gateway "${deleteConfirm.data?.title}"?`)
+            }
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
         </Modal>
       </div>
     );
