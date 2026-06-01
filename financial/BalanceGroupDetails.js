@@ -409,15 +409,28 @@
                 {accessViewMode === 'assign' ? (
                   <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
                     <DataGrid 
-                      key="grid-assign" data={accessGridData} columns={accessColumns} actions={accessActions} bulkActions={accessBulkActions}
-                      selectable={true} language={language} isLoading={modalLoading} onAdd={handleAddAccessClick}
+                      key="grid-assign" 
+                      data={accessGridData} 
+                      columns={accessColumns} 
+                      actions={accessActions} 
+                      bulkActions={accessBulkActions}
+                      selectable={true} 
+                      language={language} 
+                      isLoading={modalLoading} 
+                      onAdd={handleAddAccessClick}
+                      hideImport={true} 
                     />
                   </div>
                 ) : (
                   <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
                     <DataGrid 
-                      key="grid-aggregate" data={aggregatedUsersList} columns={aggregateColumns} language={language} 
-                      isLoading={modalLoading} hideToolbar={true}
+                      key="grid-aggregate" 
+                      data={aggregatedUsersList} 
+                      columns={aggregateColumns} 
+                      language={language} 
+                      isLoading={modalLoading} 
+                      hideToolbar={true}
+                      hideImport={true} 
                     />
                   </div>
                 )}
