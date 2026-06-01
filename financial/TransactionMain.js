@@ -222,7 +222,7 @@
           <AdvancedFilter 
             fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} 
           />
-          <div className="flex-1 min-h-[300px] bg-white dark:bg-slate-800 rounded-xl overflow-visible border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
             <DataGrid
               data={transactions} columns={columns} language={language} formCode={formCode}
               gridState={gridState} onGridStateChange={setGridState}
