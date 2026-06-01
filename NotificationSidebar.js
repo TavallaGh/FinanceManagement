@@ -136,14 +136,22 @@
     };
 
     const deleteOne = async (id) => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      try {
-        const { error } = await supabase.from('system_notifications').delete().eq('id', id);
-        if (error) throw error;
-      } catch (err) {
-        console.error('Error deleting notification:', err);
-        showToast(t('خطا در حذف اعلان.', 'Error deleting notification.'), 'error');
-      }
+      showDialog(
+        t('حذف اعلان', 'Delete Notification'),
+        t('آیا از حذف این اعلان اطمینان دارید؟', 'Are you sure you want to delete this notification?'),
+        'error',
+        async () => {
+          closeDialog();
+          setNotifications(prev => prev.filter(n => n.id !== id));
+          try {
+            const { error } = await supabase.from('system_notifications').delete().eq('id', id);
+            if (error) throw error;
+          } catch (err) {
+            console.error('Error deleting notification:', err);
+            showToast(t('خطا در حذف اعلان.', 'Error deleting notification.'), 'error');
+          }
+        }
+      );
     };
 
     const deleteAll = async () => {
