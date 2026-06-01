@@ -485,22 +485,24 @@
                         {accessViewMode === 'assign' ? <Shield size={14} className="text-indigo-500"/> : <Users size={14} className="text-indigo-500"/>}
                         {accessViewMode === 'assign' ? t('مدیریت مستقیم دسترسی‌های این حساب', 'Direct Access Management') : t('نمای تجمیعی تمامی دسترسی‌های موثر', 'Consolidated Effective Access')}
                     </span>
-                    <div className="flex items-center gap-1 p-1">
-                        <Button 
-                            size="sm" 
-                            variant={accessViewMode === 'assign' ? 'primary' : 'outline'} 
-                            onClick={() => setAccessViewMode('assign')}
+                    
+                    <div className="flex bg-slate-100 dark:bg-slate-900/50 p-0.5 rounded-md border border-slate-200 dark:border-slate-700 shrink-0 h-8">
+                        <button 
+                            onClick={() => setAccessViewMode('assign')} 
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-bold transition-all h-full ${accessViewMode === 'assign' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                         >
-                            {t('تخصیص دسترسی', 'Assign Access')}
-                        </Button>
-                        <Button 
-                            size="sm" 
-                            variant={accessViewMode === 'aggregate' ? 'primary' : 'outline'} 
-                            onClick={() => setAccessViewMode('aggregate')}
+                            <Shield size={14} />
+                            <span>{t('تخصیص دسترسی', 'Assign Access')}</span>
+                        </button>
+                        <button 
+                            onClick={() => setAccessViewMode('aggregate')} 
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-bold transition-all h-full ${accessViewMode === 'aggregate' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                         >
-                            {t('کل کاربران مجاز', 'All Authorized Users')}
-                        </Button>
+                            <Users size={14} />
+                            <span>{t('کل کاربران مجاز', 'All Authorized')}</span>
+                        </button>
                     </div>
+
                 </div>
                 
                 <div className="flex-1 flex flex-col min-h-0">
@@ -576,7 +578,7 @@
                 </div>
             </Modal>
 
-            <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید حذف قطعی رکورد', 'Confirm Permanent Revocation')} language={language} width="max-w-sm">
+            <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
                 <EmptyState
                     icon={AlertTriangle}
                     title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
