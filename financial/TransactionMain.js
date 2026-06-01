@@ -1,4 +1,4 @@
-/* Filename: financial/TransactionMain.js */
+/* Filename: financial/TransactionMainDetails.js */
 (() => {
   const React = window.React;
   const { useState, useEffect, useMemo, useCallback, useRef } = React;
@@ -7,27 +7,33 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    Copy = FallbackIcon, AlertTriangle = FallbackIcon, X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon,
-    List = FallbackIcon
+    X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon, List = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
-  
   const Core = window.DSCore || DS || {};
-  const { Button = FallbackComponent, PageHeader = FallbackComponent, EmptyState = FallbackComponent, Badge = FallbackComponent } = Core;
+  const { Button = FallbackComponent, Card = FallbackComponent } = Core;
 
   const Forms = window.DSForms || DS || {};
   const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
 
   const Grid = window.DSGrid || DS || {};
-  const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent, LOVField = FallbackComponent } = Grid;
+  const { DataGrid = FallbackComponent, LOVField = FallbackComponent } = Grid;
 
   const Feedback = window.DSFeedback || DS || {};
   const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
 
   function FallbackComponent() { return null; }
 
-  const TransactionMain = ({ language = 'fa', formCode = 'TRANSACTIONS' }) => {
+  const TransactionMainDetails = ({ 
+    isOpen, 
+    onClose, 
+    onSuccess, 
+    formMode, 
+    initialRecord, 
+    language = 'fa', 
+    formCode 
+  }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
 
@@ -71,18 +77,10 @@
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [isLoading, setIsLoading] = useState(false);
     
-    const [transactions, setTransactions] = useState([]);
-    const [gridState, setGridState] = useState(null);
-    const [filters, setFilters] = useState({});
-    
-    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-    const [formMode, setFormMode] = useState('CREATE');
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
-    
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
 
     const [lookups, setLookups] = useState({
         accounts: [],
@@ -94,7 +92,6 @@
     });
 
     const isFetchingDeps = useRef(false);
-    const isFetchingData = useRef(false);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -116,8 +113,9 @@
         if (isFetchingDeps.current || !supabase) return;
         isFetchingDeps.current = true;
         try {
-            const [accRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id').eq('is_active', true),
+            const [accRes, strRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, structure_id').eq('is_active', true),
+                supabase.from('fm_coa_structures').select('id, title_fa').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en').eq('is_active', true),
                 supabase.from('fm_income_types').select('id, title_fa, title_en').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
@@ -144,25 +142,25 @@
             });
 
             const allAccounts = accRes.data || [];
+            const structures = strRes.data || [];
             const parentIds = new Set(allAccounts.map(a => a.parent_id).filter(Boolean));
             
             const leafAccs = allAccounts.filter(a => !parentIds.has(a.id)).map(a => {
                 let pathArr = [];
                 let curr = a;
-                let topParent = curr;
                 while (curr && curr.parent_id) {
                     const parent = allAccounts.find(p => p.id === curr.parent_id);
                     if (parent) {
                         pathArr.unshift(parent.title_fa);
-                        topParent = parent;
                         curr = parent;
                     } else {
                         break;
                     }
                 }
+                const structureName = structures.find(s => s.id === a.structure_id)?.title_fa || '';
                 return {
                     ...a,
-                    structure_name: topParent.title_fa,
+                    structure_name: structureName,
                     pathTitle: pathArr.join(' / '),
                     displayLabel: `${a.code} - ${a.title_fa}`
                 };
@@ -179,89 +177,61 @@
             });
         } catch (error) {
             showToast(t('خطا در دریافت اطلاعات پایه', 'Error fetching dependencies'), 'error');
-            console.error(error);
         } finally {
             isFetchingDeps.current = false;
         }
     }, [supabase, showToast, t, currentUserId]);
 
-    const fetchData = useCallback(async () => {
-        if (isFetchingData.current || !supabase) return;
-        isFetchingData.current = true;
-        setIsLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('fm_transactions')
-                .select('*, fm_transaction_items(*)')
-                .order('created_at', { ascending: false });
-            
-            if (error) throw error;
-            setTransactions(data || []);
-        } catch (error) {
-            showToast(t('خطا در دریافت لیست تراکنش‌ها', 'Error fetching transactions'), 'error');
-            console.error(error);
-        } finally {
-            setIsLoading(false);
-            isFetchingData.current = false;
-        }
-    }, [supabase, showToast, t]);
-
-    useEffect(() => {
-        if (access.canView) {
-            fetchDependencies();
-            fetchData();
-        }
-    }, [fetchDependencies, fetchData, access.canView]);
-
     const generateDocumentCode = () => {
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
     };
 
-    const handleOpenForm = (mode, record = null) => {
-        setFormMode(mode);
-        const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
-        setInlineItemEdit(null);
-        setIsHeaderCollapsed(false);
+    useEffect(() => {
+        if (!isOpen) return;
+        fetchDependencies().then(() => {
+            const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
+            setInlineItemEdit(null);
+            setIsHeaderCollapsed(false);
 
-        if (mode === 'CREATE') {
-            setHeaderData({
-                document_code: generateDocumentCode(),
-                document_date: todayStr,
-                transaction_type: 'GENERAL',
-                department_id: lookups.currentUserDeptId,
-                department_title: lookups.currentUserDeptTitle,
-                description: '',
-                status: 'DRAFT',
-                registered_at: new Date().toISOString()
-            });
-            setItemsData([]);
-        } else if (mode === 'EDIT' || mode === 'COPY') {
-            const parsedDate = record.document_date ? record.document_date.replace(/-/g, '/') : todayStr;
-            
-            setHeaderData({
-                ...record,
-                id: mode === 'COPY' ? undefined : record.id,
-                document_code: mode === 'COPY' ? generateDocumentCode() : record.document_code,
-                status: mode === 'COPY' ? 'DRAFT' : record.status,
-                reference_code: mode === 'COPY' ? '' : record.reference_code,
-                daily_number: mode === 'COPY' ? '' : record.daily_number,
-                document_date: parsedDate,
-                registered_at: mode === 'COPY' ? new Date().toISOString() : record.registered_at,
-                department_id: mode === 'COPY' ? lookups.currentUserDeptId : record.department_id,
-                department_title: mode === 'COPY' ? lookups.currentUserDeptTitle : ''
-            });
-            
-            const mappedItems = (record.fm_transaction_items || []).map(item => ({
-                ...item,
-                _tempId: crypto.randomUUID(),
-                id: mode === 'COPY' ? undefined : item.id,
-                transaction_id: mode === 'COPY' ? undefined : item.transaction_id
-            })).sort((a, b) => a.row_number - b.row_number);
-            
-            setItemsData(mappedItems);
-        }
-        setIsFormModalOpen(true);
-    };
+            if (formMode === 'CREATE') {
+                setHeaderData({
+                    document_code: generateDocumentCode(),
+                    document_date: todayStr,
+                    transaction_type: 'GENERAL',
+                    department_id: lookups.currentUserDeptId,
+                    department_title: lookups.currentUserDeptTitle,
+                    description: '',
+                    status: 'DRAFT',
+                    registered_at: new Date().toISOString()
+                });
+                setItemsData([]);
+            } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
+                const parsedDate = initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr;
+                setHeaderData({
+                    ...initialRecord,
+                    id: formMode === 'COPY' ? undefined : initialRecord.id,
+                    document_code: formMode === 'COPY' ? generateDocumentCode() : initialRecord.document_code,
+                    status: formMode === 'COPY' ? 'DRAFT' : initialRecord.status,
+                    reference_code: formMode === 'COPY' ? '' : initialRecord.reference_code,
+                    daily_number: formMode === 'COPY' ? '' : initialRecord.daily_number,
+                    document_date: parsedDate,
+                    registered_at: formMode === 'COPY' ? new Date().toISOString() : initialRecord.registered_at,
+                    department_id: formMode === 'COPY' ? lookups.currentUserDeptId : initialRecord.department_id,
+                    department_title: formMode === 'COPY' ? lookups.currentUserDeptTitle : ''
+                });
+                
+                const mappedItems = (initialRecord.fm_transaction_items || []).map(item => ({
+                    ...item,
+                    _tempId: crypto.randomUUID(),
+                    id: formMode === 'COPY' ? undefined : item.id,
+                    transaction_id: formMode === 'COPY' ? undefined : item.transaction_id
+                })).sort((a, b) => a.row_number - b.row_number);
+                
+                setItemsData(mappedItems);
+            }
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, formMode, initialRecord]);
 
     const handleSaveTransaction = async () => {
         if (inlineItemEdit) {
@@ -279,12 +249,14 @@
         setIsLoading(true);
         try {
             let txId = headerData.id;
+            const validDeptId = headerData.department_id && headerData.department_id.trim() !== '' ? headerData.department_id : null;
+
             const txPayload = {
                 document_code: headerData.document_code,
                 document_date: headerData.document_date.replace(/\//g, '-'),
                 registrar_id: currentUserId,
                 transaction_type: headerData.transaction_type,
-                department_id: headerData.department_id,
+                department_id: validDeptId,
                 status: headerData.status,
                 description: headerData.description
             };
@@ -310,7 +282,7 @@
                 cost_type_id: item.transaction_group === 'COST' ? item.cost_type_id : null,
                 income_type_id: item.transaction_group === 'INCOME' ? item.income_type_id : null,
                 currency: item.currency || 'IRR',
-                amount: parseFloat(String(item.amount).replace(/,/g, '')),
+                amount: parseFloat(String(item.amount).replace(/,/g, '')) || 0,
                 description: item.description
             }));
 
@@ -318,8 +290,7 @@
             if (itemsError) throw itemsError;
 
             showToast(t('سند با موفقیت ثبت شد.', 'Transaction saved successfully.'));
-            setIsFormModalOpen(false);
-            fetchData();
+            onSuccess();
         } catch (error) {
             showToast(t('خطا در ثبت سند.', 'Error saving transaction.'), 'error');
             console.error(error);
@@ -384,45 +355,8 @@
         setItemsData(reordered);
     };
 
-    const executeDelete = async () => {
-        setIsLoading(true);
-        try {
-            if (deleteConfirm.type === 'single') {
-                const { error } = await supabase.from('fm_transactions').delete().eq('id', deleteConfirm.data.id);
-                if (error) throw error;
-                await logAction('delete_transaction', `حذف تراکنش: ${deleteConfirm.data.document_code}`);
-            } else if (deleteConfirm.type === 'bulk') {
-                const { error } = await supabase.from('fm_transactions').delete().in('id', deleteConfirm.data);
-                if (error) throw error;
-                await logAction('bulk_delete_transactions', `حذف گروهی ${deleteConfirm.data.length} تراکنش`);
-            }
-            showToast(t('عملیات با موفقیت انجام شد.', 'Operation successful.'));
-            fetchData();
-            setDeleteConfirm({ isOpen: false, type: null, data: null });
-        } catch (error) {
-            showToast(t('خطا در حذف.', 'Error deleting.'), 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleBulkStatusChange = async (newStatus, ids) => {
-        setIsLoading(true);
-        try {
-            const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', ids);
-            if (error) throw error;
-            showToast(t('وضعیت با موفقیت تغییر کرد.', 'Status updated.'));
-            await logAction('bulk_status_update', `تغییر وضعیت ${ids.length} سند به ${newStatus}`);
-            fetchData();
-        } catch (error) {
-            showToast(t('خطا در تغییر وضعیت.', 'Error updating status.'), 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const formatNumber = (num) => {
-        if (!num) return '';
+        if (!num && num !== 0) return '';
         const parts = num.toString().split('.');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         return parts.join('.');
@@ -435,42 +369,9 @@
         }
     };
 
-    const columns = useMemo(() => [
-        { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '100px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
-        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '140px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
-        { field: 'daily_number', header_fa: 'شماره روزانه', header_en: 'Daily Num', width: '100px' },
-        { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '120px', type: 'date' },
-        { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '120px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
-        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '100px', render: (val) => {
-            const s = STATUS_OPTIONS.find(x => x.value === val);
-            const colors = { DRAFT: 'slate', TEMPORARY: 'amber', APPROVED: 'emerald' };
-            return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
-        }},
-        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '180px', render: (val) => lookups.usersMap[val] || val }
-    ], [lookups.usersMap, t]);
-
-    const filterFields = [
-        { name: 'document_code', label: t('کد سند', 'Doc Code'), type: 'text' },
-        { name: 'document_date', label: t('تاریخ سند', 'Date'), type: 'date' },
-        { name: 'transaction_type', label: t('نوع تراکنش', 'Type'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_TYPES] },
-        { name: 'status', label: t('وضعیت', 'Status'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...STATUS_OPTIONS] }
-    ];
-
-    const gridActions = [
-        { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
-        { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit Document'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'edit' },
-        { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
-    ];
-
-    const bulkActions = [
-        { label: t('تغییر به موقت', 'Set Temporary'), icon: FileText, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids) },
-        { label: t('تغییر به یادداشت', 'Set Draft'), icon: Edit, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('DRAFT', ids) },
-        { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) }
-    ];
-
     const accountLovColumns = [
         { field: 'structure_name', header_fa: 'ساختار', header_en: 'Structure', width: '120px' },
-        { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '120px' },
+        { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '100px' },
         { field: 'title_fa', header_fa: 'عنوان حساب', header_en: 'Title', width: 'auto', render: (val, row) => (
             <div className="flex flex-col py-1">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
@@ -495,7 +396,7 @@
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                     return (
-                        <div onClick={(e) => e.stopPropagation()}>
+                        <div onClick={(e) => e.stopPropagation()} className="relative z-[100]">
                             <LOVField 
                                 size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[500px]"
                                 displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
@@ -517,7 +418,7 @@
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                     return (
-                        <div onClick={(e) => e.stopPropagation()}>
+                        <div onClick={(e) => e.stopPropagation()} className="relative z-[90]">
                             <SelectField 
                                 size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} 
                                 onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, transaction_action: e.target.value } }))} isRtl={isRtl} 
@@ -534,7 +435,7 @@
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                     return (
-                        <div onClick={(e) => e.stopPropagation()}>
+                        <div onClick={(e) => e.stopPropagation()} className="relative z-[80]">
                             <SelectField 
                                 size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} 
                                 onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: '' } }))} isRtl={isRtl} 
@@ -553,10 +454,10 @@
                 
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                     if (group === 'COST') {
-                        return <div onClick={(e) => e.stopPropagation()}><SelectField size="sm" options={lookups.costTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.cost_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, cost_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
+                        return <div onClick={(e) => e.stopPropagation()} className="relative z-[70]"><SelectField size="sm" options={lookups.costTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.cost_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, cost_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
                     }
                     if (group === 'INCOME') {
-                        return <div onClick={(e) => e.stopPropagation()}><SelectField size="sm" options={lookups.incomeTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.income_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, income_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
+                        return <div onClick={(e) => e.stopPropagation()} className="relative z-[70]"><SelectField size="sm" options={lookups.incomeTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.income_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, income_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
                     }
                     return <div className="h-8 w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
                 }
@@ -607,14 +508,292 @@
                 }
                 return <span className="text-[12px]">{val}</span>;
             }
+        },
+        {
+            field: 'actions', header_fa: 'عملیات', header_en: 'Actions', width: '90px',
+            render: (_, row) => {
+                const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
+                if (isEditing) {
+                    return (
+                        <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" icon={Save} onClick={(e) => { e.stopPropagation(); handleSaveItemInline(); }} className="!text-emerald-600 hover:!bg-emerald-50 dark:hover:!bg-emerald-900/30 !px-2" />
+                            <Button variant="ghost" size="sm" icon={X} onClick={(e) => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800 !px-2" />
+                        </div>
+                    );
+                }
+                if (inlineItemEdit) return null;
+                return (
+                    <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" icon={Edit} onClick={(e) => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !px-2" />
+                        <Button variant="ghost" size="sm" icon={Trash2} onClick={(e) => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !px-2" />
+                    </div>
+                );
+            }
         }
     ];
 
-    const itemActions = [
-        { icon: Save, tooltip: t('ذخیره', 'Save'), hidden: (row) => !inlineItemEdit || (inlineItemEdit.id !== row.id && inlineItemEdit.id !== row._tempId), onClick: handleSaveItemInline, className: '!text-emerald-600 hover:!bg-emerald-50 dark:hover:!bg-emerald-900/30' },
-        { icon: X, tooltip: t('انصراف', 'Cancel'), hidden: (row) => !inlineItemEdit || (inlineItemEdit.id !== row.id && inlineItemEdit.id !== row._tempId), onClick: () => setInlineItemEdit(null), className: '!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800' },
-        { icon: Edit, tooltip: t('ویرایش', 'Edit'), hidden: (row) => inlineItemEdit?.id === row.id || inlineItemEdit?.id === row._tempId || row._isNew, onClick: handleEditItemClick, className: 'hover:text-indigo-600 text-slate-400' },
-        { icon: Trash2, tooltip: t('حذف', 'Delete'), hidden: (row) => inlineItemEdit?.id === row.id || inlineItemEdit?.id === row._tempId || row._isNew, onClick: handleRemoveItem, className: 'hover:text-red-600 text-slate-400' }
+    if (!isOpen) return null;
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
+            <div className="flex flex-col h-[85vh] bg-slate-50/50 dark:bg-slate-900/50 text-[12px] relative">
+                <div className="flex-1 p-4 flex flex-col gap-4 overflow-visible pb-40">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300 z-20">
+                        <div 
+                            className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
+                            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+                        >
+                            <h4 className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={16} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</h4>
+                            <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} className="!p-1 h-6 w-6" />
+                        </div>
+                        {!isHeaderCollapsed && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
+                                <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                                <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                                <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                                <div className="relative z-[90]">
+                                    <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+                                </div>
+                                <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
+                                <div className="relative z-[80]">
+                                    <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
+                                </div>
+                                <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
+                                <div className="relative z-[70]">
+                                    <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
+                                </div>
+                                <div className="lg:col-span-4">
+                                    <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-col shadow-sm min-h-[350px] z-10 overflow-visible relative">
+                        <div className="flex justify-between items-center p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
+                            <h3 className="font-bold text-[12px] text-slate-700 dark:text-slate-300 flex items-center gap-2"><List size={16} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
+                        </div>
+                        <div className="overflow-visible flex flex-col p-1 w-full min-h-[250px]">
+                            <DataGrid 
+                                data={itemGridData} columns={itemColumns}
+                                language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
+                    <Button variant="outline" size="sm" onClick={onClose}>{t('انصراف', 'Cancel')}</Button>
+                    {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
+                </div>
+            </div>
+            <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
+        </Modal>
+    );
+  };
+
+  window.TransactionMainDetails = TransactionMainDetails;
+})();
+
+```
+
+```javascript
+/* Filename: financial/TransactionMain.js */
+(() => {
+  const React = window.React;
+  const { useState, useEffect, useMemo, useCallback } = React;
+
+  const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
+  const LucideIcons = window.LucideIcons || {};
+  const {
+    FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon,
+    Copy = FallbackIcon, AlertTriangle = FallbackIcon
+  } = LucideIcons;
+
+  const DS = window.DesignSystem || {};
+  const Core = window.DSCore || DS || {};
+  const { Button = FallbackComponent, PageHeader = FallbackComponent, EmptyState = FallbackComponent, Badge = FallbackComponent } = Core;
+
+  const Grid = window.DSGrid || DS || {};
+  const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent } = Grid;
+
+  const Feedback = window.DSFeedback || DS || {};
+  const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
+
+  function FallbackComponent() { return null; }
+
+  const DetailsModal = window.TransactionMainDetails || (() => null);
+
+  const TransactionMain = ({ language = 'fa', formCode = 'TRANSACTIONS' }) => {
+    const isRtl = language === 'fa';
+    const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
+
+    const supabase = window.supabase;
+    const currentUserObj = window.NavigationSystem?.currentUser || {};
+    const currentUserName = currentUserObj.name || 'مدیر سیستم';
+
+    const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
+    const access = useMemo(() => {
+      const rawActions = securityCtx ? securityCtx.getActions(formCode) : null;
+      return rawActions || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
+    }, [securityCtx, formCode]);
+
+    const TRANSACTION_TYPES = [
+        { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
+        { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
+        { value: 'GENERAL', label: t('عمومی', 'General') }
+    ];
+
+    const STATUS_OPTIONS = [
+        { value: 'DRAFT', label: t('یادداشت', 'Draft') },
+        { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
+        { value: 'APPROVED', label: t('تایید شده', 'Approved') }
+    ];
+
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+    const [isLoading, setIsLoading] = useState(false);
+    
+    const [transactions, setTransactions] = useState([]);
+    const [gridState, setGridState] = useState(null);
+    const [filters, setFilters] = useState({});
+    const [usersMap, setUsersMap] = useState({});
+    
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const [formMode, setFormMode] = useState('CREATE');
+    const [currentRecord, setCurrentRecord] = useState(null);
+    
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
+
+    const showToast = useCallback((message, type = 'success') => {
+      setToast({ isVisible: true, message, type });
+      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
+    }, []);
+
+    const logAction = useCallback(async (action, details = '') => {
+      try {
+        if (!supabase) return;
+        await supabase.from('fm_record_logs').insert([{
+          entity_type: 'تراکنش‌ها', action: action, user_name: currentUserName, details: details
+        }]);
+      } catch (err) {
+        console.error('Action log failed:', err);
+      }
+    }, [supabase, currentUserName]);
+
+    const fetchUsers = useCallback(async () => {
+        try {
+            const { data } = await supabase.from('sec_users').select('id, full_name, username');
+            const uMap = {};
+            (data || []).forEach(u => {
+                uMap[u.id] = `${u.full_name || u.username || ''}`.trim();
+            });
+            setUsersMap(uMap);
+        } catch (error) {}
+    }, [supabase]);
+
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('fm_transactions')
+                .select('*, fm_transaction_items(*)')
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            setTransactions(data || []);
+        } catch (error) {
+            showToast(t('خطا در دریافت لیست تراکنش‌ها', 'Error fetching transactions'), 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [supabase, showToast, t]);
+
+    useEffect(() => {
+        if (access.canView) {
+            fetchUsers();
+            fetchData();
+        }
+    }, [fetchUsers, fetchData, access.canView]);
+
+    const handleOpenForm = (mode, record = null) => {
+        setFormMode(mode);
+        setCurrentRecord(record);
+        setIsFormModalOpen(true);
+    };
+
+    const handleModalSuccess = () => {
+        setIsFormModalOpen(false);
+        fetchData();
+    };
+
+    const executeDelete = async () => {
+        setIsLoading(true);
+        try {
+            if (deleteConfirm.type === 'single') {
+                const { error } = await supabase.from('fm_transactions').delete().eq('id', deleteConfirm.data.id);
+                if (error) throw error;
+                await logAction('delete_transaction', `حذف تراکنش: ${deleteConfirm.data.document_code}`);
+            } else if (deleteConfirm.type === 'bulk') {
+                const { error } = await supabase.from('fm_transactions').delete().in('id', deleteConfirm.data);
+                if (error) throw error;
+                await logAction('bulk_delete_transactions', `حذف گروهی ${deleteConfirm.data.length} تراکنش`);
+            }
+            showToast(t('عملیات با موفقیت انجام شد.', 'Operation successful.'));
+            fetchData();
+            setDeleteConfirm({ isOpen: false, type: null, data: null });
+        } catch (error) {
+            showToast(t('خطا در حذف.', 'Error deleting.'), 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleBulkStatusChange = async (newStatus, ids) => {
+        setIsLoading(true);
+        try {
+            const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', ids);
+            if (error) throw error;
+            showToast(t('وضعیت با موفقیت تغییر کرد.', 'Status updated.'));
+            await logAction('bulk_status_update', `تغییر وضعیت ${ids.length} سند به ${newStatus}`);
+            fetchData();
+        } catch (error) {
+            showToast(t('خطا در تغییر وضعیت.', 'Error updating status.'), 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const columns = useMemo(() => [
+        { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '100px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
+        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '140px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
+        { field: 'daily_number', header_fa: 'شماره روزانه', header_en: 'Daily Num', width: '100px' },
+        { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '120px', type: 'date' },
+        { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '120px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
+        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '100px', render: (val) => {
+            const s = STATUS_OPTIONS.find(x => x.value === val);
+            const colors = { DRAFT: 'slate', TEMPORARY: 'amber', APPROVED: 'emerald' };
+            return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
+        }},
+        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '180px', render: (val) => usersMap[val] || val }
+    ], [usersMap, t]);
+
+    const filterFields = [
+        { name: 'document_code', label: t('کد سند', 'Doc Code'), type: 'text' },
+        { name: 'document_date', label: t('تاریخ سند', 'Date'), type: 'date' },
+        { name: 'transaction_type', label: t('نوع تراکنش', 'Type'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_TYPES] },
+        { name: 'status', label: t('وضعیت', 'Status'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...STATUS_OPTIONS] }
+    ];
+
+    const gridActions = [
+        { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
+        { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit Document'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'edit' },
+        { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
+    ];
+
+    const bulkActions = [
+        { label: t('تغییر به موقت', 'Set Temporary'), icon: FileText, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids) },
+        { label: t('تغییر به یادداشت', 'Set Draft'), icon: Edit, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('DRAFT', ids) },
+        { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) }
     ];
 
     const viewConfig = useMemo(() => ({
@@ -655,58 +834,15 @@
           </div>
         </div>
 
-        <Modal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
-          <div className="flex flex-col h-[85vh] bg-slate-50/50 dark:bg-slate-900/50 text-[12px]">
-            <div className="flex-1 overflow-visible p-4 flex flex-col gap-4">
-              
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300 z-10">
-                <div 
-                    className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
-                    onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
-                >
-                    <h4 className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={16} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</h4>
-                    <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} className="!p-1 h-6 w-6" />
-                </div>
-                {!isHeaderCollapsed && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 animate-in slide-in-from-top-2 duration-200">
-                        <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
-                        <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                        <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                        <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
-                        
-                        <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
-                        <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
-                        <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
-                        <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
-                        
-                        <div className="lg:col-span-4">
-                            <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
-                        </div>
-                    </div>
-                )}
-              </div>
-
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex-1 flex flex-col shadow-sm min-h-[350px] z-20 overflow-visible">
-                <div className="flex justify-between items-center p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
-                    <h3 className="font-bold text-[12px] text-slate-700 dark:text-slate-300 flex items-center gap-2"><List size={16} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
-                </div>
-                
-                <div className="flex-1 min-h-[250px] overflow-visible flex flex-col p-1">
-                    <DataGrid 
-                        data={itemGridData} columns={itemColumns} actions={itemActions}
-                        language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
-                    />
-                </div>
-              </div>
-
-            </div>
-
-            <div className="flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 z-50">
-                <Button variant="outline" size="sm" onClick={() => setIsFormModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-                {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
-            </div>
-          </div>
-        </Modal>
+        <DetailsModal 
+            isOpen={isFormModalOpen}
+            onClose={() => setIsFormModalOpen(false)}
+            onSuccess={handleModalSuccess}
+            formMode={formMode}
+            initialRecord={currentRecord}
+            language={language}
+            formCode={formCode}
+        />
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
           <EmptyState
