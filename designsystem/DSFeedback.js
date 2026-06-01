@@ -22,10 +22,11 @@
     ArrowLeft = FallbackIcon,
     ArrowRight = FallbackIcon,
     ChevronDown = FallbackIcon,
-    Box = FallbackIcon
+    Box = FallbackIcon,
+    Check = FallbackIcon
   } = LucideIcons;
   
-  const { Button } = window.DSCore || {};
+  const { Button } = window.DSCore || window.DesignSystem || {};
 
   const Modal = ({ isOpen, onClose, title, children, showMaximize = true, width = 'max-w-2xl', language = 'fa' }) => {
     const isRtl = language === 'fa';
@@ -469,5 +470,76 @@
     );
   };
 
-  window.DSFeedback = { Modal, Tooltip, Alert, Toast, Banner, Dialog, DiffViewer, LogTimeline };
+  const NotificationCard = ({
+    id,
+    title,
+    message,
+    type = 'info',
+    isRead = false,
+    timestamp,
+    onRead,
+    onDelete,
+    formatTime = (t) => t,
+    language = 'fa'
+  }) => {
+    const isRtl = language === 'fa';
+    const t = (fa, en) => isRtl ? fa : en;
+
+    const icons = {
+      success: <CheckCircle2 size={14} />,
+      error: <AlertCircle size={14} />,
+      info: <Info size={14} />
+    };
+
+    const typeColors = {
+      success: 'text-emerald-500 dark:text-emerald-400',
+      error: 'text-red-500 dark:text-red-400',
+      info: 'text-blue-500 dark:text-blue-400'
+    };
+
+    return (
+      <div
+        className={`group relative border rounded-lg p-3 transition-all animate-in fade-in slide-in-from-bottom-2 ${
+          isRead
+            ? 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600'
+            : 'bg-indigo-50/40 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/50 hover:border-indigo-200 dark:hover:border-indigo-700 hover:shadow-sm'
+        }`}
+      >
+        <div className="flex gap-2">
+          <div className={`mt-0.5 shrink-0 ${isRead ? 'opacity-50' : ''} ${typeColors[type] || typeColors.info}`}>
+            {icons[type] || icons.info}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className={`text-[12px] font-bold mb-1 leading-tight ${isRead ? 'text-slate-600 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>{title}</h4>
+            <p className={`text-[11px] leading-relaxed mb-1.5 line-clamp-2 ${isRead ? 'text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'}`}>{message}</p>
+            <div className="block mt-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-medium">{formatTime(timestamp)}</div>
+          </div>
+
+          <div className="flex flex-col gap-0.5 transition-all self-start shrink-0">
+            {!isRead && onRead && (
+              <Button
+                size="sm" variant="ghost" icon={Check}
+                onClick={() => onRead(id)}
+                title={t('علامت‌گذاری خوانده شده', 'Mark as read')}
+                className="!text-slate-400 dark:!text-slate-500 hover:!text-indigo-600 dark:hover:!text-indigo-400 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !px-1 !h-6"
+              />
+            )}
+            {onDelete && (
+              <Button
+                size="sm" variant="ghost" icon={Trash2}
+                onClick={() => onDelete(id)}
+                title={t('حذف اعلان', 'Delete')}
+                className="!text-slate-400 dark:!text-slate-500 hover:!text-red-500 dark:hover:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/30 !px-1 !h-6"
+              />
+            )}
+          </div>
+        </div>
+        {!isRead && (
+          <div className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-0 w-1 rounded-l-md' : 'left-0 w-1 rounded-r-md'} h-6 bg-indigo-500 dark:bg-indigo-400`} />
+        )}
+      </div>
+    );
+  };
+
+  window.DSFeedback = { Modal, Tooltip, Alert, Toast, Banner, Dialog, DiffViewer, LogTimeline, NotificationCard };
 })();

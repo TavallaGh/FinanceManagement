@@ -1,4 +1,4 @@
-/* Filename: DSOverlays.js */
+/* Filename: designsystem/DSOverlays.js */
 (() => {
   const React = window.React;
   const { useState, useEffect, useRef } = React;
@@ -11,7 +11,17 @@
     ChevronLeft = FallbackIcon 
   } = LucideIcons;
 
-  const Drawer = ({ isOpen, onClose, title, children, position = 'right', width = 'max-w-sm', language = 'fa' }) => {
+  const Drawer = ({
+    isOpen,
+    onClose,
+    title,
+    children,
+    footer,
+    headerActions,
+    position = 'right', 
+    width = 'max-w-sm',
+    language = 'fa'
+  }) => {
     const isRtl = language === 'fa';
 
     useEffect(() => {
@@ -22,7 +32,12 @@
 
     if (!isOpen) return null;
 
-    const isRight = position === 'right';
+    // Mapping 'start'/'end' logical positions to physical 'right'/'left' for backward compatibility
+    let physicalPosition = position;
+    if (position === 'start') physicalPosition = isRtl ? 'right' : 'left';
+    if (position === 'end') physicalPosition = isRtl ? 'left' : 'right';
+
+    const isRight = physicalPosition === 'right';
     const slideAnim = isRight ? 'animate-slide-in-right' : 'animate-slide-in-left';
     const placementClasses = isRight ? 'right-0 border-l' : 'left-0 border-r';
 
@@ -33,14 +48,24 @@
           className={`absolute top-0 bottom-0 ${width} w-full bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl shadow-[0_0_60px_rgba(0,0,0,0.1)] dark:shadow-[0_0_60px_rgba(0,0,0,0.5)] border-slate-200/60 dark:border-slate-700/60 flex flex-col transition-all duration-300 ${placementClasses} ${slideAnim}`}
         >
           <div className="h-12 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between px-4 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
-            <h3 className="font-black text-slate-700 dark:text-slate-200 text-[14px] tracking-tight truncate">{title}</h3>
-            <button onClick={onClose} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all active:scale-95">
-              <X size={16} strokeWidth={2.5} />
-            </button>
+            <div className="flex items-center gap-2">
+                {typeof title === 'string' ? <h3 className="font-black text-slate-700 dark:text-slate-200 text-[14px] tracking-tight truncate">{title}</h3> : title}
+            </div>
+            <div className="flex items-center gap-1">
+                {headerActions}
+                <button onClick={onClose} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all active:scale-95">
+                <X size={16} strokeWidth={2.5} />
+                </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-white dark:bg-slate-800 flex flex-col min-h-0">
             {children}
           </div>
+          {footer && (
+            <div className="p-2 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+              {footer}
+            </div>
+          )}
         </aside>
       </div>
     );
@@ -165,4 +190,6 @@
   };
 
   window.DSOverlays = { Drawer, ContextMenu, Popover };
+  if (!window.DesignSystem) window.DesignSystem = {};
+  window.DesignSystem.Drawer = Drawer;
 })();
