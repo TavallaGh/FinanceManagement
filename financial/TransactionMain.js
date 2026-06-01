@@ -7,7 +7,8 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    Copy = FallbackIcon, AlertTriangle = FallbackIcon, X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon
+    Copy = FallbackIcon, AlertTriangle = FallbackIcon, X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon,
+    List = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -594,7 +595,7 @@
         </div>
 
         <Modal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
-          <div className="flex flex-col h-[85vh] bg-slate-50/50 dark:bg-slate-900/50">
+          <div className="flex flex-col h-[85vh] bg-slate-50/50 dark:bg-slate-900/50 text-[12px]">
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
               
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300">
