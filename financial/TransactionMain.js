@@ -7,13 +7,13 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    Copy = FallbackIcon, AlertTriangle = FallbackIcon, X = FallbackIcon
+    Copy = FallbackIcon, AlertTriangle = FallbackIcon, X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
   
   const Core = window.DSCore || DS || {};
-  const { Button = FallbackComponent, PageHeader = FallbackComponent, EmptyState = FallbackComponent, Card = FallbackComponent, Badge = FallbackComponent } = Core;
+  const { Button = FallbackComponent, PageHeader = FallbackComponent, EmptyState = FallbackComponent, Badge = FallbackComponent } = Core;
 
   const Forms = window.DSForms || DS || {};
   const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
@@ -79,6 +79,7 @@
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
+    const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
     
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
 
@@ -201,6 +202,7 @@
         setFormMode(mode);
         const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
         setInlineItemEdit(null);
+        setIsHeaderCollapsed(false);
 
         if (mode === 'CREATE') {
             setHeaderData({
@@ -444,7 +446,7 @@
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
                             <LOVField 
-                                data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[400px]"
+                                size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[400px]"
                                 displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({
                                     ...prev, 
@@ -466,7 +468,7 @@
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
                             <SelectField 
-                                options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} 
+                                size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} 
                                 onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, transaction_action: e.target.value } }))} isRtl={isRtl} 
                             />
                         </div>
@@ -482,7 +484,7 @@
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
                             <SelectField 
-                                options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} 
+                                size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} 
                                 onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: '' } }))} isRtl={isRtl} 
                             />
                         </div>
@@ -498,12 +500,12 @@
                 
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                     if (group === 'COST') {
-                        return <div onClick={(e) => e.stopPropagation()}><SelectField options={lookups.costTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.cost_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, cost_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
+                        return <div onClick={(e) => e.stopPropagation()}><SelectField size="sm" options={lookups.costTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.cost_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, cost_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
                     }
                     if (group === 'INCOME') {
-                        return <div onClick={(e) => e.stopPropagation()}><SelectField options={lookups.incomeTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.income_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, income_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
+                        return <div onClick={(e) => e.stopPropagation()}><SelectField size="sm" options={lookups.incomeTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.income_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, income_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
                     }
-                    return <div className="h-10 w-full bg-slate-100 dark:bg-slate-800 rounded-md opacity-50"></div>;
+                    return <div className="h-8 w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
                 }
 
                 if (group === 'COST') {
@@ -521,7 +523,7 @@
             field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '100px', 
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return <div onClick={(e) => e.stopPropagation()}><TextField value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" /></div>;
+                    return <div onClick={(e) => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" /></div>;
                 }
                 return <span dir="ltr">{val}</span>;
             }
@@ -530,7 +532,7 @@
             field: 'amount', header_fa: 'مبلغ', header_en: 'Amount', width: '150px', 
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return <div onClick={(e) => e.stopPropagation()}><TextField type="number" value={inlineItemEdit.data.amount} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: e.target.value } }))} isRtl={isRtl} dir="ltr" /></div>;
+                    return <div onClick={(e) => e.stopPropagation()}><TextField size="sm" type="number" value={inlineItemEdit.data.amount} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: e.target.value } }))} isRtl={isRtl} dir="ltr" /></div>;
                 }
                 return <span dir="ltr">{Number(val).toLocaleString()}</span>;
             }
@@ -539,7 +541,7 @@
             field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto', 
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return <div onClick={(e) => e.stopPropagation()}><TextField value={inlineItemEdit.data.description} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, description: e.target.value } }))} isRtl={isRtl} /></div>;
+                    return <div onClick={(e) => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, description: e.target.value } }))} isRtl={isRtl} /></div>;
                 }
                 return val;
             }
@@ -595,30 +597,39 @@
           <div className="flex flex-col h-[85vh] bg-slate-50/50 dark:bg-slate-900/50">
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
               
-              <Card title={t('اطلاعات سربرگ', 'Header Data')} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
-                    <TextField formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
-                    <TextField formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                    <TextField formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                    <DatePicker formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
-                    
-                    <TextField formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
-                    <SelectField formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
-                    <TextField formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
-                    <SelectField formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} isRtl={isRtl} />
-                    
-                    <div className="lg:col-span-4">
-                        <TextField formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
-                    </div>
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300">
+                <div 
+                    className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
+                    onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+                >
+                    <h4 className="text-[12px] font-black text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={16} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</h4>
+                    <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} className="!p-1 h-6 w-6" />
                 </div>
-              </Card>
+                {!isHeaderCollapsed && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3 animate-in slide-in-from-top-2 duration-200">
+                        <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                        <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                        <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                        <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+                        
+                        <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
+                        <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
+                        <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
+                        <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} isRtl={isRtl} />
+                        
+                        <div className="md:col-span-4">
+                            <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
+                        </div>
+                    </div>
+                )}
+              </div>
 
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex-1 flex flex-col shadow-sm min-h-[350px]">
-                <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
-                    <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={16} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
+                <div className="flex justify-between items-center p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
+                    <h3 className="font-bold text-[12px] text-slate-700 dark:text-slate-300 flex items-center gap-2"><List size={16} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
                 </div>
                 
-                <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 min-h-0 flex flex-col p-1">
                     <DataGrid 
                         data={itemGridData} columns={itemColumns} actions={itemActions}
                         language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
@@ -628,9 +639,9 @@
 
             </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 z-50">
-                <Button variant="outline" onClick={() => setIsFormModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-                {access.canEdit && <Button variant="primary" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
+            <div className="flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 z-50">
+                <Button variant="outline" size="sm" onClick={() => setIsFormModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
+                {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
             </div>
           </div>
         </Modal>
@@ -642,8 +653,8 @@
             description={deleteConfirm.type === 'bulk' ? t(`آیا از حذف ${deleteConfirm.data?.length} سند اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} documents?`) : t(`آیا از حذف این سند اطمینان دارید؟`, `Delete this document?`)}
             action={
               <div className="flex gap-2 w-full mt-4 px-4">
-                <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-                <Button variant="danger" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Confirm')}</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Confirm')}</Button>
               </div>
             }
           />
