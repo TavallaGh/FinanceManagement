@@ -223,9 +223,9 @@
           return (
              <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
                <Calendar size={12} className="text-slate-400 dark:text-slate-500" />
-               <span className="font-mono text-[12px] font-medium" dir="ltr">{formattedDate}</span>
+               <span className="font-sans text-[12px] font-medium" dir="ltr">{formattedDate}</span>
                <Clock size={12} className="text-slate-400 dark:text-slate-500 ml-1" />
-               <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-600" dir="ltr">
+               <span className="font-sans text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-600" dir="ltr">
                   {String(d.getHours()).padStart(2, '0')}:{String(d.getMinutes()).padStart(2, '0')}
                </span>
              </div>
@@ -269,7 +269,7 @@
         render: (v) => (
             <div className="flex items-center gap-1">
                <Hash size={10} className="text-slate-400" />
-               <span className="text-[12px] font-mono text-slate-600 dark:text-slate-400 truncate max-w-[80px]" title={v}>{v}</span>
+               <span className="text-[12px] font-sans text-slate-600 dark:text-slate-400 truncate max-w-[80px]" title={v}>{v}</span>
             </div>
         )
       },
@@ -304,13 +304,13 @@
                         <span className="text-slate-300 dark:text-slate-600">|</span>
                         <span className="text-[12px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1"><Database size={12}/> {getEntityLabel(selectedLog.entity_type)}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[10.5px] font-mono font-medium" dir="ltr">
+                    <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[10.5px] font-sans font-medium" dir="ltr">
                         <div className="flex items-center gap-1.5"><Calendar size={12} /> <span>{formattedDate}</span></div>
                         <div className="flex items-center gap-1.5"><Clock size={12} /> <span>{timeStr}</span></div>
                     </div>
                 </div>
 
-                <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('شناسه رکورد:', 'Record ID:')} {selectedLog.record_id}</div>
+                <div className="text-[10px] font-sans text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('شناسه رکورد:', 'Record ID:')} {selectedLog.record_id}</div>
 
                 {selectedLog.details && (
                     <div className="text-[11.5px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-700 leading-relaxed font-medium w-full">
