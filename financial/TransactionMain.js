@@ -8,7 +8,7 @@
   const {
     FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
     Copy = FallbackIcon, AlertTriangle = FallbackIcon, X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon,
-    List = FallbackIcon, Search = FallbackIcon
+    List = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -116,9 +116,8 @@
         if (isFetchingDeps.current || !supabase) return;
         isFetchingDeps.current = true;
         try {
-            const [accRes, strRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, structure_id').eq('is_active', true),
-                supabase.from('fm_coa_structures').select('id, title_fa').eq('is_active', true),
+            const [accRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en').eq('is_active', true),
                 supabase.from('fm_income_types').select('id, title_fa, title_en').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
@@ -132,7 +131,6 @@
 
             (usersRes.data || []).forEach(u => {
                 uMap[u.id] = `${u.full_name || u.username || ''}`.trim();
-                
                 if (u.id === currentUserId && u.party_id) {
                     const personnelRecord = (personnelRes.data || []).find(p => p.person_id === u.party_id);
                     if (personnelRecord) {
@@ -146,30 +144,29 @@
             });
 
             const allAccounts = accRes.data || [];
-            const structures = strRes.data || [];
-
-            const getPath = (accId) => {
+            const parentIds = new Set(allAccounts.map(a => a.parent_id).filter(Boolean));
+            
+            const leafAccs = allAccounts.filter(a => !parentIds.has(a.id)).map(a => {
                 let pathArr = [];
-                let curr = allAccounts.find(a => a.id === accId);
+                let curr = a;
+                let topParent = curr;
                 while (curr && curr.parent_id) {
-                    const parent = allAccounts.find(a => a.id === curr.parent_id);
+                    const parent = allAccounts.find(p => p.id === curr.parent_id);
                     if (parent) {
                         pathArr.unshift(parent.title_fa);
+                        topParent = parent;
                         curr = parent;
                     } else {
                         break;
                     }
                 }
-                return pathArr.join(' / ');
-            };
-
-            const parentIds = new Set(allAccounts.map(a => a.parent_id).filter(Boolean));
-            const leafAccs = allAccounts.filter(a => !parentIds.has(a.id)).map(a => ({
-                ...a,
-                structure_name: structures.find(s => s.id === a.structure_id)?.title_fa || '',
-                pathTitle: getPath(a.id),
-                displayLabel: `${a.code} - ${a.title_fa}`
-            }));
+                return {
+                    ...a,
+                    structure_name: topParent.title_fa,
+                    pathTitle: pathArr.join(' / '),
+                    displayLabel: `${a.code} - ${a.title_fa}`
+                };
+            });
 
             setLookups({
                 accounts: allAccounts,
@@ -424,6 +421,20 @@
         }
     };
 
+    const formatNumber = (num) => {
+        if (!num) return '';
+        const parts = num.toString().split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join('.');
+    };
+
+    const handleAmountChange = (e) => {
+        const raw = e.target.value.replace(/,/g, '');
+        if (raw === '' || !isNaN(raw)) {
+            setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: raw } }));
+        }
+    };
+
     const columns = useMemo(() => [
         { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '100px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
         { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '140px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
@@ -498,7 +509,7 @@
                     );
                 }
                 const acc = lookups.leafAccounts.find(a => String(a.id) === String(val));
-                return acc ? `${acc.code} - ${acc.title_fa}` : '';
+                return acc ? <span className="text-[12px]">{acc.code} - {acc.title_fa}</span> : '';
             }
         },
         { 
@@ -514,7 +525,8 @@
                         </div>
                     );
                 }
-                return TRANSACTION_ACTIONS.find(a => a.value === val)?.label || val;
+                const act = TRANSACTION_ACTIONS.find(a => a.value === val);
+                return act ? <span className="text-[12px]">{act.label}</span> : val;
             }
         },
         { 
@@ -530,7 +542,8 @@
                         </div>
                     );
                 }
-                return TRANSACTION_GROUPS.find(a => a.value === val)?.label || val;
+                const grp = TRANSACTION_GROUPS.find(a => a.value === val);
+                return grp ? <span className="text-[12px]">{grp.label}</span> : val;
             }
         },
         { 
@@ -550,11 +563,11 @@
 
                 if (group === 'COST') {
                     const c = lookups.costTypes.find(x => String(x.id) === String(row.cost_type_id));
-                    return c ? (isRtl ? c.title_fa : c.title_en) : '';
+                    return c ? <span className="text-[12px]">{isRtl ? c.title_fa : c.title_en}</span> : '';
                 }
                 if (group === 'INCOME') {
                     const i = lookups.incomeTypes.find(x => String(x.id) === String(row.income_type_id));
-                    return i ? (isRtl ? i.title_fa : i.title_en) : '';
+                    return i ? <span className="text-[12px]">{isRtl ? i.title_fa : i.title_en}</span> : '';
                 }
                 return '-';
             }
@@ -572,23 +585,18 @@
             field: 'amount', header_fa: 'مبلغ', header_en: 'Amount', width: '150px', 
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    const dispVal = inlineItemEdit.data.amount ? Number(inlineItemEdit.data.amount).toLocaleString() : '';
+                    const dispVal = formatNumber(inlineItemEdit.data.amount);
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
                             <TextField 
                                 size="sm" type="text" value={dispVal} 
-                                onChange={(e) => {
-                                    const raw = e.target.value.replace(/,/g, '');
-                                    if (raw === '' || !isNaN(raw)) {
-                                        setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: raw } }));
-                                    }
-                                }} 
+                                onChange={handleAmountChange} 
                                 isRtl={isRtl} dir="ltr" 
                             />
                         </div>
                     );
                 }
-                return <span dir="ltr" className="text-[12px]">{Number(val).toLocaleString()}</span>;
+                return <span dir="ltr" className="text-[12px]">{formatNumber(val)}</span>;
             }
         },
         { 
@@ -599,28 +607,14 @@
                 }
                 return <span className="text-[12px]">{val}</span>;
             }
-        },
-        {
-            field: 'actions', header_fa: 'عملیات', header_en: 'Actions', width: '90px',
-            render: (_, row) => {
-                const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
-                if (isEditing) {
-                    return (
-                        <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" icon={Save} onClick={(e) => { e.stopPropagation(); handleSaveItemInline(); }} className="!text-emerald-600 hover:!bg-emerald-50 dark:hover:!bg-emerald-900/30 !px-2" />
-                            <Button variant="ghost" size="sm" icon={X} onClick={(e) => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800 !px-2" />
-                        </div>
-                    );
-                }
-                if (inlineItemEdit) return null;
-                return (
-                    <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" icon={Edit} onClick={(e) => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !px-2" />
-                        <Button variant="ghost" size="sm" icon={Trash2} onClick={(e) => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !px-2" />
-                    </div>
-                );
-            }
         }
+    ];
+
+    const itemActions = [
+        { icon: Save, tooltip: t('ذخیره', 'Save'), hidden: (row) => !inlineItemEdit || (inlineItemEdit.id !== row.id && inlineItemEdit.id !== row._tempId), onClick: handleSaveItemInline, className: '!text-emerald-600 hover:!bg-emerald-50 dark:hover:!bg-emerald-900/30' },
+        { icon: X, tooltip: t('انصراف', 'Cancel'), hidden: (row) => !inlineItemEdit || (inlineItemEdit.id !== row.id && inlineItemEdit.id !== row._tempId), onClick: () => setInlineItemEdit(null), className: '!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800' },
+        { icon: Edit, tooltip: t('ویرایش', 'Edit'), hidden: (row) => inlineItemEdit?.id === row.id || inlineItemEdit?.id === row._tempId || row._isNew, onClick: handleEditItemClick, className: 'hover:text-indigo-600 text-slate-400' },
+        { icon: Trash2, tooltip: t('حذف', 'Delete'), hidden: (row) => inlineItemEdit?.id === row.id || inlineItemEdit?.id === row._tempId || row._isNew, onClick: handleRemoveItem, className: 'hover:text-red-600 text-slate-400' }
     ];
 
     const viewConfig = useMemo(() => ({
@@ -651,7 +645,7 @@
           <AdvancedFilter 
             fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} 
           />
-          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-visible border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+          <div className="flex-1 min-h-[300px] bg-white dark:bg-slate-800 rounded-xl overflow-visible border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
             <DataGrid
               data={transactions} columns={columns} language={language} formCode={formCode}
               gridState={gridState} onGridStateChange={setGridState}
@@ -663,9 +657,9 @@
 
         <Modal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
           <div className="flex flex-col h-[85vh] bg-slate-50/50 dark:bg-slate-900/50 text-[12px]">
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
+            <div className="flex-1 overflow-visible p-4 flex flex-col gap-4">
               
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300 z-10">
                 <div 
                     className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
                     onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
@@ -683,7 +677,7 @@
                         <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
                         <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
                         <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
-                        <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} isRtl={isRtl} />
+                        <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
                         
                         <div className="lg:col-span-4">
                             <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
@@ -692,14 +686,14 @@
                 )}
               </div>
 
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex-1 flex flex-col shadow-sm min-h-[350px]">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex-1 flex flex-col shadow-sm min-h-[350px] z-20 overflow-visible">
                 <div className="flex justify-between items-center p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
                     <h3 className="font-bold text-[12px] text-slate-700 dark:text-slate-300 flex items-center gap-2"><List size={16} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
                 </div>
                 
-                <div className="flex-1 overflow-visible flex flex-col p-1 pb-48">
+                <div className="flex-1 min-h-[250px] overflow-visible flex flex-col p-1">
                     <DataGrid 
-                        data={itemGridData} columns={itemColumns}
+                        data={itemGridData} columns={itemColumns} actions={itemActions}
                         language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
                     />
                 </div>
