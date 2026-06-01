@@ -1,7 +1,7 @@
 /* Filename: security/UserManagement.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo } = React;
+  const { useState, useEffect, useMemo, useCallback } = React;
   
   const { 
     Button, PageHeader, Modal, AdvancedFilter, DataGrid, 
@@ -17,6 +17,7 @@
   const UserManagement = ({ language = 'fa' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
+    const calendarMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : 'jalali';
     
     const [data, setData] = useState([]);
     const [allParties, setAllParties] = useState([]);
@@ -344,36 +345,13 @@
       }));
     };
 
-    const handleDownloadSample = () => {
-      const headers = isRtl
-        ? 'نام کاربری,نوع کاربری,ایمیل,موبایل'
-        : 'Username,User Type,Email,Mobile';
-        
-      const sampleRow = isRtl
-        ? 'admin,مدیر سیستم,admin@test.com,09120000000'
-        : 'admin,System Admin,admin@test.com,09120000000';
-        
-      const csv = '\uFEFF' + headers + '\n' + sampleRow;
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.setAttribute('download', 'Users_Import_Sample.csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    };
-
-    const handleImportFile = (file) => {
-      if (!file) return;
-      console.log('Import file selected:', file.name);
-    };
-
     const formatDateTime = (dateString) => {
       if (!dateString) return '-';
       try {
         return new Date(dateString).toLocaleString(isRtl ? 'fa-IR' : 'en-US', {
           year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit'
+          hour: '2-digit', minute: '2-digit',
+          calendar: calendarMode === 'jalali' ? 'persian' : 'gregory'
         });
       } catch (e) {
         return dateString;
@@ -386,6 +364,10 @@
       if (!p) return '-';
       return p.party_type === 'legal' ? p.company_name : `${p.first_name || ''} ${p.last_name || ''}`.trim();
     };
+
+    const hasAccess = useCallback((userId) => {
+       return userRoles.some(ur => ur.user_id === userId) || permissions.some(p => p.user_id === userId);
+    }, [userRoles, permissions]);
 
     const columns = [
       { 
@@ -585,14 +567,13 @@
               onRowDoubleClick={(row) => handleOpenModal(row)}
               gridState={gridState}
               onGridStateChange={setGridState}
-              onDownloadSample={handleDownloadSample}
-              onImport={handleImportFile}
+              hideImport={true}
               onToggle={(row, field, val) => {
                  if (field === 'is_active') handleToggleActive(row, val);
               }}
               actions={[
                 { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
-                { icon: Shield, tooltip: t('دسترسی‌ها', 'Permissions'), onClick: (row) => setAccessModal({ isOpen: true, user: row }), className: 'text-slate-400 hover:text-purple-600' },
+                { icon: Shield, tooltip: t('دسترسی‌ها', 'Permissions'), onClick: (row) => setAccessModal({ isOpen: true, user: row }), className: (row) => hasAccess(row.id) ? '!text-indigo-600 dark:!text-indigo-400 hover:!text-indigo-800' : 'text-slate-400 hover:text-indigo-600' },
                 { icon: RefreshCw, tooltip: t('بازنشانی رمز عبور', 'Reset Password'), onClick: (row) => setResetConfirm({ isOpen: true, data: row }), className: 'text-slate-400 hover:text-amber-600' },
                 { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600' }
               ]}

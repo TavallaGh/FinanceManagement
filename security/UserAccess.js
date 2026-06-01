@@ -485,6 +485,7 @@
                                 columns={columns}
                                 language={language}
                                 selectable={true}
+                                hideImport={true}
                                 selectedIds={gridSelectedIds}
                                 onSelectChange={setGridSelectedIds}
                                 activeRowId={selectedMenuId}
