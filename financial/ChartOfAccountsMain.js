@@ -15,7 +15,7 @@
     const FallbackComponent = () => null;
 
     const Core = window.DSCore || window.DesignSystem || {};
-    const { Button = FallbackComponent, Card = FallbackComponent } = Core;
+    const { Button = FallbackComponent, Card = FallbackComponent, Tabs = FallbackComponent, EmptyState = FallbackComponent } = Core;
 
     const Forms = window.DSForms || window.DesignSystem || {};
     const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent } = Forms;
@@ -371,6 +371,14 @@
       return isRtl ? (c.title_fa || c.title || c.code) : (c.title_en || c.title || c.code);
     };
 
+    const tabOptions = [
+      { id: 'details', label: t('مشخصات حساب', 'Account Parameters') },
+      ...(!isCreatingNode ? [
+        { id: 'access', label: t('تنظیمات دسترسی', 'Access Configuration') },
+        { id: 'balance_groups', label: t('گروه‌های بالانس', 'Balance Groups') }
+      ] : [])
+    ];
+
     return (
       <div className="p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
@@ -403,20 +411,9 @@
             <div className="flex-1 flex flex-col overflow-auto p-4 gap-3 bg-slate-50/50 dark:bg-slate-900/20">
               {selectedNodeId || isCreatingNode ? (
                 <Card noPadding={true} className="flex-1 border border-slate-200 dark:border-slate-700 flex flex-col min-h-0 bg-white dark:bg-slate-800 shadow-sm h-full">
-                  <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 px-3 pt-2 gap-1 shrink-0 h-10">
-                    <button onClick={() => setActiveTab('details')} className={`px-4 py-2 h-full font-bold text-xs border-b-2 transition-all ${activeTab === 'details' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-                      {t('مشخصات حساب', 'Account Parameters')}
-                    </button>
-                    {!isCreatingNode && (
-                      <button onClick={() => setActiveTab('access')} className={`px-4 py-2 h-full font-bold text-xs border-b-2 transition-all ${activeTab === 'access' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-                        {t('تنظیمات دسترسی', 'Access Configuration')}
-                      </button>
-                    )}
-                    {!isCreatingNode && (
-                      <button onClick={() => setActiveTab('balance_groups')} className={`px-4 py-2 h-full font-bold text-xs border-b-2 transition-all ${activeTab === 'balance_groups' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 bg-white dark:bg-slate-800 rounded-t-lg shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-                        {t('گروه‌های بالانس', 'Balance Groups')}
-                      </button>
-                    )}
+                  
+                  <div className="px-3 pt-3 pb-1 border-b border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 shrink-0">
+                    <Tabs tabs={tabOptions} activeTab={activeTab} onChange={setActiveTab} />
                   </div>
 
                   <div className="flex-1 flex flex-col p-4 overflow-y-auto min-h-0">
@@ -425,7 +422,6 @@
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
                           
                           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 shrink-0 lg:h-[60px]">
-                            {/* تغییر به lg:col-span-2 برای گرفتن عرض دو فیلد */}
                             <div className="lg:col-span-2 flex items-center gap-3 px-4 py-2 bg-blue-50/60 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 rounded-xl h-full shadow-sm">
                               <Info size={18} className="text-blue-500 shrink-0" />
                               <div className="flex flex-col justify-center overflow-hidden">
@@ -434,7 +430,7 @@
                               </div>
                             </div>
 
-                              {!isCreatingNode && (
+                            {!isCreatingNode && (
                               <div className="lg:col-span-2 flex items-center justify-between gap-4 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl h-full shadow-sm">
                                 <div className="flex flex-col justify-center flex-1">
                                     <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 truncate">{t(`بالانس در لحظه (به ${getNodeCurrencyName()})`, `Real-time Balance (${getNodeCurrencyName()})`)}</span>
@@ -508,17 +504,17 @@
         </div>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید حذف قطعی رکورد', 'Confirm Permanent Revocation')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1"><AlertTriangle size={22} /></div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1"><Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}</div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1">
-              {deleteConfirm.type === 'node' && t(`آیا از حذف حساب کدینگ "${deleteConfirm.data?.titleFa}" اطمینان دارید؟`, `Are you sure you want to delete account component "${deleteConfirm.data?.titleFa}"?`)}
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button size="sm" variant="outline" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button size="sm" variant="primary" onClick={executeDelete} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 border-red-600 dark:border-red-500 shadow-lg">{t('تایید حذف نهایی', 'Delete Now')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'node' && t(`آیا از حذف حساب کدینگ "${deleteConfirm.data?.titleFa}" اطمینان دارید؟`, `Are you sure you want to delete account component "${deleteConfirm.data?.titleFa}"?`)}
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} className="flex-1">{t('تایید حذف نهایی', 'Delete Now')}</Button>
+              </div>
+            }
+          />
         </Modal>
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />

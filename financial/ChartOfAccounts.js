@@ -14,7 +14,7 @@
     const FallbackComponent = () => null;
 
     const Core = window.DSCore || window.DesignSystem || {};
-    const { Button = FallbackComponent, PageHeader = FallbackComponent } = Core;
+    const { Button = FallbackComponent, PageHeader = FallbackComponent, EmptyState = FallbackComponent } = Core;
 
     const Forms = window.DSForms || window.DesignSystem || {};
     const { TextField = FallbackComponent, ToggleField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
@@ -347,16 +347,17 @@
         </Modal>
 
         <Modal isOpen={activationConfirm.isOpen} onClose={() => setActivationConfirm({ isOpen: false, pendingData: null })} title={t('تایید تغییر وضعیت فعال', 'Confirm Activation')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-500 dark:text-amber-400 mb-1"><AlertTriangle size={22} /></div>
-            <p className="text-slate-600 dark:text-slate-300 text-[13px] leading-relaxed mt-1">
-              {t('در هر زمان تنها یک ساختار حساب می‌تواند فعال باشد. آیا تایید می‌کنید که این ساختار فعال شده و سایر ساختارها غیرفعال شوند؟', 'Only one chart structure can be active at a time. Do you confirm activating this one and deactivating all others?')}
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button size="sm" variant="outline" className="flex-1" onClick={() => setActivationConfirm({ isOpen: false, pendingData: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button size="sm" variant="primary" onClick={() => executeSaveChart(activationConfirm.pendingData, true)} isLoading={isLoading} className="flex-1 shadow-sm">{t('تایید و فعال‌سازی', 'Confirm & Activate')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار تغییر وضعیت', 'Activation Warning')}
+            description={t('در هر زمان تنها یک ساختار حساب می‌تواند فعال باشد. آیا تایید می‌کنید که این ساختار فعال شده و سایر ساختارها غیرفعال شوند؟', 'Only one chart structure can be active at a time. Do you confirm activating this one and deactivating all others?')}
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setActivationConfirm({ isOpen: false, pendingData: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="primary" size="sm" onClick={() => executeSaveChart(activationConfirm.pendingData, true)} isLoading={isLoading} className="flex-1">{t('تایید و فعال‌سازی', 'Confirm & Activate')}</Button>
+              </div>
+            }
+          />
         </Modal>
 
         <Modal isOpen={isCopyModalOpen} onClose={() => setIsCopyModalOpen(false)} title={t('کپی‌برداری کامل از ساختار حساب', 'Duplicate Account Code Hierarchy')} language={language} width="max-w-md">
@@ -373,17 +374,17 @@
         </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید حذف قطعی رکورد', 'Confirm Permanent Revocation')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1"><AlertTriangle size={22} /></div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1"><Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}</div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1">
-              {t(`آیا از حذف کامل ساختار "${deleteConfirm.data?.title}" و تمامی کدهای متصل به آن اطمینان دارید؟`, `Are you sure you want to delete structure "${deleteConfirm.data?.title}" and all nested accounts?`)}
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button size="sm" variant="outline" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button size="sm" variant="primary" onClick={executeDelete} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 border-red-600 dark:border-red-500 shadow-lg">{t('تایید حذف نهایی', 'Delete Now')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={t(`آیا از حذف کامل ساختار "${deleteConfirm.data?.title}" و تمامی کدهای متصل به آن اطمینان دارید؟`, `Are you sure you want to delete structure "${deleteConfirm.data?.title}" and all nested accounts?`)}
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} className="flex-1">{t('تایید حذف نهایی', 'Delete Now')}</Button>
+              </div>
+            }
+          />
         </Modal>
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
