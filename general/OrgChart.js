@@ -6,9 +6,9 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const { 
-    Network = FallbackIcon, FolderTree = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, Users = FallbackIcon, AlertTriangle = FallbackIcon, Lock = FallbackIcon,
-    ChevronDown = FallbackIcon, ChevronUp = FallbackIcon
+    Network = FallbackIcon, FolderTree = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
+    ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, AlertTriangle = FallbackIcon, Lock = FallbackIcon,
+    ChevronDown = FallbackIcon, ChevronUp = FallbackIcon, X = FallbackIcon, Plus = FallbackIcon
   } = LucideIcons;
 
   const OrgChart = ({ language = 'fa', formCode = 'ORG_CHART' }) => {
@@ -21,7 +21,7 @@
     const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
     
     const Grid = window.DSGrid || window.DesignSystem || {};
-    const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent } = Grid;
+    const { DataGrid = FallbackComponent } = Grid;
     
     const Feedback = window.DSFeedback || window.DesignSystem || {};
     const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
@@ -50,7 +50,6 @@
     const isFetchingEmps = useRef(false);
 
     const [charts, setCharts] = useState([]);
-    const [chartFilters, setChartFilters] = useState({});
     const [chartsGridState, setChartsGridState] = useState(null);
     const [isChartModalOpen, setIsChartModalOpen] = useState(false);
     const [chartFormData, setChartFormData] = useState({});
@@ -64,7 +63,6 @@
     const [isNodeFormExpanded, setIsNodeFormExpanded] = useState(true);
 
     const [employees, setEmployees] = useState([]);
-    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [assignData, setAssignData] = useState({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
 
     const showToast = useCallback((message, type = 'success') => {
@@ -169,18 +167,16 @@
       }
     };
 
-    const filteredCharts = useMemo(() => {
-      let result = [...charts];
-      if (chartFilters.code) result = result.filter(c => (c.code || '').toLowerCase().includes(chartFilters.code.toLowerCase()));
-      if (chartFilters.title) result = result.filter(c => (c.title || '').toLowerCase().includes(chartFilters.title.toLowerCase()));
-      return result;
-    }, [charts, chartFilters]);
-
-    const handleOpenChartModal = (chart = null) => {
+    const handleOpenChartModal = async (chart = null) => {
       if (chart) {
         setChartFormData({ ...chart });
       } else {
-        setChartFormData({ code: '', title: '', type: 'standard', is_active: true, start_date: '', end_date: '' });
+        let nextCode = '';
+        if (window.AutoNumberingService) {
+           const preview = await window.AutoNumberingService.previewNext('ORG_CHART');
+           if (preview) nextCode = preview.formattedCode;
+        }
+        setChartFormData({ code: nextCode, title: '', type: 'standard', is_active: true, start_date: '', end_date: '' });
       }
       setIsChartModalOpen(true);
     };
@@ -207,6 +203,11 @@
         } else {
           const { data, error } = await supabase.from('fm_org_charts').insert([payload]).select();
           if (error) throw error;
+          
+          if (window.AutoNumberingService) {
+             await window.AutoNumberingService.consumeNext('ORG_CHART');
+          }
+          
           if (data && data[0]) await logAction('چارت سازمانی', data[0].id, 'create', `ایجاد چارت جدید: ${payload.title}`);
           showToast(t('چارت سازمانی جدید ایجاد شد', 'New chart created successfully'));
         }
@@ -225,6 +226,7 @@
       setIsNodeEditMode(false);
       setIsNodeFormExpanded(true);
       setViewMode('designer');
+      setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
     };
 
     const handleSelectNode = (node) => {
@@ -238,6 +240,7 @@
       });
       setIsNodeEditMode(true);
       setIsNodeFormExpanded(true);
+      setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
     };
 
     const handlePrepareNewNode = (parentNode = null) => {
@@ -245,6 +248,7 @@
       setNodeForm({ id: null, code: '', title: '', parentId: parentNode ? parentNode.id : '', isActive: true });
       setIsNodeEditMode(false);
       setIsNodeFormExpanded(true);
+      setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
     };
 
     const handleSaveNode = async () => {
@@ -287,19 +291,14 @@
       return rawPersonnel.filter(p => p.node_id === selectedNode.id);
     }, [rawPersonnel, selectedNode]);
 
-    const handleOpenAssignModal = (assignment = null) => {
-      if (assignment) {
-        setAssignData({ 
-          id: assignment.id, 
-          personId: assignment.person_id || '', 
-          fromDate: assignment.from_date || '', 
-          toDate: assignment.to_date || '',
-          isManager: assignment.is_manager || false
-        });
-      } else {
-        setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
-      }
-      setIsAssignModalOpen(true);
+    const handleLoadInlineAssign = (assignment) => {
+      setAssignData({ 
+        id: assignment.id, 
+        personId: assignment.person_id || '', 
+        fromDate: assignment.from_date || '', 
+        toDate: assignment.to_date || '',
+        isManager: assignment.is_manager || false
+      });
     };
 
     const handleSaveAssignment = async () => {
@@ -342,7 +341,7 @@
         }
 
         await fetchDesignerData(activeChart.id, selectedNode.id);
-        setIsAssignModalOpen(false);
+        setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
         showToast(t('تخصیص پرسنل انجام شد', 'Personnel assigned'));
       } catch (err) {
         showToast(t('خطا در ذخیره تخصیص', 'Error saving assignment'), 'error');
@@ -365,6 +364,9 @@
           const { error } = await supabase.from('fm_org_chart_personnel').delete().eq('id', deleteConfirm.data);
           if (error) throw error;
           await fetchDesignerData(activeChart.id, selectedNode.id);
+          if (assignData.id === deleteConfirm.data) {
+             setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
+          }
         }
         showToast(t('عملیات حذف با موفقیت انجام شد', 'Deletion successful'));
         setDeleteConfirm({ isOpen: false, type: null, data: null });
@@ -378,23 +380,32 @@
 
     const viewConfig = useMemo(() => ({
       pageId: 'org_chart_main',
-      currentState: () => ({ viewMode, chartFilters, chartsGridState }),
+      currentState: () => ({ viewMode, chartsGridState }),
       onApplyState: (state) => {
         if (state) {
           if (state.viewMode) setViewMode(state.viewMode);
-          if (state.chartFilters) setChartFilters(state.chartFilters);
           if (state.chartsGridState) setChartsGridState(state.chartsGridState);
         } else {
           setViewMode('list');
-          setChartFilters({});
           setChartsGridState(null);
         }
       }
-    }), [viewMode, chartFilters, chartsGridState]);
+    }), [viewMode, chartsGridState]);
 
     const chartColumns = [
       { field: 'code', header_fa: 'کد چارت', header_en: 'Code', width: '100px' },
-      { field: 'title', header_fa: 'عنوان چارت', header_en: 'Title', width: '200px' },
+      { 
+        field: 'title', header_fa: 'عنوان چارت', header_en: 'Title', width: '250px',
+        render: (val, row) => {
+           const isExpired = row.end_date && new Date(row.end_date) < new Date();
+           return (
+               <div className="flex items-center gap-2">
+                   <span className="font-bold text-slate-700 dark:text-slate-200">{val}</span>
+                   {isExpired && <Badge variant="danger" className="!py-0 !px-1.5 !text-[10px]">{t('منقضی', 'Expired')}</Badge>}
+               </div>
+           );
+        }
+      },
       { 
         field: 'type', header_fa: 'نوع چارت', header_en: 'Type', width: '120px', type: 'select',
         options: [{value: 'standard', label: t('استاندارد', 'Standard')}, {value: 'sales', label: t('فروش', 'Sales')}, {value: 'finance', label: t('مالی', 'Finance')}, {value: 'hr', label: t('منابع انسانی', 'HR')}],
@@ -432,18 +443,12 @@
 
     const renderList = () => (
       <div className="flex-1 min-h-0 flex flex-col gap-3 animate-in fade-in duration-500">
-        <AdvancedFilter 
-          fields={[
-            { name: 'code', label: t('کد چارت', 'Chart Code'), type: 'text' },
-            { name: 'title', label: t('عنوان چارت', 'Chart Title'), type: 'text' }
-          ]} 
-          initialValues={chartFilters} onFilter={setChartFilters} onClear={() => setChartFilters({})} language={language} 
-        />
         <div className="flex-1 min-h-0">
           <DataGrid 
-            data={filteredCharts} columns={chartColumns} language={language} formCode={formCode}
+            data={charts} columns={chartColumns} language={language} formCode={formCode}
             gridState={chartsGridState} onGridStateChange={setChartsGridState}
             onAdd={access.canCreate ? () => handleOpenChartModal() : undefined}
+            onRowDoubleClick={(row) => handleOpenChartModal(row)}
             hideImport={true}
             hideExport={true}
             actions={[
@@ -469,7 +474,7 @@
           </div>
 
           <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
-            <div className={`w-full md:w-[440px] flex flex-col bg-slate-50/50 dark:bg-slate-900/20 border-b md:border-b-0 ${isRtl ? 'md:border-l' : 'md:border-r'} border-slate-200 dark:border-slate-700`}>
+            <div className={`w-full md:w-[350px] lg:w-[400px] flex flex-col bg-slate-50/50 dark:bg-slate-900/20 border-b md:border-b-0 ${isRtl ? 'md:border-l' : 'md:border-r'} border-slate-200 dark:border-slate-700`}>
               <Tree 
                 data={rawNodes} language={language} formCode={formCode}
                 idField="id" parentField="parentId" displayField="title" activeField="isActive"
@@ -481,46 +486,64 @@
               />
             </div>
 
-            <div className="flex-1 flex flex-col overflow-auto custom-scrollbar p-4 gap-4 bg-slate-50 dark:bg-slate-900/30">
-              <Card noPadding={false} language={language}>
+            <div className="flex-1 flex flex-col overflow-auto custom-scrollbar p-3 gap-3 bg-slate-50 dark:bg-slate-900/30">
+              <Card noPadding={false} language={language} className="shrink-0">
                 <div 
                   className="flex justify-between items-center cursor-pointer mb-2 pb-2 border-b border-slate-100 dark:border-slate-700/50"
                   onClick={() => setIsNodeFormExpanded(!isNodeFormExpanded)}
                 >
-                  <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                  <div className="font-bold text-slate-800 dark:text-slate-100 text-[13px]">
                     {isNodeEditMode ? t('ویرایش اطلاعات گره', 'Edit Node Info') : t('تعریف گره جدید', 'Define New Node')}
                   </div>
-                  <Button variant="ghost" size="sm" icon={isNodeFormExpanded ? ChevronUp : ChevronDown} />
+                  <Button variant="ghost" size="sm" className="!h-6 !w-6 !p-0" icon={isNodeFormExpanded ? ChevronUp : ChevronDown} />
                 </div>
                 
                 {isNodeFormExpanded && (
                   <div className="animate-in fade-in duration-300">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
-                      <TextField formCode={formCode} label={t('کد گره', 'Node Code')} value={nodeForm.code} onChange={e => setNodeForm({...nodeForm, code: e.target.value})} isRtl={isRtl} size="sm" />
-                      <TextField formCode={formCode} label={t('عنوان گره', 'Node Title')} value={nodeForm.title} onChange={e => setNodeForm({...nodeForm, title: e.target.value})} isRtl={isRtl} required size="sm" />
-                      <SelectField formCode={formCode} label={t('گره والد', 'Parent Node')} value={nodeForm.parentId} onChange={e => setNodeForm({...nodeForm, parentId: e.target.value})} isRtl={isRtl} size="sm" options={[{value: '', label: t('بدون والد (ریشه)', 'Root (No Parent)')}, ...parentNodeOptions]} />
-                      <div className="flex items-end pb-1.5">
-                        <ToggleField formCode={formCode} label={t('فعال', 'Active')} checked={nodeForm.isActive} onChange={val => setNodeForm({...nodeForm, isActive: val})} isRtl={isRtl} />
+                    <div className="flex flex-wrap items-end gap-3 mt-2">
+                      <div className="w-28 shrink-0"><TextField formCode={formCode} label={t('کد گره', 'Node Code')} value={nodeForm.code} onChange={e => setNodeForm({...nodeForm, code: e.target.value})} isRtl={isRtl} size="sm" wrapperClassName="!mb-0" /></div>
+                      <div className="flex-1 min-w-[180px]"><TextField formCode={formCode} label={t('عنوان گره', 'Node Title')} value={nodeForm.title} onChange={e => setNodeForm({...nodeForm, title: e.target.value})} isRtl={isRtl} required size="sm" wrapperClassName="!mb-0" /></div>
+                      <div className="flex-1 min-w-[180px]"><SelectField formCode={formCode} label={t('گره والد', 'Parent Node')} value={nodeForm.parentId} onChange={e => setNodeForm({...nodeForm, parentId: e.target.value})} isRtl={isRtl} size="sm" wrapperClassName="!mb-0" options={[{value: '', label: t('بدون والد (ریشه)', 'Root (No Parent)')}, ...parentNodeOptions]} /></div>
+                      <div className="pb-1.5"><ToggleField formCode={formCode} label={t('فعال', 'Active')} checked={nodeForm.isActive} onChange={val => setNodeForm({...nodeForm, isActive: val})} isRtl={isRtl} wrapperClassName="!mb-0" /></div>
+                      <div className="pb-0.5">
+                        {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveNode}>{t('ذخیره', 'Save')}</Button>}
                       </div>
-                    </div>
-                    <div className="flex justify-end mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 gap-2">
-                      {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveNode}>{t('ذخیره گره', 'Save Node')}</Button>}
                     </div>
                   </div>
                 )}
               </Card>
 
-              <Card title={t('پرسنل تخصیص یافته به این گره', 'Assigned Personnel')} noPadding={true} language={language} className="flex-1 min-h-[300px]">
-                <DataGrid 
-                  data={personnelDataForSelectedNode} columns={personnelColumns} language={language} formCode={formCode}
-                  onAdd={isNodeEditMode && access.canEdit ? () => handleOpenAssignModal() : undefined}
-                  hideImport={true}
-                  hideExport={true}
-                  actions={[
-                    { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenAssignModal(row), requiredAccess: 'edit' },
-                    { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'personnel', data: row.id }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
-                  ]}
-                />
+              <Card title={t('پرسنل تخصیص یافته به این گره', 'Assigned Personnel')} noPadding={true} language={language} className="flex-1 min-h-[350px] flex flex-col">
+                {isNodeEditMode && access.canEdit && (
+                  <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-indigo-50/50 dark:bg-indigo-900/10 shrink-0">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="flex-1 min-w-[200px]"><SelectField formCode={formCode} label={t('انتخاب شخص', 'Select Person')} value={assignData.personId} onChange={e => setAssignData({...assignData, personId: e.target.value})} options={employeeOptions} isRtl={isRtl} required size="sm" wrapperClassName="!mb-0" /></div>
+                      <div className="pb-1.5"><ToggleField formCode={formCode} label={t('مسئول واحد', 'Manager')} checked={assignData.isManager} onChange={val => setAssignData({...assignData, isManager: val})} isRtl={isRtl} wrapperClassName="!mb-0" /></div>
+                      <div className="w-32 shrink-0"><DatePicker formCode={formCode} label={t('از تاریخ', 'From Date')} value={assignData.fromDate} onChange={val => setAssignData({...assignData, fromDate: val})} isRtl={isRtl} size="sm" wrapperClassName="!mb-0" /></div>
+                      <div className="w-32 shrink-0"><DatePicker formCode={formCode} label={t('تا تاریخ', 'To Date')} value={assignData.toDate} onChange={val => setAssignData({...assignData, toDate: val})} isRtl={isRtl} size="sm" wrapperClassName="!mb-0" /></div>
+                      <div className="pb-0.5 flex gap-1 items-center">
+                        <Button variant="primary" size="sm" icon={assignData.id ? Save : Plus} onClick={handleSaveAssignment}>
+                          {assignData.id ? t('بروزرسانی', 'Update') : t('افزودن', 'Add')}
+                        </Button>
+                        {assignData.id && (
+                          <Button variant="ghost" size="sm" className="!px-2" icon={X} onClick={() => setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false })} title={t('لغو ویرایش', 'Cancel Edit')} />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex-1 min-h-0">
+                  <DataGrid 
+                    data={personnelDataForSelectedNode} columns={personnelColumns} language={language} formCode={formCode}
+                    hideImport={true}
+                    hideExport={true}
+                    actions={[
+                      { id: 'update', icon: Edit, tooltip: t('ویرایش درون‌خطی', 'Inline Edit'), onClick: (row) => handleLoadInlineAssign(row), requiredAccess: 'edit' },
+                      { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'personnel', data: row.id }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
+                    ]}
+                  />
+                </div>
               </Card>
             </div>
           </div>
@@ -542,7 +565,7 @@
         <Modal isOpen={isChartModalOpen} onClose={() => setIsChartModalOpen(false)} title={chartFormData.id ? t('ویرایش اطلاعات چارت', 'Edit Chart Info') : t('تعریف چارت جدید', 'Define New Chart')} language={language} width="max-w-2xl">
           <div className="p-4 flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <TextField formCode={formCode} label={t('کد چارت', 'Chart Code')} value={chartFormData.code} onChange={e => setChartFormData({...chartFormData, code: e.target.value})} isRtl={isRtl} required size="sm" />
+              <TextField formCode={formCode} label={t('کد چارت', 'Chart Code')} value={chartFormData.code} onChange={e => setChartFormData({...chartFormData, code: e.target.value})} isRtl={isRtl} required size="sm" dir="ltr" />
               <TextField formCode={formCode} label={t('عنوان چارت', 'Chart Title')} value={chartFormData.title} onChange={e => setChartFormData({...chartFormData, title: e.target.value})} isRtl={isRtl} required size="sm" />
               <SelectField formCode={formCode} label={t('نوع چارت', 'Chart Type')} value={chartFormData.type} onChange={e => setChartFormData({...chartFormData, type: e.target.value})} isRtl={isRtl} size="sm" options={[{value: 'standard', label: t('استاندارد', 'Standard')}, {value: 'sales', label: t('فروش', 'Sales')}, {value: 'finance', label: t('مالی', 'Finance')}, {value: 'hr', label: t('منابع انسانی', 'HR')}]} />
               <div className="flex items-end pb-1.5">
@@ -554,21 +577,6 @@
             <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
               <Button variant="outline" size="sm" onClick={() => setIsChartModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
               {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveChart}>{t('ذخیره تغییرات', 'Save Changes')}</Button>}
-            </div>
-          </div>
-        </Modal>
-
-        <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title={t('تخصیص پرسنل به گره', 'Assign Personnel to Node')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-4">
-            <SelectField formCode={formCode} label={t('انتخاب شخص', 'Select Person')} value={assignData.personId} onChange={e => setAssignData({...assignData, personId: e.target.value})} options={employeeOptions} isRtl={isRtl} required size="sm" />
-            <div className="flex items-center pt-2">
-                <ToggleField formCode={formCode} label={t('مسئول واحد', 'Manager')} checked={assignData.isManager} onChange={val => setAssignData({...assignData, isManager: val})} isRtl={isRtl} />
-            </div>
-            <DatePicker formCode={formCode} label={t('از تاریخ', 'From Date')} value={assignData.fromDate} onChange={val => setAssignData({...assignData, fromDate: val})} isRtl={isRtl} size="sm" />
-            <DatePicker formCode={formCode} label={t('تا تاریخ', 'To Date')} value={assignData.toDate} onChange={val => setAssignData({...assignData, toDate: val})} isRtl={isRtl} size="sm" />
-            <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-              <Button variant="outline" size="sm" onClick={() => setIsAssignModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-              {access.canEdit && <Button variant="primary" size="sm" onClick={handleSaveAssignment}>{t('تخصیص و ذخیره', 'Assign & Save')}</Button>}
             </div>
           </div>
         </Modal>
