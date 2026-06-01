@@ -7,9 +7,8 @@
   const LucideIcons = window.LucideIcons || {};
   const { 
     History = FallbackIcon, Clock = FallbackIcon, Calendar = FallbackIcon, User = FallbackIcon, 
-    Database = FallbackIcon, ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon,
-    Eye = FallbackIcon, RefreshCw = FallbackIcon, Info = FallbackIcon,
-    Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Box = FallbackIcon, Hash = FallbackIcon
+    Database = FallbackIcon, Eye = FallbackIcon, RefreshCw = FallbackIcon,
+    Hash = FallbackIcon
   } = LucideIcons;
 
   const SystemLog = ({ language = 'fa' }) => {
@@ -23,7 +22,7 @@
     const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent } = Grid;
     
     const Feedback = window.DSFeedback || window.DesignSystem || {};
-    const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
+    const { Modal = FallbackComponent, Toast = FallbackComponent, DiffViewer = FallbackComponent } = Feedback;
 
     const formatGlobalDate = Core.formatGlobalDate || ((v) => v);
     const useCalendarMode = Core.useCalendarMode || (() => 'jalali');
@@ -79,6 +78,9 @@
             'fm_record_logs': t('لاگ سیستم', 'System Logs'),
             'menus': t('منوهای سیستم', 'System Menus'),
             'users': t('کاربران', 'Users'),
+            'parties': t('اشخاص و شرکت‌ها', 'Parties & Companies'),
+            'fm_org_charts': t('چارت‌های سازمانی', 'Organization Charts'),
+            'sec_roles': t('نقش‌های امنیتی', 'Security Roles')
         };
         return labels[entity] || entity;
     }, [t]);
@@ -102,8 +104,12 @@
 
     const getFieldLabel = useCallback((key) => {
         const labels = {
-          code: t('کد ارز', 'Currency Code'),
+          code: t('کد', 'Code'),
           title: t('عنوان', 'Title'),
+          name: t('نام', 'Name'),
+          first_name: t('نام', 'First Name'),
+          last_name: t('نام خانوادگی', 'Last Name'),
+          company_name: t('نام شرکت', 'Company Name'),
           symbol: t('نماد', 'Symbol'),
           is_active: t('وضعیت فعالیت', 'Status'),
           fetch_type: t('نحوه دریافت', 'Fetch Type'),
@@ -118,7 +124,12 @@
           updated_by: t('ویرایش کننده', 'Updated By'),
           created_at: t('تاریخ ایجاد', 'Created At'),
           updated_at: t('تاریخ ویرایش', 'Updated At'),
-          id: t('شناسه رکورد', 'Record ID')
+          id: t('شناسه رکورد', 'Record ID'),
+          description: t('توضیحات', 'Description'),
+          party_type: t('نوع موجودیت', 'Entity Type'),
+          roles: t('نقش‌ها', 'Roles'),
+          national_id: t('شناسه/کد ملی', 'National ID'),
+          mobile: t('موبایل', 'Mobile')
         };
         return labels[key] || key;
     }, [t]);
@@ -258,13 +269,13 @@
         render: (v) => (
             <div className="flex items-center gap-1">
                <Hash size={10} className="text-slate-400" />
-               <span className="text-[12px] font-mono text-slate-600 dark:text-slate-400">{v}</span>
+               <span className="text-[12px] font-mono text-slate-600 dark:text-slate-400 truncate max-w-[80px]" title={v}>{v}</span>
             </div>
         )
       },
       { 
         field: 'details', header_fa: 'شرح جزئیات', header_en: 'Details', width: 'auto', minWidth: '250px',
-        render: (v) => <span className="text-[12px] text-slate-600 dark:text-slate-400 truncate block w-full">{v || '-'}</span> 
+        render: (v) => <span className="text-[12px] text-slate-600 dark:text-slate-400 truncate block w-full" title={v}>{v || '-'}</span> 
       }
     ];
 
@@ -284,95 +295,9 @@
         const formattedDate = formatGlobalDate ? formatGlobalDate(selectedLog.timestamp, globalCalendarMode) : d.toISOString().split('T')[0];
         const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-        const renderDiffs = () => {
-            if (!selectedLog.old_data && !selectedLog.new_data) return (
-                <div className="flex flex-col items-center justify-center p-8 text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 mt-4">
-                    <Box size={32} className="opacity-40 mb-2" />
-                    <span className="text-[12px] font-bold">{t('اطلاعات دقیق ساختاری برای این لاگ ثبت نشده است.', 'No structural data recorded for this log.')}</span>
-                </div>
-            );
-            
-            if (type === 'UPDATE' && selectedLog.old_data && selectedLog.new_data) {
-                const changes = [];
-                Object.keys(selectedLog.new_data).forEach(key => {
-                    if (['updated_at', 'updated_by', 'created_at', 'created_by'].includes(key)) return;
-                    const oldVal = selectedLog.old_data[key];
-                    const newVal = selectedLog.new_data[key];
-                    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-                        changes.push({ key, oldVal, newVal });
-                    }
-                });
-                
-                if (changes.length === 0) return (
-                    <div className="p-4 mt-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-[12px] text-slate-500 font-bold">
-                        {t('هیچ تغییر مقداری در فیلدها یافت نشد.', 'No value changes found in fields.')}
-                    </div>
-                );
-
-                return (
-                    <div className="mt-4 flex flex-col gap-3">
-                        <h4 className="text-[12px] font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 px-1 border-b border-slate-200 dark:border-slate-700 pb-2">
-                            <Edit size={14} className="text-amber-500" />
-                            {t('فیلدهای تغییر یافته:', 'Changed Fields:')}
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {changes.map(c => (
-                                <div key={c.key} className="flex items-center flex-wrap gap-2 text-[12px] bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-700/50 shadow-sm">
-                                    <span className="font-black text-slate-700 dark:text-slate-300 min-w-[70px] shrink-0">{getFieldLabel(c.key)}:</span>
-                                    <span className="text-rose-500 dark:text-rose-400 line-through decoration-rose-300/50 truncate max-w-[150px] font-medium" title={formatValue(c.oldVal)}>{formatValue(c.oldVal)}</span>
-                                    {isRtl ? <ArrowLeft size={12} className="text-slate-400 shrink-0" /> : <ArrowRight size={12} className="text-slate-400 shrink-0" />}
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold truncate max-w-[150px]" title={formatValue(c.newVal)}>{formatValue(c.newVal)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            }
-            
-            if (type === 'DELETE' && selectedLog.old_data) {
-                return (
-                    <div className="mt-4 flex flex-col gap-3">
-                        <h4 className="text-[12px] font-black text-rose-600 dark:text-rose-400 flex items-center gap-1.5 px-1 border-b border-rose-100 dark:border-rose-900/30 pb-2">
-                            <Trash2 size={14} />
-                            {t('اطلاعات رکورد حذف شده:', 'Deleted Record Data:')}
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-rose-50/30 dark:bg-rose-900/10 p-3 rounded-xl border border-rose-100/50 dark:border-rose-900/30">
-                            {Object.keys(selectedLog.old_data).filter(k => !['updated_at', 'updated_by', 'created_at', 'created_by'].includes(k)).map(key => (
-                                <div key={key} className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm">
-                                    <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 min-w-[80px]">{getFieldLabel(key)}:</span>
-                                    <span className="text-[12px] font-bold text-slate-800 dark:text-slate-200 truncate" title={formatValue(selectedLog.old_data[key])}>{formatValue(selectedLog.old_data[key])}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            }
-
-            if (type === 'CREATE' && selectedLog.new_data) {
-                return (
-                    <div className="mt-4 flex flex-col gap-3">
-                        <h4 className="text-[12px] font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 px-1 border-b border-emerald-100 dark:border-emerald-900/30 pb-2">
-                            <Plus size={14} />
-                            {t('اطلاعات رکورد ایجاد شده:', 'Created Record Data:')}
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-emerald-50/30 dark:bg-emerald-900/10 p-3 rounded-xl border border-emerald-100/50 dark:border-emerald-900/30">
-                            {Object.keys(selectedLog.new_data).filter(k => !['updated_at', 'updated_by', 'created_at', 'created_by'].includes(k)).map(key => (
-                                <div key={key} className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm">
-                                    <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 min-w-[80px]">{getFieldLabel(key)}:</span>
-                                    <span className="text-[12px] font-bold text-slate-800 dark:text-slate-200 truncate" title={formatValue(selectedLog.new_data[key])}>{formatValue(selectedLog.new_data[key])}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            }
-
-            return null;
-        };
-
         return (
-            <div className="flex flex-col p-4 font-sans gap-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-col p-4 font-sans gap-4 w-full">
+                <div className="flex flex-wrap items-center justify-between gap-4 w-full">
                     <div className="flex items-center gap-2.5">
                         {getActionBadge(selectedLog.action)}
                         <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600">{selectedLog.user_name}</span>
@@ -388,12 +313,21 @@
                 <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t('شناسه رکورد:', 'Record ID:')} {selectedLog.record_id}</div>
 
                 {selectedLog.details && (
-                    <div className="text-[11.5px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-700 leading-relaxed font-medium">
+                    <div className="text-[11.5px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-700 leading-relaxed font-medium w-full">
                         {selectedLog.details}
                     </div>
                 )}
                 
-                {renderDiffs()}
+                <div className="mt-2 w-full">
+                    <DiffViewer 
+                        oldData={selectedLog.old_data} 
+                        newData={selectedLog.new_data} 
+                        actionType={type} 
+                        getFieldLabel={getFieldLabel} 
+                        formatValue={formatValue} 
+                        language={language} 
+                    />
+                </div>
             </div>
         );
     };
@@ -459,7 +393,7 @@
             onClose={() => setIsDetailModalOpen(false)} 
             title={t('جزئیات دقیق تغییرات رکورد', 'Detailed Record Changes')} 
             language={language} 
-            width="max-w-2xl"
+            width="max-w-3xl"
         >
             {renderLogDetails()}
         </Modal>
