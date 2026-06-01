@@ -7,10 +7,11 @@
   const DSCore = window.DSCore || DS;
   const DSForms = window.DSForms || DS;
   const DSGrid = window.DSGrid || DS;
+  const DSFeedback = window.DSFeedback || DS;
 
   const Button = DSCore.Button || DS.Button || (() => null);
   const PageHeader = DSCore.PageHeader || DS.PageHeader || (() => null);
-  const Modal = window.DSFeedback?.Modal || DSCore.Modal || DS.Modal || (() => null);
+  const Modal = DSFeedback.Modal || DSCore.Modal || DS.Modal || (() => null);
   const EmptyState = DSCore.EmptyState || DS.EmptyState || (() => null);
   
   const TextField = DSForms.TextField || DS.TextField || (() => null);
@@ -367,14 +368,14 @@
         header_fa: 'کف تراکنش', 
         header_en: 'Min Amount', 
         width: '130px',
-        render: (val) => val ? Number(val).toLocaleString() : '0'
+        render: (row) => row.minAmount ? Number(row.minAmount).toLocaleString() : '0'
       },
       { 
         field: 'maxAmount', 
         header_fa: 'سقف تراکنش', 
         header_en: 'Max Amount', 
         width: '130px',
-        render: (val) => val ? Number(val).toLocaleString() : '0'
+        render: (row) => row.maxAmount ? Number(row.maxAmount).toLocaleString() : '0'
       },
       { 
         field: 'isActive', 

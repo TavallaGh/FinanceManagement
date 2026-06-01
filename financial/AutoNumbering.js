@@ -1,95 +1,85 @@
-/* Filename: financial/AutoNumbering.js */
+/* Filename: settings/AutoNumbering.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useCallback } = React;
+
+  const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
+  const LucideIcons = window.LucideIcons || {};
+  const {
+    Hash = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon,
+    Save = FallbackIcon, AlertTriangle = FallbackIcon
+  } = LucideIcons;
+
+  const DS = window.DesignSystem || {};
+  const DSCore = window.DSCore || DS;
+  const DSForms = window.DSForms || DS;
+  const DSGrid = window.DSGrid || DS;
+  const DSFeedback = window.DSFeedback || DS;
+
+  const Button = DSCore.Button || DS.Button || (() => null);
+  const PageHeader = DSCore.PageHeader || DS.PageHeader || (() => null);
+  const EmptyState = DSCore.EmptyState || DS.EmptyState || (() => null);
   
-  const { 
-    Button, PageHeader, Modal, DataGrid, 
-    TextField, ToggleField
-  } = window.DesignSystem || window.DSCore || window.DSForms || window.DSGrid || {};
+  const TextField = DSForms.TextField || DS.TextField || (() => null);
+  const SelectField = DSForms.SelectField || DS.SelectField || (() => null);
+  const ToggleField = DSForms.ToggleField || DS.ToggleField || (() => null);
   
-  const { 
-    Settings, Edit, RefreshCw, Save, Hash
-  } = window.LucideIcons || {};
-  
+  const DataGrid = DSGrid.DataGrid || DS.DataGrid || (() => null);
+  const Modal = DSFeedback.Modal || DSCore.Modal || DS.Modal || (() => null);
+  const Toast = DSFeedback.Toast || DS.Toast || (() => null);
+
   const supabase = window.supabase;
 
-  // ---------------------------------------------------------------------------
-  // سرویس سراسری برای تولید و مصرف شماره‌های اتوماتیک در سایر فرم‌ها
-  // ---------------------------------------------------------------------------
-  window.AutoNumberingService = {
-    previewNext: async (entityCode) => {
-      if (!supabase) return null;
-      try {
-        const { data, error } = await supabase
-          .from('fm_auto_numbering')
-          .select('*')
-          .eq('entity_code', entityCode)
-          .eq('is_active', true)
-          .single();
-          
-        if (error || !data) return null;
-        
-        const nextNum = data.current_number >= data.start_number ? data.current_number + 1 : data.start_number;
-        const paddedNum = String(nextNum).padStart(data.number_length || 4, '0');
-        const formattedCode = `${data.prefix || ''}${paddedNum}${data.suffix || ''}`;
-        
-        return { rawNumber: nextNum, formattedCode };
-      } catch (err) {
-        console.error('AutoNumberingService Error:', err);
-        return null;
-      }
-    },
-    consumeNext: async (entityCode) => {
-      if (!supabase) return null;
-      try {
-        const preview = await window.AutoNumberingService.previewNext(entityCode);
-        if (!preview) return null;
-
-        const { error } = await supabase
-          .from('fm_auto_numbering')
-          .update({ current_number: preview.rawNumber, updated_at: new Date().toISOString() })
-          .eq('entity_code', entityCode);
-
-        if (error) throw error;
-        return preview.formattedCode;
-      } catch (err) {
-        console.error('AutoNumberingService Error:', err);
-        return null;
-      }
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // کامپوننت فرم تنظیمات شماره‌گذاری
-  // ---------------------------------------------------------------------------
-  const AutoNumbering = ({ isAdmin, language = 'fa' }) => {
+  const AutoNumbering = ({ language = 'fa' }) => {
     const isRtl = language === 'fa';
-    const t = (fa, en) => isRtl ? fa : en;
-    
+    const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
+
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentRecord, setCurrentRecord] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
     
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+    const [gridState, setGridState] = useState(null);
+
     const [formData, setFormData] = useState({
+      entity_type: '',
       prefix: '',
       suffix: '',
-      numberLength: 4,
-      startNumber: 1,
-      isActive: true
+      current_value: 0,
+      step: 1,
+      pad_length: 4,
+      is_active: true
     });
 
-    const [gridState, setGridState] = useState(null);
+    const ENTITY_OPTIONS = [
+      { value: 'COST_TYPE', label: t('انواع هزینه', 'Cost Types') },
+      { value: 'INCOME_TYPE', label: t('انواع درآمد', 'Income Types') },
+      { value: 'GATEWAY_TYPE', label: t('درگاه‌های پرداخت', 'Gateway Types') },
+      { value: 'CHART_OF_ACCOUNTS', label: t('ساختار حساب‌ها', 'Chart of Accounts') },
+      { value: 'BALANCE_GROUP', label: t('گروه‌های بالانس', 'Balance Groups') },
+      { value: 'BROKER', label: t('بروکرها', 'Brokers') }
+    ];
 
     const viewConfig = {
       pageId: 'auto_numbering_main',
       currentState: () => ({ gridState }),
       onApplyState: (state) => {
-        if (state && state.gridState) setGridState(state.gridState);
+        if (state) {
+          if (state.gridState) setGridState(state.gridState);
+        } else {
+          setGridState(null);
+        }
       }
     };
+
+    const showToast = useCallback((message, type = 'success') => {
+      setToast({ isVisible: true, message, type });
+      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
+    }, []);
 
     useEffect(() => {
       fetchData();
@@ -98,70 +88,62 @@
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const { data: settings, error } = await supabase
-          .from('fm_auto_numbering')
+        if (!supabase) return;
+        const { data: res, error } = await supabase
+          .from('sys_auto_numbering')
           .select('*')
-          .order('id', { ascending: true });
+          .order('entity_type', { ascending: true });
 
         if (error) throw error;
-
-        const mappedData = (settings || []).map(item => ({
-          id: item.id,
-          entityCode: item.entity_code,
-          titleFa: item.title_fa,
-          titleEn: item.title_en,
-          title: isRtl ? item.title_fa : item.title_en,
-          prefix: item.prefix || '',
-          suffix: item.suffix || '',
-          numberLength: item.number_length,
-          startNumber: item.start_number,
-          currentNumber: item.current_number,
-          isActive: item.is_active ?? true
-        }));
-        
-        setData(mappedData);
+        setData(res || []);
       } catch (err) {
         console.error('Fetch Error:', err);
+        showToast(t('خطا در دریافت اطلاعات', 'Error fetching data'), 'error');
       } finally {
         setIsLoading(false);
       }
     };
 
-    const handleOpenModal = (record) => {
-      setCurrentRecord(record);
-      setFormData({
-        prefix: record.prefix || '',
-        suffix: record.suffix || '',
-        numberLength: record.numberLength || 4,
-        startNumber: record.startNumber || 1,
-        isActive: record.isActive
-      });
-      setIsModalOpen(true);
-    };
-
     const handleSave = async () => {
-      if (!currentRecord) return;
+      if (!formData.entity_type) {
+         showToast(t('انتخاب موجودیت الزامی است', 'Entity selection is required'), 'error');
+         return;
+      }
+
       setIsLoading(true);
       try {
         const payload = {
-          prefix: formData.prefix,
-          suffix: formData.suffix,
-          number_length: parseInt(formData.numberLength) || 4,
-          start_number: parseInt(formData.startNumber) || 1,
-          is_active: formData.isActive,
-          updated_at: new Date().toISOString()
+          entity_type: formData.entity_type,
+          prefix: formData.prefix || null,
+          suffix: formData.suffix || null,
+          current_value: parseInt(formData.current_value) || 0,
+          step: parseInt(formData.step) || 1,
+          pad_length: parseInt(formData.pad_length) || 4,
+          is_active: formData.is_active
         };
 
-        const { error } = await supabase
-          .from('fm_auto_numbering')
-          .update(payload)
-          .eq('id', currentRecord.id);
+        if (currentRecord?.id) {
+          const { error } = await supabase.from('sys_auto_numbering').update(payload).eq('id', currentRecord.id);
+          if (error) {
+            if (error.code === '23505') showToast(t('تنظیمات این موجودیت قبلاً ثبت شده است', 'Configuration for this entity already exists'), 'error');
+            else throw error;
+            return;
+          }
+        } else {
+          const { error } = await supabase.from('sys_auto_numbering').insert([payload]);
+          if (error) {
+            if (error.code === '23505') showToast(t('تنظیمات این موجودیت قبلاً ثبت شده است', 'Configuration for this entity already exists'), 'error');
+            else throw error;
+            return;
+          }
+        }
 
-        if (error) throw error;
         setIsModalOpen(false);
         fetchData();
+        showToast(t('اطلاعات با موفقیت ذخیره شد', 'Saved successfully'));
       } catch (err) {
         console.error('Save Error:', err);
+        showToast(t('خطا در ذخیره اطلاعات', 'Error saving data'), 'error');
       } finally {
         setIsLoading(false);
       }
@@ -170,47 +152,69 @@
     const handleToggleActive = async (row, newValue) => {
       try {
         const { error } = await supabase
-          .from('fm_auto_numbering')
+          .from('sys_auto_numbering')
           .update({ is_active: newValue })
           .eq('id', row.id);
         
         if (error) throw error;
-        setData(prev => prev.map(item => item.id === row.id ? { ...item, isActive: newValue } : item));
+        setData(prev => prev.map(item => item.id === row.id ? { ...item, is_active: newValue } : item));
       } catch (err) {
         console.error("Toggle Error:", err);
+        showToast(t('خطا در تغییر وضعیت', 'Error toggling status'), 'error');
       }
     };
 
-    const generatePreview = () => {
-      const nLen = parseInt(formData.numberLength) || 4;
-      const sNum = parseInt(formData.startNumber) || 1;
-      const curr = currentRecord ? currentRecord.currentNumber : 0;
-      
-      const nextNum = curr >= sNum ? curr + 1 : sNum;
-      const paddedNum = String(nextNum).padStart(nLen, '0');
-      return `${formData.prefix}${paddedNum}${formData.suffix}`;
+    const executeDelete = async () => {
+      setIsLoading(true);
+      try {
+        if (deleteConfirm.type === 'single') {
+          const { error } = await supabase.from('sys_auto_numbering').delete().eq('id', deleteConfirm.data.id);
+          if (error) throw error;
+        } else if (deleteConfirm.type === 'bulk') {
+          const { error } = await supabase.from('sys_auto_numbering').delete().in('id', deleteConfirm.data);
+          if (error) throw error;
+        }
+        
+        setSelectedIds([]);
+        setDeleteConfirm({ isOpen: false, type: null, data: null });
+        fetchData();
+        showToast(t('عملیات حذف با موفقیت انجام شد', 'Deletion successful'));
+      } catch (err) {
+        console.error("Delete error:", err);
+        showToast(t('خطا در حذف رکوردها', 'Error deleting records'), 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const handleOpenModal = (record = null) => {
+      setFormData(record ? { ...record } : { 
+        entity_type: '', prefix: '', suffix: '', current_value: 0, step: 1, pad_length: 4, is_active: true 
+      });
+      setCurrentRecord(record);
+      setIsModalOpen(true);
+    };
+
+    const getEntityLabel = (val) => {
+        const opt = ENTITY_OPTIONS.find(o => o.value === val);
+        return opt ? opt.label : val;
     };
 
     const columns = [
-      { field: 'entityCode', header_fa: 'کد سیستم', header_en: 'Sys Code', width: '150px' },
-      { field: 'title', header_fa: 'موجودیت / فرم', header_en: 'Entity', width: '200px' },
       { 
-        field: 'formatPreview', 
-        header_fa: 'فرمت الگو', 
-        header_en: 'Pattern Format', 
-        width: '180px',
-        render: (value, row) => {
-          const r = (value && value.startNumber !== undefined) ? value : (row || {});
-          const startNum = r.startNumber || 1;
-          const numLen = r.numberLength || 4;
-          const paddedNum = String(startNum).padStart(numLen, 'X');
-          return <span className="font-sans text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded dir-ltr inline-block">{`${r.prefix || ''}${paddedNum}${r.suffix || ''}`}</span>;
-        }
+        field: 'entity_type', 
+        header_fa: 'موجودیت هدف', 
+        header_en: 'Target Entity', 
+        width: '200px',
+        render: (val) => <span className="font-bold text-slate-700 dark:text-slate-200">{getEntityLabel(val)}</span>
       },
-      { field: 'numberLength', header_fa: 'طول ارقام', header_en: 'Length', width: '100px' },
-      { field: 'currentNumber', header_fa: 'آخرین شماره مصرفی', header_en: 'Last Used', width: '150px' },
+      { field: 'prefix', header_fa: 'پیشوند', header_en: 'Prefix', width: '100px', render: (val) => <span dir="ltr">{val || '-'}</span> },
+      { field: 'suffix', header_fa: 'پسوند', header_en: 'Suffix', width: '100px', render: (val) => <span dir="ltr">{val || '-'}</span> },
+      { field: 'current_value', header_fa: 'مقدار فعلی (آخرین شماره)', header_en: 'Current Value', width: '180px', render: (val) => <span className="font-mono text-[13px] font-bold" dir="ltr">{val}</span> },
+      { field: 'pad_length', header_fa: 'طول ارقام (Padding)', header_en: 'Pad Length', width: '150px' },
+      { field: 'step', header_fa: 'گام افزایش', header_en: 'Step', width: '100px' },
       { 
-        field: 'isActive', 
+        field: 'is_active', 
         header_fa: 'وضعیت', 
         header_en: 'Status', 
         width: '100px', 
@@ -219,31 +223,48 @@
       }
     ];
 
+    const generatePreview = () => {
+        const p = formData.prefix || '';
+        const s = formData.suffix || '';
+        const val = parseInt(formData.current_value) || 0;
+        const step = parseInt(formData.step) || 1;
+        const pad = parseInt(formData.pad_length) || 1;
+        const nextVal = String(val + step).padStart(pad, '0');
+        return `${p}${nextVal}${s}`;
+    };
+
     return (
-      <div className="flex flex-col h-full p-4 bg-[#f8fafc] dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="flex flex-col h-full p-4 bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <PageHeader 
-          title={t('تنظیمات شماره‌گذاری اتوماتیک', 'Auto Numbering Settings')} 
+          title={t('تنظیمات شماره‌گذاری خودکار', 'Auto Numbering Configuration')} 
           icon={Hash}
-          description={t('پیکربندی ساختار و الگوی تولید کدهای سیستمی برای فرم‌های مختلف', 'Configure system code generation patterns for various forms')}
+          description={t('مدیریت پیشوندها، پسوندها و توالی کدهای سیستم', 'Manage prefixes, suffixes, and sequences for system codes')}
           language={language}
-          breadcrumbs={[{ label: t('تنظیمات پایه', 'Base Settings') }, { label: t('شماره‌گذاری', 'Auto Numbering') }]}
+          breadcrumbs={[{ label: t('تنظیمات', 'Settings') }, { label: t('شماره‌گذاری', 'Numbering') }]}
           viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-4 animate-in fade-in duration-300">
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
             <DataGrid 
               data={data}
               columns={columns} 
               language={language}
-              selectable={false}
+              selectable={true}
+              selectedIds={selectedIds}
+              onSelectChange={setSelectedIds}
               isLoading={isLoading}
+              onAdd={() => handleOpenModal()}
               onRowDoubleClick={(row) => handleOpenModal(row)}
               gridState={gridState}
               onGridStateChange={setGridState}
               hideImport={true}
               actions={[
-                { icon: Edit, tooltip: t('ویرایش تنظیمات', 'Edit Settings'), onClick: (row) => handleOpenModal(row), className: 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700' }
+                { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
+                { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600' }
+              ]}
+              bulkActions={[
+                { label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) }
               ]}
             />
           </div>
@@ -251,83 +272,71 @@
 
         <Modal 
           isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} 
-          title={t(`تنظیمات الگو: ${currentRecord?.title || ''}`, `Pattern Settings: ${currentRecord?.titleEn || ''}`)}
-          width="max-w-xl"
+          title={currentRecord ? t('ویرایش تنظیمات شماره‌گذاری', 'Edit Auto Numbering') : t('تعریف ساختار جدید', 'New Configuration')}
+          width="max-w-2xl"
           language={language}
         >
           <div className="p-4 flex flex-col gap-4">
-            
-            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-2">
-              <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('پیش‌نمایش کد بعدی:', 'Next Code Preview:')}</span>
-              <div className="font-sans text-2xl font-black text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 px-6 py-2 rounded-lg shadow-sm border border-indigo-100 dark:border-indigo-900/50 dir-ltr tracking-widest">
-                {generatePreview()}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SelectField 
+                size="sm" 
+                label={t('موجودیت هدف', 'Target Entity')} 
+                value={formData.entity_type} 
+                onChange={e => setFormData({...formData, entity_type: e.target.value})} 
+                options={[
+                  { value: '', label: t('انتخاب کنید...', 'Select...') },
+                  ...ENTITY_OPTIONS
+                ]}
+                isRtl={isRtl} 
+                required
+                disabled={!!currentRecord}
+              />
+              <div className="md:col-start-1">
+                 <TextField size="sm" label={t('پیشوند (Prefix)', 'Prefix')} value={formData.prefix} onChange={e => setFormData({...formData, prefix: e.target.value})} isRtl={isRtl} dir="ltr" />
               </div>
-            </div>
+              <div>
+                 <TextField size="sm" label={t('پسوند (Suffix)', 'Suffix')} value={formData.suffix} onChange={e => setFormData({...formData, suffix: e.target.value})} isRtl={isRtl} dir="ltr" />
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TextField 
-                size="sm" 
-                label={t('پیشوند (Prefix)', 'Prefix')} 
-                value={formData.prefix} 
-                onChange={e => setFormData({...formData, prefix: e.target.value})} 
-                isRtl={isRtl} 
-                dir="ltr"
-                placeholder="e.g. CST-"
-              />
-              <TextField 
-                size="sm" 
-                label={t('پسوند (Suffix)', 'Suffix')} 
-                value={formData.suffix} 
-                onChange={e => setFormData({...formData, suffix: e.target.value})} 
-                isRtl={isRtl} 
-                dir="ltr"
-                placeholder="e.g. -1403"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TextField 
-                size="sm" 
-                type="number"
-                label={t('طول ارقام (تعداد صفرها)', 'Number Length')} 
-                value={formData.numberLength} 
-                onChange={e => setFormData({...formData, numberLength: e.target.value})} 
-                isRtl={isRtl} 
-                dir="ltr"
-                min="1"
-                max="10"
-                required
-              />
-              <TextField 
-                size="sm" 
-                type="number"
-                label={t('شروع شمارش از', 'Start Number')} 
-                value={formData.startNumber} 
-                onChange={e => setFormData({...formData, startNumber: e.target.value})} 
-                isRtl={isRtl} 
-                dir="ltr"
-                min="1"
-                required
-              />
-            </div>
-
-            <div className="flex items-center justify-between mt-2 pt-4 border-t border-slate-100 dark:border-slate-700/50">
-              <ToggleField 
-                size="sm" 
-                label={t('وضعیت فعال‌بودن الگو', 'Pattern Active Status')} 
-                checked={formData.isActive} 
-                onChange={v => setFormData({...formData, isActive: v})} 
-                isRtl={isRtl} 
-              />
+              <TextField size="sm" type="number" label={t('آخرین مقدار ثبت شده', 'Current Value')} value={formData.current_value} onChange={e => setFormData({...formData, current_value: e.target.value})} isRtl={isRtl} dir="ltr" required />
+              <TextField size="sm" type="number" label={t('گام افزایش', 'Step')} value={formData.step} onChange={e => setFormData({...formData, step: e.target.value})} isRtl={isRtl} dir="ltr" required />
+              <TextField size="sm" type="number" label={t('طول ارقام (Padding)', 'Pad Length')} value={formData.pad_length} onChange={e => setFormData({...formData, pad_length: e.target.value})} isRtl={isRtl} dir="ltr" required />
               
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-                <Button variant="primary" size="sm" icon={Save} onClick={handleSave} isLoading={isLoading}>{t('ذخیره الگو', 'Save Pattern')}</Button>
+              <div className="md:col-span-2 flex items-center justify-between mt-2 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                 <ToggleField size="sm" label={t('وضعیت فعال', 'Active Status')} checked={formData.is_active} onChange={v => setFormData({...formData, is_active: v})} isRtl={isRtl} />
+                 
+                 <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('پیش‌نمایش شماره بعدی:', 'Next Number Preview:')}</span>
+                    <span className="font-mono text-[14px] font-black text-indigo-600 dark:text-indigo-400" dir="ltr">{generatePreview()}</span>
+                 </div>
               </div>
             </div>
 
+            <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+              <Button variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
+              <Button variant="primary" size="sm" icon={Save} onClick={handleSave} isLoading={isLoading}>{t('ذخیره تنظیمات', 'Save')}</Button>
+            </div>
           </div>
         </Modal>
+
+        <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'bulk' 
+              ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
+              : t(`آیا از حذف تنظیمات شماره‌گذاری برای این موجودیت اطمینان دارید؟`, `Are you sure you want to delete this configuration?`)
+            }
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
+        </Modal>
+
+        <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
       </div>
     );
   };

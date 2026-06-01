@@ -6,14 +6,14 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const { 
-    TrendingUp = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon, ListTree = FallbackIcon, AlertTriangle = FallbackIcon, Lock = FallbackIcon
+    TrendingUp = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon, ListTree = FallbackIcon, AlertTriangle = FallbackIcon
   } = LucideIcons;
 
   const IncomeTypes = ({ language = 'fa', formCode = 'INCOME_TYPES' }) => {
     const FallbackComponent = () => null;
     
     const Core = window.DSCore || window.DesignSystem || {};
-    const { Button = FallbackComponent, PageHeader = FallbackComponent, Card = FallbackComponent } = Core;
+    const { Button = FallbackComponent, PageHeader = FallbackComponent, Card = FallbackComponent, EmptyState = FallbackComponent } = Core;
     
     const Forms = window.DSForms || window.DesignSystem || {};
     const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent } = Forms;
@@ -313,7 +313,7 @@
 
         <div className="flex-1 flex gap-4 min-h-0 overflow-hidden mt-3 animate-in fade-in duration-300">
           
-          <div className="w-full md:w-[40%] h-full min-h-0 shadow-sm overflow-auto">
+          <div className="w-full md:w-[40%] h-full min-h-0 shadow-sm overflow-auto bg-slate-50/40 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-700 rounded-xl">
             <Tree 
               data={rawNodes} language={language} formCode={formCode}
               idField="id" parentField="parentId" displayField="title" secondaryField="code" activeField="isActive"
@@ -328,8 +328,8 @@
           <div className="w-full md:w-[60%] h-full min-h-0 flex flex-col">
             <Card 
               title={isCreatingNode ? (newTargetParentId ? t('ایجاد زیرمجموعه جدید', 'Create New Child') : t('ایجاد درآمد ریشه', 'Create Root Income')) : (selectedTreeNodeId ? t('ویرایش مشخصات نوع درآمد', 'Edit Income Type Details') : t('اطلاعات جزئی', 'Details'))}
-              className="h-full border border-slate-200 dark:border-slate-700 shadow-sm"
-              headerClassName="bg-slate-50/80 dark:bg-slate-900/50"
+              className="h-full border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col"
+              headerClassName="bg-slate-50/80 dark:bg-slate-900/50 shrink-0"
               action={
                 (selectedTreeNodeId && !isCreatingNode && access.canDelete) && (
                   <Button size="sm" variant="ghost" icon={Trash2} className="!text-red-500 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/30" onClick={() => handleDeleteTreeNode(rawNodes.find(n => n.id === selectedTreeNodeId))} title={t('حذف', 'Delete')}/>
@@ -337,7 +337,7 @@
               }
             >
               {(selectedTreeNodeId || isCreatingNode) ? (
-                <div className="flex flex-col h-full">
+                <div className="flex flex-col h-full min-h-0 p-4">
                   <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1">
                     {isCreatingNode && newTargetParentId && (
                       <Alert 
@@ -358,13 +358,13 @@
 
                     <div className="pt-2">
                         <ToggleField size="sm" formCode={formCode} label={t('وضعیت فعال بودن', 'Active Status')} checked={treeFormData.isActive !== false} onChange={(v) => setTreeFormData({...treeFormData, isActive: v})} isRtl={isRtl} wrapperClassName="pt-2" />
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mr-8">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                             {t('درآمدهای غیرفعال در لیست‌های انتخاب فرم‌های عملیاتی نمایش داده نمی‌شوند.', 'Inactive incomes will not appear in selection dropdowns.')}
                         </p>
                     </div>
 
                   </div>
-                  <div className="pt-4 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-end gap-2 shrink-0">
+                  <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-end gap-2 shrink-0">
                     <Button size="sm" variant="ghost" onClick={handleCancelTreeForm}>{t('لغو', 'Cancel')}</Button>
                     {access.canEdit && (
                         <Button size="sm" variant="primary" icon={Save} onClick={handleSaveTreeForm}>{t('ذخیره تغییرات', 'Save Changes')}</Button>
@@ -372,9 +372,12 @@
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500 gap-3 text-[12px] font-medium">
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full"><ListTree size={24} className="text-slate-300 dark:text-slate-600"/></div>
-                  <span>{t('برای مشاهده یا ویرایش اطلاعات، یک گره را از درخت انتخاب کنید.', 'Select a node from the tree to view or edit details.')}</span>
+                <div className="flex flex-col items-center justify-center h-full min-h-0 text-slate-400 dark:text-slate-500 gap-3 text-[12px] font-medium p-4">
+                  <EmptyState 
+                    icon={ListTree}
+                    title={t('گره‌ای انتخاب نشده است', 'No Node Selected')}
+                    description={t('برای مشاهده یا ویرایش اطلاعات، یک گره را از درخت انتخاب کنید.', 'Select a node from the tree to view or edit details.')}
+                  />
                 </div>
               )}
             </Card>
@@ -383,21 +386,17 @@
         </div>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1">
-               <AlertTriangle size={22} />
-            </div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1">
-               <Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-2">
-              {t(`آیا از حذف نوع درآمد "${deleteConfirm.data?.titleFa}" اطمینان دارید Dorset؟`, `Are you sure you want to delete "${deleteConfirm.data?.titleEn || deleteConfirm.data?.titleFa}"?`)}
-            </p>
-            <div className="flex gap-2 mt-5 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeDelete} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 border-red-600 dark:border-red-500 shadow-lg shadow-red-100 dark:shadow-none">{t('تایید حذف', 'Delete Now')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={t(`آیا از حذف نوع درآمد "${deleteConfirm.data?.titleFa}" اطمینان دارید؟`, `Are you sure you want to delete "${deleteConfirm.data?.titleEn || deleteConfirm.data?.titleFa}"?`)}
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} className="flex-1">{t('تایید حذف نهایی', 'Delete Now')}</Button>
+              </div>
+            }
+          />
         </Modal>
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
