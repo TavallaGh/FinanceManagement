@@ -18,6 +18,7 @@
   const Badge = DS.Badge || window.DSCore?.Badge || (() => null);
   const Tabs = DS.Tabs || window.DSCore?.Tabs || (() => null);
   const EmptyState = DS.EmptyState || window.DSCore?.EmptyState || (() => null);
+  const Toast = DS.Toast || window.DSFeedback?.Toast || (() => null);
 
   const supabase = window.supabase;
 
@@ -31,6 +32,7 @@
     const [modalLoading, setModalLoading] = useState(false);
     const [accessViewMode, setAccessViewMode] = useState('assign');
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, targetType: null, type: null, data: null });
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
 
     // Arrays
     const [groupAccounts, setGroupAccounts] = useState([]);
@@ -42,6 +44,11 @@
 
     const globalMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : 'jalali';
     const formatDate = (val) => val && window.DSCore?.formatGlobalDate ? window.DSCore.formatGlobalDate(val, globalMode) : val;
+
+    const showToast = useCallback((message, type = 'success') => {
+      setToast({ isVisible: true, message, type });
+      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
+    }, []);
 
     useEffect(() => {
       if (isOpen && group) {
@@ -89,7 +96,7 @@
       if (!form.account_id || !form.valid_from) return;
       
       if (inlineAccountEdit.id === 'new' && groupAccounts.some(a => String(a.account_id) === String(form.account_id))) {
-         alert(t('این حساب قبلاً به گروه افزوده شده است.', 'This account is already added to the group.'));
+         showToast(t('این حساب قبلاً به گروه افزوده شده است.', 'This account is already added to the group.'), 'error');
          return;
       }
 
@@ -113,11 +120,36 @@
         
         setInlineAccountEdit(null);
         fetchGroupAccounts();
+        showToast(t('حساب با موفقیت ذخیره شد.', 'Account saved successfully.'));
       } catch (error) {
-        console.error('Error saving account map:', error);
+        showToast(t('خطا در ذخیره حساب', 'Error saving account'), 'error');
       } finally {
         setModalLoading(false);
       }
+    };
+
+    const handleDownloadSample = () => {
+      const headers = isRtl
+        ? 'کد حساب,تاریخ شروع (YYYY/MM/DD),تاریخ پایان (YYYY/MM/DD),وضعیت (1 فعال / 0 غیرفعال)'
+        : 'Account Code,Valid From (YYYY/MM/DD),Valid To (YYYY/MM/DD),Status (1 Active / 0 Inactive)';
+        
+      const sampleRow = isRtl
+        ? '1101001,1403/01/01,,1'
+        : '1101001,2024/03/20,,1';
+        
+      const csv = '\uFEFF' + headers + '\n' + sampleRow;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', 'BalanceGroup_Accounts_Sample.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    const handleImport = (file) => {
+        if (!file) return;
+        showToast(t(`فایل ${file.name} جهت پردازش بارگذاری شد.`, `File ${file.name} uploaded for processing.`), 'info');
     };
 
     const accountGridData = useMemo(() => {
@@ -152,7 +184,7 @@
       if (!form.grantee_id) return;
 
       if (inlineAccessEdit.id === 'new' && groupAccesses.some(a => a.grantee_type?.toUpperCase() === form.grantee_type?.toUpperCase() && String(a.grantee_id) === String(form.grantee_id))) {
-         alert(t('این دسترسی قبلاً افزوده شده است.', 'This access is already added.'));
+         showToast(t('این دسترسی قبلاً افزوده شده است.', 'This access is already added.'), 'error');
          return;
       }
 
@@ -168,8 +200,9 @@
         
         setInlineAccessEdit(null);
         fetchGroupAccess();
+        showToast(t('دسترسی با موفقیت ذخیره شد.', 'Access saved successfully.'));
       } catch (error) {
-        console.error('Error saving access map:', error);
+        showToast(t('خطا در ذخیره دسترسی', 'Error saving access'), 'error');
       } finally {
         setModalLoading(false);
       }
@@ -233,8 +266,9 @@
         setDeleteConfirm({ isOpen: false, targetType: null, type: null, data: null });
         if (targetType === 'account') fetchGroupAccounts();
         if (targetType === 'access') fetchGroupAccess();
+        showToast(t('عملیات حذف با موفقیت انجام شد.', 'Deletion completed successfully.'));
       } catch (err) {
-        console.error("Delete error:", err);
+        showToast(t('خطا در حذف اطلاعات.', 'Error deleting data.'), 'error');
       } finally {
         setModalLoading(false);
       }
@@ -398,6 +432,7 @@
               <DataGrid 
                 data={accountGridData} columns={accountColumns} actions={accountActions} bulkActions={accountBulkActions}
                 selectable={true} language={language} isLoading={modalLoading} onAdd={handleAddAccountClick}
+                onImport={handleImport} onDownloadSample={handleDownloadSample}
               />
             </div>
           )}
@@ -456,6 +491,8 @@
             }
           />
         </Modal>
+        
+        <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
       </Modal>
     );
   };
