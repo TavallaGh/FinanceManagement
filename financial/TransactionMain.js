@@ -8,7 +8,7 @@
   const {
     FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
     Copy = FallbackIcon, AlertTriangle = FallbackIcon, X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon,
-    List = FallbackIcon
+    List = FallbackIcon, Search = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -116,8 +116,9 @@
         if (isFetchingDeps.current || !supabase) return;
         isFetchingDeps.current = true;
         try {
-            const [accRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id').eq('is_active', true),
+            const [accRes, strRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, structure_id').eq('is_active', true),
+                supabase.from('fm_coa_structures').select('id, title_fa').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en').eq('is_active', true),
                 supabase.from('fm_income_types').select('id, title_fa, title_en').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
@@ -144,14 +145,34 @@
                 }
             });
 
-            const parentIds = new Set((accRes.data || []).map(a => a.parent_id).filter(Boolean));
-            const leafAccs = (accRes.data || []).filter(a => !parentIds.has(a.id)).map(a => ({
+            const allAccounts = accRes.data || [];
+            const structures = strRes.data || [];
+
+            const getPath = (accId) => {
+                let pathArr = [];
+                let curr = allAccounts.find(a => a.id === accId);
+                while (curr && curr.parent_id) {
+                    const parent = allAccounts.find(a => a.id === curr.parent_id);
+                    if (parent) {
+                        pathArr.unshift(parent.title_fa);
+                        curr = parent;
+                    } else {
+                        break;
+                    }
+                }
+                return pathArr.join(' / ');
+            };
+
+            const parentIds = new Set(allAccounts.map(a => a.parent_id).filter(Boolean));
+            const leafAccs = allAccounts.filter(a => !parentIds.has(a.id)).map(a => ({
                 ...a,
+                structure_name: structures.find(s => s.id === a.structure_id)?.title_fa || '',
+                pathTitle: getPath(a.id),
                 displayLabel: `${a.code} - ${a.title_fa}`
             }));
 
             setLookups({
-                accounts: accRes.data || [],
+                accounts: allAccounts,
                 leafAccounts: leafAccs,
                 costTypes: costRes.data || [],
                 incomeTypes: incRes.data || [],
@@ -292,7 +313,7 @@
                 cost_type_id: item.transaction_group === 'COST' ? item.cost_type_id : null,
                 income_type_id: item.transaction_group === 'INCOME' ? item.income_type_id : null,
                 currency: item.currency || 'IRR',
-                amount: parseFloat(item.amount),
+                amount: parseFloat(String(item.amount).replace(/,/g, '')),
                 description: item.description
             }));
 
@@ -311,7 +332,10 @@
     };
 
     const handleAddItemClick = () => {
-        if (inlineItemEdit) return;
+        if (inlineItemEdit) {
+            showToast(t('لطفاً ابتدا سطر باز را ذخیره کنید.', 'Please save current edit first.'), 'warning');
+            return;
+        }
         setInlineItemEdit({
             id: 'new',
             data: { 
@@ -328,7 +352,8 @@
             id: row._tempId || row.id,
             data: {
                 ...row,
-                account_obj: accObj
+                account_obj: accObj,
+                amount: row.amount ? String(row.amount).replace(/,/g, '') : ''
             }
         });
     };
@@ -340,10 +365,18 @@
             return;
         }
 
+        const cleanAmount = String(form.amount).replace(/,/g, '');
+        if (isNaN(cleanAmount) || cleanAmount === '') {
+            showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
+            return;
+        }
+
+        const dataToSave = { ...form, amount: cleanAmount };
+
         if (inlineItemEdit.id === 'new') {
-            setItemsData([...itemsData, { ...form, _tempId: crypto.randomUUID(), row_number: itemsData.length + 1 }]);
+            setItemsData([...itemsData, { ...dataToSave, _tempId: crypto.randomUUID(), row_number: itemsData.length + 1 }]);
         } else {
-            setItemsData(itemsData.map(item => (item._tempId === inlineItemEdit.id || item.id === inlineItemEdit.id) ? { ...item, ...form } : item));
+            setItemsData(itemsData.map(item => (item._tempId === inlineItemEdit.id || item.id === inlineItemEdit.id) ? { ...item, ...dataToSave } : item));
         }
         setInlineItemEdit(null);
     };
@@ -425,8 +458,14 @@
     ];
 
     const accountLovColumns = [
+        { field: 'structure_name', header_fa: 'ساختار', header_en: 'Structure', width: '120px' },
         { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '120px' },
-        { field: 'title_fa', header_fa: 'عنوان حساب', header_en: 'Title', width: 'auto' }
+        { field: 'title_fa', header_fa: 'عنوان حساب', header_en: 'Title', width: 'auto', render: (val, row) => (
+            <div className="flex flex-col py-1">
+                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
+                <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>
+            </div>
+        )}
     ];
 
     const itemGridData = useMemo(() => {
@@ -437,7 +476,7 @@
 
     const itemColumns = [
         { 
-            field: 'row_number', header_fa: 'ردیف', header_en: '#', width: '60px', 
+            field: 'row_number', header_fa: 'ردیف', header_en: '#', width: '50px', 
             render: (val, row) => row._isNew ? <span className="text-emerald-600 font-bold">*</span> : val 
         },
         { 
@@ -447,7 +486,7 @@
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[400px]"
+                                size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[500px]"
                                 displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({
                                     ...prev, 
@@ -521,21 +560,35 @@
             }
         },
         { 
-            field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '100px', 
+            field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '80px', 
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                     return <div onClick={(e) => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" /></div>;
                 }
-                return <span dir="ltr">{val}</span>;
+                return <span dir="ltr" className="text-[12px]">{val}</span>;
             }
         },
         { 
             field: 'amount', header_fa: 'مبلغ', header_en: 'Amount', width: '150px', 
             render: (val, row) => {
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return <div onClick={(e) => e.stopPropagation()}><TextField size="sm" type="number" value={inlineItemEdit.data.amount} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: e.target.value } }))} isRtl={isRtl} dir="ltr" /></div>;
+                    const dispVal = inlineItemEdit.data.amount ? Number(inlineItemEdit.data.amount).toLocaleString() : '';
+                    return (
+                        <div onClick={(e) => e.stopPropagation()}>
+                            <TextField 
+                                size="sm" type="text" value={dispVal} 
+                                onChange={(e) => {
+                                    const raw = e.target.value.replace(/,/g, '');
+                                    if (raw === '' || !isNaN(raw)) {
+                                        setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: raw } }));
+                                    }
+                                }} 
+                                isRtl={isRtl} dir="ltr" 
+                            />
+                        </div>
+                    );
                 }
-                return <span dir="ltr">{Number(val).toLocaleString()}</span>;
+                return <span dir="ltr" className="text-[12px]">{Number(val).toLocaleString()}</span>;
             }
         },
         { 
@@ -544,16 +597,30 @@
                 if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                     return <div onClick={(e) => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, description: e.target.value } }))} isRtl={isRtl} /></div>;
                 }
-                return val;
+                return <span className="text-[12px]">{val}</span>;
+            }
+        },
+        {
+            field: 'actions', header_fa: 'عملیات', header_en: 'Actions', width: '90px',
+            render: (_, row) => {
+                const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
+                if (isEditing) {
+                    return (
+                        <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" icon={Save} onClick={(e) => { e.stopPropagation(); handleSaveItemInline(); }} className="!text-emerald-600 hover:!bg-emerald-50 dark:hover:!bg-emerald-900/30 !px-2" />
+                            <Button variant="ghost" size="sm" icon={X} onClick={(e) => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800 !px-2" />
+                        </div>
+                    );
+                }
+                if (inlineItemEdit) return null;
+                return (
+                    <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" icon={Edit} onClick={(e) => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !px-2" />
+                        <Button variant="ghost" size="sm" icon={Trash2} onClick={(e) => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !px-2" />
+                    </div>
+                );
             }
         }
-    ];
-
-    const itemActions = [
-        { icon: Save, tooltip: t('ذخیره', 'Save'), hidden: (row) => !inlineItemEdit || (inlineItemEdit.id !== row.id && inlineItemEdit.id !== row._tempId), onClick: handleSaveItemInline, className: '!text-emerald-600 hover:!text-emerald-800' },
-        { icon: X, tooltip: t('انصراف', 'Cancel'), hidden: (row) => !inlineItemEdit || (inlineItemEdit.id !== row.id && inlineItemEdit.id !== row._tempId), onClick: () => setInlineItemEdit(null), className: '!text-slate-500 hover:!text-slate-700' },
-        { icon: Edit, tooltip: t('ویرایش', 'Edit'), hidden: (row) => inlineItemEdit?.id === row.id || inlineItemEdit?.id === row._tempId || row._isNew, onClick: handleEditItemClick, className: 'hover:text-indigo-600 text-slate-400' },
-        { icon: Trash2, tooltip: t('حذف', 'Delete'), hidden: (row) => inlineItemEdit?.id === row.id || inlineItemEdit?.id === row._tempId || row._isNew, onClick: handleRemoveItem, className: 'hover:text-red-600 text-slate-400' }
     ];
 
     const viewConfig = useMemo(() => ({
@@ -584,7 +651,7 @@
           <AdvancedFilter 
             fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} 
           />
-          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-visible border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
             <DataGrid
               data={transactions} columns={columns} language={language} formCode={formCode}
               gridState={gridState} onGridStateChange={setGridState}
@@ -603,11 +670,11 @@
                     className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
                     onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
                 >
-                    <h4 className="text-[12px] font-black text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={16} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</h4>
+                    <h4 className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={16} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</h4>
                     <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} className="!p-1 h-6 w-6" />
                 </div>
                 {!isHeaderCollapsed && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3 animate-in slide-in-from-top-2 duration-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 animate-in slide-in-from-top-2 duration-200">
                         <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
                         <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                         <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
@@ -618,7 +685,7 @@
                         <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
                         <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} isRtl={isRtl} />
                         
-                        <div className="md:col-span-4">
+                        <div className="lg:col-span-4">
                             <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
                         </div>
                     </div>
@@ -630,9 +697,9 @@
                     <h3 className="font-bold text-[12px] text-slate-700 dark:text-slate-300 flex items-center gap-2"><List size={16} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
                 </div>
                 
-                <div className="flex-1 min-h-0 flex flex-col p-1">
+                <div className="flex-1 overflow-visible flex flex-col p-1 pb-48">
                     <DataGrid 
-                        data={itemGridData} columns={itemColumns} actions={itemActions}
+                        data={itemGridData} columns={itemColumns}
                         language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
                     />
                 </div>
