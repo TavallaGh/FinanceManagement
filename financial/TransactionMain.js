@@ -7,23 +7,23 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    Copy = FallbackIcon, AlertTriangle = FallbackIcon, Search = FallbackIcon, Info = FallbackIcon, RefreshCw = FallbackIcon
+    Copy = FallbackIcon, AlertTriangle = FallbackIcon, Search = FallbackIcon, Download = FallbackIcon, Upload = FallbackIcon
   } = LucideIcons;
 
   const TransactionMain = ({ language = 'fa', formCode = 'TRANSACTIONS' }) => {
     const FallbackComponent = () => null;
 
     const Core = window.DSCore || window.DesignSystem || {};
-    const { Button = FallbackComponent, PageHeader = FallbackComponent, EmptyState = FallbackComponent, Card = FallbackComponent } = Core;
+    const { Button = FallbackComponent, PageHeader = FallbackComponent, EmptyState = FallbackComponent, Card = FallbackComponent, Badge = FallbackComponent } = Core;
 
     const Forms = window.DSForms || window.DesignSystem || {};
     const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
 
     const Grid = window.DSGrid || window.DesignSystem || {};
-    const { DataGrid = FallbackComponent } = Grid;
+    const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent, LOVField = FallbackComponent } = Grid;
 
     const Feedback = window.DSFeedback || window.DesignSystem || {};
-    const { Modal = FallbackComponent, Toast = FallbackComponent, Alert = FallbackComponent } = Feedback;
+    const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
 
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
@@ -65,23 +65,19 @@
         { value: 'APPROVED', label: t('تایید شده', 'Approved') }
     ];
 
-    const [viewMode, setViewMode] = useState('list');
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [isLoading, setIsLoading] = useState(false);
     
     const [transactions, setTransactions] = useState([]);
     const [gridState, setGridState] = useState(null);
+    const [filters, setFilters] = useState({});
     
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [formMode, setFormMode] = useState('CREATE');
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
     
-    const [isLovOpen, setIsLovOpen] = useState(false);
-    const [lovTargetIndex, setLovTargetIndex] = useState(null);
-    const [lovGridState, setLovGridState] = useState(null);
-
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, data: null });
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
 
     const [lookups, setLookups] = useState({
         accounts: [],
@@ -114,32 +110,55 @@
         if (isFetchingDeps.current || !supabase) return;
         isFetchingDeps.current = true;
         try {
-            const [accRes, costRes, incRes, orgRes, usersRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id').eq('is_active', true),
+            const [accRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en').eq('is_active', true),
                 supabase.from('fm_income_types').select('id, title_fa, title_en').eq('is_active', true),
-                supabase.from('org_departments').select('id, title, members'),
-                supabase.from('sec_users').select('id, first_name, last_name, username')
+                supabase.from('sec_users').select('id, full_name, username, party_id'),
+                supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
+                supabase.from('fm_org_chart_nodes').select('id, title')
             ]);
             
             const uMap = {};
+            let myDeptId = '';
+            let myDeptTitle = '';
+
             (usersRes.data || []).forEach(u => {
-                uMap[u.id] = `${u.first_name || ''} ${u.last_name || ''} (${u.username || ''})`.trim();
+                uMap[u.id] = `${u.full_name || u.username || ''}`.trim();
+                
+                if (u.id === currentUserId && u.party_id) {
+                    const personnelRecord = (personnelRes.data || []).find(p => p.person_id === u.party_id);
+                    if (personnelRecord) {
+                        const nodeRecord = (nodesRes.data || []).find(n => n.id === personnelRecord.node_id);
+                        if (nodeRecord) {
+                            myDeptId = nodeRecord.id;
+                            myDeptTitle = nodeRecord.title;
+                        }
+                    }
+                }
             });
 
+            const parentIds = new Set((accRes.data || []).map(a => a.parent_id).filter(Boolean));
+            const leafAccounts = (accRes.data || []).filter(a => !parentIds.has(a.id)).map(a => ({
+                ...a,
+                displayLabel: `${a.code} - ${a.title_fa}`
+            }));
+
             setLookups({
-                accounts: accRes.data || [],
+                accounts: leafAccounts,
                 costTypes: costRes.data || [],
                 incomeTypes: incRes.data || [],
-                departments: orgRes.data || [],
-                usersMap: uMap
+                usersMap: uMap,
+                currentUserDeptId: myDeptId,
+                currentUserDeptTitle: myDeptTitle
             });
         } catch (error) {
             showToast(t('خطا در دریافت اطلاعات پایه', 'Error fetching dependencies'), 'error');
+            console.error(error);
         } finally {
             isFetchingDeps.current = false;
         }
-    }, [supabase, showToast, t]);
+    }, [supabase, showToast, t, currentUserId]);
 
     const fetchData = useCallback(async () => {
         if (isFetchingData.current || !supabase) return;
@@ -155,6 +174,7 @@
             setTransactions(data || []);
         } catch (error) {
             showToast(t('خطا در دریافت لیست تراکنش‌ها', 'Error fetching transactions'), 'error');
+            console.error(error);
         } finally {
             setIsLoading(false);
             isFetchingData.current = false;
@@ -162,37 +182,40 @@
     }, [supabase, showToast, t]);
 
     useEffect(() => {
-        if (access.canView && viewMode === 'list') {
+        if (access.canView) {
             fetchDependencies();
             fetchData();
         }
-    }, [fetchDependencies, fetchData, access.canView, viewMode]);
+    }, [fetchDependencies, fetchData, access.canView]);
 
     const generateDocumentCode = () => {
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
     };
 
-    const getEmptyItem = (rowNum) => ({
-        row_number: rowNum, account_id: '', transaction_action: 'DEPOSIT', transaction_group: 'COST',
+    const getEmptyItem = () => ({
+        account_id: '', transaction_action: 'DEPOSIT', transaction_group: 'COST',
         cost_type_id: '', income_type_id: '', currency: '', amount: '', description: ''
     });
 
     const handleOpenForm = (mode, record = null) => {
         setFormMode(mode);
-        const userDept = lookups.departments.find(d => d.members?.includes(currentUserId))?.id || '';
+        const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
 
         if (mode === 'CREATE') {
             setHeaderData({
                 document_code: generateDocumentCode(),
-                document_date: new Date().toISOString().split('T')[0],
+                document_date: todayStr,
                 transaction_type: 'GENERAL',
-                department_id: userDept,
+                department_id: lookups.currentUserDeptId,
+                department_title: lookups.currentUserDeptTitle,
                 description: '',
                 status: 'DRAFT',
                 registered_at: new Date().toISOString()
             });
-            setItemsData([getEmptyItem(1)]);
+            setItemsData([getEmptyItem()]);
         } else if (mode === 'EDIT' || mode === 'COPY') {
+            const parsedDate = record.document_date ? record.document_date.replace(/-/g, '/') : todayStr;
+            
             setHeaderData({
                 ...record,
                 id: mode === 'COPY' ? undefined : record.id,
@@ -200,8 +223,10 @@
                 status: mode === 'COPY' ? 'DRAFT' : record.status,
                 reference_code: mode === 'COPY' ? '' : record.reference_code,
                 daily_number: mode === 'COPY' ? '' : record.daily_number,
+                document_date: parsedDate,
                 registered_at: mode === 'COPY' ? new Date().toISOString() : record.registered_at,
-                department_id: mode === 'COPY' ? userDept : record.department_id
+                department_id: mode === 'COPY' ? lookups.currentUserDeptId : record.department_id,
+                department_title: mode === 'COPY' ? lookups.currentUserDeptTitle : ''
             });
             
             const mappedItems = (record.fm_transaction_items || []).map(item => ({
@@ -210,7 +235,7 @@
                 transaction_id: mode === 'COPY' ? undefined : item.transaction_id
             })).sort((a, b) => a.row_number - b.row_number);
             
-            setItemsData(mappedItems.length ? mappedItems : [getEmptyItem(1)]);
+            setItemsData(mappedItems.length ? mappedItems : [getEmptyItem()]);
         }
         setIsFormModalOpen(true);
     };
@@ -229,7 +254,7 @@
             let txId = headerData.id;
             const txPayload = {
                 document_code: headerData.document_code,
-                document_date: headerData.document_date,
+                document_date: headerData.document_date.replace(/\//g, '-'),
                 registrar_id: currentUserId,
                 transaction_type: headerData.transaction_type,
                 department_id: headerData.department_id,
@@ -270,6 +295,7 @@
             fetchData();
         } catch (error) {
             showToast(t('خطا در ثبت سند.', 'Error saving transaction.'), 'error');
+            console.error(error);
         } finally {
             setIsLoading(false);
         }
@@ -285,204 +311,246 @@
         setItemsData(newItems);
     };
 
-    const addItem = () => setItemsData([...itemsData, getEmptyItem(itemsData.length + 1)]);
+    const addItem = () => setItemsData([...itemsData, getEmptyItem()]);
     
     const removeItem = (index) => {
-        const newItems = itemsData.filter((_, idx) => idx !== index).map((item, idx) => ({ ...item, row_number: idx + 1 }));
+        const newItems = itemsData.filter((_, idx) => idx !== index);
         setItemsData(newItems);
     };
 
-    const openAccountLOV = (index) => {
-        setLovTargetIndex(index);
-        setIsLovOpen(true);
-    };
-
-    const selectAccount = (account) => {
-        if (lovTargetIndex !== null) {
-            handleItemChange(lovTargetIndex, 'account_id', account.id);
-            handleItemChange(lovTargetIndex, 'currency', account.currency_id || 'IRR');
-        }
-        setIsLovOpen(false);
-        setLovTargetIndex(null);
-    };
-
     const executeDelete = async () => {
+        setIsLoading(true);
         try {
-            const { error } = await supabase.from('fm_transactions').delete().eq('id', deleteConfirm.data.id);
-            if (error) throw error;
-            await logAction('delete_transaction', `حذف تراکنش: ${deleteConfirm.data.document_code}`);
-            showToast(t('سند با موفقیت حذف شد.', 'Document deleted successfully.'));
+            if (deleteConfirm.type === 'single') {
+                const { error } = await supabase.from('fm_transactions').delete().eq('id', deleteConfirm.data.id);
+                if (error) throw error;
+                await logAction('delete_transaction', `حذف تراکنش: ${deleteConfirm.data.document_code}`);
+            } else if (deleteConfirm.type === 'bulk') {
+                const { error } = await supabase.from('fm_transactions').delete().in('id', deleteConfirm.data);
+                if (error) throw error;
+                await logAction('bulk_delete_transactions', `حذف گروهی ${deleteConfirm.data.length} تراکنش`);
+            }
+            showToast(t('عملیات با موفقیت انجام شد.', 'Operation successful.'));
             fetchData();
-            setDeleteConfirm({ isOpen: false, data: null });
+            setDeleteConfirm({ isOpen: false, type: null, data: null });
         } catch (error) {
-            showToast(t('خطا در حذف سند.', 'Error deleting document.'), 'error');
-            setDeleteConfirm({ isOpen: false, data: null });
+            showToast(t('خطا در حذف.', 'Error deleting.'), 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleBulkStatusChange = async (newStatus, ids) => {
+        setIsLoading(true);
+        try {
+            const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', ids);
+            if (error) throw error;
+            showToast(t('وضعیت با موفقیت تغییر کرد.', 'Status updated.'));
+            await logAction('bulk_status_update', `تغییر وضعیت ${ids.length} سند به ${newStatus}`);
+            fetchData();
+        } catch (error) {
+            showToast(t('خطا در تغییر وضعیت.', 'Error updating status.'), 'error');
+        } finally {
+            setIsLoading(false);
         }
     };
 
     const columns = useMemo(() => [
-        { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '100px' },
-        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '140px' },
+        { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '100px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
+        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '140px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
+        { field: 'daily_number', header_fa: 'شماره روزانه', header_en: 'Daily Num', width: '100px' },
         { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '120px', type: 'date' },
-        { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '120px', render: (row) => TRANSACTION_TYPES.find(x => x.value === row.transaction_type)?.label || row.transaction_type },
-        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '100px', render: (row) => STATUS_OPTIONS.find(x => x.value === row.status)?.label || row.status },
-        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '180px', render: (row) => lookups.usersMap[row.registrar_id] || row.registrar_id }
+        { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '120px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
+        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '100px', render: (val) => {
+            const s = STATUS_OPTIONS.find(x => x.value === val);
+            const colors = { DRAFT: 'slate', TEMPORARY: 'amber', APPROVED: 'emerald' };
+            return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
+        }},
+        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '180px', render: (val) => lookups.usersMap[val] || val }
     ], [lookups.usersMap, t]);
-
-    const lovColumns = useMemo(() => [
-        { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '120px' },
-        { field: 'title_fa', header_fa: 'عنوان حساب', header_en: 'Title', width: 'auto' }
-    ], []);
 
     const viewConfig = useMemo(() => ({
       pageId: 'transactions_main_list',
-      currentState: () => ({ viewMode, gridState }),
+      currentState: () => ({ filters, gridState }),
       onApplyState: (state) => {
         if (state) {
-          if (state.viewMode) setViewMode(state.viewMode);
+          if (state.filters) setFilters(state.filters);
           if (state.gridState) setGridState(state.gridState);
         } else {
-          setViewMode('list');
+          setFilters({});
           setGridState(null);
         }
       }
-    }), [viewMode, gridState]);
+    }), [filters, gridState]);
+
+    const filterFields = [
+        { name: 'document_code', label: t('کد سند', 'Doc Code'), type: 'text' },
+        { name: 'document_date', label: t('تاریخ سند', 'Date'), type: 'date' },
+        { name: 'transaction_type', label: t('نوع تراکنش', 'Type'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_TYPES] },
+        { name: 'status', label: t('وضعیت', 'Status'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...STATUS_OPTIONS] }
+    ];
+
+    const gridActions = [
+        { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300' },
+        { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit Document'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'edit' },
+        { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
+    ];
+
+    const bulkActions = [
+        { label: t('تغییر به موقت', 'Set Temporary'), icon: FileText, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids) },
+        { label: t('تغییر به یادداشت', 'Set Draft'), icon: Edit, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('DRAFT', ids) },
+        { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) }
+    ];
+
+    const accountLovColumns = [
+        { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '100px' },
+        { field: 'title_fa', header_fa: 'عنوان حساب', header_en: 'Title', width: '200px' }
+    ];
 
     return (
       <div className="p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <PageHeader
-          title={t('ثبت و مدیریت تراکنش‌ها', 'Transactions Management')}
+          title={t('مدیریت تراکنش‌ها', 'Transactions Management')}
           icon={FileText} language={language}
-          description={t('ورود اطلاعات و مدیریت اسناد مالی چندسطری', 'Manage financial documents and multi-row records')}
+          description={t('ثبت و پیگیری اسناد مالی چندسطری', 'Manage financial documents and multi-row records')}
           breadcrumbs={[{ label: t('مدیریت مالی', 'Financial Setup') }, { label: t('تراکنش‌ها', 'Transactions') }]}
           viewConfig={viewConfig}
         />
 
         <div className="flex-1 min-h-0 flex flex-col gap-1 mt-2 animate-in fade-in duration-500">
+          <AdvancedFilter 
+            fields={filterFields} 
+            initialValues={filters} 
+            onFilter={setFilters} 
+            onClear={() => setFilters({})} 
+            language={language} 
+          />
           <div className="flex-1 min-h-0">
             <DataGrid
               data={transactions} columns={columns} language={language} formCode={formCode}
               gridState={gridState} onGridStateChange={setGridState}
               onAdd={access.canCreate ? () => handleOpenForm('CREATE') : undefined}
               onRowDoubleClick={access.canEdit ? (row) => handleOpenForm('EDIT', row) : undefined}
-              hideImport={false}
-              hideExport={false}
-              actions={[
-                { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 dark:text-emerald-400' },
-                { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit Document'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'edit' },
-                { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => setDeleteConfirm({ isOpen: true, data: row }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
-              ]}
+              selectable={true}
+              actions={gridActions}
+              bulkActions={bulkActions}
+              isLoading={isLoading}
             />
           </div>
         </div>
 
-        <Modal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-5xl">
-          <div className="flex flex-col gap-4 h-[75vh] overflow-hidden">
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
-                
-              <Card title={t('اطلاعات سربرگ سند', 'Document Header')} className="bg-slate-50/50 dark:bg-slate-900/20 border border-slate-200 dark:border-slate-700 shadow-none">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-2">
-                    <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} readOnly isRtl={isRtl} dir="ltr" />
-                    <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} readOnly isRtl={isRtl} dir="ltr" />
-                    <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} readOnly isRtl={isRtl} dir="ltr" />
-                    <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+        <Modal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
+          <div className="flex flex-col h-[85vh] bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-3">
+              
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 shadow-sm shrink-0">
+                <h4 className="text-[12px] font-black text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700/50 pb-2 mb-3">{t('اطلاعات سربرگ', 'Header Data')}</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    <TextField size="xs" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                    <TextField size="xs" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                    <TextField size="xs" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                    <DatePicker size="xs" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+                    <TextField size="xs" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
                     
-                    <TextField size="sm" formCode={formCode} label={t('تاریخ ثبت', 'Registered At')} value={headerData.registered_at ? new Date(headerData.registered_at).toLocaleString('fa-IR') : ''} readOnly isRtl={isRtl} dir="ltr" />
-                    <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} readOnly isRtl={isRtl} />
-                    <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
-                    <SelectField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_id || ''} disabled options={lookups.departments.map(d => ({ value: d.id, label: d.title }))} isRtl={isRtl} />
-                    
-                    <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} isRtl={isRtl} className="md:col-span-1" />
-                    <TextField size="sm" formCode={formCode} label={t('شرح تراکنش (سربرگ)', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} className="md:col-span-3" />
-                </div>
-              </Card>
-
-              <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-center px-1">
-                    <h3 className="font-bold text-slate-700 dark:text-slate-300 text-sm">{t('اقلام و جزئیات سند', 'Document Items Details')}</h3>
-                    <Button variant="secondary" size="sm" onClick={addItem} icon={Plus}>{t('افزودن ردیف', 'Add Row')}</Button>
-                </div>
-                
-                <div className="flex flex-col gap-3">
-                    {itemsData.map((item, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm items-start">
-                            <div className="md:col-span-1 flex flex-col justify-center h-[60px] border-l border-slate-100 dark:border-slate-700 pl-2">
-                                <span className="text-[10px] text-slate-400 font-bold mb-1">{t('ردیف', 'Row')}</span>
-                                <span className="font-black text-slate-700 dark:text-slate-300 text-lg">{item.row_number}</span>
-                            </div>
-                            
-                            <div className="md:col-span-11 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="flex flex-col gap-1 sm:col-span-2">
-                                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('حساب', 'Account')}</label>
-                                    <div className="flex gap-1 h-9">
-                                        <div className="flex-1">
-                                            <TextField size="sm" value={lookups.accounts.find(a => a.id === item.account_id)?.title_fa || ''} readOnly isRtl={isRtl} placeholder={t('انتخاب کنید...', 'Select...')} />
-                                        </div>
-                                        <Button variant="outline" size="sm" icon={Search} onClick={() => openAccountLOV(index)} className="px-2" />
-                                    </div>
-                                </div>
-                                <SelectField size="sm" formCode={formCode} label={t('نوع', 'Action')} value={item.transaction_action} onChange={e => handleItemChange(index, 'transaction_action', e.target.value)} options={TRANSACTION_ACTIONS} isRtl={isRtl} />
-                                <SelectField size="sm" formCode={formCode} label={t('گروه', 'Group')} value={item.transaction_group} onChange={e => handleItemChange(index, 'transaction_group', e.target.value)} options={TRANSACTION_GROUPS} isRtl={isRtl} />
-                                
-                                {item.transaction_group === 'COST' ? (
-                                    <SelectField size="sm" formCode={formCode} label={t('نوع هزینه', 'Cost Type')} value={item.cost_type_id} onChange={e => handleItemChange(index, 'cost_type_id', e.target.value)} options={lookups.costTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} isRtl={isRtl} />
-                                ) : item.transaction_group === 'INCOME' ? (
-                                    <SelectField size="sm" formCode={formCode} label={t('نوع درآمد', 'Income Type')} value={item.income_type_id} onChange={e => handleItemChange(index, 'income_type_id', e.target.value)} options={lookups.incomeTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} isRtl={isRtl} />
-                                ) : (
-                                    <div className="hidden sm:block"></div>
-                                )}
-                                
-                                <TextField size="sm" formCode={formCode} label={t('ارز', 'Currency')} value={item.currency} readOnly isRtl={isRtl} dir="ltr" />
-                                <TextField size="sm" type="number" formCode={formCode} label={t('مبلغ', 'Amount')} value={item.amount} onChange={e => handleItemChange(index, 'amount', e.target.value)} isRtl={isRtl} dir="ltr" required />
-                                <div className="flex gap-2 items-end">
-                                    <div className="flex-1">
-                                        <TextField size="sm" formCode={formCode} label={t('شرح قلم', 'Item Description')} value={item.description} onChange={e => handleItemChange(index, 'description', e.target.value)} isRtl={isRtl} required />
-                                    </div>
-                                    {itemsData.length > 1 && (
-                                        <Button variant="ghost" size="sm" icon={Trash2} className="!text-red-500 mb-0.5 h-9 w-9 px-0" onClick={() => removeItem(index)} />
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                    <SelectField size="xs" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
+                    <TextField size="xs" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
+                    <SelectField size="xs" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} isRtl={isRtl} />
+                    <div className="md:col-span-2 lg:col-span-2">
+                        <TextField size="xs" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
+                    </div>
                 </div>
               </div>
+
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg flex-1 flex flex-col shadow-sm min-h-[300px]">
+                <div className="flex justify-between items-center p-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
+                    <h3 className="font-black text-[12px] text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><FileText size={14} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
+                    <Button variant="primary" size="xs" onClick={addItem} icon={Plus} className="shadow-sm">{t('افزودن سطر', 'Add Row')}</Button>
+                </div>
+                
+                <div className="flex-1 overflow-x-auto overflow-y-visible pb-16">
+                    <div className="min-w-[1000px] flex flex-col">
+                        <div className="flex items-center gap-2 px-2 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 text-[11px] font-black text-slate-500 dark:text-slate-400 sticky top-0 z-20">
+                            <div className="w-8 text-center shrink-0">{t('ردیف', '#')}</div>
+                            <div className="flex-1 min-w-[200px] shrink-0">{t('حساب', 'Account')} <span className="text-red-500">*</span></div>
+                            <div className="w-24 shrink-0">{t('نوع', 'Action')}</div>
+                            <div className="w-24 shrink-0">{t('گروه', 'Group')}</div>
+                            <div className="w-36 shrink-0">{t('نوع هزینه/درآمد', 'Sub-type')}</div>
+                            <div className="w-16 shrink-0">{t('ارز', 'Currency')}</div>
+                            <div className="w-32 shrink-0">{t('مبلغ', 'Amount')} <span className="text-red-500">*</span></div>
+                            <div className="flex-1 min-w-[200px] shrink-0">{t('شرح', 'Description')} <span className="text-red-500">*</span></div>
+                            <div className="w-8 shrink-0"></div>
+                        </div>
+
+                        <div className="flex flex-col z-10">
+                            {itemsData.map((item, index) => (
+                                <div key={index} className="flex items-start gap-2 px-2 py-1.5 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors">
+                                    <div className="w-8 flex items-center justify-center h-6 text-[11px] font-black text-slate-400 dark:text-slate-500 shrink-0 mt-0.5">{index + 1}</div>
+                                    <div className="flex-1 min-w-[200px] shrink-0">
+                                        <LOVField 
+                                            size="xs" formCode={formCode} data={lookups.accounts} columns={accountLovColumns} dropdownWidth="min-w-[250px]"
+                                            displayValue={lookups.accounts.find(a => String(a.id) === String(item.account_id))?.displayLabel || ''}
+                                            onChange={(row) => {
+                                                handleItemChange(index, 'account_id', row ? row.id : '');
+                                                handleItemChange(index, 'currency', row ? (row.currency_id || 'IRR') : '');
+                                            }}
+                                            isRtl={isRtl}
+                                        />
+                                    </div>
+                                    <div className="w-24 shrink-0">
+                                        <SelectField size="xs" formCode={formCode} value={item.transaction_action} onChange={e => handleItemChange(index, 'transaction_action', e.target.value)} options={TRANSACTION_ACTIONS} isRtl={isRtl} />
+                                    </div>
+                                    <div className="w-24 shrink-0">
+                                        <SelectField size="xs" formCode={formCode} value={item.transaction_group} onChange={e => handleItemChange(index, 'transaction_group', e.target.value)} options={TRANSACTION_GROUPS} isRtl={isRtl} />
+                                    </div>
+                                    <div className="w-36 shrink-0">
+                                        {item.transaction_group === 'COST' ? (
+                                            <SelectField size="xs" formCode={formCode} value={item.cost_type_id} onChange={e => handleItemChange(index, 'cost_type_id', e.target.value)} options={lookups.costTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} isRtl={isRtl} />
+                                        ) : item.transaction_group === 'INCOME' ? (
+                                            <SelectField size="xs" formCode={formCode} value={item.income_type_id} onChange={e => handleItemChange(index, 'income_type_id', e.target.value)} options={lookups.incomeTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} isRtl={isRtl} />
+                                        ) : (
+                                            <div className="h-6 w-full bg-slate-100/50 dark:bg-slate-800/50 rounded-md border border-slate-200 dark:border-slate-700"></div>
+                                        )}
+                                    </div>
+                                    <div className="w-16 shrink-0">
+                                        <TextField size="xs" formCode={formCode} value={item.currency} disabled isRtl={isRtl} dir="ltr" />
+                                    </div>
+                                    <div className="w-32 shrink-0">
+                                        <TextField size="xs" type="number" formCode={formCode} value={item.amount} onChange={e => handleItemChange(index, 'amount', e.target.value)} isRtl={isRtl} dir="ltr" />
+                                    </div>
+                                    <div className="flex-1 min-w-[200px] shrink-0">
+                                        <TextField size="xs" formCode={formCode} value={item.description} onChange={e => handleItemChange(index, 'description', e.target.value)} isRtl={isRtl} />
+                                    </div>
+                                    <div className="w-8 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Button variant="ghost" size="xs" icon={Trash2} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !px-0 !w-6 !h-6" onClick={() => removeItem(index)} />
+                                    </div>
+                                </div>
+                            ))}
+                            {itemsData.length === 0 && (
+                                <div className="p-8 text-center text-[12px] font-bold text-slate-400 dark:text-slate-500">{t('هیچ قلمی وارد نشده است.', 'No items entered.')}</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+              </div>
+
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 px-4 pb-4 border-t border-slate-200 dark:border-slate-700 shrink-0 bg-slate-50/80 dark:bg-slate-900/80">
-                <Button variant="outline" onClick={() => setIsFormModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-                {access.canEdit && <Button variant="primary" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
+            <div className="flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 z-50">
+                <Button variant="outline" size="sm" onClick={() => setIsFormModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
+                {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
             </div>
           </div>
         </Modal>
 
-        <Modal isOpen={isLovOpen} onClose={() => { setIsLovOpen(false); setLovTargetIndex(null); }} title={t('انتخاب حساب', 'Select Account')} language={language} width="max-w-3xl">
-          <div className="h-[60vh] flex flex-col p-2">
-            <DataGrid
-              data={lookups.accounts}
-              columns={lovColumns}
-              language={language}
-              formCode={formCode}
-              gridState={lovGridState}
-              onGridStateChange={setLovGridState}
-              hideImport={true}
-              hideExport={true}
-              actions={[
-                  { id: 'select', icon: Plus, tooltip: t('انتخاب این حساب', 'Select Account'), onClick: (row) => selectAccount(row), className: 'text-indigo-600 dark:text-indigo-400 font-bold' }
-              ]}
-            />
-          </div>
-        </Modal>
-
-        <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, data: null })} title={t('تایید حذف سند', 'Confirm Document Deletion')} language={language} width="max-w-sm">
+        <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
           <EmptyState
             icon={AlertTriangle}
             title={t('هشدار', 'Warning')}
-            description={t(`آیا از حذف سند شماره ${deleteConfirm.data?.document_code} اطمینان دارید؟`, `Are you sure you want to delete document ${deleteConfirm.data?.document_code}?`)}
+            description={deleteConfirm.type === 'bulk' ? t(`آیا از حذف ${deleteConfirm.data?.length} سند اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} documents?`) : t(`آیا از حذف این سند اطمینان دارید؟`, `Delete this document?`)}
             action={
               <div className="flex gap-2 w-full mt-2 px-4">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, data: null })}>{t('انصراف', 'Cancel')}</Button>
-                <Button variant="danger" size="sm" onClick={executeDelete} className="flex-1">{t('تایید', 'Confirm')}</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Confirm')}</Button>
               </div>
             }
           />
