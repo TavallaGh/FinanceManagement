@@ -73,7 +73,9 @@
         await supabase.from('fm_record_logs').insert([{
           entity_type: 'تراکنش‌ها', action: action, user_name: currentUserName, details: details
         }]);
-      } catch (err) {}
+      } catch (err) {
+        console.error('Action log failed:', err);
+      }
     }, [supabase, currentUserName]);
 
     const fetchUsers = useCallback(async () => {
@@ -222,7 +224,7 @@
           <AdvancedFilter 
             fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} 
           />
-          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-visible border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
             <DataGrid
               data={transactions} columns={columns} language={language} formCode={formCode}
               gridState={gridState} onGridStateChange={setGridState}
