@@ -15,7 +15,7 @@
     const FallbackComponent = () => null;
     
     const Core = window.DSCore || window.DesignSystem || {};
-    const { Button = FallbackComponent, PageHeader = FallbackComponent, Badge = FallbackComponent, Card = FallbackComponent } = Core;
+    const { Button = FallbackComponent, PageHeader = FallbackComponent, Badge = FallbackComponent, Card = FallbackComponent, EmptyState = FallbackComponent } = Core;
     
     const Forms = window.DSForms || window.DesignSystem || {};
     const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
@@ -350,6 +350,7 @@
     };
 
     const executeDelete = async () => {
+      setIsLoading(true);
       try {
         if (deleteConfirm.type === 'chart') {
           const { error } = await supabase.from('fm_org_charts').delete().eq('id', deleteConfirm.data);
@@ -370,6 +371,8 @@
       } catch (err) {
         showToast(t('امکان حذف رکورد دارای وابستگی وجود ندارد', 'Cannot delete record with relations'), 'error');
         setDeleteConfirm({ isOpen: false, type: null, data: null });
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -441,6 +444,8 @@
             data={filteredCharts} columns={chartColumns} language={language} formCode={formCode}
             gridState={chartsGridState} onGridStateChange={setChartsGridState}
             onAdd={access.canCreate ? () => handleOpenChartModal() : undefined}
+            hideImport={true}
+            hideExport={true}
             actions={[
               { id: 'design', icon: FolderTree, tooltip: t('طراحی ساختار', 'Design Structure'), onClick: (row) => handleOpenDesigner(row), className: 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30' },
               { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenChartModal(row), requiredAccess: 'edit' },
@@ -509,6 +514,8 @@
                 <DataGrid 
                   data={personnelDataForSelectedNode} columns={personnelColumns} language={language} formCode={formCode}
                   onAdd={isNodeEditMode && access.canEdit ? () => handleOpenAssignModal() : undefined}
+                  hideImport={true}
+                  hideExport={true}
                   actions={[
                     { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenAssignModal(row), requiredAccess: 'edit' },
                     { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'personnel', data: row.id }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
@@ -567,15 +574,17 @@
         </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1"><AlertTriangle size={22} /></div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1"><Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}</div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">{t('آیا از حذف این مورد اطمینان دارید؟', 'Are you sure you want to delete this item?')}</p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeDelete} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 border-red-600 dark:border-red-500 shadow-lg shadow-red-100 dark:shadow-none">{t('تایید حذف', 'Delete Now')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={t('آیا از حذف این مورد اطمینان دارید؟', 'Are you sure you want to delete this item?')}
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete Now')}</Button>
+              </div>
+            }
+          />
         </Modal>
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />

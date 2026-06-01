@@ -5,8 +5,8 @@
   
   const { 
     Button, PageHeader, Modal, DataGrid, 
-    TextField, ToggleField, Badge
-  } = window.DesignSystem || {};
+    TextField, ToggleField, Badge, EmptyState, Avatar
+  } = window.DesignSystem || window.DSCore || {};
   
   const { 
     Building2, Plus, Edit, Trash2, MapPin, Upload, X, Save, 
@@ -231,23 +231,25 @@
           language={language}
         >
           <div className="p-4 flex flex-col gap-4">
-            <div className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50/50 dark:bg-slate-800/50">
-               {formData.logo ? (
-                 <div className="relative group">
-                   <img src={formData.logo} className="h-16 object-contain" alt="Logo" />
-                   <button onClick={() => setFormData({...formData, logo: null})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><X size={12}/></button>
-                 </div>
-               ) : (
-                 <label className="cursor-pointer flex flex-col items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
-                   <Upload size={20}/>
-                   <span className="text-[12px] font-bold">{t('بارگذاری لوگوی سازمان', 'Upload Logo')}</span>
-                   <input type="file" className="hidden" accept="image/*" onChange={(e) => {
+            <div className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+               <Avatar src={formData.logo} name={formData.name || 'Org'} size="lg" />
+               <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                     <Button variant="outline" size="sm" icon={Upload} onClick={() => document.getElementById('logo-upload-input').click()}>
+                        {t('انتخاب لوگو', 'Select Logo')}
+                     </Button>
+                     {formData.logo && (
+                        <Button variant="danger-outline" size="sm" icon={Trash2} onClick={() => setFormData({...formData, logo: null})}>
+                           {t('حذف لوگو', 'Remove Logo')}
+                        </Button>
+                     )}
+                  </div>
+                  <input id="logo-upload-input" type="file" className="hidden" accept="image/*" onChange={(e) => {
                      const reader = new FileReader();
                      reader.onload = () => setFormData({...formData, logo: reader.result});
                      if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
-                   }} />
-                 </label>
-               )}
+                  }} />
+               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -282,7 +284,7 @@
                      </div>
                      <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                        {a.isDefault ? (
-                         <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 px-1">{t('پیش‌فرض', 'Default')}</span>
+                         <Badge variant="indigo" className="!py-0.5">{t('پیش‌فرض', 'Default')}</Badge>
                        ) : (
                          <Button variant="ghost" size="sm" className="!h-6 !text-[10px] !px-2 text-slate-400 hover:text-indigo-600" onClick={() => handleSetDefaultAddress(a.id)}>
                            {t('انتخاب پیش‌فرض', 'Set Default')}
@@ -308,24 +310,20 @@
         </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-11 h-11 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-500 dark:text-red-400 mb-1">
-               <AlertTriangle size={22} />
-            </div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1">
-               <Lock size={12}/> {t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-              {deleteConfirm.type === 'bulk' 
-                ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
-                : t(`آیا از حذف سازمان ${deleteConfirm.data?.name} اطمینان دارید؟`, `Delete ${deleteConfirm.data?.name}?`)
-              }
-            </p>
-            <div className="flex gap-2 mt-4 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1 bg-red-600 dark:bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 border-red-600 dark:border-red-500">{t('تایید حذف', 'Delete')}</Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'bulk' 
+              ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
+              : t(`آیا از حذف سازمان ${deleteConfirm.data?.name} اطمینان دارید؟`, `Delete ${deleteConfirm.data?.name}?`)
+            }
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
         </Modal>
       </div>
     );
