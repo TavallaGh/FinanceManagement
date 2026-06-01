@@ -5,7 +5,7 @@
   
   const { 
     Button, PageHeader, Modal, DataGrid, 
-    TextField, ToggleField, Badge, CheckboxField, RadioGroup
+    TextField, ToggleField, Badge, CheckboxField, RadioGroup, EmptyState
   } = window.DesignSystem || {};
   
   const { 
@@ -461,24 +461,20 @@
         </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <div className="p-4 flex flex-col gap-3 items-center text-center">
-            <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center text-rose-500 dark:text-rose-400 mb-2">
-               <AlertTriangle size={24} />
-            </div>
-            <div className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-1.5 shadow-sm">
-               <Lock size={12}/> {t('هشدار: عملیات غیرقابل بازگشت است', 'WARNING: IRREVERSIBLE ACTION')}
-            </div>
-            <p className="text-slate-600 dark:text-slate-300 text-[13px] leading-relaxed mt-2">
-              {deleteConfirm.type === 'bulk' 
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'bulk' 
                 ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
                 : t(`آیا از حذف شخص/شرکت "${deleteConfirm.data?.partyType === 'legal' ? deleteConfirm.data?.companyName : (deleteConfirm.data?.firstName + ' ' + deleteConfirm.data?.lastName).trim()}" اطمینان دارید؟`, `Delete this party?`)
-              }
-            </p>
-            <div className="flex gap-2 mt-5 w-full">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1 bg-rose-600 dark:bg-rose-500 hover:bg-rose-700 dark:hover:bg-rose-600 border-rose-600 dark:border-rose-500">{t('تایید حذف', 'Delete')}</Button>
-            </div>
-          </div>
+            }
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
         </Modal>
       </div>
     );
