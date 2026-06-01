@@ -8,7 +8,7 @@
   const { 
     Network = FallbackIcon, FolderTree = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
     ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, AlertTriangle = FallbackIcon, Lock = FallbackIcon,
-    ChevronDown = FallbackIcon, ChevronUp = FallbackIcon, X = FallbackIcon, Plus = FallbackIcon
+    ChevronDown = FallbackIcon, ChevronUp = FallbackIcon, X = FallbackIcon
   } = LucideIcons;
 
   const OrgChart = ({ language = 'fa', formCode = 'ORG_CHART' }) => {
@@ -21,7 +21,7 @@
     const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
     
     const Grid = window.DSGrid || window.DesignSystem || {};
-    const { DataGrid = FallbackComponent } = Grid;
+    const { DataGrid = FallbackComponent, LOVField = FallbackComponent } = Grid;
     
     const Feedback = window.DSFeedback || window.DesignSystem || {};
     const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
@@ -63,7 +63,7 @@
     const [isNodeFormExpanded, setIsNodeFormExpanded] = useState(true);
 
     const [employees, setEmployees] = useState([]);
-    const [assignData, setAssignData] = useState({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
+    const [inlineAssignEdit, setInlineAssignEdit] = useState(null);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -226,7 +226,7 @@
       setIsNodeEditMode(false);
       setIsNodeFormExpanded(true);
       setViewMode('designer');
-      setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
+      setInlineAssignEdit(null);
     };
 
     const handleSelectNode = (node) => {
@@ -240,7 +240,7 @@
       });
       setIsNodeEditMode(true);
       setIsNodeFormExpanded(true);
-      setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
+      setInlineAssignEdit(null);
     };
 
     const handlePrepareNewNode = (parentNode = null) => {
@@ -248,7 +248,7 @@
       setNodeForm({ id: null, code: '', title: '', parentId: parentNode ? parentNode.id : '', isActive: true });
       setIsNodeEditMode(false);
       setIsNodeFormExpanded(true);
-      setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
+      setInlineAssignEdit(null);
     };
 
     const handleSaveNode = async () => {
@@ -291,25 +291,39 @@
       return rawPersonnel.filter(p => p.node_id === selectedNode.id);
     }, [rawPersonnel, selectedNode]);
 
-    const handleLoadInlineAssign = (assignment) => {
-      setAssignData({ 
-        id: assignment.id, 
-        personId: assignment.person_id || '', 
-        fromDate: assignment.from_date || '', 
-        toDate: assignment.to_date || '',
-        isManager: assignment.is_manager || false
-      });
+    const employeeOptions = useMemo(() => {
+      return employees.filter(e => {
+        if (!e.roles || !e.roles.includes('employee')) return false;
+        const isAlreadyInNode = personnelDataForSelectedNode.some(p => String(p.person_id) === String(e.id) && (!inlineAssignEdit || String(p.id) !== String(inlineAssignEdit.id)));
+        return !isAlreadyInNode;
+      }).map(e => ({ id: e.id, value: e.id, label: `${e.name} (${e.code})` }));
+    }, [employees, personnelDataForSelectedNode, inlineAssignEdit]);
+
+    const personnelGridData = useMemo(() => {
+        const data = [...personnelDataForSelectedNode];
+        if (inlineAssignEdit && inlineAssignEdit.id === 'new') data.unshift({ id: 'new', _isNew: true, ...inlineAssignEdit.data });
+        return data;
+    }, [personnelDataForSelectedNode, inlineAssignEdit]);
+
+    const handleAddAssignmentClick = () => {
+        if (inlineAssignEdit) return;
+        setInlineAssignEdit({
+            id: 'new',
+            data: { person_id: '', person_obj: null, person_name: '', from_date: '', to_date: '', is_manager: false }
+        });
     };
 
     const handleSaveAssignment = async () => {
-      if (!assignData.personId || !selectedNode) return;
-      const personName = employees.find(p => String(p.id) === String(assignData.personId))?.name || '';
+      const form = inlineAssignEdit?.data;
+      if (!form || !form.person_id || !selectedNode) return;
       
-      if (assignData.isManager) {
-        const start1 = assignData.fromDate || '2000/01/01';
-        const end1 = assignData.toDate || '2200/01/01';
+      const personName = form.person_name || form.person_obj?.label?.split(' (')[0] || '';
+      
+      if (form.is_manager) {
+        const start1 = form.from_date || '2000/01/01';
+        const end1 = form.to_date || '2200/01/01';
         
-        const otherManagers = personnelDataForSelectedNode.filter(p => p.is_manager && String(p.id) !== String(assignData.id));
+        const otherManagers = personnelDataForSelectedNode.filter(p => p.is_manager && String(p.id) !== String(inlineAssignEdit.id));
         
         const hasOverlap = otherManagers.some(m => {
           const start2 = m.from_date || '2000/01/01';
@@ -325,23 +339,23 @@
       try {
         const payload = {
           node_id: selectedNode.id,
-          person_id: assignData.personId,
+          person_id: form.person_id,
           person_name: personName,
-          from_date: assignData.fromDate || null,
-          to_date: assignData.toDate || null,
-          is_manager: assignData.isManager
+          from_date: form.from_date || null,
+          to_date: form.to_date || null,
+          is_manager: form.is_manager
         };
 
-        if (assignData.id) {
-          const { error } = await supabase.from('fm_org_chart_personnel').update(payload).eq('id', assignData.id);
+        if (inlineAssignEdit.id === 'new') {
+          const { error } = await supabase.from('fm_org_chart_personnel').insert([payload]);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('fm_org_chart_personnel').insert([payload]);
+          const { error } = await supabase.from('fm_org_chart_personnel').update(payload).eq('id', inlineAssignEdit.id);
           if (error) throw error;
         }
 
         await fetchDesignerData(activeChart.id, selectedNode.id);
-        setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
+        setInlineAssignEdit(null);
         showToast(t('تخصیص پرسنل انجام شد', 'Personnel assigned'));
       } catch (err) {
         showToast(t('خطا در ذخیره تخصیص', 'Error saving assignment'), 'error');
@@ -364,8 +378,8 @@
           const { error } = await supabase.from('fm_org_chart_personnel').delete().eq('id', deleteConfirm.data);
           if (error) throw error;
           await fetchDesignerData(activeChart.id, selectedNode.id);
-          if (assignData.id === deleteConfirm.data) {
-             setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false });
+          if (inlineAssignEdit && inlineAssignEdit.id === deleteConfirm.data) {
+             setInlineAssignEdit(null);
           }
         }
         showToast(t('عملیات حذف با موفقیت انجام شد', 'Deletion successful'));
@@ -425,19 +439,64 @@
     ];
 
     const personnelColumns = [
-      { field: 'person_name', header_fa: 'نام شخص', header_en: 'Person Name', width: '180px', render: (v) => <span className="font-bold text-slate-700 dark:text-slate-200">{v}</span> },
-      { field: 'is_manager', header_fa: 'مسئول واحد', header_en: 'Manager', width: '90px', type: 'toggle' },
-      { field: 'from_date', header_fa: 'از تاریخ', header_en: 'From Date', width: '100px', type: 'date' },
-      { field: 'to_date', header_fa: 'تا تاریخ', header_en: 'To Date', width: '100px', type: 'date' }
+      { 
+        field: 'person_id', header_fa: 'نام شخص', header_en: 'Person Name', width: '250px', 
+        render: (val, row) => {
+            if (inlineAssignEdit?.id === row.id) {
+                return (
+                  <div onClick={(e)=>e.stopPropagation()}>
+                    <LOVField size="sm" data={employeeOptions}
+                      columns={[
+                        { field: 'label', header_fa: 'نام و کد', width: 'auto' }
+                      ]}
+                      dropdownWidth="min-w-[300px]"
+                      displayValue={inlineAssignEdit.data.person_obj ? inlineAssignEdit.data.person_obj.label : ''}
+                      onChange={(r) => setInlineAssignEdit(prev => ({...prev, data: {...prev.data, person_id: r?.value, person_obj: r, person_name: r?.label}}))}
+                    />
+                  </div>
+                )
+            }
+            return <span className="font-bold text-slate-700 dark:text-slate-200">{row.person_name || val}</span>;
+        } 
+      },
+      { 
+        field: 'is_manager', header_fa: 'مسئول واحد', header_en: 'Manager', width: '100px', 
+        render: (val, row) => {
+            if (inlineAssignEdit?.id === row.id) {
+                return <div onClick={(e)=>e.stopPropagation()}><ToggleField size="sm" checked={inlineAssignEdit.data.is_manager} onChange={v => setInlineAssignEdit(prev => ({...prev, data: {...prev.data, is_manager: v}}))} isRtl={isRtl} /></div>
+            }
+            return <Badge variant={val ? 'indigo' : 'slate'} size="sm" className="text-[10px]">{val ? t('بله', 'Yes') : t('خیر', 'No')}</Badge>;
+        }
+      },
+      { 
+        field: 'from_date', header_fa: 'از تاریخ', header_en: 'From Date', width: '130px', 
+        render: (val, row) => {
+            if (inlineAssignEdit?.id === row.id) {
+                return <div onClick={(e)=>e.stopPropagation()}><DatePicker size="sm" value={inlineAssignEdit.data.from_date} onChange={(v) => setInlineAssignEdit(prev => ({...prev, data: {...prev.data, from_date: v}}))} isRtl={isRtl} language={language}/></div>
+            }
+            return <span className="text-[12px]" dir="ltr">{val || '-'}</span>;
+        }
+      },
+      { 
+        field: 'to_date', header_fa: 'تا تاریخ', header_en: 'To Date', width: '130px', 
+        render: (val, row) => {
+            if (inlineAssignEdit?.id === row.id) {
+                return <div onClick={(e)=>e.stopPropagation()}><DatePicker size="sm" value={inlineAssignEdit.data.to_date} onChange={(v) => setInlineAssignEdit(prev => ({...prev, data: {...prev.data, to_date: v}}))} isRtl={isRtl} language={language}/></div>
+            }
+            return <span className="text-[12px]" dir="ltr">{val || '-'}</span>;
+        }
+      }
     ];
 
-    const employeeOptions = useMemo(() => {
-      return employees.filter(e => {
-        if (!e.roles || !e.roles.includes('employee')) return false;
-        const isAlreadyInNode = personnelDataForSelectedNode.some(p => String(p.person_id) === String(e.id) && String(p.id) !== String(assignData.id));
-        return !isAlreadyInNode;
-      }).map(e => ({ value: e.id, label: `${e.name} (${e.code})` }));
-    }, [employees, personnelDataForSelectedNode, assignData.id]);
+    const personnelActions = [
+      { icon: Save, tooltip: t('ذخیره', 'Save'), hidden: (row) => inlineAssignEdit?.id !== row.id, onClick: () => handleSaveAssignment(), className: '!text-emerald-600 hover:!text-emerald-800' },
+      { icon: X, tooltip: t('انصراف', 'Cancel'), hidden: (row) => inlineAssignEdit?.id !== row.id, onClick: () => setInlineAssignEdit(null), className: '!text-slate-500 hover:!text-slate-700' },
+      { icon: Edit, tooltip: t('ویرایش', 'Edit'), hidden: (row) => inlineAssignEdit?.id === row.id || row._isNew, onClick: (row) => {
+          const empObj = employeeOptions.find(e => String(e.value) === String(row.person_id));
+          setInlineAssignEdit({ id: row.id, data: { person_id: row.person_id, person_obj: empObj, person_name: row.person_name, from_date: row.from_date || '', to_date: row.to_date || '', is_manager: row.is_manager } });
+      }, className: 'text-slate-400 hover:text-indigo-500' },
+      { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete'), hidden: (row) => inlineAssignEdit?.id === row.id || row._isNew, onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'personnel', data: row.id }), className: 'text-red-500 hover:text-red-600' }
+    ];
 
     const parentNodeOptions = rawNodes.filter(n => n.id !== nodeForm.id).map(n => ({ value: n.id, label: n.title }));
 
@@ -514,34 +573,12 @@
               </Card>
 
               <Card title={t('پرسنل تخصیص یافته به این گره', 'Assigned Personnel')} noPadding={true} language={language} className="flex-1 min-h-[350px] flex flex-col">
-                {isNodeEditMode && access.canEdit && (
-                  <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-indigo-50/50 dark:bg-indigo-900/10 shrink-0">
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div className="flex-1 min-w-[200px]"><SelectField formCode={formCode} label={t('انتخاب شخص', 'Select Person')} value={assignData.personId} onChange={e => setAssignData({...assignData, personId: e.target.value})} options={employeeOptions} isRtl={isRtl} required size="sm" wrapperClassName="!mb-0" /></div>
-                      <div className="pb-1.5"><ToggleField formCode={formCode} label={t('مسئول واحد', 'Manager')} checked={assignData.isManager} onChange={val => setAssignData({...assignData, isManager: val})} isRtl={isRtl} wrapperClassName="!mb-0" /></div>
-                      <div className="w-32 shrink-0"><DatePicker formCode={formCode} label={t('از تاریخ', 'From Date')} value={assignData.fromDate} onChange={val => setAssignData({...assignData, fromDate: val})} isRtl={isRtl} size="sm" wrapperClassName="!mb-0" /></div>
-                      <div className="w-32 shrink-0"><DatePicker formCode={formCode} label={t('تا تاریخ', 'To Date')} value={assignData.toDate} onChange={val => setAssignData({...assignData, toDate: val})} isRtl={isRtl} size="sm" wrapperClassName="!mb-0" /></div>
-                      <div className="pb-0.5 flex gap-1 items-center">
-                        <Button variant="primary" size="sm" icon={assignData.id ? Save : Plus} onClick={handleSaveAssignment}>
-                          {assignData.id ? t('بروزرسانی', 'Update') : t('افزودن', 'Add')}
-                        </Button>
-                        {assignData.id && (
-                          <Button variant="ghost" size="sm" className="!px-2" icon={X} onClick={() => setAssignData({ id: null, personId: '', fromDate: '', toDate: '', isManager: false })} title={t('لغو ویرایش', 'Cancel Edit')} />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
                 <div className="flex-1 min-h-0">
                   <DataGrid 
-                    data={personnelDataForSelectedNode} columns={personnelColumns} language={language} formCode={formCode}
+                    data={personnelGridData} columns={personnelColumns} actions={personnelActions} language={language} formCode={formCode}
                     hideImport={true}
                     hideExport={true}
-                    actions={[
-                      { id: 'update', icon: Edit, tooltip: t('ویرایش درون‌خطی', 'Inline Edit'), onClick: (row) => handleLoadInlineAssign(row), requiredAccess: 'edit' },
-                      { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'personnel', data: row.id }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
-                    ]}
+                    onAdd={isNodeEditMode && access.canEdit ? handleAddAssignmentClick : undefined}
                   />
                 </div>
               </Card>
