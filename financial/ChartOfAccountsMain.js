@@ -437,7 +437,7 @@
           </div>
 
           <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
-            <div className={`w-full md:w-[40%] flex flex-col bg-slate-50/40 dark:bg-slate-900/10 border-b md:border-b-0 ${isRtl ? 'md:border-l' : 'md:border-r'} border-slate-200 dark:border-slate-700 overflow-y-auto`}>
+            <div className={`w-full md:w-[30%] flex flex-col bg-slate-50/40 dark:bg-slate-900/10 border-b md:border-b-0 ${isRtl ? 'md:border-l' : 'md:border-r'} border-slate-200 dark:border-slate-700 overflow-y-auto`}>
               <Tree
                 data={rawAccounts} language={language} formCode={formCode}
                 idField="id" parentField="parentId" displayField="title" secondaryField="code" activeField="isActive"
