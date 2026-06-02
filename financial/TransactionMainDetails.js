@@ -476,7 +476,7 @@
     }, [itemsData, inlineItemEdit]);
 
     const itemColumns = [
-        { field: 'row_number', header_fa: '#', width: '60px', render: (val, row) => {
+        { field: 'row_number', header_fa: '#', width: '40px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="number" min="1" value={inlineItemEdit.data.row_number || ''} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, row_number: e.target.value}}))} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
@@ -560,24 +560,6 @@
                 return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} required wrapperClassName="m-0" placeholder={t('Enter برای ثبت', 'Enter to save')} /></div>;
             }
             return <span className="text-[12px] truncate">{val}</span>;
-        }},
-        { field: 'actions', header_fa: '', width: '40px', render: (_, row) => {
-            if (isReadOnly) return null;
-            const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
-            if (isEditing) {
-                return (
-                    <div className="flex gap-1 justify-center">
-                        <Button variant="ghost" size="sm" icon={X} onClick={e => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800 !p-1 h-6 w-6" title={t('انصراف (Esc)', 'Cancel')} />
-                    </div>
-                );
-            }
-            if (inlineItemEdit) return null;
-            return (
-                <div className="flex gap-1 justify-center">
-                    <Button variant="ghost" size="sm" icon={Edit} onClick={e => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !p-1 h-6 w-6" />
-                    <Button variant="ghost" size="sm" icon={Trash2} onClick={e => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !p-1 h-6 w-6" />
-                </div>
-            );
         }}
     ];
 

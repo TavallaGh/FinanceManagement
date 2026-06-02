@@ -72,6 +72,7 @@
     const [filters, setFilters] = useState({});
     const [usersMap, setUsersMap] = useState({});
     const [lookups, setLookups] = useState({ accounts: [], costTypes: [], incomeTypes: [] });
+    const [resolvedUserId, setResolvedUserId] = useState(currentUserId);
     
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [formMode, setFormMode] = useState('CREATE');
@@ -108,8 +109,16 @@
                 uMap[u.id] = `${u.full_name || u.username || ''}`.trim();
             });
             setUsersMap(uMap);
+
+            let myId = currentUserId;
+            if (!myId || myId === '00000000-0000-0000-0000-000000000000') {
+                const me = (data || []).find(u => u.username === (currentUserObj.username || 'admin') || u.full_name === currentUserName);
+                if (me) myId = me.id;
+            }
+            setResolvedUserId(myId);
+
         } catch (error) {}
-    }, [supabase]);
+    }, [supabase, currentUserId, currentUserObj.username, currentUserName]);
 
     const fetchLookups = useCallback(async () => {
         try {
@@ -275,7 +284,7 @@
                 file_size: file.size,
                 file_type: file.type,
                 file_url: fileUrl,
-                created_by: currentUserId
+                created_by: resolvedUserId
             };
 
             const { error } = await supabase.from('fm_attachments').insert([payload]);
@@ -306,7 +315,7 @@
 
     const filteredTransactions = useMemo(() => {
         return transactions.filter(tx => {
-            if (filters.my_docs && String(tx.registrar_id) !== String(currentUserId)) return false;
+            if (filters.my_docs && String(tx.registrar_id) !== String(resolvedUserId)) return false;
             if (filters.status && tx.status !== filters.status) return false;
 
             if (filters.account_id || filters.transaction_action || filters.transaction_group || filters.cost_type_id || filters.income_type_id) {
@@ -322,7 +331,7 @@
             }
             return true;
         });
-    }, [transactions, filters, currentUserId]);
+    }, [transactions, filters, resolvedUserId]);
 
     const columns = useMemo(() => [
         { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '90px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
@@ -380,7 +389,7 @@
         { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'lov', lovData: lookups.costTypes, lovColumns: costLovColumns, dropdownWidth: 'min-w-[500px]' },
         { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'lov', lovData: lookups.incomeTypes, lovColumns: incomeLovColumns, dropdownWidth: 'min-w-[500px]' },
         { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: STATUS_OPTIONS },
-        { name: 'my_docs', label: t('سندهای من', 'My Documents'), type: 'switch' }
+        { name: 'my_docs', label: t('سندهای من', 'My Documents'), type: 'checkbox' }
     ];
 
     const gridActions = [
@@ -425,7 +434,7 @@
 
         <div className="flex-1 min-h-0 flex flex-col gap-2 mt-4">
           <AdvancedFilter 
-            fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} 
+            fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} columns={6} 
           />
           <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
             <DataGrid
