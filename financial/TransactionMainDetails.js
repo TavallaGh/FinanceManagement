@@ -1,7 +1,7 @@
 /* Filename: financial/TransactionMainDetails.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo, useCallback, useRef } = React;
+  const { useState, useEffect, useMemo, useCallback } = React;
 
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
@@ -84,8 +84,6 @@
         usersList: []
     });
 
-    const isFetchingDeps = useRef(false);
-
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
       setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
@@ -105,8 +103,7 @@
     }, [supabase, currentUserName]);
 
     const fetchDependencies = useCallback(async () => {
-        if (isFetchingDeps.current || !supabase) return;
-        isFetchingDeps.current = true;
+        if (!supabase) return null;
         try {
             const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
                 supabase.from('fm_coa_accounts').select('id, title_fa, code, currency_id, parent_id, chart_id').eq('is_active', true),
@@ -161,7 +158,7 @@
                 };
             });
 
-            setLookups({
+            const newLookups = {
                 accounts: allAccounts,
                 leafAccounts: leafAccs,
                 costTypes: costRes.data || [],
@@ -170,11 +167,13 @@
                 usersList: usersRes.data || [],
                 currentUserDeptId: myDeptId,
                 currentUserDeptTitle: myDeptTitle
-            });
+            };
+
+            setLookups(newLookups);
+            return newLookups;
         } catch (error) {
             showToast(t('خطا در دریافت اطلاعات پایه', 'Error fetching dependencies'), 'error');
-        } finally {
-            isFetchingDeps.current = false;
+            return null;
         }
     }, [supabase, showToast, t, currentUserId]);
 
@@ -184,14 +183,17 @@
 
     useEffect(() => {
         if (!isOpen) return;
-        fetchDependencies().then(() => {
+        
+        fetchDependencies().then((newLookups) => {
+            if (!newLookups) return;
+
             const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
             setInlineItemEdit(null);
             setCopyWarning(null);
 
             let safeFinalRegistrar = currentUserId;
             if (!safeFinalRegistrar || safeFinalRegistrar === '00000000-0000-0000-0000-000000000000') {
-                const matchingUser = lookups.usersList.find(u => u.username === currentUserUsername || u.full_name === currentUserName);
+                const matchingUser = newLookups.usersList.find(u => u.username === currentUserUsername || u.full_name === currentUserName);
                 if (matchingUser) safeFinalRegistrar = matchingUser.id;
             }
 
@@ -200,8 +202,8 @@
                     document_code: generateDocumentCode(),
                     document_date: todayStr,
                     transaction_type: 'GENERAL',
-                    department_id: lookups.currentUserDeptId,
-                    department_title: lookups.currentUserDeptTitle,
+                    department_id: newLookups.currentUserDeptId,
+                    department_title: newLookups.currentUserDeptTitle,
                     description: '',
                     status: 'DRAFT',
                     registrar_id: safeFinalRegistrar,
@@ -224,8 +226,8 @@
                     daily_number: formMode === 'COPY' ? '' : initialRecord.daily_number,
                     document_date: parsedDate,
                     registered_at: formMode === 'COPY' ? new Date().toISOString() : initialRecord.registered_at,
-                    department_id: formMode === 'COPY' ? lookups.currentUserDeptId : initialRecord.department_id,
-                    department_title: formMode === 'COPY' ? lookups.currentUserDeptTitle : '',
+                    department_id: formMode === 'COPY' ? newLookups.currentUserDeptId : initialRecord.department_id,
+                    department_title: formMode === 'COPY' ? newLookups.currentUserDeptTitle : '',
                     registrar_id: formMode === 'COPY' ? safeFinalRegistrar : initialRecord.registrar_id
                 });
                 
@@ -239,7 +241,7 @@
                 setItemsData(mappedItems);
             }
         });
-    }, [isOpen, formMode, initialRecord, fetchDependencies, lookups.currentUserDeptId, lookups.currentUserDeptTitle, lookups.usersList, currentUserId, currentUserName, currentUserUsername, t]);
+    }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
     const handleChangeStatus = async (newStatus) => {
         setHeaderData(prev => ({ ...prev, status: newStatus }));
