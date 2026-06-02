@@ -7,7 +7,8 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    X = FallbackIcon, List = FallbackIcon, AlertTriangle = FallbackIcon, Check = FallbackIcon
+    X = FallbackIcon, List = FallbackIcon, AlertTriangle = FallbackIcon, Check = FallbackIcon,
+    UploadCloud = FallbackIcon, Download = FallbackIcon, Paperclip = FallbackIcon, Eye = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -21,7 +22,7 @@
   const { DataGrid = FallbackComponent, LOVField = FallbackComponent } = Grid;
 
   const Feedback = window.DSFeedback || DS || {};
-  const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
+  const { Modal = FallbackComponent, Toast = FallbackComponent, EmptyState = FallbackComponent } = Feedback;
 
   function FallbackComponent() { return null; }
 
@@ -73,6 +74,10 @@
     const [itemsData, setItemsData] = useState([]);
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
     const [copyWarning, setCopyWarning] = useState(null);
+
+    const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
+    const [previewFile, setPreviewFile] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     const [lookups, setLookups] = useState({
         accounts: [],
@@ -197,6 +202,13 @@
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
     };
 
+    const loadAttachments = async (recordId) => {
+        try {
+            const { data } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
+            setAttachModal(prev => ({ ...prev, files: data || [] }));
+        } catch (err) {}
+    };
+
     useEffect(() => {
         if (!isOpen) {
             hasInitialized.current = false;
@@ -231,6 +243,7 @@
                     registered_at: new Date().toISOString()
                 });
                 setItemsData([]);
+                setAttachModal({ isOpen: false, record: null, files: [] });
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
                 if (formMode === 'COPY') {
                     setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of document ${initialRecord.document_code} and requires review.`));
@@ -260,6 +273,12 @@
                 })).sort((a, b) => a.row_number - b.row_number);
                 
                 setItemsData(mappedItems);
+
+                if (formMode === 'EDIT') {
+                    loadAttachments(initialRecord.id);
+                } else {
+                    setAttachModal({ isOpen: false, record: null, files: [] });
+                }
             }
         });
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
@@ -345,6 +364,66 @@
             showToast(t('خطا در ثبت سند.', 'Error saving transaction.'), 'error');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleFileUpload = async (e) => {
+        if (!headerData.id) {
+            showToast(t('ابتدا سند را ذخیره کنید تا امکان افزودن پیوست فراهم شود.', 'Save document first to add attachments.'), 'warning');
+            return;
+        }
+
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${headerData.id}_${Date.now()}.${fileExt}`;
+            const filePath = `transactions/${fileName}`;
+
+            let fileUrl = '';
+            if (supabase.storage) {
+                const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file);
+                if (uploadError) throw uploadError;
+                const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+                fileUrl = urlData.publicUrl;
+            } else {
+                fileUrl = URL.createObjectURL(file);
+            }
+
+            const payload = {
+                entity_type: 'TRANSACTION',
+                entity_id: headerData.id,
+                file_name: file.name,
+                file_size: file.size,
+                file_type: file.type || 'application/octet-stream',
+                file_url: fileUrl,
+                created_by: currentUserId
+            };
+
+            const { error } = await supabase.from('fm_attachments').insert([payload]);
+            if (error) throw error;
+
+            showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
+            loadAttachments(headerData.id);
+        } catch (error) {
+            showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
+        } finally {
+            setIsUploading(false);
+            e.target.value = null;
+        }
+    };
+
+    const handleDeleteAttachment = async (fileId) => {
+        if (isReadOnly) return;
+        try {
+            const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
+            if (error) throw error;
+            showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
+            if (headerData.id) loadAttachments(headerData.id);
+        } catch (error) {
+            showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
         }
     };
 
@@ -560,6 +639,24 @@
                 return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} required wrapperClassName="m-0" placeholder={t('Enter برای ثبت', 'Enter to save')} /></div>;
             }
             return <span className="text-[12px] truncate">{val}</span>;
+        }},
+        { field: 'actions', header_fa: '', width: '40px', render: (_, row) => {
+            if (isReadOnly) return null;
+            const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
+            if (isEditing) {
+                return (
+                    <div className="flex gap-1 justify-center">
+                        <Button variant="ghost" size="sm" icon={X} onClick={e => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800 !p-1 h-6 w-6" title={t('انصراف (Esc)', 'Cancel')} />
+                    </div>
+                );
+            }
+            if (inlineItemEdit) return null;
+            return (
+                <div className="flex gap-1 justify-center">
+                    <Button variant="ghost" size="sm" icon={Edit} onClick={e => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !p-1 h-6 w-6" />
+                    <Button variant="ghost" size="sm" icon={Trash2} onClick={e => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !p-1 h-6 w-6" />
+                </div>
+            );
         }}
     ];
 
@@ -648,6 +745,53 @@
                             />
                         </div>
                     </Card>
+
+                    {(attachModal.files.length > 0 || !isReadOnly) && formMode !== 'CREATE' && (
+                        <Card
+                            title={t('پیوست‌ها', 'Attachments')}
+                            isCollapsible={true}
+                            noPadding={true}
+                            className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0"
+                            headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
+                            language={language}
+                        >
+                            <div className="p-3 bg-white dark:bg-slate-800 flex flex-col gap-3">
+                                {!isReadOnly && (
+                                    <div className="flex items-center gap-2">
+                                        <label className="flex-1 border border-dashed border-slate-300 dark:border-slate-600 rounded p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                            <UploadCloud size={20} className="text-slate-400 mb-1" />
+                                            <span className="text-[11px] text-slate-500">{isUploading ? t('در حال آپلود...', 'Uploading...') : t('برای افزودن فایل کلیک کنید', 'Click to attach file')}</span>
+                                            <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                                        </label>
+                                    </div>
+                                )}
+                                
+                                {attachModal.files.length > 0 ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        {attachModal.files.map(file => (
+                                            <div key={file.id} className="flex items-center justify-between p-2 border border-slate-100 dark:border-slate-700/50 rounded bg-slate-50/50 dark:bg-slate-900/30">
+                                                <div className="flex items-center gap-2 overflow-hidden w-full">
+                                                    <Paperclip size={14} className="text-slate-400 shrink-0" />
+                                                    <span className="text-[11px] text-slate-700 dark:text-slate-300 truncate font-medium flex-1">{file.file_name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 shrink-0 ms-2">
+                                                    <Button variant="ghost" size="sm" icon={Eye} onClick={() => setPreviewFile(file)} className="!p-1 text-indigo-600 h-6 w-6" title={t('پیش‌نمایش', 'Preview')} />
+                                                    {!isReadOnly && (
+                                                        <>
+                                                            <Button variant="ghost" size="sm" icon={Download} onClick={() => window.open(file.file_url, '_blank')} className="!p-1 text-blue-600 h-6 w-6" title={t('دانلود', 'Download')} />
+                                                            <Button variant="ghost" size="sm" icon={Trash2} onClick={() => handleDeleteAttachment(file.id)} className="!p-1 text-red-500 h-6 w-6" title={t('حذف', 'Delete')} />
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    isReadOnly && <span className="text-[11px] text-slate-500">{t('فایلی ضمیمه نشده است.', 'No attachments.')}</span>
+                                )}
+                            </div>
+                        </Card>
+                    )}
                 </div>
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
@@ -655,6 +799,29 @@
                     {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
                 </div>
             </div>
+            
+            <Modal isOpen={!!previewFile} onClose={() => setPreviewFile(null)} title={previewFile?.file_name} language={language} width="max-w-4xl">
+                <div className="p-4 bg-slate-100 dark:bg-slate-900 rounded-b-lg">
+                    {previewFile && (
+                        previewFile.file_type?.startsWith('image/') ? (
+                            <img src={previewFile.file_url} alt="preview" className="max-w-full max-h-[70vh] object-contain mx-auto rounded shadow-sm" />
+                        ) : previewFile.file_type === 'application/pdf' ? (
+                            <iframe src={previewFile.file_url} className="w-full h-[70vh] border-0 rounded shadow-sm" title="pdf-preview" />
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-[40vh] text-slate-500 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+                                <FileText size={48} className="mb-4 opacity-50 text-indigo-400" />
+                                <p className="font-medium">{t('پیش‌نمایش برای این نوع فایل پشتیبانی نمی‌شود.', 'Preview not supported for this file type.')}</p>
+                                {!isReadOnly && (
+                                    <Button variant="outline" size="sm" className="mt-4" onClick={() => window.open(previewFile.file_url, '_blank')}>
+                                        {t('دانلود فایل برای مشاهده', 'Download File to View')}
+                                    </Button>
+                                )}
+                            </div>
+                        )
+                    )}
+                </div>
+            </Modal>
+
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </Modal>
     );
