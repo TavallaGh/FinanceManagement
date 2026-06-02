@@ -6,13 +6,13 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const {
-    FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon, List = FallbackIcon, AlertTriangle = FallbackIcon
+    FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
+    X = FallbackIcon, List = FallbackIcon, AlertTriangle = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
-  const { Button = FallbackComponent, Badge = FallbackComponent } = Core;
+  const { Button = FallbackComponent, Badge = FallbackComponent, Card = FallbackComponent } = Core;
 
   const Forms = window.DSForms || DS || {};
   const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
@@ -72,7 +72,6 @@
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
-    const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
     const [copyWarning, setCopyWarning] = useState(null);
 
     const [lookups, setLookups] = useState({
@@ -188,7 +187,6 @@
         fetchDependencies().then(() => {
             const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
             setInlineItemEdit(null);
-            setIsHeaderCollapsed(false);
             setCopyWarning(null);
 
             if (formMode === 'CREATE') {
@@ -452,7 +450,7 @@
             }
             return <span dir="ltr" className="text-[12px] font-medium">{formatNumber(val)}</span>;
         }},
-        { field: 'description', header_fa: 'شرح *', width: 'auto', render: (val, row) => {
+        { field: 'description', header_fa: 'شرح', width: 'auto', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} required wrapperClassName="m-0" /></div>;
             }
@@ -486,78 +484,86 @@
                 <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
                     
                     {copyWarning && (
-                        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-3 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2">
+                        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-3 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2 shrink-0">
                             <AlertTriangle size={18} />
                             <span className="text-[12px] font-bold">{copyWarning}</span>
                         </div>
                     )}
 
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300 relative z-20">
-                        <div className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/80 rounded-t-lg">
-                            <div className="flex flex-wrap items-center gap-4">
-                                <span className="text-[13px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 cursor-pointer" onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}>
-                                    <FileText size={16} className="text-indigo-500" />
-                                    {t('اطلاعات سربرگ', 'Header Data')}
-                                </span>
-                                <div className="hidden sm:block h-4 w-px bg-slate-300 dark:bg-slate-600"></div>
-                                <div className="flex items-center gap-2">
-                                    <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'amber' : 'slate'} size="md" className="shadow-sm border border-black/5 dark:border-white/5">
-                                        {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
-                                    </Badge>
-                                    
-                                    {formMode !== 'CREATE' && (
-                                        <div className="flex items-center gap-1 ms-2">
-                                            {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                                <Button variant="outline" size="xs" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-[11px] !py-0.5 !h-6 hover:bg-amber-50 dark:hover:bg-amber-900/30 hover:text-amber-700 dark:hover:text-amber-400 hover:border-amber-300 dark:hover:border-amber-700">
-                                                    {t('تبدیل به موقت', 'Set Temporary')}
-                                                </Button>
-                                            )}
-                                            {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                                <Button variant="outline" size="xs" onClick={() => handleChangeStatus('DRAFT')} className="!text-[11px] !py-0.5 !h-6 hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                    {t('برگشت به یادداشت', 'Revert to Draft')}
-                                                </Button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                    <Card
+                        title={
+                            <span className="flex items-center gap-2 text-[13px] font-bold text-slate-700 dark:text-slate-300">
+                                <FileText size={16} className="text-indigo-500" />
+                                {t('اطلاعات سربرگ', 'Header Data')}
+                            </span>
+                        }
+                        isCollapsible={true}
+                        noPadding={true}
+                        className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 relative z-20"
+                        headerClassName="h-12 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700/50"
+                        action={
+                            <div className="flex items-center gap-3 pr-2" onClick={e => e.stopPropagation()}>
+                                <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'amber' : 'slate'} size="md" className="shadow-sm">
+                                    {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
+                                </Badge>
+                                
+                                {formMode !== 'CREATE' && (
+                                    <div className="flex items-center gap-2 pr-3 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-3">
+                                        {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-amber-600 !border-amber-500 hover:!bg-amber-50 dark:hover:!bg-amber-900/30">
+                                                {t('تبدیل به موقت', 'Set Temporary')}
+                                            </Button>
+                                        )}
+                                        {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800">
+                                                {t('برگشت به یادداشت', 'Revert to Draft')}
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                            <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)} className="!p-1 h-7 w-7" />
+                        }
+                    >
+                        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
+                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                            <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                            <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                            <div className="relative z-[90]">
+                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+                            </div>
+                            <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
+                            
+                            <div className="relative z-[80]">
+                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
+                            </div>
+                            <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
+                            
+                            <div className="lg:col-span-3 sm:col-span-2 relative z-[70]">
+                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} required />
+                            </div>
                         </div>
-                        
-                        {!isHeaderCollapsed && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 animate-in slide-in-from-top-2 overflow-visible">
-                                <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
-                                <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                                <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                                <div className="relative z-[90]">
-                                    <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند *', 'Document Date *')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
-                                </div>
-                                <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
-                                
-                                <div className="relative z-[80]">
-                                    <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش *', 'Transaction Type *')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
-                                </div>
-                                <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
-                                
-                                <div className="lg:col-span-4 sm:col-span-2 relative z-[70]">
-                                    <TextField size="sm" formCode={formCode} label={t('شرح سربرگ *', 'Header Description *')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} required />
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    </Card>
 
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-col shadow-sm flex-1 min-h-[350px] relative z-10 overflow-visible">
-                        <div className="flex justify-between items-center p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
-                            <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><List size={14} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</span>
-                        </div>
-                        <div className="flex-1 w-full overflow-visible p-1 relative min-h-[300px]">
+                    <Card
+                        title={
+                            <span className="flex items-center gap-2 text-[13px] font-bold text-slate-700 dark:text-slate-300">
+                                <List size={16} className="text-indigo-500" />
+                                {t('اقلام سند', 'Document Items')}
+                            </span>
+                        }
+                        isCollapsible={true}
+                        noPadding={true}
+                        className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px] relative z-10"
+                        headerClassName="h-12 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700/50 shrink-0"
+                    >
+                        <div className="flex-1 w-full overflow-visible p-1 relative min-h-[300px] bg-white dark:bg-slate-800">
                             <DataGrid 
                                 data={itemGridData} columns={itemColumns}
                                 language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
                                 className="h-full"
                             />
                         </div>
-                    </div>
+                    </Card>
                 </div>
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
