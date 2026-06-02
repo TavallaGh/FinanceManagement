@@ -28,7 +28,7 @@
 
     const supabase = window.supabase;
     const currentUserObj = window.NavigationSystem?.currentUser || {};
-    const currentUserName = currentUserObj.name || 'مدیر سیستم';
+    const currentUserName = currentUserObj.name || currentUserObj.username || 'مدیر سیستم';
 
     const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
     const access = useMemo(() => {
@@ -72,8 +72,8 @@
         if (!supabase) return;
         await supabase.from('fm_record_logs').insert([{
           entity_type: 'تراکنش‌ها',
-          action: action,
           record_id: String(recordId || 'SYSTEM'),
+          action: action,
           user_name: currentUserName,
           details: details
         }]);
@@ -136,7 +136,7 @@
             } else if (deleteConfirm.type === 'bulk') {
                 const { error } = await supabase.from('fm_transactions').delete().in('id', deleteConfirm.data);
                 if (error) throw error;
-                await logAction('bulk_delete_transactions', 'BULK', `حذف گروهی ${deleteConfirm.data.length} تراکنش`);
+                await logAction('bulk_delete_transactions', 'BULK_DELETE', `حذف گروهی ${deleteConfirm.data.length} تراکنش`);
             }
             showToast(t('عملیات با موفقیت انجام شد.', 'Operation successful.'));
             fetchData();
@@ -154,7 +154,7 @@
             const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', ids);
             if (error) throw error;
             showToast(t('وضعیت با موفقیت تغییر کرد.', 'Status updated.'));
-            await logAction('bulk_status_update', 'BULK', `تغییر وضعیت ${ids.length} سند به ${newStatus}`);
+            await logAction('bulk_status_update', 'BULK_UPDATE', `تغییر وضعیت ${ids.length} سند به ${newStatus}`);
             fetchData();
         } catch (error) {
             showToast(t('خطا در تغییر وضعیت.', 'Error updating status.'), 'error');
@@ -164,17 +164,21 @@
     };
 
     const columns = useMemo(() => [
-        { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '100px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
-        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '140px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
-        { field: 'daily_number', header_fa: 'شماره روزانه', header_en: 'Daily Num', width: '100px' },
-        { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '120px', type: 'date' },
-        { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '120px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
-        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '100px', render: (val) => {
+        { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '90px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
+        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '130px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
+        { field: 'daily_number', header_fa: 'شماره روزانه', header_en: 'Daily Num', width: '90px' },
+        { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '110px', type: 'date' },
+        { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '110px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
+        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => <span className="text-[12px] truncate max-w-[200px] block" title={val}>{val || '-'}</span> },
+        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '90px', render: (val) => {
             const s = STATUS_OPTIONS.find(x => x.value === val);
             const colors = { DRAFT: 'slate', TEMPORARY: 'amber', APPROVED: 'emerald' };
             return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
         }},
-        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '180px', render: (val) => usersMap[val] || val }
+        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '140px', render: (val) => {
+            if (!val || val === '00000000-0000-0000-0000-000000000000') return <span className="text-[12px] text-slate-500">ثبت سیستمی</span>;
+            return <span className="text-[12px] truncate font-medium text-slate-700 dark:text-slate-300">{usersMap[val] || val}</span>;
+        }}
     ], [usersMap, t]);
 
     const filterFields = [

@@ -7,7 +7,7 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon, List = FallbackIcon
+    X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon, List = FallbackIcon, AlertTriangle = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -32,7 +32,7 @@
     const supabase = window.supabase;
     const currentUserObj = window.NavigationSystem?.currentUser || {};
     const currentUserId = currentUserObj.id || null;
-    const currentUserName = currentUserObj.name || 'مدیر سیستم';
+    const currentUserName = currentUserObj.name || currentUserObj.full_name || 'مدیر سیستم';
     const currentUserUsername = currentUserObj.username || 'admin';
 
     const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
@@ -73,6 +73,7 @@
     const [itemsData, setItemsData] = useState([]);
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+    const [copyWarning, setCopyWarning] = useState(null);
 
     const [lookups, setLookups] = useState({
         accounts: [],
@@ -80,7 +81,8 @@
         costTypes: [],
         incomeTypes: [],
         departments: [],
-        usersMap: {}
+        usersMap: {},
+        usersList: []
     });
 
     const isFetchingDeps = useRef(false);
@@ -95,8 +97,8 @@
         if (!supabase) return;
         await supabase.from('fm_record_logs').insert([{
           entity_type: 'تراکنش‌ها',
-          action: action,
           record_id: String(recordId || 'SYSTEM'),
+          action: action,
           user_name: currentUserName,
           details: details
         }]);
@@ -166,6 +168,7 @@
                 costTypes: costRes.data || [],
                 incomeTypes: incRes.data || [],
                 usersMap: uMap,
+                usersList: usersRes.data || [],
                 currentUserDeptId: myDeptId,
                 currentUserDeptTitle: myDeptTitle
             });
@@ -186,6 +189,7 @@
             const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
             setInlineItemEdit(null);
             setIsHeaderCollapsed(false);
+            setCopyWarning(null);
 
             if (formMode === 'CREATE') {
                 setHeaderData({
@@ -200,6 +204,10 @@
                 });
                 setItemsData([]);
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
+                if (formMode === 'COPY') {
+                    setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of document ${initialRecord.document_code} and requires review.`));
+                }
+                
                 const parsedDate = initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr;
                 setHeaderData({
                     ...initialRecord,
@@ -224,7 +232,7 @@
                 setItemsData(mappedItems);
             }
         });
-    }, [isOpen, formMode, initialRecord, fetchDependencies, lookups.currentUserDeptId, lookups.currentUserDeptTitle]);
+    }, [isOpen, formMode, initialRecord, fetchDependencies, lookups.currentUserDeptId, lookups.currentUserDeptTitle, t]);
 
     const handleChangeStatus = async (newStatus) => {
         setHeaderData(prev => ({ ...prev, status: newStatus }));
@@ -235,8 +243,10 @@
                 if (error) throw error;
                 await logAction('status_update', headerData.id, `تغییر وضعیت سند به ${newStatus}`);
                 showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Document status updated successfully.'));
+                onSuccess();
             } catch (err) {
                 showToast(t('خطا در تغییر وضعیت سند.', 'Error updating document status.'), 'error');
+                setHeaderData(prev => ({ ...prev, status: initialRecord?.status || 'DRAFT' }));
             } finally {
                 setIsLoading(false);
             }
@@ -249,7 +259,7 @@
         }
 
         if (!headerData.document_date || !headerData.transaction_type || !headerData.description) {
-            return showToast(t('تکمیل فیلدهای اجباری سربرگ الزامی است.', 'Header required fields missing.'), 'warning');
+            return showToast(t('تکمیل فیلدهای اجباری سربرگ (تاریخ، نوع، شرح) الزامی است.', 'Header required fields missing.'), 'warning');
         }
         
         if (itemsData.length === 0) {
@@ -259,12 +269,22 @@
         setIsLoading(true);
         try {
             let txId = headerData.id;
-            const validDeptId = headerData.department_id || null;
+            const validDeptId = (headerData.department_id && String(headerData.department_id).trim() !== '') ? headerData.department_id : null;
+
+            let finalRegistrarId = currentUserId;
+            if (!finalRegistrarId || finalRegistrarId === '00000000-0000-0000-0000-000000000000') {
+                const matchingUser = lookups.usersList.find(u => u.username === currentUserUsername || u.full_name === currentUserName);
+                if (matchingUser) {
+                    finalRegistrarId = matchingUser.id;
+                } else if (lookups.usersList.length > 0) {
+                    finalRegistrarId = lookups.usersList[0].id;
+                }
+            }
 
             const txPayload = {
                 document_code: headerData.document_code,
                 document_date: headerData.document_date.replace(/\//g, '-'),
-                registrar_id: currentUserId || '00000000-0000-0000-0000-000000000000',
+                registrar_id: finalRegistrarId || null,
                 transaction_type: headerData.transaction_type,
                 department_id: validDeptId,
                 status: headerData.status || 'DRAFT',
@@ -464,51 +484,63 @@
         <Modal isOpen={isOpen} onClose={onClose} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
             <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
                 <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300 relative z-20">
-                        <div 
-                            className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
-                            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
-                        >
-                            <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={14} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</span>
-                            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                {formMode !== 'CREATE' && (headerData.status || 'DRAFT') === 'DRAFT' && (
-                                    <Button variant="success-outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')}>
-                                        {t('تبدیل به موقت', 'Convert to Temporary')}
-                                    </Button>
-                                )}
-                                {formMode !== 'CREATE' && (headerData.status || 'DRAFT') === 'TEMPORARY' && (
-                                    <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')}>
-                                        {t('تبدیل به یادداشت', 'Convert to Draft')}
-                                    </Button>
-                                )}
-                            </div>
-                            <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} className="!p-1 h-6 w-6" />
+                    
+                    {copyWarning && (
+                        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-3 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2">
+                            <AlertTriangle size={18} />
+                            <span className="text-[12px] font-bold">{copyWarning}</span>
                         </div>
+                    )}
+
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300 relative z-20">
+                        <div className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/80 rounded-t-lg">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <span className="text-[13px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 cursor-pointer" onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}>
+                                    <FileText size={16} className="text-indigo-500" />
+                                    {t('اطلاعات سربرگ', 'Header Data')}
+                                </span>
+                                <div className="hidden sm:block h-4 w-px bg-slate-300 dark:bg-slate-600"></div>
+                                <div className="flex items-center gap-2">
+                                    <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'amber' : 'slate'} size="md" className="shadow-sm border border-black/5 dark:border-white/5">
+                                        {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
+                                    </Badge>
+                                    
+                                    {formMode !== 'CREATE' && (
+                                        <div className="flex items-center gap-1 ms-2">
+                                            {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
+                                                <Button variant="outline" size="xs" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-[11px] !py-0.5 !h-6 hover:bg-amber-50 dark:hover:bg-amber-900/30 hover:text-amber-700 dark:hover:text-amber-400 hover:border-amber-300 dark:hover:border-amber-700">
+                                                    {t('تبدیل به موقت', 'Set Temporary')}
+                                                </Button>
+                                            )}
+                                            {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
+                                                <Button variant="outline" size="xs" onClick={() => handleChangeStatus('DRAFT')} className="!text-[11px] !py-0.5 !h-6 hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                    {t('برگشت به یادداشت', 'Revert to Draft')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)} className="!p-1 h-7 w-7" />
+                        </div>
+                        
                         {!isHeaderCollapsed && (
-                            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-3 animate-in slide-in-from-top-2 duration-200 overflow-visible">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 animate-in slide-in-from-top-2 overflow-visible">
                                 <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
                                 <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                                 <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                                 <div className="relative z-[90]">
-                                    <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+                                    <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند *', 'Document Date *')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
                                 </div>
                                 <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
                                 
                                 <div className="relative z-[80]">
-                                    <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
+                                    <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش *', 'Transaction Type *')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
                                 </div>
                                 <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
-                                <div className="relative z-[70] flex flex-col justify-center bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded border border-slate-100 dark:border-slate-700">
-                                    <span className="text-slate-500 text-[11px] mb-1 font-medium">{t('وضعیت سند', 'Document Status')}</span>
-                                    <div>
-                                        <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'amber' : 'slate'} size="sm">
-                                            {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label}
-                                        </Badge>
-                                    </div>
-                                </div>
                                 
-                                <div className="lg:col-span-2 sm:col-span-3">
-                                    <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} required />
+                                <div className="lg:col-span-4 sm:col-span-2 relative z-[70]">
+                                    <TextField size="sm" formCode={formCode} label={t('شرح سربرگ *', 'Header Description *')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} required />
                                 </div>
                             </div>
                         )}
