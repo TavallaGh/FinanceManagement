@@ -7,7 +7,7 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    X = FallbackIcon, List = FallbackIcon, AlertTriangle = FallbackIcon
+    X = FallbackIcon, List = FallbackIcon, AlertTriangle = FallbackIcon, Check = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -279,7 +279,7 @@
 
     const handleSaveTransaction = async () => {
         if (inlineItemEdit) {
-            return showToast(t('لطفاً تغییرات سطر باز را ذخیره کنید.', 'Please save inline edits first.'), 'warning');
+            return showToast(t('لطفاً با زدن دکمه Enter تغییرات سطر باز را ذخیره کنید.', 'Please save inline edits first using Enter key.'), 'warning');
         }
 
         if (!headerData.document_date || !headerData.transaction_type || !headerData.description) {
@@ -343,7 +343,7 @@
     };
 
     const handleAddItemClick = () => {
-        if (inlineItemEdit) return showToast(t('ابتدا سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
+        if (inlineItemEdit) return showToast(t('ابتدا با زدن دکمه Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
         setInlineItemEdit({
             id: 'new',
             data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', amount: '', description: '' }
@@ -360,7 +360,9 @@
     };
 
     const handleSaveItemInline = () => {
+        if (!inlineItemEdit) return;
         const form = inlineItemEdit.data;
+        
         if (!form.account_id || !form.amount || !form.description) {
             return showToast(t('حساب، مبلغ و شرح اجباری هستند.', 'Account, Amount, and Description required.'), 'warning');
         }
@@ -392,6 +394,25 @@
     const handleRemoveItem = (row) => {
         const newItems = itemsData.filter(item => item._tempId !== row._tempId && item.id !== row.id);
         setItemsData(newItems.map((item, idx) => ({ ...item, row_number: idx + 1 })));
+    };
+
+    const handleBulkDeleteItems = (ids) => {
+        const newItems = itemsData.filter(item => !ids.includes(item.id) && !ids.includes(item._tempId));
+        setItemsData(newItems.map((item, idx) => ({ ...item, row_number: idx + 1 })));
+        setInlineItemEdit(null);
+        showToast(t('اقلام انتخاب شده حذف شدند.', 'Selected items deleted.'));
+    };
+
+    const handleInlineKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            handleSaveItemInline();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            setInlineItemEdit(null);
+        }
     };
 
     const formatNumber = (num) => {
@@ -446,18 +467,18 @@
     }, [itemsData, inlineItemEdit]);
 
     const itemColumns = [
-        { field: 'row_number', header_fa: '#', width: '60px', render: (val, row) => {
+        { field: 'row_number', header_fa: '#', width: '40px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onClick={e => e.stopPropagation()}><TextField size="sm" type="number" min="1" value={inlineItemEdit.data.row_number || ''} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, row_number: e.target.value}}))} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="number" min="1" value={inlineItemEdit.data.row_number || ''} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, row_number: e.target.value}}))} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
             return row._isNew ? <span className="text-emerald-600 font-bold">*</span> : <span className="text-[12px]">{val}</span>;
         }},
-        { field: 'account_id', header_fa: 'حساب', width: '250px', render: (val, row) => {
+        { field: 'account_id', header_fa: 'حساب *', width: '200px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return (
-                    <div onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
+                    <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
                         <LOVField 
-                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[600px]"
+                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[400px]"
                             displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
                             onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
                             isRtl={isRtl} wrapperClassName="m-0"
@@ -468,26 +489,26 @@
             const acc = lookups.leafAccounts.find(a => String(a.id) === String(val));
             return acc ? <span className="text-[12px] truncate block">{acc.code} - {acc.title_fa}</span> : '';
         }},
-        { field: 'transaction_action', header_fa: 'نوع', width: '100px', render: (val, row) => {
+        { field: 'transaction_action', header_fa: 'نوع', width: '80px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onClick={e => e.stopPropagation()} className="relative z-[90]"><SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_action: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[90]"><SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_action: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
             }
             return <span className="text-[12px]">{TRANSACTION_ACTIONS.find(a => a.value === val)?.label || val}</span>;
         }},
-        { field: 'transaction_group', header_fa: 'گروه', width: '100px', render: (val, row) => {
+        { field: 'transaction_group', header_fa: 'گروه', width: '80px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onClick={e => e.stopPropagation()} className="relative z-[80]"><SelectField size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: ''}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[80]"><SelectField size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: ''}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
             }
             return <span className="text-[12px]">{TRANSACTION_GROUPS.find(a => a.value === val)?.label || val}</span>;
         }},
-        { field: 'sub_type', header_fa: 'هزینه/درآمد', width: '180px', render: (_, row) => {
+        { field: 'sub_type', header_fa: 'هزینه/درآمد', width: '150px', render: (_, row) => {
             const group = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId) ? inlineItemEdit.data.transaction_group : row.transaction_group;
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 if (group === 'COST') {
                     return (
-                        <div onClick={e => e.stopPropagation()} className="relative z-[70]">
+                        <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[500px]"
+                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[400px]"
                                 displayValue={lookups.costTypes.find(c => c.id === inlineItemEdit.data.cost_type_id)?.title_fa || ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: r?.id}}))}
                                 isRtl={isRtl} wrapperClassName="m-0"
@@ -497,9 +518,9 @@
                 }
                 if (group === 'INCOME') {
                     return (
-                        <div onClick={e => e.stopPropagation()} className="relative z-[70]">
+                        <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[500px]"
+                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[400px]"
                                 displayValue={lookups.incomeTypes.find(c => c.id === inlineItemEdit.data.income_type_id)?.title_fa || ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: r?.id}}))}
                                 isRtl={isRtl} wrapperClassName="m-0"
@@ -513,42 +534,45 @@
             if (group === 'INCOME') return <span className="text-[12px]">{lookups.incomeTypes.find(x => String(x.id) === String(row.income_type_id))?.title_fa || ''}</span>;
             return '-';
         }},
-        { field: 'currency', header_fa: 'ارز', width: '60px', render: (val, row) => {
+        { field: 'currency', header_fa: 'ارز', width: '50px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
             return <span dir="ltr" className="text-[12px]">{val}</span>;
         }},
-        { field: 'amount', header_fa: 'مبلغ', width: '120px', render: (val, row) => {
+        { field: 'amount', header_fa: 'مبلغ *', width: '100px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onClick={e => e.stopPropagation()}><TextField size="sm" type="text" value={formatNumber(inlineItemEdit.data.amount)} onChange={handleAmountChange} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" value={formatNumber(inlineItemEdit.data.amount)} onChange={handleAmountChange} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
             return <span dir="ltr" className="text-[12px] font-medium">{formatNumber(val)}</span>;
         }},
-        { field: 'description', header_fa: 'شرح', width: 'auto', render: (val, row) => {
+        { field: 'description', header_fa: 'شرح *', width: 'auto', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} required wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} required wrapperClassName="m-0" placeholder={t('Enter برای ثبت', 'Enter to save')} /></div>;
             }
             return <span className="text-[12px] truncate">{val}</span>;
         }},
-        { field: 'actions', header_fa: '', width: '80px', render: (_, row) => {
+        { field: 'actions', header_fa: '', width: '50px', render: (_, row) => {
             const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
             if (isEditing) {
                 return (
                     <div className="flex gap-1 justify-center">
-                        <Button variant="ghost" size="sm" icon={Save} onClick={e => { e.stopPropagation(); handleSaveItemInline(); }} className="!text-emerald-600 hover:!bg-emerald-50 dark:hover:!bg-emerald-900/30 !p-1.5" />
-                        <Button variant="ghost" size="sm" icon={X} onClick={e => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800 !p-1.5" />
+                        <Button variant="ghost" size="sm" icon={X} onClick={e => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800 !p-1 h-6 w-6" title={t('انصراف (Esc)', 'Cancel')} />
                     </div>
                 );
             }
             if (inlineItemEdit) return null;
             return (
                 <div className="flex gap-1 justify-center">
-                    <Button variant="ghost" size="sm" icon={Edit} onClick={e => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !p-1.5" />
-                    <Button variant="ghost" size="sm" icon={Trash2} onClick={e => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !p-1.5" />
+                    <Button variant="ghost" size="sm" icon={Edit} onClick={e => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !p-1 h-6 w-6" />
+                    <Button variant="ghost" size="sm" icon={Trash2} onClick={e => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !p-1 h-6 w-6" />
                 </div>
             );
         }}
+    ];
+
+    const itemBulkActions = [
+        { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => handleBulkDeleteItems(ids) }
     ];
 
     if (!isOpen) return null;
@@ -559,8 +583,8 @@
                 <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
                     
                     {copyWarning && (
-                        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-3 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2 shrink-0">
-                            <AlertTriangle size={18} />
+                        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2 shrink-0">
+                            <AlertTriangle size={16} />
                             <span className="text-[12px] font-bold">{copyWarning}</span>
                         </div>
                     )}
@@ -570,22 +594,22 @@
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 relative z-20"
-                        headerClassName="bg-white dark:bg-slate-800 border-b-2 border-indigo-100 dark:border-indigo-800/50 h-14"
+                        headerClassName="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 p-2 shrink-0"
                         action={
-                            <div className="flex items-center gap-3 pr-2" onClick={e => e.stopPropagation()}>
-                                <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'orange' : 'slate'} size="md" className="shadow-sm">
+                            <div className="flex items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
+                                <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'orange' : 'slate'} size="sm" className="shadow-sm">
                                     {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
                                 </Badge>
                                 
                                 {formMode !== 'CREATE' && (
-                                    <div className="flex items-center gap-2 pr-3 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-3">
+                                    <div className="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-2">
                                         {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30">
+                                            <Button variant="outline" size="xs" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                                                 {t('تبدیل به موقت', 'Set Temporary')}
                                             </Button>
                                         )}
                                         {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800">
+                                            <Button variant="outline" size="xs" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
                                                 {t('برگشت به یادداشت', 'Revert to Draft')}
                                             </Button>
                                         )}
@@ -620,13 +644,14 @@
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px] relative z-10"
-                        headerClassName="bg-white dark:bg-slate-800 border-b-2 border-indigo-100 dark:border-indigo-800/50 h-14 shrink-0"
+                        headerClassName="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 p-2 shrink-0"
                         language={language}
                     >
-                        <div className="flex-1 w-full overflow-visible p-1 relative min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="flex-1 w-full p-1 relative min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50 flex flex-col">
                             <DataGrid 
                                 data={itemGridData} columns={itemColumns}
                                 language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
+                                selectable={true} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)}
                                 className="h-full"
                             />
                         </div>
@@ -635,7 +660,7 @@
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
                     <Button variant="outline" size="sm" onClick={onClose}>{t('انصراف', 'Cancel')}</Button>
-                    {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
+                    {access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
                 </div>
             </div>
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
