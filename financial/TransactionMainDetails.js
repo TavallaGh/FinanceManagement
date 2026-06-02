@@ -35,6 +35,12 @@
     const currentUserName = currentUserObj.name || 'مدیر سیستم';
     const currentUserUsername = currentUserObj.username || 'admin';
 
+    const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
+    const access = useMemo(() => {
+      const rawActions = securityCtx ? securityCtx.getActions(formCode) : null;
+      return rawActions || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
+    }, [securityCtx, formCode]);
+
     const TRANSACTION_TYPES = [
         { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
         { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
