@@ -220,8 +220,7 @@
                 setItemsData(mappedItems);
             }
         });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, formMode, initialRecord]);
+    }, [isOpen, formMode, initialRecord, fetchDependencies, lookups.currentUserDeptId, lookups.currentUserDeptTitle]);
 
     const handleSaveTransaction = async () => {
         if (inlineItemEdit) {
@@ -239,16 +238,22 @@
         setIsLoading(true);
         try {
             let txId = headerData.id;
-            const validDeptId = headerData.department_id || null;
+            const validDeptId = (headerData.department_id && String(headerData.department_id).trim() !== '') ? headerData.department_id : null;
+
+            let finalRegistrarId = currentUserId;
+            if (!finalRegistrarId) {
+                const fallbackIds = Object.keys(lookups.usersMap);
+                finalRegistrarId = fallbackIds.length > 0 ? fallbackIds[0] : null;
+            }
 
             const txPayload = {
                 document_code: headerData.document_code,
                 document_date: headerData.document_date.replace(/\//g, '-'),
-                registrar_id: currentUserId,
+                registrar_id: finalRegistrarId,
                 transaction_type: headerData.transaction_type,
                 department_id: validDeptId,
                 status: headerData.status,
-                description: headerData.description || ''
+                description: headerData.description || null
             };
 
             if (formMode === 'CREATE' || formMode === 'COPY') {
@@ -470,7 +475,7 @@
                                     <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
                                 </div>
                                 
-                                <div className="lg:col-span-5 sm:col-span-3">
+                                <div className="lg:col-span-2 sm:col-span-3">
                                     <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
                                 </div>
                             </div>
