@@ -7,7 +7,8 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon,
-    Copy = FallbackIcon, AlertTriangle = FallbackIcon
+    Copy = FallbackIcon, AlertTriangle = FallbackIcon, Paperclip = FallbackIcon,
+    UploadCloud = FallbackIcon, Download = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -66,6 +67,7 @@
     const [isLoading, setIsLoading] = useState(false);
     
     const [transactions, setTransactions] = useState([]);
+    const [attachmentCounts, setAttachmentCounts] = useState({});
     const [gridState, setGridState] = useState(null);
     const [filters, setFilters] = useState({});
     const [usersMap, setUsersMap] = useState({});
@@ -76,6 +78,9 @@
     const [currentRecord, setCurrentRecord] = useState(null);
     
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
+
+    const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
+    const [isUploading, setIsUploading] = useState(false);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -153,13 +158,20 @@
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('fm_transactions')
-                .select('*, fm_transaction_items(*)')
-                .order('created_at', { ascending: false });
+            const [{ data: txData, error: txError }, { data: attData }] = await Promise.all([
+                supabase.from('fm_transactions').select('*, fm_transaction_items(*)').order('created_at', { ascending: false }),
+                supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'TRANSACTION')
+            ]);
             
-            if (error) throw error;
-            setTransactions(data || []);
+            if (txError) throw txError;
+            setTransactions(txData || []);
+
+            const counts = {};
+            (attData || []).forEach(att => {
+                counts[att.entity_id] = (counts[att.entity_id] || 0) + 1;
+            });
+            setAttachmentCounts(counts);
+
         } catch (error) {
             showToast(t('خطا در دریافت لیست تراکنش‌ها', 'Error fetching transactions'), 'error');
         } finally {
@@ -223,9 +235,78 @@
         }
     };
 
+    const loadAttachments = async (recordId) => {
+        try {
+            const { data } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
+            setAttachModal(prev => ({ ...prev, files: data || [] }));
+        } catch (err) {}
+    };
+
+    const openAttachments = (record) => {
+        setAttachModal({ isOpen: true, record, files: [] });
+        loadAttachments(record.id);
+    };
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !attachModal.record) return;
+
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${attachModal.record.id}_${Date.now()}.${fileExt}`;
+            const filePath = `transactions/${fileName}`;
+
+            let fileUrl = '';
+            
+            if (supabase.storage) {
+                const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file);
+                if (uploadError) throw uploadError;
+                const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+                fileUrl = urlData.publicUrl;
+            } else {
+                fileUrl = URL.createObjectURL(file); 
+            }
+
+            const payload = {
+                entity_type: 'TRANSACTION',
+                entity_id: attachModal.record.id,
+                file_name: file.name,
+                file_size: file.size,
+                file_type: file.type,
+                file_url: fileUrl,
+                created_by: currentUserId
+            };
+
+            const { error } = await supabase.from('fm_attachments').insert([payload]);
+            if (error) throw error;
+
+            showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
+            loadAttachments(attachModal.record.id);
+            fetchData();
+        } catch (error) {
+            showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
+        } finally {
+            setIsUploading(false);
+            e.target.value = null;
+        }
+    };
+
+    const handleDeleteAttachment = async (fileId) => {
+        try {
+            const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
+            if (error) throw error;
+            showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
+            loadAttachments(attachModal.record.id);
+            fetchData();
+        } catch (error) {
+            showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
+        }
+    };
+
     const filteredTransactions = useMemo(() => {
         return transactions.filter(tx => {
-            if (filters.my_docs && tx.registrar_id !== currentUserId) return false;
+            if (filters.my_docs && String(tx.registrar_id) !== String(currentUserId)) return false;
             if (filters.status && tx.status !== filters.status) return false;
 
             if (filters.account_id || filters.transaction_action || filters.transaction_group || filters.cost_type_id || filters.income_type_id) {
@@ -299,12 +380,13 @@
         { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'lov', lovData: lookups.costTypes, lovColumns: costLovColumns, dropdownWidth: 'min-w-[500px]' },
         { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'lov', lovData: lookups.incomeTypes, lovColumns: incomeLovColumns, dropdownWidth: 'min-w-[500px]' },
         { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: STATUS_OPTIONS },
-        { name: 'my_docs', label: t('سندهای من', 'My Documents'), type: 'checkbox' }
+        { name: 'my_docs', label: t('سندهای من', 'My Documents'), type: 'switch' }
     ];
 
     const gridActions = [
+        { id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: (row) => (attachmentCounts[row.id] > 0 ? '!text-blue-500 hover:!text-blue-600' : '!text-slate-400 hover:!text-slate-600') },
         { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
-        { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit Document'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'edit' },
+        { id: 'update', icon: Edit, tooltip: t('مشاهده/ویرایش', 'View/Edit'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'view' },
         { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
     ];
 
@@ -329,6 +411,7 @@
     }), [filters, gridState]);
 
     const DetailsModal = window.TransactionMainDetails || (() => null);
+    const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
 
     return (
       <div className="p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -379,6 +462,52 @@
               </div>
             }
           />
+        </Modal>
+
+        <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Document Attachments')} language={language} width="max-w-xl">
+            <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
+                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50">
+                    <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.document_code}</span>
+                    {isAttachReadOnly && <Badge variant="slate" size="sm">{t('فقط خواندنی', 'Read Only')}</Badge>}
+                </div>
+
+                {!isAttachReadOnly && (
+                    <div className="flex items-center gap-2">
+                        <label className="flex-1 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <UploadCloud size={24} className="text-slate-400 mb-2" />
+                            <span className="text-[12px] text-slate-600 dark:text-slate-400">{isUploading ? t('در حال آپلود...', 'Uploading...') : t('برای انتخاب فایل کلیک کنید', 'Click to select file')}</span>
+                            <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                        </label>
+                    </div>
+                )}
+
+                {attachModal.files.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                        {attachModal.files.map(file => (
+                            <div key={file.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800">
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <FileText size={18} className="text-slate-400 shrink-0" />
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className="text-[12px] font-medium text-slate-700 dark:text-slate-300 truncate">{file.file_name}</span>
+                                        <span className="text-[10px] text-slate-500">{(file.file_size / 1024).toFixed(1)} KB</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <Button variant="ghost" size="sm" icon={Download} onClick={() => window.open(file.file_url, '_blank')} className="!p-1.5 text-blue-600" />
+                                    {!isAttachReadOnly && (
+                                        <Button variant="ghost" size="sm" icon={Trash2} onClick={() => handleDeleteAttachment(file.id)} className="!p-1.5 text-red-500" />
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <EmptyState icon={Paperclip} title={t('پیوستی یافت نشد', 'No Attachments')} />
+                )}
+            </div>
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end">
+                <Button variant="primary" size="sm" onClick={() => setAttachModal({ isOpen: false, record: null, files: [] })}>{t('بستن', 'Close')}</Button>
+            </div>
         </Modal>
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />

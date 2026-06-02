@@ -87,6 +87,12 @@
     const isFetchingDeps = useRef(false);
     const hasInitialized = useRef(false);
 
+    const isReadOnly = useMemo(() => {
+        if (formMode === 'CREATE' || formMode === 'COPY') return false;
+        if (!headerData.status) return false;
+        return headerData.status !== 'DRAFT' && headerData.status !== 'TEMPORARY';
+    }, [headerData.status, formMode]);
+
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
       setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
@@ -343,6 +349,7 @@
     };
 
     const handleAddItemClick = () => {
+        if (isReadOnly) return;
         if (inlineItemEdit) return showToast(t('ابتدا با زدن دکمه Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
         setInlineItemEdit({
             id: 'new',
@@ -351,7 +358,7 @@
     };
 
     const handleEditItemClick = (row) => {
-        if (inlineItemEdit) return;
+        if (isReadOnly || inlineItemEdit) return;
         const accObj = lookups.leafAccounts.find(a => String(a.id) === String(row.account_id)) || null;
         setInlineItemEdit({
             id: row._tempId || row.id,
@@ -392,11 +399,13 @@
     };
 
     const handleRemoveItem = (row) => {
+        if (isReadOnly) return;
         const newItems = itemsData.filter(item => item._tempId !== row._tempId && item.id !== row.id);
         setItemsData(newItems.map((item, idx) => ({ ...item, row_number: idx + 1 })));
     };
 
     const handleBulkDeleteItems = (ids) => {
+        if (isReadOnly) return;
         const newItems = itemsData.filter(item => !ids.includes(item.id) && !ids.includes(item._tempId));
         setItemsData(newItems.map((item, idx) => ({ ...item, row_number: idx + 1 })));
         setInlineItemEdit(null);
@@ -467,7 +476,7 @@
     }, [itemsData, inlineItemEdit]);
 
     const itemColumns = [
-        { field: 'row_number', header_fa: '#', width: '40px', render: (val, row) => {
+        { field: 'row_number', header_fa: '#', width: '60px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="number" min="1" value={inlineItemEdit.data.row_number || ''} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, row_number: e.target.value}}))} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
@@ -552,7 +561,8 @@
             }
             return <span className="text-[12px] truncate">{val}</span>;
         }},
-        { field: 'actions', header_fa: '', width: '50px', render: (_, row) => {
+        { field: 'actions', header_fa: '', width: '40px', render: (_, row) => {
+            if (isReadOnly) return null;
             const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
             if (isEditing) {
                 return (
@@ -571,14 +581,14 @@
         }}
     ];
 
-    const itemBulkActions = [
+    const itemBulkActions = isReadOnly ? [] : [
         { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => handleBulkDeleteItems(ids) }
     ];
 
     if (!isOpen) return null;
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
+        <Modal isOpen={isOpen} onClose={onClose} title={isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : (formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction'))} language={language} width="max-w-6xl">
             <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
                 <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
                     
@@ -594,22 +604,22 @@
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 relative z-20"
-                        headerClassName="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 p-2 shrink-0"
+                        headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
                         action={
                             <div className="flex items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
                                 <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'orange' : 'slate'} size="sm" className="shadow-sm">
                                     {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
                                 </Badge>
                                 
-                                {formMode !== 'CREATE' && (
+                                {!isReadOnly && formMode !== 'CREATE' && (
                                     <div className="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-2">
                                         {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30">
                                                 {t('تبدیل به موقت', 'Set Temporary')}
                                             </Button>
                                         )}
                                         {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800">
                                                 {t('برگشت به یادداشت', 'Revert to Draft')}
                                             </Button>
                                         )}
@@ -624,17 +634,17 @@
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
-                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند *', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
                             <div className="relative z-[80]">
-                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
+                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش *', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
                             
                             <div className="lg:col-span-3 sm:col-span-2 relative z-[70]">
-                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} required />
+                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ *', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                         </div>
                     </Card>
@@ -644,14 +654,14 @@
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px] relative z-10"
-                        headerClassName="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 p-2 shrink-0"
+                        headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
                         language={language}
                     >
-                        <div className="flex-1 w-full p-1 relative min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50 flex flex-col">
+                        <div className="flex-1 w-full p-1 relative min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50 flex flex-col min-w-0">
                             <DataGrid 
                                 data={itemGridData} columns={itemColumns}
-                                language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
-                                selectable={true} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)}
+                                language={language} onAdd={isReadOnly ? undefined : handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
+                                selectable={!isReadOnly} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)}
                                 className="h-full"
                             />
                         </div>
@@ -659,8 +669,8 @@
                 </div>
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
-                    <Button variant="outline" size="sm" onClick={onClose}>{t('انصراف', 'Cancel')}</Button>
-                    {access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
+                    <Button variant="outline" size="sm" onClick={onClose}>{t('بستن', 'Close')}</Button>
+                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
                 </div>
             </div>
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
