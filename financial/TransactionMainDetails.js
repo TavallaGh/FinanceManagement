@@ -671,12 +671,12 @@
                                 {!isReadOnly && formMode !== 'CREATE' && (
                                     <div className="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-2">
                                         {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="xs" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                                                 {t('تبدیل به موقت', 'Set Temporary')}
                                             </Button>
                                         )}
                                         {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                            <Button variant="outline" size="xs" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
                                                 {t('برگشت به یادداشت', 'Revert to Draft')}
                                             </Button>
                                         )}
