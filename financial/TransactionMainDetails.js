@@ -15,7 +15,7 @@
   const { Button = FallbackComponent, Badge = FallbackComponent, Card = FallbackComponent } = Core;
 
   const Forms = window.DSForms || DS || {};
-  const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
+  const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent, AttachmentManager = FallbackComponent } = Forms;
 
   const Grid = window.DSGrid || DS || {};
   const { DataGrid = FallbackComponent, LOVField = FallbackComponent } = Grid;
@@ -74,6 +74,9 @@
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
     const [copyWarning, setCopyWarning] = useState(null);
 
+    const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
+    const [isUploading, setIsUploading] = useState(false);
+
     const [lookups, setLookups] = useState({
         accounts: [],
         leafAccounts: [],
@@ -92,6 +95,10 @@
         if (!headerData.status) return false;
         return headerData.status !== 'DRAFT' && headerData.status !== 'TEMPORARY';
     }, [headerData.status, formMode]);
+
+    const isAttachReadOnly = useMemo(() => {
+        return attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
+    }, [attachModal.record]);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -197,6 +204,13 @@
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
     };
 
+    const loadAttachments = async (recordId) => {
+        try {
+            const { data } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
+            setAttachModal(prev => ({ ...prev, files: data || [] }));
+        } catch (err) {}
+    };
+
     useEffect(() => {
         if (!isOpen) {
             hasInitialized.current = false;
@@ -231,6 +245,7 @@
                     registered_at: new Date().toISOString()
                 });
                 setItemsData([]);
+                setAttachModal({ isOpen: false, record: null, files: [] });
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
                 if (formMode === 'COPY') {
                     setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of document ${initialRecord.document_code} and requires review.`));
@@ -260,6 +275,13 @@
                 })).sort((a, b) => a.row_number - b.row_number);
                 
                 setItemsData(mappedItems);
+
+                if (formMode === 'EDIT') {
+                    loadAttachments(initialRecord.id);
+                    setAttachModal(prev => ({ ...prev, record: initialRecord }));
+                } else {
+                    setAttachModal({ isOpen: false, record: null, files: [] });
+                }
             }
         });
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
@@ -421,6 +443,59 @@
             e.preventDefault();
             e.stopPropagation();
             setInlineItemEdit(null);
+        }
+    };
+
+    const handleFileUpload = async (files) => {
+        if (!files || files.length === 0 || !attachModal.record) return;
+        const file = files[0];
+
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${attachModal.record.id}_${Date.now()}.${fileExt}`;
+            const filePath = `transactions/${fileName}`;
+
+            let fileUrl = '';
+            if (supabase.storage) {
+                const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file);
+                if (uploadError) throw uploadError;
+                const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+                fileUrl = urlData.publicUrl;
+            } else {
+                fileUrl = URL.createObjectURL(file); 
+            }
+
+            const payload = {
+                entity_type: 'TRANSACTION',
+                entity_id: attachModal.record.id,
+                file_name: file.name,
+                file_size: file.size,
+                file_type: file.type,
+                file_url: fileUrl,
+                created_by: currentUserId
+            };
+
+            const { error } = await supabase.from('fm_attachments').insert([payload]);
+            if (error) throw error;
+
+            showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
+            loadAttachments(attachModal.record.id);
+        } catch (error) {
+            showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleDeleteAttachment = async (fileId) => {
+        try {
+            const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
+            if (error) throw error;
+            showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
+            loadAttachments(attachModal.record.id);
+        } catch (error) {
+            showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
         }
     };
 
@@ -596,12 +671,12 @@
                                 {!isReadOnly && formMode !== 'CREATE' && (
                                     <div className="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-2">
                                         {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30">
+                                            <Button variant="outline" size="xs" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                                                 {t('تبدیل به موقت', 'Set Temporary')}
                                             </Button>
                                         )}
                                         {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800">
+                                            <Button variant="outline" size="xs" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
                                                 {t('برگشت به یادداشت', 'Revert to Draft')}
                                             </Button>
                                         )}
@@ -655,6 +730,32 @@
                     {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
                 </div>
             </div>
+            
+            <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Document Attachments')} language={language} width="max-w-xl">
+                <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg">
+                    <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0">
+                        <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.document_code}</span>
+                        {isAttachReadOnly && <Badge variant="slate" size="sm">{t('فقط خواندنی', 'Read Only')}</Badge>}
+                    </div>
+
+                    <div className="flex-1 overflow-hidden min-h-[300px] rounded-lg">
+                        <AttachmentManager 
+                            files={attachModal.files}
+                            onUpload={handleFileUpload}
+                            onDelete={(f) => handleDeleteAttachment(f.id)}
+                            onDownload={(f) => window.open(f.file_url, '_blank')}
+                            readOnly={isAttachReadOnly}
+                            isUploading={isUploading}
+                            language={language}
+                            formCode={formCode}
+                        />
+                    </div>
+                </div>
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
+                    <Button variant="primary" size="sm" onClick={() => setAttachModal({ isOpen: false, record: null, files: [] })}>{t('بستن', 'Close')}</Button>
+                </div>
+            </Modal>
+            
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </Modal>
     );

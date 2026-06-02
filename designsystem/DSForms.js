@@ -16,7 +16,8 @@
     UploadCloud = FallbackIcon, 
     FileText = FallbackIcon, 
     Download = FallbackIcon, 
-    Trash2 = FallbackIcon 
+    Trash2 = FallbackIcon,
+    Eye = FallbackIcon
   } = window.LucideIcons || {};
 
   const { useCalendarMode, formatGlobalDate, j2g, g2j } = window.DSCore || {};
@@ -464,12 +465,19 @@
     );
   };
 
-  const AttachmentManager = ({ files = [], onUpload, onDelete, onDownload, readOnly = false, language = 'fa', formCode }) => {
+  const AttachmentManager = ({ files = [], onUpload, onDelete, onDownload, readOnly = false, isUploading = false, language = 'fa', formCode }) => {
     const isReadOnlyMode = useSecureField(formCode, readOnly);
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
+    const [previewFile, setPreviewFile] = useState(null);
+
+    const Feedback = window.DSFeedback || window.DesignSystem || {};
+    const Modal = Feedback.Modal || (({children}) => <div className="hidden">{children}</div>);
+    const EmptyState = Feedback.EmptyState || (({title}) => <div className="text-center p-4 text-slate-500">{title}</div>);
+    const Core = window.DSCore || window.DesignSystem || {};
+    const Button = Core.Button || (({children, onClick}) => <button onClick={onClick}>{children}</button>);
 
     const handleDrop = (e) => { e.preventDefault(); setIsDragging(false); if (!isReadOnlyMode && e.dataTransfer.files?.length > 0) onUpload(Array.from(e.dataTransfer.files)); };
     const handleFileSelect = (e) => { if (e.target.files?.length > 0) onUpload(Array.from(e.target.files)); };
@@ -480,29 +488,62 @@
       return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     };
 
+    const getName = (f) => f.file_name || f.name;
+    const getSize = (f) => f.file_size || f.size;
+    const getType = (f) => f.file_type || f.type;
+    const getUrl = (f) => f.file_url || f.url || (f instanceof File ? URL.createObjectURL(f) : '');
+
     return (
       <div className="flex flex-col gap-3 font-sans w-full h-full" dir={isRtl ? 'rtl' : 'ltr'}>
         {!isReadOnlyMode && (
-          <div onDragOver={e => {e.preventDefault(); setIsDragging(true);}} onDragLeave={e => {e.preventDefault(); setIsDragging(false);}} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()} className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all shrink-0 ${isDragging ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500'}`}>
-            <UploadCloud size={24} className={isDragging ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'} />
-            <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mt-2">{t('فایل‌ها را اینجا رها کنید یا کلیک کنید', 'Drop files here or click to upload')}</span>
-            <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileSelect} />
+          <div onDragOver={e => {e.preventDefault(); setIsDragging(true);}} onDragLeave={e => {e.preventDefault(); setIsDragging(false);}} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()} className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all shrink-0 ${isDragging ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500'}`}>
+            <UploadCloud size={24} className={isDragging ? 'text-indigo-600 dark:text-indigo-400 mb-2' : 'text-slate-400 dark:text-slate-500 mb-2'} />
+            <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{isUploading ? t('در حال آپلود...', 'Uploading...') : t('برای انتخاب فایل کلیک کنید یا فایل را اینجا رها کنید', 'Click to select file or drop here')}</span>
+            <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileSelect} disabled={isUploading} />
           </div>
         )}
-        <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto custom-scrollbar pr-1 min-h-0">
-          {files.length === 0 ? <div className="text-center p-4 text-[12px] text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-800/50">{t('هیچ فایلی ضمیمه نشده است.', 'No attachments found.')}</div> : files.map((file, idx) => (
-            <div key={idx} className="flex items-center justify-between p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50 transition-colors group shrink-0">
-              <div className="flex items-center gap-2.5 overflow-hidden">
-                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md shrink-0"><FileText size={14} /></div>
-                <div className="flex flex-col min-w-0"><span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 truncate">{file.name}</span><span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{formatSize(file.size)}</span></div>
+        <div className="flex flex-col gap-2 flex-1 overflow-y-auto custom-scrollbar pr-1 min-h-0">
+          {files.length === 0 ? (
+              <EmptyState icon={FileText} title={t('هیچ فایلی ضمیمه نشده است.', 'No attachments found.')} />
+          ) : files.map((file, idx) => (
+            <div key={file.id || idx} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50 transition-colors group shrink-0">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <FileText size={18} className="text-slate-400 shrink-0" />
+                <div className="flex flex-col min-w-0">
+                    <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 truncate">{getName(file)}</span>
+                    <span className="text-[10px] text-slate-500">{formatSize(getSize(file))}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                {onDownload && <button onClick={(e) => { e.stopPropagation(); onDownload(file); }} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md"><Download size={14} /></button>}
-                {!isReadOnlyMode && onDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(file); }} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md"><Trash2 size={14} /></button>}
+              <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="sm" icon={Eye} onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }} className="!p-1.5 text-indigo-600 dark:text-indigo-400" title={t('پیش‌نمایش', 'Preview')} />
+                {onDownload && <Button variant="ghost" size="sm" icon={Download} onClick={(e) => { e.stopPropagation(); onDownload(file); }} className="!p-1.5 text-blue-600 dark:text-blue-400" title={t('دانلود', 'Download')} />}
+                {!isReadOnlyMode && onDelete && <Button variant="ghost" size="sm" icon={Trash2} onClick={(e) => { e.stopPropagation(); onDelete(file); }} className="!p-1.5 text-red-500 dark:text-red-400" title={t('حذف', 'Delete')} />}
               </div>
             </div>
           ))}
         </div>
+
+        <Modal isOpen={!!previewFile} onClose={() => setPreviewFile(null)} title={previewFile ? getName(previewFile) : ''} language={language} width="max-w-4xl">
+            <div className="p-4 bg-slate-100 dark:bg-slate-900 rounded-b-lg">
+                {previewFile && (
+                    getType(previewFile)?.startsWith('image/') ? (
+                        <img src={getUrl(previewFile)} alt="preview" className="max-w-full max-h-[70vh] object-contain mx-auto rounded shadow-sm" />
+                    ) : getType(previewFile) === 'application/pdf' ? (
+                        <iframe src={getUrl(previewFile)} className="w-full h-[70vh] border-0 rounded shadow-sm" title="pdf-preview" />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-[40vh] text-slate-500 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
+                            <FileText size={48} className="mb-4 opacity-50 text-indigo-400" />
+                            <p className="font-bold text-[12px]">{t('پیش‌نمایش برای این نوع فایل پشتیبانی نمی‌شود.', 'Preview not supported for this file type.')}</p>
+                            {!isReadOnlyMode && (
+                                <Button variant="outline" size="sm" className="mt-4" onClick={() => window.open(getUrl(previewFile), '_blank')}>
+                                    {t('دانلود فایل برای مشاهده', 'Download File to View')}
+                                </Button>
+                            )}
+                        </div>
+                    )
+                )}
+            </div>
+        </Modal>
       </div>
     );
   };

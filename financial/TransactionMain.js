@@ -7,8 +7,7 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon,
-    Copy = FallbackIcon, AlertTriangle = FallbackIcon, Paperclip = FallbackIcon,
-    UploadCloud = FallbackIcon, Download = FallbackIcon, Eye = FallbackIcon
+    Copy = FallbackIcon, AlertTriangle = FallbackIcon, Paperclip = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -17,6 +16,9 @@
 
   const Grid = window.DSGrid || DS || {};
   const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent } = Grid;
+
+  const Forms = window.DSForms || DS || {};
+  const { AttachmentManager = FallbackComponent } = Forms;
 
   const Feedback = window.DSFeedback || DS || {};
   const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
@@ -81,7 +83,6 @@
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
 
     const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
-    const [previewFile, setPreviewFile] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
 
     const showToast = useCallback((message, type = 'success') => {
@@ -257,9 +258,9 @@
         loadAttachments(record.id);
     };
 
-    const handleFileUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file || !attachModal.record) return;
+    const handleFileUpload = async (files) => {
+        if (!files || files.length === 0 || !attachModal.record) return;
+        const file = files[0];
 
         setIsUploading(true);
         try {
@@ -283,7 +284,7 @@
                 entity_id: attachModal.record.id,
                 file_name: file.name,
                 file_size: file.size,
-                file_type: file.type,
+                file_type: file.type || 'application/octet-stream',
                 file_url: fileUrl,
                 created_by: resolvedUserId
             };
@@ -298,13 +299,12 @@
             showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
         } finally {
             setIsUploading(false);
-            e.target.value = null;
         }
     };
 
-    const handleDeleteAttachment = async (fileId) => {
+    const handleDeleteAttachment = async (file) => {
         try {
-            const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
+            const { error } = await supabase.from('fm_attachments').delete().eq('id', file.id);
             if (error) throw error;
             showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
             loadAttachments(attachModal.record.id);
@@ -390,7 +390,7 @@
         { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'lov', lovData: lookups.costTypes, lovColumns: costLovColumns, dropdownWidth: 'min-w-[500px]' },
         { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'lov', lovData: lookups.incomeTypes, lovColumns: incomeLovColumns, dropdownWidth: 'min-w-[500px]' },
         { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: STATUS_OPTIONS },
-        { name: 'my_docs', label: t('سندهای من', 'My Documents'), type: 'switch' }
+        { name: 'my_docs', label: t('سندهای من', 'My Documents'), type: 'toggle' }
     ];
 
     const gridActions = [
@@ -435,7 +435,7 @@
 
         <div className="flex-1 min-h-0 flex flex-col gap-2 mt-4">
           <AdvancedFilter 
-            fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} columns={6}
+            fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} columns={6} 
           />
           <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
             <DataGrid
@@ -475,69 +475,27 @@
         </Modal>
 
         <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Document Attachments')} language={language} width="max-w-xl">
-            <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50">
+            <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg">
+                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0">
                     <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.document_code}</span>
                     {isAttachReadOnly && <Badge variant="slate" size="sm">{t('فقط خواندنی', 'Read Only')}</Badge>}
                 </div>
 
-                {!isAttachReadOnly && (
-                    <div className="flex items-center gap-2">
-                        <label className="flex-1 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <UploadCloud size={24} className="text-slate-400 mb-2" />
-                            <span className="text-[12px] text-slate-600 dark:text-slate-400">{isUploading ? t('در حال آپلود...', 'Uploading...') : t('برای انتخاب فایل کلیک کنید', 'Click to select file')}</span>
-                            <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-                        </label>
-                    </div>
-                )}
-
-                {attachModal.files.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                        {attachModal.files.map(file => (
-                            <div key={file.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800">
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <FileText size={18} className="text-slate-400 shrink-0" />
-                                    <div className="flex flex-col overflow-hidden">
-                                        <span className="text-[12px] font-medium text-slate-700 dark:text-slate-300 truncate">{file.file_name}</span>
-                                        <span className="text-[10px] text-slate-500">{(file.file_size / 1024).toFixed(1)} KB</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <Button variant="ghost" size="sm" icon={Eye} onClick={() => setPreviewFile(file)} className="!p-1.5 text-indigo-600" title={t('پیش‌نمایش', 'Preview')} />
-                                    <Button variant="ghost" size="sm" icon={Download} onClick={() => window.open(file.file_url, '_blank')} className="!p-1.5 text-blue-600" title={t('دانلود', 'Download')} />
-                                    {!isAttachReadOnly && (
-                                        <Button variant="ghost" size="sm" icon={Trash2} onClick={() => handleDeleteAttachment(file.id)} className="!p-1.5 text-red-500" title={t('حذف', 'Delete')} />
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <EmptyState icon={Paperclip} title={t('پیوستی یافت نشد', 'No Attachments')} />
-                )}
+                <div className="flex-1 overflow-hidden min-h-[300px] rounded-lg">
+                    <AttachmentManager 
+                        files={attachModal.files}
+                        onUpload={handleFileUpload}
+                        onDelete={handleDeleteAttachment}
+                        onDownload={(f) => window.open(f.file_url, '_blank')}
+                        readOnly={isAttachReadOnly}
+                        isUploading={isUploading}
+                        language={language}
+                        formCode={formCode}
+                    />
+                </div>
             </div>
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
                 <Button variant="primary" size="sm" onClick={() => setAttachModal({ isOpen: false, record: null, files: [] })}>{t('بستن', 'Close')}</Button>
-            </div>
-        </Modal>
-
-        <Modal isOpen={!!previewFile} onClose={() => setPreviewFile(null)} title={previewFile?.file_name} language={language} width="max-w-4xl">
-            <div className="p-4 bg-slate-100 dark:bg-slate-900 rounded-b-lg">
-                {previewFile && (
-                    previewFile.file_type?.startsWith('image/') ? (
-                        <img src={previewFile.file_url} alt="preview" className="max-w-full max-h-[70vh] object-contain mx-auto rounded shadow-sm" />
-                    ) : previewFile.file_type === 'application/pdf' ? (
-                        <iframe src={previewFile.file_url} className="w-full h-[70vh] border-0 rounded shadow-sm" title="pdf-preview" />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-[40vh] text-slate-500 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-700">
-                            <FileText size={48} className="mb-4 opacity-50 text-indigo-400" />
-                            <p className="font-medium">{t('پیش‌نمایش برای این نوع فایل پشتیبانی نمی‌شود.', 'Preview not supported for this file type.')}</p>
-                            <Button variant="outline" size="sm" className="mt-4" onClick={() => window.open(previewFile.file_url, '_blank')}>
-                                {t('دانلود فایل برای مشاهده', 'Download File to View')}
-                            </Button>
-                        </div>
-                    )
-                )}
             </div>
         </Modal>
 
