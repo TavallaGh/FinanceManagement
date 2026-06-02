@@ -68,6 +68,7 @@
     const [gridState, setGridState] = useState(null);
     const [filters, setFilters] = useState({});
     const [usersMap, setUsersMap] = useState({});
+    const [lookups, setLookups] = useState({ accounts: [], costTypes: [], incomeTypes: [] });
     
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [formMode, setFormMode] = useState('CREATE');
@@ -104,6 +105,43 @@
         } catch (error) {}
     }, [supabase]);
 
+    const fetchLookups = useCallback(async () => {
+        try {
+            const [accRes, chartRes, costRes, incRes] = await Promise.all([
+                supabase.from('fm_coa_accounts').select('id, title_fa, code, parent_id, chart_id').eq('is_active', true),
+                supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
+                supabase.from('fm_cost_types').select('id, title_fa, code, parent_id').eq('is_active', true),
+                supabase.from('fm_income_types').select('id, title_fa, code, parent_id').eq('is_active', true)
+            ]);
+
+            const buildPaths = (items, charts = []) => {
+                const parentIds = new Set(items.map(i => i.parent_id).filter(Boolean));
+                return items.filter(i => !parentIds.has(i.id)).map(i => {
+                    let pathArr = [];
+                    let curr = i;
+                    while (curr && curr.parent_id) {
+                        const parent = items.find(p => p.id === curr.parent_id);
+                        if (parent) {
+                            pathArr.unshift(parent.title_fa || parent.title);
+                            curr = parent;
+                        } else break;
+                    }
+                    return {
+                        ...i,
+                        pathTitle: pathArr.join(' / '),
+                        chart_name: charts.find(c => c.id === i.chart_id)?.title || ''
+                    };
+                });
+            };
+
+            setLookups({
+                accounts: buildPaths(accRes.data || [], chartRes.data || []),
+                costTypes: buildPaths(costRes.data || []),
+                incomeTypes: buildPaths(incRes.data || [])
+            });
+        } catch (err) {}
+    }, [supabase]);
+
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -124,9 +162,10 @@
     useEffect(() => {
         if (access.canView) {
             fetchUsers();
+            fetchLookups();
             fetchData();
         }
-    }, [fetchUsers, fetchData, access.canView]);
+    }, [fetchUsers, fetchLookups, fetchData, access.canView]);
 
     const handleOpenForm = (mode, record = null) => {
         setFormMode(mode);
@@ -176,6 +215,25 @@
         }
     };
 
+    const filteredTransactions = useMemo(() => {
+        return transactions.filter(tx => {
+            if (filters.status && tx.status !== filters.status) return false;
+
+            if (filters.account_id || filters.transaction_action || filters.transaction_group || filters.cost_type_id || filters.income_type_id) {
+                const hasMatchingItem = (tx.fm_transaction_items || []).some(item => {
+                    if (filters.account_id && item.account_id !== filters.account_id.id) return false;
+                    if (filters.transaction_action && item.transaction_action !== filters.transaction_action) return false;
+                    if (filters.transaction_group && item.transaction_group !== filters.transaction_group) return false;
+                    if (filters.cost_type_id && item.cost_type_id !== filters.cost_type_id.id) return false;
+                    if (filters.income_type_id && item.income_type_id !== filters.income_type_id.id) return false;
+                    return true;
+                });
+                if (!hasMatchingItem) return false;
+            }
+            return true;
+        });
+    }, [transactions, filters]);
+
     const columns = useMemo(() => [
         { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '90px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
         { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '130px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
@@ -194,12 +252,43 @@
         }}
     ], [usersMap, t]);
 
+    const accountLovColumns = [
+        { field: 'chart_name', header_fa: 'ساختار حساب', width: '120px' },
+        { field: 'code', header_fa: 'کد حساب', width: '100px' },
+        { field: 'title_fa', header_fa: 'عنوان حساب', width: 'auto', render: (val, row) => (
+            <div className="flex flex-col">
+                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
+                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
+            </div>
+        )}
+    ];
+
+    const costLovColumns = [
+        { field: 'code', header_fa: 'کد هزینه', width: '100px' },
+        { field: 'title_fa', header_fa: 'عنوان هزینه', width: 'auto', render: (val, row) => (
+            <div className="flex flex-col">
+                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
+                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
+            </div>
+        )}
+    ];
+
+    const incomeLovColumns = [
+        { field: 'code', header_fa: 'کد درآمد', width: '100px' },
+        { field: 'title_fa', header_fa: 'عنوان درآمد', width: 'auto', render: (val, row) => (
+            <div className="flex flex-col">
+                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
+                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
+            </div>
+        )}
+    ];
+
     const filterFields = [
-        { name: 'account_id', label: t('حساب مرتبط', 'Account'), type: 'text' },
+        { name: 'account_id', label: t('حساب مرتبط', 'Account'), type: 'lov', lovData: lookups.accounts, lovColumns: accountLovColumns },
         { name: 'transaction_action', label: t('نوع (واریز/برداشت)', 'Action'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_ACTIONS] },
         { name: 'transaction_group', label: t('گروه', 'Group'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_GROUPS] },
-        { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'text' },
-        { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'text' },
+        { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'lov', lovData: lookups.costTypes, lovColumns: costLovColumns },
+        { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'lov', lovData: lookups.incomeTypes, lovColumns: incomeLovColumns },
         { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...STATUS_OPTIONS] }
     ];
 
@@ -247,7 +336,7 @@
           />
           <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
             <DataGrid
-              data={transactions} columns={columns} language={language} formCode={formCode}
+              data={filteredTransactions} columns={columns} language={language} formCode={formCode}
               gridState={gridState} onGridStateChange={setGridState}
               onAdd={access.canCreate ? () => handleOpenForm('CREATE') : undefined}
               onRowDoubleClick={(row) => handleOpenForm('EDIT', row)}

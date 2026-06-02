@@ -1,7 +1,7 @@
 /* Filename: financial/TransactionMainDetails.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo, useCallback } = React;
+  const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
@@ -84,6 +84,9 @@
         usersList: []
     });
 
+    const isFetchingDeps = useRef(false);
+    const hasInitialized = useRef(false);
+
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
       setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
@@ -108,8 +111,8 @@
             const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
                 supabase.from('fm_coa_accounts').select('id, title_fa, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
-                supabase.from('fm_cost_types').select('id, title_fa').eq('is_active', true),
-                supabase.from('fm_income_types').select('id, title_fa').eq('is_active', true),
+                supabase.from('fm_cost_types').select('id, title_fa, code, parent_id').eq('is_active', true),
+                supabase.from('fm_income_types').select('id, title_fa, code, parent_id').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title')
@@ -133,36 +136,36 @@
                 }
             });
 
-            const allAccounts = accRes.data || [];
-            const charts = chartRes.data || [];
-            const parentIds = new Set(allAccounts.map(a => a.parent_id).filter(Boolean));
-            
-            const leafAccs = allAccounts.filter(a => !parentIds.has(a.id)).map(a => {
-                let pathArr = [];
-                let curr = a;
-                while (curr && curr.parent_id) {
-                    const parent = allAccounts.find(p => p.id === curr.parent_id);
-                    if (parent) {
-                        pathArr.unshift(parent.title_fa);
-                        curr = parent;
-                    } else {
-                        break;
+            const buildPaths = (items, charts = []) => {
+                const parentIds = new Set(items.map(i => i.parent_id).filter(Boolean));
+                return items.filter(i => !parentIds.has(i.id)).map(i => {
+                    let pathArr = [];
+                    let curr = i;
+                    while (curr && curr.parent_id) {
+                        const parent = items.find(p => p.id === curr.parent_id);
+                        if (parent) {
+                            pathArr.unshift(parent.title_fa || parent.title);
+                            curr = parent;
+                        } else break;
                     }
-                }
-                const chartName = charts.find(c => c.id === a.chart_id)?.title || '';
-                return {
-                    ...a,
-                    chart_name: chartName,
-                    pathTitle: pathArr.join(' / '),
-                    displayLabel: `${a.code} - ${a.title_fa}`
-                };
-            });
+                    return {
+                        ...i,
+                        pathTitle: pathArr.join(' / '),
+                        chart_name: charts.find(c => c.id === i.chart_id)?.title || ''
+                    };
+                });
+            };
+
+            const allAccounts = accRes.data || [];
+            const leafAccs = buildPaths(allAccounts, chartRes.data || []);
+            const costLeafs = buildPaths(costRes.data || []);
+            const incomeLeafs = buildPaths(incRes.data || []);
 
             const newLookups = {
                 accounts: allAccounts,
                 leafAccounts: leafAccs,
-                costTypes: costRes.data || [],
-                incomeTypes: incRes.data || [],
+                costTypes: costLeafs,
+                incomeTypes: incomeLeafs,
                 usersMap: uMap,
                 usersList: usersRes.data || [],
                 currentUserDeptId: myDeptId,
@@ -182,7 +185,12 @@
     };
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            hasInitialized.current = false;
+            return;
+        }
+        if (hasInitialized.current) return;
+        hasInitialized.current = true;
         
         fetchDependencies().then((newLookups) => {
             if (!newLookups) return;
@@ -394,12 +402,32 @@
     };
 
     const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'چارت حساب', header_en: 'Chart', width: '120px' },
-        { field: 'code', header_fa: 'کد', header_en: 'Code', width: '100px' },
-        { field: 'title_fa', header_fa: 'عنوان حساب', header_en: 'Title', width: 'auto', render: (val, row) => (
+        { field: 'chart_name', header_fa: 'ساختار حساب', width: '120px' },
+        { field: 'code', header_fa: 'کد حساب', width: '100px' },
+        { field: 'title_fa', header_fa: 'عنوان حساب', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>
+                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
+            </div>
+        )}
+    ];
+
+    const costLovColumns = [
+        { field: 'code', header_fa: 'کد هزینه', width: '100px' },
+        { field: 'title_fa', header_fa: 'عنوان هزینه', width: 'auto', render: (val, row) => (
+            <div className="flex flex-col">
+                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
+                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
+            </div>
+        )}
+    ];
+
+    const incomeLovColumns = [
+        { field: 'code', header_fa: 'کد درآمد', width: '100px' },
+        { field: 'title_fa', header_fa: 'عنوان درآمد', width: 'auto', render: (val, row) => (
+            <div className="flex flex-col">
+                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
+                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
             </div>
         )}
     ];
@@ -445,11 +473,33 @@
             }
             return <span className="text-[12px]">{TRANSACTION_GROUPS.find(a => a.value === val)?.label || val}</span>;
         }},
-        { field: 'sub_type', header_fa: 'هزینه/درآمد', width: '150px', render: (_, row) => {
+        { field: 'sub_type', header_fa: 'هزینه/درآمد', width: '180px', render: (_, row) => {
             const group = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId) ? inlineItemEdit.data.transaction_group : row.transaction_group;
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                if (group === 'COST') return <div onClick={e => e.stopPropagation()} className="relative z-[70]"><SelectField size="sm" options={lookups.costTypes.map(c => ({value: c.id, label: c.title_fa}))} value={inlineItemEdit.data.cost_type_id} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
-                if (group === 'INCOME') return <div onClick={e => e.stopPropagation()} className="relative z-[70]"><SelectField size="sm" options={lookups.incomeTypes.map(c => ({value: c.id, label: c.title_fa}))} value={inlineItemEdit.data.income_type_id} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
+                if (group === 'COST') {
+                    return (
+                        <div onClick={e => e.stopPropagation()} className="relative z-[70]">
+                            <LOVField 
+                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[400px]"
+                                displayValue={lookups.costTypes.find(c => c.id === inlineItemEdit.data.cost_type_id)?.title_fa || ''}
+                                onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: r?.id}}))}
+                                isRtl={isRtl} wrapperClassName="m-0"
+                            />
+                        </div>
+                    );
+                }
+                if (group === 'INCOME') {
+                    return (
+                        <div onClick={e => e.stopPropagation()} className="relative z-[70]">
+                            <LOVField 
+                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[400px]"
+                                displayValue={lookups.incomeTypes.find(c => c.id === inlineItemEdit.data.income_type_id)?.title_fa || ''}
+                                onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: r?.id}}))}
+                                isRtl={isRtl} wrapperClassName="m-0"
+                            />
+                        </div>
+                    );
+                }
                 return <div className="h-[32px] w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
             }
             if (group === 'COST') return <span className="text-[12px]">{lookups.costTypes.find(x => String(x.id) === String(row.cost_type_id))?.title_fa || ''}</span>;
