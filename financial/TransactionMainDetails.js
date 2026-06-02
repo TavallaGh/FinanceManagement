@@ -136,10 +136,17 @@
                 }
             });
 
-            const buildPaths = (items, charts = []) => {
+            const activeCharts = chartRes.data || [];
+            const activeChartIds = new Set(activeCharts.map(c => c.id));
+
+            const buildPathsAndFilterLeafs = (items, charts = null) => {
                 const parentIds = new Set(items.map(i => i.parent_id).filter(Boolean));
-                return items.filter(i => !parentIds.has(i.id)).map(i => {
-                    let pathArr = [];
+                return items.filter(i => {
+                    if (parentIds.has(i.id)) return false; 
+                    if (charts && !activeChartIds.has(i.chart_id)) return false; 
+                    return true;
+                }).map(i => {
+                    let pathArr = [i.title_fa || i.title]; 
                     let curr = i;
                     while (curr && curr.parent_id) {
                         const parent = items.find(p => p.id === curr.parent_id);
@@ -151,15 +158,15 @@
                     return {
                         ...i,
                         pathTitle: pathArr.join(' / '),
-                        chart_name: charts.find(c => c.id === i.chart_id)?.title || ''
+                        chart_name: charts ? (charts.find(c => c.id === i.chart_id)?.title || '') : ''
                     };
                 });
             };
 
             const allAccounts = accRes.data || [];
-            const leafAccs = buildPaths(allAccounts, chartRes.data || []);
-            const costLeafs = buildPaths(costRes.data || []);
-            const incomeLeafs = buildPaths(incRes.data || []);
+            const leafAccs = buildPathsAndFilterLeafs(allAccounts, activeCharts);
+            const costLeafs = buildPathsAndFilterLeafs(costRes.data || []);
+            const incomeLeafs = buildPathsAndFilterLeafs(incRes.data || []);
 
             const newLookups = {
                 accounts: allAccounts,
@@ -450,7 +457,7 @@
                 return (
                     <div onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
                         <LOVField 
-                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[500px]"
+                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[600px]"
                             displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
                             onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
                             isRtl={isRtl} wrapperClassName="m-0"
@@ -480,7 +487,7 @@
                     return (
                         <div onClick={e => e.stopPropagation()} className="relative z-[70]">
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[400px]"
+                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[500px]"
                                 displayValue={lookups.costTypes.find(c => c.id === inlineItemEdit.data.cost_type_id)?.title_fa || ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: r?.id}}))}
                                 isRtl={isRtl} wrapperClassName="m-0"
@@ -492,7 +499,7 @@
                     return (
                         <div onClick={e => e.stopPropagation()} className="relative z-[70]">
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[400px]"
+                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[500px]"
                                 displayValue={lookups.incomeTypes.find(c => c.id === inlineItemEdit.data.income_type_id)?.title_fa || ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: r?.id}}))}
                                 isRtl={isRtl} wrapperClassName="m-0"

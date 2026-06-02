@@ -28,6 +28,7 @@
 
     const supabase = window.supabase;
     const currentUserObj = window.NavigationSystem?.currentUser || {};
+    const currentUserId = currentUserObj.id || null;
     const currentUserName = currentUserObj.name || currentUserObj.username || 'مدیر سیستم';
 
     const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
@@ -114,10 +115,17 @@
                 supabase.from('fm_income_types').select('id, title_fa, code, parent_id').eq('is_active', true)
             ]);
 
-            const buildPaths = (items, charts = []) => {
+            const activeCharts = chartRes.data || [];
+            const activeChartIds = new Set(activeCharts.map(c => c.id));
+
+            const buildPathsAndFilterLeafs = (items, charts = null) => {
                 const parentIds = new Set(items.map(i => i.parent_id).filter(Boolean));
-                return items.filter(i => !parentIds.has(i.id)).map(i => {
-                    let pathArr = [];
+                return items.filter(i => {
+                    if (parentIds.has(i.id)) return false; 
+                    if (charts && !activeChartIds.has(i.chart_id)) return false; 
+                    return true;
+                }).map(i => {
+                    let pathArr = [i.title_fa || i.title]; 
                     let curr = i;
                     while (curr && curr.parent_id) {
                         const parent = items.find(p => p.id === curr.parent_id);
@@ -129,15 +137,15 @@
                     return {
                         ...i,
                         pathTitle: pathArr.join(' / '),
-                        chart_name: charts.find(c => c.id === i.chart_id)?.title || ''
+                        chart_name: charts ? (charts.find(c => c.id === i.chart_id)?.title || '') : ''
                     };
                 });
             };
 
             setLookups({
-                accounts: buildPaths(accRes.data || [], chartRes.data || []),
-                costTypes: buildPaths(costRes.data || []),
-                incomeTypes: buildPaths(incRes.data || [])
+                accounts: buildPathsAndFilterLeafs(accRes.data || [], activeCharts),
+                costTypes: buildPathsAndFilterLeafs(costRes.data || []),
+                incomeTypes: buildPathsAndFilterLeafs(incRes.data || [])
             });
         } catch (err) {}
     }, [supabase]);
@@ -217,6 +225,7 @@
 
     const filteredTransactions = useMemo(() => {
         return transactions.filter(tx => {
+            if (filters.my_docs && tx.registrar_id !== currentUserId) return false;
             if (filters.status && tx.status !== filters.status) return false;
 
             if (filters.account_id || filters.transaction_action || filters.transaction_group || filters.cost_type_id || filters.income_type_id) {
@@ -232,7 +241,7 @@
             }
             return true;
         });
-    }, [transactions, filters]);
+    }, [transactions, filters, currentUserId]);
 
     const columns = useMemo(() => [
         { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '90px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
@@ -284,12 +293,13 @@
     ];
 
     const filterFields = [
-        { name: 'account_id', label: t('حساب مرتبط', 'Account'), type: 'lov', lovData: lookups.accounts, lovColumns: accountLovColumns },
-        { name: 'transaction_action', label: t('نوع (واریز/برداشت)', 'Action'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_ACTIONS] },
-        { name: 'transaction_group', label: t('گروه', 'Group'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_GROUPS] },
-        { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'lov', lovData: lookups.costTypes, lovColumns: costLovColumns },
-        { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'lov', lovData: lookups.incomeTypes, lovColumns: incomeLovColumns },
-        { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...STATUS_OPTIONS] }
+        { name: 'my_docs', label: t('سندهای من', 'My Documents'), type: 'switch' },
+        { name: 'account_id', label: t('حساب مرتبط', 'Account'), type: 'lov', lovData: lookups.accounts, lovColumns: accountLovColumns, dropdownWidth: 'min-w-[600px]' },
+        { name: 'transaction_action', label: t('نوع (واریز/برداشت)', 'Action'), type: 'select', options: TRANSACTION_ACTIONS },
+        { name: 'transaction_group', label: t('گروه', 'Group'), type: 'select', options: TRANSACTION_GROUPS },
+        { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'lov', lovData: lookups.costTypes, lovColumns: costLovColumns, dropdownWidth: 'min-w-[500px]' },
+        { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'lov', lovData: lookups.incomeTypes, lovColumns: incomeLovColumns, dropdownWidth: 'min-w-[500px]' },
+        { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: STATUS_OPTIONS }
     ];
 
     const gridActions = [
