@@ -67,11 +67,15 @@
       setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
     }, []);
 
-    const logAction = useCallback(async (action, details = '') => {
+    const logAction = useCallback(async (action, recordId, details = '') => {
       try {
         if (!supabase) return;
         await supabase.from('fm_record_logs').insert([{
-          entity_type: 'تراکنش‌ها', action: action, user_name: currentUserName, details: details
+          entity_type: 'تراکنش‌ها',
+          action: action,
+          record_id: String(recordId || 'SYSTEM'),
+          user_name: currentUserName,
+          details: details
         }]);
       } catch (err) {}
     }, [supabase, currentUserName]);
@@ -128,11 +132,11 @@
             if (deleteConfirm.type === 'single') {
                 const { error } = await supabase.from('fm_transactions').delete().eq('id', deleteConfirm.data.id);
                 if (error) throw error;
-                await logAction('delete_transaction', `حذف تراکنش: ${deleteConfirm.data.document_code}`);
+                await logAction('delete_transaction', deleteConfirm.data.id, `حذف تراکنش: ${deleteConfirm.data.document_code}`);
             } else if (deleteConfirm.type === 'bulk') {
                 const { error } = await supabase.from('fm_transactions').delete().in('id', deleteConfirm.data);
                 if (error) throw error;
-                await logAction('bulk_delete_transactions', `حذف گروهی ${deleteConfirm.data.length} تراکنش`);
+                await logAction('bulk_delete_transactions', 'BULK', `حذف گروهی ${deleteConfirm.data.length} تراکنش`);
             }
             showToast(t('عملیات با موفقیت انجام شد.', 'Operation successful.'));
             fetchData();
@@ -150,7 +154,7 @@
             const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', ids);
             if (error) throw error;
             showToast(t('وضعیت با موفقیت تغییر کرد.', 'Status updated.'));
-            await logAction('bulk_status_update', `تغییر وضعیت ${ids.length} سند به ${newStatus}`);
+            await logAction('bulk_status_update', 'BULK', `تغییر وضعیت ${ids.length} سند به ${newStatus}`);
             fetchData();
         } catch (error) {
             showToast(t('خطا در تغییر وضعیت.', 'Error updating status.'), 'error');
@@ -227,6 +231,7 @@
               data={transactions} columns={columns} language={language} formCode={formCode}
               gridState={gridState} onGridStateChange={setGridState}
               onAdd={access.canCreate ? () => handleOpenForm('CREATE') : undefined}
+              onRowDoubleClick={(row) => handleOpenForm('EDIT', row)}
               selectable={true} actions={gridActions} bulkActions={bulkActions} isLoading={isLoading}
             />
           </div>

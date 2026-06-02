@@ -12,7 +12,7 @@
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
-  const { Button = FallbackComponent } = Core;
+  const { Button = FallbackComponent, Badge = FallbackComponent } = Core;
 
   const Forms = window.DSForms || DS || {};
   const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
@@ -90,11 +90,15 @@
       setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
     }, []);
 
-    const logAction = useCallback(async (action, details = '') => {
+    const logAction = useCallback(async (action, recordId, details = '') => {
       try {
         if (!supabase) return;
         await supabase.from('fm_record_logs').insert([{
-          entity_type: 'تراکنش‌ها', action: action, user_name: currentUserName, details: details
+          entity_type: 'تراکنش‌ها',
+          action: action,
+          record_id: String(recordId || 'SYSTEM'),
+          user_name: currentUserName,
+          details: details
         }]);
       } catch (err) {}
     }, [supabase, currentUserName]);
@@ -222,12 +226,29 @@
         });
     }, [isOpen, formMode, initialRecord, fetchDependencies, lookups.currentUserDeptId, lookups.currentUserDeptTitle]);
 
+    const handleChangeStatus = async (newStatus) => {
+        setHeaderData(prev => ({ ...prev, status: newStatus }));
+        if (headerData.id) {
+            setIsLoading(true);
+            try {
+                const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).eq('id', headerData.id);
+                if (error) throw error;
+                await logAction('status_update', headerData.id, `تغییر وضعیت سند به ${newStatus}`);
+                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Document status updated successfully.'));
+            } catch (err) {
+                showToast(t('خطا در تغییر وضعیت سند.', 'Error updating document status.'), 'error');
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    };
+
     const handleSaveTransaction = async () => {
         if (inlineItemEdit) {
             return showToast(t('لطفاً تغییرات سطر باز را ذخیره کنید.', 'Please save inline edits first.'), 'warning');
         }
 
-        if (!headerData.document_date || !headerData.transaction_type) {
+        if (!headerData.document_date || !headerData.transaction_type || !headerData.description) {
             return showToast(t('تکمیل فیلدهای اجباری سربرگ الزامی است.', 'Header required fields missing.'), 'warning');
         }
         
@@ -238,34 +259,28 @@
         setIsLoading(true);
         try {
             let txId = headerData.id;
-            const validDeptId = (headerData.department_id && String(headerData.department_id).trim() !== '') ? headerData.department_id : null;
-
-            let finalRegistrarId = currentUserId;
-            if (!finalRegistrarId) {
-                const fallbackIds = Object.keys(lookups.usersMap);
-                finalRegistrarId = fallbackIds.length > 0 ? fallbackIds[0] : null;
-            }
+            const validDeptId = headerData.department_id || null;
 
             const txPayload = {
                 document_code: headerData.document_code,
                 document_date: headerData.document_date.replace(/\//g, '-'),
-                registrar_id: finalRegistrarId,
+                registrar_id: currentUserId || '00000000-0000-0000-0000-000000000000',
                 transaction_type: headerData.transaction_type,
                 department_id: validDeptId,
-                status: headerData.status,
-                description: headerData.description || null
+                status: headerData.status || 'DRAFT',
+                description: headerData.description || ''
             };
 
             if (formMode === 'CREATE' || formMode === 'COPY') {
                 const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
                 if (error) throw error;
                 txId = data[0].id;
-                await logAction('create_transaction', `ایجاد تراکنش: ${headerData.document_code}`);
+                await logAction('create_transaction', txId, `ایجاد تراکنش: ${headerData.document_code}`);
             } else {
                 const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
                 if (error) throw error;
                 await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
-                await logAction('update_transaction', `ویرایش تراکنش: ${headerData.document_code}`);
+                await logAction('update_transaction', txId, `ویرایش تراکنش: ${headerData.document_code}`);
             }
 
             const itemsPayload = itemsData.map((item, index) => ({
@@ -417,9 +432,9 @@
             }
             return <span dir="ltr" className="text-[12px] font-medium">{formatNumber(val)}</span>;
         }},
-        { field: 'description', header_fa: 'شرح', width: 'auto', render: (val, row) => {
+        { field: 'description', header_fa: 'شرح *', width: 'auto', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
+                return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} required wrapperClassName="m-0" /></div>;
             }
             return <span className="text-[12px] truncate">{val}</span>;
         }},
@@ -455,6 +470,18 @@
                             onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
                         >
                             <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={14} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</span>
+                            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                {formMode !== 'CREATE' && (headerData.status || 'DRAFT') === 'DRAFT' && (
+                                    <Button variant="success-outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')}>
+                                        {t('تبدیل به موقت', 'Convert to Temporary')}
+                                    </Button>
+                                )}
+                                {formMode !== 'CREATE' && (headerData.status || 'DRAFT') === 'TEMPORARY' && (
+                                    <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')}>
+                                        {t('تبدیل به یادداشت', 'Convert to Draft')}
+                                    </Button>
+                                )}
+                            </div>
                             <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} className="!p-1 h-6 w-6" />
                         </div>
                         {!isHeaderCollapsed && (
@@ -471,12 +498,17 @@
                                     <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
                                 </div>
                                 <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
-                                <div className="relative z-[70]">
-                                    <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
+                                <div className="relative z-[70] flex flex-col justify-center bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded border border-slate-100 dark:border-slate-700">
+                                    <span className="text-slate-500 text-[11px] mb-1 font-medium">{t('وضعیت سند', 'Document Status')}</span>
+                                    <div>
+                                        <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'amber' : 'slate'} size="sm">
+                                            {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label}
+                                        </Badge>
+                                    </div>
                                 </div>
                                 
                                 <div className="lg:col-span-2 sm:col-span-3">
-                                    <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
+                                    <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} required />
                                 </div>
                             </div>
                         )}
