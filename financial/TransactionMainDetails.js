@@ -44,13 +44,13 @@
     const TRANSACTION_TYPES = [
         { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
         { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
-        { value: 'GENERAL', label: t('عمومی', 'General') }
+        { value: 'GENERAL', label: t('عمومی', 'General') },
+        { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
     ];
 
     const TRANSACTION_ACTIONS = [
         { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
-        { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') },
-        { value: 'TRANSFER', label: t('انتقال', 'Transfer') }
+        { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') }
     ];
 
     const TRANSACTION_GROUPS = [
@@ -189,6 +189,12 @@
             setInlineItemEdit(null);
             setCopyWarning(null);
 
+            let safeFinalRegistrar = currentUserId;
+            if (!safeFinalRegistrar || safeFinalRegistrar === '00000000-0000-0000-0000-000000000000') {
+                const matchingUser = lookups.usersList.find(u => u.username === currentUserUsername || u.full_name === currentUserName);
+                if (matchingUser) safeFinalRegistrar = matchingUser.id;
+            }
+
             if (formMode === 'CREATE') {
                 setHeaderData({
                     document_code: generateDocumentCode(),
@@ -198,6 +204,7 @@
                     department_title: lookups.currentUserDeptTitle,
                     description: '',
                     status: 'DRAFT',
+                    registrar_id: safeFinalRegistrar,
                     registered_at: new Date().toISOString()
                 });
                 setItemsData([]);
@@ -206,7 +213,8 @@
                     setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of document ${initialRecord.document_code} and requires review.`));
                 }
                 
-                const parsedDate = initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr;
+                const parsedDate = formMode === 'COPY' ? todayStr : (initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr);
+                
                 setHeaderData({
                     ...initialRecord,
                     id: formMode === 'COPY' ? undefined : initialRecord.id,
@@ -217,7 +225,8 @@
                     document_date: parsedDate,
                     registered_at: formMode === 'COPY' ? new Date().toISOString() : initialRecord.registered_at,
                     department_id: formMode === 'COPY' ? lookups.currentUserDeptId : initialRecord.department_id,
-                    department_title: formMode === 'COPY' ? lookups.currentUserDeptTitle : ''
+                    department_title: formMode === 'COPY' ? lookups.currentUserDeptTitle : '',
+                    registrar_id: formMode === 'COPY' ? safeFinalRegistrar : initialRecord.registrar_id
                 });
                 
                 const mappedItems = (initialRecord.fm_transaction_items || []).map(item => ({
@@ -230,7 +239,7 @@
                 setItemsData(mappedItems);
             }
         });
-    }, [isOpen, formMode, initialRecord, fetchDependencies, lookups.currentUserDeptId, lookups.currentUserDeptTitle, t]);
+    }, [isOpen, formMode, initialRecord, fetchDependencies, lookups.currentUserDeptId, lookups.currentUserDeptTitle, lookups.usersList, currentUserId, currentUserName, currentUserUsername, t]);
 
     const handleChangeStatus = async (newStatus) => {
         setHeaderData(prev => ({ ...prev, status: newStatus }));
@@ -269,20 +278,10 @@
             let txId = headerData.id;
             const validDeptId = (headerData.department_id && String(headerData.department_id).trim() !== '') ? headerData.department_id : null;
 
-            let finalRegistrarId = currentUserId;
-            if (!finalRegistrarId || finalRegistrarId === '00000000-0000-0000-0000-000000000000') {
-                const matchingUser = lookups.usersList.find(u => u.username === currentUserUsername || u.full_name === currentUserName);
-                if (matchingUser) {
-                    finalRegistrarId = matchingUser.id;
-                } else if (lookups.usersList.length > 0) {
-                    finalRegistrarId = lookups.usersList[0].id;
-                }
-            }
-
             const txPayload = {
                 document_code: headerData.document_code,
                 document_date: headerData.document_date.replace(/\//g, '-'),
-                registrar_id: finalRegistrarId || null,
+                registrar_id: headerData.registrar_id || null,
                 transaction_type: headerData.transaction_type,
                 department_id: validDeptId,
                 status: headerData.status || 'DRAFT',
@@ -330,7 +329,7 @@
         if (inlineItemEdit) return showToast(t('ابتدا سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
         setInlineItemEdit({
             id: 'new',
-            data: { account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', amount: '', description: '' }
+            data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', amount: '', description: '' }
         });
     };
 
@@ -352,12 +351,24 @@
         const cleanAmount = String(form.amount || '0').replace(/,/g, '');
         if (isNaN(cleanAmount) || cleanAmount === '') return showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
 
+        let newRowNum = parseInt(form.row_number, 10);
+        if (isNaN(newRowNum) || newRowNum < 1) newRowNum = itemsData.length + (inlineItemEdit.id === 'new' ? 1 : 0);
+
         const dataToSave = { ...form, amount: cleanAmount };
-        if (inlineItemEdit.id === 'new') {
-            setItemsData([...itemsData, { ...dataToSave, _tempId: crypto.randomUUID(), row_number: itemsData.length + 1 }]);
-        } else {
-            setItemsData(itemsData.map(item => (item._tempId === inlineItemEdit.id || item.id === inlineItemEdit.id) ? { ...item, ...dataToSave } : item));
+        if (inlineItemEdit.id === 'new') dataToSave._tempId = crypto.randomUUID();
+
+        let otherItems = itemsData;
+        if (inlineItemEdit.id !== 'new') {
+            otherItems = itemsData.filter(item => item._tempId !== inlineItemEdit.id && item.id !== inlineItemEdit.id);
         }
+
+        otherItems.sort((a, b) => a.row_number - b.row_number);
+        
+        const targetIndex = Math.min(Math.max(0, newRowNum - 1), otherItems.length);
+        otherItems.splice(targetIndex, 0, dataToSave);
+        
+        const finalItems = otherItems.map((item, idx) => ({ ...item, row_number: idx + 1 }));
+        setItemsData(finalItems);
         setInlineItemEdit(null);
     };
 
@@ -398,7 +409,12 @@
     }, [itemsData, inlineItemEdit]);
 
     const itemColumns = [
-        { field: 'row_number', header_fa: '#', width: '40px', render: (val, row) => row._isNew ? <span className="text-emerald-600 font-bold">*</span> : <span className="text-[12px]">{val}</span> },
+        { field: 'row_number', header_fa: '#', width: '60px', render: (val, row) => {
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                return <div onClick={e => e.stopPropagation()}><TextField size="sm" type="number" min="1" value={inlineItemEdit.data.row_number || ''} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, row_number: e.target.value}}))} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+            }
+            return row._isNew ? <span className="text-emerald-600 font-bold">*</span> : <span className="text-[12px]">{val}</span>;
+        }},
         { field: 'account_id', header_fa: 'حساب', width: '250px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return (
@@ -491,26 +507,21 @@
                     )}
 
                     <Card
-                        title={
-                            <span className="flex items-center gap-2 text-[13px] font-bold text-slate-700 dark:text-slate-300">
-                                <FileText size={16} className="text-indigo-500" />
-                                {t('اطلاعات سربرگ', 'Header Data')}
-                            </span>
-                        }
+                        title={t('اطلاعات سربرگ', 'Header Data')}
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 relative z-20"
-                        headerClassName="h-12 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700/50"
+                        headerClassName="bg-white dark:bg-slate-800 border-b-2 border-indigo-100 dark:border-indigo-800/50 h-14"
                         action={
                             <div className="flex items-center gap-3 pr-2" onClick={e => e.stopPropagation()}>
-                                <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'amber' : 'slate'} size="md" className="shadow-sm">
+                                <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'orange' : 'slate'} size="md" className="shadow-sm">
                                     {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
                                 </Badge>
                                 
                                 {formMode !== 'CREATE' && (
                                     <div className="flex items-center gap-2 pr-3 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-3">
                                         {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-amber-600 !border-amber-500 hover:!bg-amber-50 dark:hover:!bg-amber-900/30">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30">
                                                 {t('تبدیل به موقت', 'Set Temporary')}
                                             </Button>
                                         )}
@@ -523,15 +534,16 @@
                                 )}
                             </div>
                         }
+                        language={language}
                     >
-                        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
                             <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
                                 <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
                             </div>
-                            <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
+                            <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
                             <div className="relative z-[80]">
                                 <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
@@ -545,18 +557,14 @@
                     </Card>
 
                     <Card
-                        title={
-                            <span className="flex items-center gap-2 text-[13px] font-bold text-slate-700 dark:text-slate-300">
-                                <List size={16} className="text-indigo-500" />
-                                {t('اقلام سند', 'Document Items')}
-                            </span>
-                        }
+                        title={t('اقلام سند', 'Document Items')}
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px] relative z-10"
-                        headerClassName="h-12 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700/50 shrink-0"
+                        headerClassName="bg-white dark:bg-slate-800 border-b-2 border-indigo-100 dark:border-indigo-800/50 h-14 shrink-0"
+                        language={language}
                     >
-                        <div className="flex-1 w-full overflow-visible p-1 relative min-h-[300px] bg-white dark:bg-slate-800">
+                        <div className="flex-1 w-full overflow-visible p-1 relative min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50">
                             <DataGrid 
                                 data={itemGridData} columns={itemColumns}
                                 language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}

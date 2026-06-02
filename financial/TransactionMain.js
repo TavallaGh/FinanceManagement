@@ -39,7 +39,20 @@
     const TRANSACTION_TYPES = [
         { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
         { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
-        { value: 'GENERAL', label: t('عمومی', 'General') }
+        { value: 'GENERAL', label: t('عمومی', 'General') },
+        { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
+    ];
+
+    const TRANSACTION_ACTIONS = [
+        { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
+        { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') }
+    ];
+
+    const TRANSACTION_GROUPS = [
+        { value: 'COST', label: t('هزینه', 'Cost') },
+        { value: 'INCOME', label: t('درآمد', 'Income') },
+        { value: 'BALANCE', label: t('بالانس', 'Balance') },
+        { value: 'OTHER', label: t('سایر', 'Other') }
     ];
 
     const STATUS_OPTIONS = [
@@ -172,7 +185,7 @@
         { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => <span className="text-[12px] truncate max-w-[200px] block" title={val}>{val || '-'}</span> },
         { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '90px', render: (val) => {
             const s = STATUS_OPTIONS.find(x => x.value === val);
-            const colors = { DRAFT: 'slate', TEMPORARY: 'amber', APPROVED: 'emerald' };
+            const colors = { DRAFT: 'slate', TEMPORARY: 'orange', APPROVED: 'emerald' };
             return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
         }},
         { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '140px', render: (val) => {
@@ -182,10 +195,12 @@
     ], [usersMap, t]);
 
     const filterFields = [
-        { name: 'document_code', label: t('کد سند', 'Doc Code'), type: 'text' },
-        { name: 'document_date', label: t('تاریخ سند', 'Date'), type: 'date' },
-        { name: 'transaction_type', label: t('نوع تراکنش', 'Type'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_TYPES] },
-        { name: 'status', label: t('وضعیت', 'Status'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...STATUS_OPTIONS] }
+        { name: 'account_id', label: t('حساب مرتبط', 'Account'), type: 'text' },
+        { name: 'transaction_action', label: t('نوع (واریز/برداشت)', 'Action'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_ACTIONS] },
+        { name: 'transaction_group', label: t('گروه', 'Group'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...TRANSACTION_GROUPS] },
+        { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'text' },
+        { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'text' },
+        { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: [{value: '', label: t('همه', 'All')}, ...STATUS_OPTIONS] }
     ];
 
     const gridActions = [
