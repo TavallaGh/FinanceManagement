@@ -6,13 +6,13 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const {
-    FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    X = FallbackIcon, List = FallbackIcon
+    FileText = FallbackIcon, Plus = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
+    X = FallbackIcon, ChevronUp = FallbackIcon, ChevronDown = FallbackIcon, List = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
-  const { Button = FallbackComponent, Card = FallbackComponent, Badge = FallbackComponent } = Core;
+  const { Button = FallbackComponent } = Core;
 
   const Forms = window.DSForms || DS || {};
   const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
@@ -66,6 +66,7 @@
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
+    const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
     const [lookups, setLookups] = useState({
         accounts: [],
@@ -174,6 +175,7 @@
         fetchDependencies().then(() => {
             const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
             setInlineItemEdit(null);
+            setIsHeaderCollapsed(false);
 
             if (formMode === 'CREATE') {
                 setHeaderData({
@@ -217,7 +219,7 @@
 
     const handleSaveTransaction = async () => {
         if (inlineItemEdit) {
-            return showToast(t('لطفاً ابتدا سطر باز را ذخیره کنید.', 'Please save inline edits first.'), 'warning');
+            return showToast(t('لطفاً تغییرات سطر باز را ذخیره کنید.', 'Please save inline edits first.'), 'warning');
         }
 
         if (!headerData.document_date || !headerData.transaction_type) {
@@ -247,10 +249,12 @@
                 const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
                 if (error) throw error;
                 txId = data[0].id;
+                await logAction('create_transaction', `ایجاد تراکنش: ${headerData.document_code}`);
             } else {
                 const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
                 if (error) throw error;
                 await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
+                await logAction('update_transaction', `ویرایش تراکنش: ${headerData.document_code}`);
             }
 
             const itemsPayload = itemsData.map((item, index) => ({
@@ -354,12 +358,14 @@
         { field: 'account_id', header_fa: 'حساب', width: '250px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return (
-                    <LOVField 
-                        size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[500px]"
-                        displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
-                        onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
-                        isRtl={isRtl} wrapperClassName="m-0"
-                    />
+                    <div onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
+                        <LOVField 
+                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[500px]"
+                            displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
+                            onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
+                            isRtl={isRtl} wrapperClassName="m-0"
+                        />
+                    </div>
                 );
             }
             const acc = lookups.leafAccounts.find(a => String(a.id) === String(val));
@@ -367,21 +373,21 @@
         }},
         { field: 'transaction_action', header_fa: 'نوع', width: '100px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_action: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" />;
+                return <div onClick={e => e.stopPropagation()} className="relative z-[90]"><SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_action: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
             }
             return <span className="text-[12px]">{TRANSACTION_ACTIONS.find(a => a.value === val)?.label || val}</span>;
         }},
         { field: 'transaction_group', header_fa: 'گروه', width: '100px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <SelectField size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: ''}}))} isRtl={isRtl} wrapperClassName="m-0" />;
+                return <div onClick={e => e.stopPropagation()} className="relative z-[80]"><SelectField size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: ''}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
             }
             return <span className="text-[12px]">{TRANSACTION_GROUPS.find(a => a.value === val)?.label || val}</span>;
         }},
         { field: 'sub_type', header_fa: 'هزینه/درآمد', width: '150px', render: (_, row) => {
             const group = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId) ? inlineItemEdit.data.transaction_group : row.transaction_group;
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                if (group === 'COST') return <SelectField size="sm" options={lookups.costTypes.map(c => ({value: c.id, label: c.title_fa}))} value={inlineItemEdit.data.cost_type_id} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" />;
-                if (group === 'INCOME') return <SelectField size="sm" options={lookups.incomeTypes.map(c => ({value: c.id, label: c.title_fa}))} value={inlineItemEdit.data.income_type_id} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" />;
+                if (group === 'COST') return <div onClick={e => e.stopPropagation()} className="relative z-[70]"><SelectField size="sm" options={lookups.costTypes.map(c => ({value: c.id, label: c.title_fa}))} value={inlineItemEdit.data.cost_type_id} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
+                if (group === 'INCOME') return <div onClick={e => e.stopPropagation()} className="relative z-[70]"><SelectField size="sm" options={lookups.incomeTypes.map(c => ({value: c.id, label: c.title_fa}))} value={inlineItemEdit.data.income_type_id} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
                 return <div className="h-[32px] w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
             }
             if (group === 'COST') return <span className="text-[12px]">{lookups.costTypes.find(x => String(x.id) === String(row.cost_type_id))?.title_fa || ''}</span>;
@@ -390,19 +396,19 @@
         }},
         { field: 'currency', header_fa: 'ارز', width: '60px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <TextField size="sm" value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" wrapperClassName="m-0" />;
+                return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
             return <span dir="ltr" className="text-[12px]">{val}</span>;
         }},
         { field: 'amount', header_fa: 'مبلغ', width: '120px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <TextField size="sm" type="text" value={formatNumber(inlineItemEdit.data.amount)} onChange={handleAmountChange} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" />;
+                return <div onClick={e => e.stopPropagation()}><TextField size="sm" type="text" value={formatNumber(inlineItemEdit.data.amount)} onChange={handleAmountChange} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
             return <span dir="ltr" className="text-[12px] font-medium">{formatNumber(val)}</span>;
         }},
         { field: 'description', header_fa: 'شرح', width: 'auto', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" />;
+                return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
             }
             return <span className="text-[12px] truncate">{val}</span>;
         }},
@@ -430,37 +436,58 @@
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
-            <div className="flex flex-col h-[85vh]">
-                <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 min-h-0">
-                    <Card title={t('اطلاعات سربرگ', 'Header Data')} noPadding className="border border-slate-200 dark:border-slate-700 shadow-sm !overflow-visible shrink-0" headerClassName="h-10 bg-white dark:bg-slate-800" isCollapsible language={language}>
-                        <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-slate-800">
-                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
-                            <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                            <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                            <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
-                            
-                            <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
-                            <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
-                            <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
-                            <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
-                            
-                            <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} wrapperClassName="md:col-span-4" />
+            <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300 relative z-20">
+                        <div 
+                            className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
+                            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+                        >
+                            <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={14} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</span>
+                            <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} className="!p-1 h-6 w-6" />
                         </div>
-                    </Card>
+                        {!isHeaderCollapsed && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-3 animate-in slide-in-from-top-2 duration-200 overflow-visible">
+                                <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                                <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                                <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                                <div className="relative z-[90]">
+                                    <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+                                </div>
+                                <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
+                                
+                                <div className="relative z-[80]">
+                                    <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
+                                </div>
+                                <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
+                                <div className="relative z-[70]">
+                                    <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
+                                </div>
+                                
+                                <div className="lg:col-span-5 sm:col-span-3">
+                                    <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
-                    <Card title={t('اقلام سند', 'Line Items')} noPadding className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px]" headerClassName="h-10 bg-white dark:bg-slate-800 shrink-0" language={language}>
-                        <div className="flex-1 flex flex-col min-h-0">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-col shadow-sm flex-1 min-h-[350px] relative z-10 overflow-visible">
+                        <div className="flex justify-between items-center p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
+                            <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><List size={14} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</span>
+                        </div>
+                        <div className="flex-1 w-full overflow-visible p-1 relative min-h-[300px]">
                             <DataGrid 
                                 data={itemGridData} columns={itemColumns}
                                 language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
+                                className="h-full"
                             />
                         </div>
-                    </Card>
+                    </div>
                 </div>
 
-                <div className="flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
+                <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
                     <Button variant="outline" size="sm" onClick={onClose}>{t('انصراف', 'Cancel')}</Button>
-                    <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>
+                    {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
                 </div>
             </div>
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
