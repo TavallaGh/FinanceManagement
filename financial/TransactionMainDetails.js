@@ -32,14 +32,6 @@
     const supabase = window.supabase;
     const currentUserObj = window.NavigationSystem?.currentUser || {};
     const currentUserId = currentUserObj.id || null;
-    const currentUserName = currentUserObj.name || 'مدیر سیستم';
-    const currentUserUsername = currentUserObj.username || 'admin';
-
-    const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
-    const access = useMemo(() => {
-      const rawActions = securityCtx ? securityCtx.getActions(formCode) : null;
-      return rawActions || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
-    }, [securityCtx, formCode]);
 
     const TRANSACTION_TYPES = [
         { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
@@ -83,33 +75,19 @@
         usersMap: {}
     });
 
-    const isFetchingDeps = useRef(false);
-
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
       setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
     }, []);
 
-    const logAction = useCallback(async (action, details = '') => {
-      try {
-        if (!supabase) return;
-        await supabase.from('fm_record_logs').insert([{
-          entity_type: 'تراکنش‌ها', action: action, user_name: currentUserName, details: details
-        }]);
-      } catch (err) {
-        console.error('Action log failed:', err);
-      }
-    }, [supabase, currentUserName]);
-
     const fetchDependencies = useCallback(async () => {
-        if (isFetchingDeps.current || !supabase) return;
-        isFetchingDeps.current = true;
+        if (!supabase) return;
         try {
-            const [accRes, strRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, structure_id').eq('is_active', true),
-                supabase.from('fm_coa_structures').select('id, title_fa').eq('is_active', true),
-                supabase.from('fm_cost_types').select('id, title_fa, title_en').eq('is_active', true),
-                supabase.from('fm_income_types').select('id, title_fa, title_en').eq('is_active', true),
+            const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
+                supabase.from('fm_coa_accounts').select('id, title_fa, code, currency_id, parent_id, chart_id').eq('is_active', true),
+                supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
+                supabase.from('fm_cost_types').select('id, title_fa').eq('is_active', true),
+                supabase.from('fm_income_types').select('id, title_fa').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title')
@@ -134,7 +112,7 @@
             });
 
             const allAccounts = accRes.data || [];
-            const structures = strRes.data || [];
+            const charts = chartRes.data || [];
             const parentIds = new Set(allAccounts.map(a => a.parent_id).filter(Boolean));
             
             const leafAccs = allAccounts.filter(a => !parentIds.has(a.id)).map(a => {
@@ -149,10 +127,10 @@
                         break;
                     }
                 }
-                const structureName = structures.find(s => s.id === a.structure_id)?.title_fa || '';
+                const chartName = charts.find(c => c.id === a.chart_id)?.title || '';
                 return {
                     ...a,
-                    structure_name: structureName,
+                    chart_name: chartName,
                     pathTitle: pathArr.join(' / '),
                     displayLabel: `${a.code} - ${a.title_fa}`
                 };
@@ -169,14 +147,8 @@
             });
         } catch (error) {
             showToast(t('خطا در دریافت اطلاعات پایه', 'Error fetching dependencies'), 'error');
-        } finally {
-            isFetchingDeps.current = false;
         }
     }, [supabase, showToast, t, currentUserId]);
-
-    const generateDocumentCode = () => {
-        return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-    };
 
     useEffect(() => {
         if (!isOpen) return;
@@ -187,7 +159,7 @@
 
             if (formMode === 'CREATE') {
                 setHeaderData({
-                    document_code: generateDocumentCode(),
+                    document_code: `DOC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
                     document_date: todayStr,
                     transaction_type: 'GENERAL',
                     department_id: lookups.currentUserDeptId,
@@ -202,7 +174,7 @@
                 setHeaderData({
                     ...initialRecord,
                     id: formMode === 'COPY' ? undefined : initialRecord.id,
-                    document_code: formMode === 'COPY' ? generateDocumentCode() : initialRecord.document_code,
+                    document_code: formMode === 'COPY' ? `DOC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}` : initialRecord.document_code,
                     status: formMode === 'COPY' ? 'DRAFT' : initialRecord.status,
                     reference_code: formMode === 'COPY' ? '' : initialRecord.reference_code,
                     daily_number: formMode === 'COPY' ? '' : initialRecord.daily_number,
@@ -227,7 +199,7 @@
 
     const handleSaveTransaction = async () => {
         if (inlineItemEdit) {
-            return showToast(t('لطفاً ابتدا تغییرات سطر باز را ذخیره یا لغو کنید.', 'Please save or cancel inline edits first.'), 'warning');
+            return showToast(t('لطفاً تغییرات سطر باز را ذخیره کنید.', 'Please save inline edits first.'), 'warning');
         }
 
         if (!headerData.document_date || !headerData.transaction_type) {
@@ -235,13 +207,13 @@
         }
         
         if (itemsData.length === 0) {
-            return showToast(t('سند باید حداقل یک قلم داشته باشد.', 'Document must have at least one item.'), 'warning');
+            return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Document must have at least one item.'), 'warning');
         }
 
         setIsLoading(true);
         try {
             let txId = headerData.id;
-            const validDeptId = headerData.department_id && headerData.department_id.trim() !== '' ? headerData.department_id : null;
+            const validDeptId = headerData.department_id || null;
 
             const txPayload = {
                 document_code: headerData.document_code,
@@ -250,32 +222,30 @@
                 transaction_type: headerData.transaction_type,
                 department_id: validDeptId,
                 status: headerData.status,
-                description: headerData.description
+                description: headerData.description || ''
             };
 
             if (formMode === 'CREATE' || formMode === 'COPY') {
                 const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
                 if (error) throw error;
                 txId = data[0].id;
-                await logAction('create_transaction', `ایجاد تراکنش: ${headerData.document_code}`);
             } else {
                 const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
                 if (error) throw error;
-                await logAction('update_transaction', `ویرایش تراکنش: ${headerData.document_code}`);
                 await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
             }
 
             const itemsPayload = itemsData.map((item, index) => ({
                 transaction_id: txId,
                 row_number: index + 1,
-                account_id: item.account_id,
+                account_id: item.account_id || null,
                 transaction_action: item.transaction_action,
                 transaction_group: item.transaction_group,
-                cost_type_id: item.cost_type_id && item.cost_type_id.trim() !== '' ? item.cost_type_id : null,
-                income_type_id: item.income_type_id && item.income_type_id.trim() !== '' ? item.income_type_id : null,
+                cost_type_id: item.cost_type_id || null,
+                income_type_id: item.income_type_id || null,
                 currency: item.currency || 'IRR',
                 amount: parseFloat(String(item.amount).replace(/,/g, '')) || 0,
-                description: item.description
+                description: item.description || ''
             }));
 
             const { error: itemsError } = await supabase.from('fm_transaction_items').insert(itemsPayload);
@@ -285,23 +255,16 @@
             onSuccess();
         } catch (error) {
             showToast(t('خطا در ثبت سند.', 'Error saving transaction.'), 'error');
-            console.error(error);
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleAddItemClick = () => {
-        if (inlineItemEdit) {
-            showToast(t('لطفاً ابتدا سطر باز را ذخیره کنید.', 'Please save current edit first.'), 'warning');
-            return;
-        }
+        if (inlineItemEdit) return showToast(t('ابتدا سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
         setInlineItemEdit({
             id: 'new',
-            data: { 
-                account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST',
-                cost_type_id: '', income_type_id: '', currency: '', amount: '', description: ''
-            }
+            data: { account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', amount: '', description: '' }
         });
     };
 
@@ -310,29 +273,20 @@
         const accObj = lookups.leafAccounts.find(a => String(a.id) === String(row.account_id)) || null;
         setInlineItemEdit({
             id: row._tempId || row.id,
-            data: {
-                ...row,
-                account_obj: accObj,
-                amount: row.amount ? String(row.amount).replace(/,/g, '') : ''
-            }
+            data: { ...row, account_obj: accObj, amount: row.amount ? String(row.amount).replace(/,/g, '') : '' }
         });
     };
 
     const handleSaveItemInline = () => {
         const form = inlineItemEdit.data;
         if (!form.account_id || !form.amount || !form.description) {
-            showToast(t('حساب، مبلغ و شرح اجباری هستند.', 'Account, Amount, and Description are required.'), 'warning');
-            return;
+            return showToast(t('حساب، مبلغ و شرح اجباری هستند.', 'Account, Amount, and Description required.'), 'warning');
         }
 
         const cleanAmount = String(form.amount).replace(/,/g, '');
-        if (isNaN(cleanAmount) || cleanAmount === '') {
-            showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
-            return;
-        }
+        if (isNaN(cleanAmount) || cleanAmount === '') return showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
 
         const dataToSave = { ...form, amount: cleanAmount };
-
         if (inlineItemEdit.id === 'new') {
             setItemsData([...itemsData, { ...dataToSave, _tempId: crypto.randomUUID(), row_number: itemsData.length + 1 }]);
         } else {
@@ -343,8 +297,7 @@
 
     const handleRemoveItem = (row) => {
         const newItems = itemsData.filter(item => item._tempId !== row._tempId && item.id !== row.id);
-        const reordered = newItems.map((item, idx) => ({ ...item, row_number: idx + 1 }));
-        setItemsData(reordered);
+        setItemsData(newItems.map((item, idx) => ({ ...item, row_number: idx + 1 })));
     };
 
     const formatNumber = (num) => {
@@ -362,12 +315,12 @@
     };
 
     const accountLovColumns = [
-        { field: 'structure_name', header_fa: 'ساختار', header_en: 'Structure', width: '120px' },
-        { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '100px' },
+        { field: 'chart_name', header_fa: 'چارت حساب', header_en: 'Chart', width: '120px' },
+        { field: 'code', header_fa: 'کد', header_en: 'Code', width: '100px' },
         { field: 'title_fa', header_fa: 'عنوان حساب', header_en: 'Title', width: 'auto', render: (val, row) => (
-            <div className="flex flex-col py-1">
+            <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                <span className="text-xs text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>
+                <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>
             </div>
         )}
     ];
@@ -379,198 +332,129 @@
     }, [itemsData, inlineItemEdit]);
 
     const itemColumns = [
-        { 
-            field: 'row_number', header_fa: 'ردیف', header_en: '#', width: '50px', 
-            render: (val, row) => row._isNew ? <span className="text-emerald-600 font-bold">*</span> : val 
-        },
-        { 
-            field: 'account_id', header_fa: 'حساب', header_en: 'Account', width: '250px', 
-            render: (val, row) => {
-                if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return (
-                        <div onClick={(e) => e.stopPropagation()}>
-                            <LOVField 
-                                size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[500px]"
-                                displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
-                                onChange={(r) => setInlineItemEdit(prev => ({
-                                    ...prev, 
-                                    data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }
-                                }))}
-                                isRtl={isRtl}
-                            />
-                        </div>
-                    );
-                }
-                const acc = lookups.leafAccounts.find(a => String(a.id) === String(val));
-                return acc ? <span>{acc.code} - {acc.title_fa}</span> : '';
-            }
-        },
-        { 
-            field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '120px', 
-            render: (val, row) => {
-                if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return (
-                        <div onClick={(e) => e.stopPropagation()}>
-                            <SelectField 
-                                size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} 
-                                onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, transaction_action: e.target.value } }))} isRtl={isRtl} 
-                            />
-                        </div>
-                    );
-                }
-                const act = TRANSACTION_ACTIONS.find(a => a.value === val);
-                return act ? <span>{act.label}</span> : val;
-            }
-        },
-        { 
-            field: 'transaction_group', header_fa: 'گروه', header_en: 'Group', width: '120px', 
-            render: (val, row) => {
-                if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return (
-                        <div onClick={(e) => e.stopPropagation()}>
-                            <SelectField 
-                                size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} 
-                                onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: '' } }))} isRtl={isRtl} 
-                            />
-                        </div>
-                    );
-                }
-                const grp = TRANSACTION_GROUPS.find(a => a.value === val);
-                return grp ? <span>{grp.label}</span> : val;
-            }
-        },
-        { 
-            field: 'sub_type', header_fa: 'نوع هزینه/درآمد', header_en: 'Sub-type', width: '150px', 
-            render: (_, row) => {
-                const group = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId) ? inlineItemEdit.data.transaction_group : row.transaction_group;
-                
-                if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    if (group === 'COST') {
-                        return <div onClick={(e) => e.stopPropagation()}><SelectField size="sm" options={lookups.costTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.cost_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, cost_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
-                    }
-                    if (group === 'INCOME') {
-                        return <div onClick={(e) => e.stopPropagation()}><SelectField size="sm" options={lookups.incomeTypes.map(c => ({ value: c.id, label: isRtl ? c.title_fa : c.title_en }))} value={inlineItemEdit.data.income_type_id} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, income_type_id: e.target.value } }))} isRtl={isRtl} /></div>;
-                    }
-                    return <div className="h-8 w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
-                }
-
-                if (group === 'COST') {
-                    const c = lookups.costTypes.find(x => String(x.id) === String(row.cost_type_id));
-                    return c ? <span>{isRtl ? c.title_fa : c.title_en}</span> : '';
-                }
-                if (group === 'INCOME') {
-                    const i = lookups.incomeTypes.find(x => String(x.id) === String(row.income_type_id));
-                    return i ? <span>{isRtl ? i.title_fa : i.title_en}</span> : '';
-                }
-                return '-';
-            }
-        },
-        { 
-            field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '80px', 
-            render: (val, row) => {
-                if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return <div onClick={(e) => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" /></div>;
-                }
-                return <span dir="ltr">{val}</span>;
-            }
-        },
-        { 
-            field: 'amount', header_fa: 'مبلغ', header_en: 'Amount', width: '150px', 
-            render: (val, row) => {
-                if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    const dispVal = formatNumber(inlineItemEdit.data.amount);
-                    return (
-                        <div onClick={(e) => e.stopPropagation()}>
-                            <TextField 
-                                size="sm" type="text" value={dispVal} 
-                                onChange={handleAmountChange} 
-                                isRtl={isRtl} dir="ltr" 
-                            />
-                        </div>
-                    );
-                }
-                return <span dir="ltr">{formatNumber(val)}</span>;
-            }
-        },
-        { 
-            field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto', 
-            render: (val, row) => {
-                if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                    return <div onClick={(e) => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={(e) => setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, description: e.target.value } }))} isRtl={isRtl} /></div>;
-                }
-                return <span>{val}</span>;
-            }
-        },
-        {
-            field: 'actions', header_fa: 'عملیات', header_en: 'Actions', width: '90px',
-            render: (_, row) => {
-                const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
-                if (isEditing) {
-                    return (
-                        <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" icon={Save} onClick={(e) => { e.stopPropagation(); handleSaveItemInline(); }} className="!text-emerald-600 hover:!bg-emerald-50 dark:hover:!bg-emerald-900/30 !px-2" />
-                            <Button variant="ghost" size="sm" icon={X} onClick={(e) => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 hover:!bg-slate-100 dark:hover:!bg-slate-800 !px-2" />
-                        </div>
-                    );
-                }
-                if (inlineItemEdit) return null;
+        { field: 'row_number', header_fa: '#', width: '40px', render: (val, row) => row._isNew ? <span className="text-emerald-600 font-bold">*</span> : <span className="text-[12px]">{val}</span> },
+        { field: 'account_id', header_fa: 'حساب', width: '250px', render: (val, row) => {
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return (
-                    <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" icon={Edit} onClick={(e) => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !px-2" />
-                        <Button variant="ghost" size="sm" icon={Trash2} onClick={(e) => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/30 !px-2" />
+                    <div onClick={e => e.stopPropagation()} className="w-full">
+                        <LOVField 
+                            data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[500px]"
+                            displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
+                            onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
+                            isRtl={isRtl}
+                        />
                     </div>
                 );
             }
-        }
+            const acc = lookups.leafAccounts.find(a => String(a.id) === String(val));
+            return acc ? <span className="text-[12px] truncate block">{acc.code} - {acc.title_fa}</span> : '';
+        }},
+        { field: 'transaction_action', header_fa: 'نوع', width: '100px', render: (val, row) => {
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                return <div onClick={e => e.stopPropagation()}><SelectField options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_action: e.target.value}}))} isRtl={isRtl} /></div>;
+            }
+            return <span className="text-[12px]">{TRANSACTION_ACTIONS.find(a => a.value === val)?.label || val}</span>;
+        }},
+        { field: 'transaction_group', header_fa: 'گروه', width: '100px', render: (val, row) => {
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                return <div onClick={e => e.stopPropagation()}><SelectField options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: ''}}))} isRtl={isRtl} /></div>;
+            }
+            return <span className="text-[12px]">{TRANSACTION_GROUPS.find(a => a.value === val)?.label || val}</span>;
+        }},
+        { field: 'sub_type', header_fa: 'هزینه/درآمد', width: '150px', render: (_, row) => {
+            const group = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId) ? inlineItemEdit.data.transaction_group : row.transaction_group;
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                if (group === 'COST') return <div onClick={e => e.stopPropagation()}><SelectField options={lookups.costTypes.map(c => ({value: c.id, label: c.title_fa}))} value={inlineItemEdit.data.cost_type_id} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: e.target.value}}))} isRtl={isRtl} /></div>;
+                if (group === 'INCOME') return <div onClick={e => e.stopPropagation()}><SelectField options={lookups.incomeTypes.map(c => ({value: c.id, label: c.title_fa}))} value={inlineItemEdit.data.income_type_id} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: e.target.value}}))} isRtl={isRtl} /></div>;
+                return <div className="h-[30px] w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
+            }
+            if (group === 'COST') return <span className="text-[12px]">{lookups.costTypes.find(x => String(x.id) === String(row.cost_type_id))?.title_fa || ''}</span>;
+            if (group === 'INCOME') return <span className="text-[12px]">{lookups.incomeTypes.find(x => String(x.id) === String(row.income_type_id))?.title_fa || ''}</span>;
+            return '-';
+        }},
+        { field: 'currency', header_fa: 'ارز', width: '60px', render: (val, row) => {
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                return <div onClick={e => e.stopPropagation()}><TextField value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" /></div>;
+            }
+            return <span dir="ltr" className="text-[12px]">{val}</span>;
+        }},
+        { field: 'amount', header_fa: 'مبلغ', width: '120px', render: (val, row) => {
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                return <div onClick={e => e.stopPropagation()}><TextField type="text" value={formatNumber(inlineItemEdit.data.amount)} onChange={handleAmountChange} isRtl={isRtl} dir="ltr" /></div>;
+            }
+            return <span dir="ltr" className="text-[12px] font-medium">{formatNumber(val)}</span>;
+        }},
+        { field: 'description', header_fa: 'شرح', width: 'auto', render: (val, row) => {
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                return <div onClick={e => e.stopPropagation()}><TextField value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} /></div>;
+            }
+            return <span className="text-[12px] truncate">{val}</span>;
+        }},
+        { field: 'actions', header_fa: '', width: '80px', render: (_, row) => {
+            const isEditing = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
+            if (isEditing) {
+                return (
+                    <div className="flex gap-1 justify-center">
+                        <Button variant="ghost" size="sm" icon={Save} onClick={e => { e.stopPropagation(); handleSaveItemInline(); }} className="!text-emerald-600 !p-1" />
+                        <Button variant="ghost" size="sm" icon={X} onClick={e => { e.stopPropagation(); setInlineItemEdit(null); }} className="!text-slate-500 !p-1" />
+                    </div>
+                );
+            }
+            if (inlineItemEdit) return null;
+            return (
+                <div className="flex gap-1 justify-center">
+                    <Button variant="ghost" size="sm" icon={Edit} onClick={e => { e.stopPropagation(); handleEditItemClick(row); }} className="!text-indigo-600 !p-1" />
+                    <Button variant="ghost" size="sm" icon={Trash2} onClick={e => { e.stopPropagation(); handleRemoveItem(row); }} className="!text-red-500 !p-1" />
+                </div>
+            );
+        }}
     ];
 
     if (!isOpen) return null;
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction')} language={language} width="max-w-6xl">
-            <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 relative overflow-visible h-full min-h-[500px]">
-                <div className="flex-1 p-4 flex flex-col gap-4 overflow-visible">
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0 transition-all duration-300 relative z-20">
-                        <div 
-                            className="flex justify-between items-center p-3 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
-                            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
-                        >
-                            <h4 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><FileText size={16} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</h4>
+            <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px]">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm shrink-0">
+                        <div className="flex justify-between items-center p-2 border-b border-slate-100 dark:border-slate-700/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80" onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}>
+                            <h4 className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><FileText size={14} className="text-indigo-500" /> {t('اطلاعات سربرگ', 'Header Data')}</h4>
                             <Button variant="ghost" size="sm" icon={isHeaderCollapsed ? ChevronDown : ChevronUp} className="!p-1 h-6 w-6" />
                         </div>
                         {!isHeaderCollapsed && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 overflow-visible">
-                                <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
-                                <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                                <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
-                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
-                                <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
-                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
-                                <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
-                                <SelectField size="sm" formCode={formCode} label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
-                                <div className="lg:col-span-4">
-                                    <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3 text-[12px]">
+                                <TextField label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                                <TextField label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                                <TextField label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
+                                <DatePicker label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} required />
+                                <TextField label={t('ثبت کننده', 'Registrar')} value={formMode === 'EDIT' && headerData.registrar_id ? (lookups.usersMap[headerData.registrar_id] || '') : `${currentUserName} (${currentUserUsername})`} disabled isRtl={isRtl} />
+                                <SelectField label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} required />
+                                <TextField label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
+                                <SelectField label={t('وضعیت سند', 'Document Status')} value={headerData.status || 'DRAFT'} onChange={e => setHeaderData({...headerData, status: e.target.value})} options={STATUS_OPTIONS} disabled={formMode === 'CREATE'} isRtl={isRtl} />
+                                <div className="md:col-span-4">
+                                    <TextField label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} />
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex flex-col shadow-sm flex-1 relative z-10 overflow-visible min-h-[300px]">
-                        <div className="flex justify-between items-center p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
-                            <h3 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><List size={16} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col shadow-sm flex-1 min-h-[350px]">
+                        <div className="flex justify-between items-center p-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
+                            <h3 className="font-bold text-[12px] text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><List size={14} className="text-indigo-500" /> {t('اقلام سند', 'Document Items')}</h3>
                         </div>
-                        <div className="flex-1 w-full overflow-visible p-1 relative">
+                        <div className="flex-1 w-full p-1 relative">
                             <DataGrid 
                                 data={itemGridData} columns={itemColumns}
                                 language={language} onAdd={handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
+                                className="h-full min-h-[300px]"
                             />
                         </div>
                     </div>
                 </div>
 
-                <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 z-30">
+                <div className="flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
                     <Button variant="outline" size="sm" onClick={onClose}>{t('انصراف', 'Cancel')}</Button>
-                    {access.canEdit && <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
+                    <Button variant="primary" size="sm" icon={Save} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>
                 </div>
             </div>
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
