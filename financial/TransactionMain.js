@@ -125,10 +125,10 @@
     const fetchLookups = useCallback(async () => {
         try {
             const [accRes, chartRes, costRes, incRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, code, parent_id, chart_id').eq('is_active', true),
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
-                supabase.from('fm_cost_types').select('id, title_fa, code, parent_id').eq('is_active', true),
-                supabase.from('fm_income_types').select('id, title_fa, code, parent_id').eq('is_active', true)
+                supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+                supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true)
             ]);
 
             const activeCharts = chartRes.data || [];
@@ -141,17 +141,22 @@
                     if (charts && !activeChartIds.has(i.chart_id)) return false; 
                     return true;
                 }).map(i => {
-                    let pathArr = [i.title_fa || i.title]; 
+                    const titleFa = i.title_fa || i.title;
+                    const titleEn = i.title_en || i.title_fa || i.title;
+                    let pathArr = [isRtl ? titleFa : titleEn]; 
                     let curr = i;
                     while (curr && curr.parent_id) {
                         const parent = items.find(p => p.id === curr.parent_id);
                         if (parent) {
-                            pathArr.unshift(parent.title_fa || parent.title);
+                            const pTitleFa = parent.title_fa || parent.title;
+                            const pTitleEn = parent.title_en || parent.title_fa || parent.title;
+                            pathArr.unshift(isRtl ? pTitleFa : pTitleEn);
                             curr = parent;
                         } else break;
                     }
                     return {
                         ...i,
+                        displayLabel: isRtl ? titleFa : titleEn,
                         pathTitle: pathArr.join(' / '),
                         chart_name: charts ? (charts.find(c => c.id === i.chart_id)?.title || '') : ''
                     };
@@ -164,7 +169,7 @@
                 incomeTypes: buildPathsAndFilterLeafs(incRes.data || [])
             });
         } catch (err) {}
-    }, [supabase]);
+    }, [supabase, isRtl]);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -347,15 +352,15 @@
             return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
         }},
         { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '140px', render: (val) => {
-            if (!val || val === '00000000-0000-0000-0000-000000000000') return <span className="text-[12px] text-slate-500">ثبت سیستمی</span>;
+            if (!val || val === '00000000-0000-0000-0000-000000000000') return <span className="text-[12px] text-slate-500">{t('ثبت سیستمی', 'System')}</span>;
             return <span className="text-[12px] truncate font-medium text-slate-700 dark:text-slate-300">{usersMap[val] || val}</span>;
         }}
     ], [usersMap, t]);
 
     const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'ساختار حساب', width: '120px' },
-        { field: 'code', header_fa: 'کد حساب', width: '100px' },
-        { field: 'title_fa', header_fa: 'عنوان حساب', width: 'auto', render: (val, row) => (
+        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '120px' },
+        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px' },
+        { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
                 {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
@@ -364,8 +369,8 @@
     ];
 
     const costLovColumns = [
-        { field: 'code', header_fa: 'کد هزینه', width: '100px' },
-        { field: 'title_fa', header_fa: 'عنوان هزینه', width: 'auto', render: (val, row) => (
+        { field: 'code', header_fa: 'کد هزینه', header_en: 'Cost Code', width: '100px' },
+        { field: 'displayLabel', header_fa: 'عنوان هزینه', header_en: 'Cost Title', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
                 {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
@@ -374,8 +379,8 @@
     ];
 
     const incomeLovColumns = [
-        { field: 'code', header_fa: 'کد درآمد', width: '100px' },
-        { field: 'title_fa', header_fa: 'عنوان درآمد', width: 'auto', render: (val, row) => (
+        { field: 'code', header_fa: 'کد درآمد', header_en: 'Income Code', width: '100px' },
+        { field: 'displayLabel', header_fa: 'عنوان درآمد', header_en: 'Income Title', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
                 {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
@@ -394,7 +399,7 @@
     ];
 
     const gridActions = [
-        { id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: (row) => (attachmentCounts[row.id] > 0 ? '!text-indigo-500 hover:!text-indigo-600' : '!text-slate-400 hover:!text-slate-600') },
+        { id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: (row) => (attachmentCounts[row.id] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600') },
         { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
         { id: 'update', icon: Edit, tooltip: t('مشاهده/ویرایش', 'View/Edit'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'view' },
         { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
@@ -435,7 +440,7 @@
 
         <div className="flex-1 min-h-0 flex flex-col gap-2 mt-4">
           <AdvancedFilter 
-            fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} columns={6} 
+            fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} columns={6}
           />
           <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
             <DataGrid

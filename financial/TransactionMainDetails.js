@@ -42,10 +42,10 @@
     }, [securityCtx, formCode]);
 
     const TRANSACTION_TYPES = [
-        { value: 'OPENING', label: t('افتتاحیه', 'Opening') },
-        { value: 'CLOSING', label: t('اختتامیه', 'Closing') },
+        { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
+        { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
         { value: 'GENERAL', label: t('عمومی', 'General') },
-        { value: 'TRANSFER', label: t('انتقال', 'Transfer') }
+        { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
     ];
 
     const TRANSACTION_ACTIONS = [
@@ -63,8 +63,7 @@
     const STATUS_OPTIONS = [
         { value: 'DRAFT', label: t('یادداشت', 'Draft') },
         { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
-        { value: 'APPROVED', label: t('تایید شده', 'Approved') },
-        { value: 'FINAL', label: t('قطعی شده', 'Final') }
+        { value: 'APPROVED', label: t('تایید شده', 'Approved') }
     ];
 
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
@@ -123,10 +122,10 @@
         if (!supabase) return null;
         try {
             const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, code, currency_id, parent_id, chart_id').eq('is_active', true),
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
-                supabase.from('fm_cost_types').select('id, title_fa, code, parent_id').eq('is_active', true),
-                supabase.from('fm_income_types').select('id, title_fa, code, parent_id').eq('is_active', true),
+                supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+                supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title')
@@ -160,17 +159,22 @@
                     if (charts && !activeChartIds.has(i.chart_id)) return false; 
                     return true;
                 }).map(i => {
-                    let pathArr = [i.title_fa || i.title]; 
+                    const titleFa = i.title_fa || i.title;
+                    const titleEn = i.title_en || i.title_fa || i.title;
+                    let pathArr = [isRtl ? titleFa : titleEn]; 
                     let curr = i;
                     while (curr && curr.parent_id) {
                         const parent = items.find(p => p.id === curr.parent_id);
                         if (parent) {
-                            pathArr.unshift(parent.title_fa || parent.title);
+                            const pTitleFa = parent.title_fa || parent.title;
+                            const pTitleEn = parent.title_en || parent.title_fa || parent.title;
+                            pathArr.unshift(isRtl ? pTitleFa : pTitleEn);
                             curr = parent;
                         } else break;
                     }
                     return {
                         ...i,
+                        displayLabel: isRtl ? titleFa : titleEn,
                         pathTitle: pathArr.join(' / '),
                         chart_name: charts ? (charts.find(c => c.id === i.chart_id)?.title || '') : ''
                     };
@@ -199,7 +203,7 @@
             showToast(t('خطا در دریافت اطلاعات پایه', 'Error fetching dependencies'), 'error');
             return null;
         }
-    }, [supabase, showToast, t, currentUserId]);
+    }, [supabase, showToast, t, currentUserId, isRtl]);
 
     const generateDocumentCode = () => {
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -249,7 +253,7 @@
                 setAttachModal({ isOpen: false, record: null, files: [] });
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
                 if (formMode === 'COPY') {
-                    setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of transaction ${initialRecord.document_code} and requires review.`));
+                    setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of document ${initialRecord.document_code} and requires review.`));
                 }
                 
                 const parsedDate = formMode === 'COPY' ? todayStr : (initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr);
@@ -288,17 +292,6 @@
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
     const handleChangeStatus = async (newStatus) => {
-        if (headerData.transaction_type === 'TRANSFER' && newStatus !== 'DRAFT') {
-            let sumDep = 0, sumWid = 0;
-            itemsData.forEach(i => {
-                sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
-                sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-            });
-            if (sumDep !== sumWid) {
-                return showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Cannot change status of unbalanced transfer.'), 'warning');
-            }
-        }
-        
         setHeaderData(prev => ({ ...prev, status: newStatus }));
         if (headerData.id) {
             setIsLoading(true);
@@ -306,10 +299,10 @@
                 const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).eq('id', headerData.id);
                 if (error) throw error;
                 await logAction('status_update', headerData.id, `تغییر وضعیت سند به ${newStatus}`);
-                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
+                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Document status updated successfully.'));
                 onSuccess();
             } catch (err) {
-                showToast(t('خطا در تغییر وضعیت سند.', 'Error updating transaction status.'), 'error');
+                showToast(t('خطا در تغییر وضعیت سند.', 'Error updating document status.'), 'error');
                 setHeaderData(prev => ({ ...prev, status: initialRecord?.status || 'DRAFT' }));
             } finally {
                 setIsLoading(false);
@@ -327,18 +320,7 @@
         }
         
         if (itemsData.length === 0) {
-            return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Transaction must have at least one item.'), 'warning');
-        }
-
-        if (headerData.transaction_type === 'TRANSFER' && headerData.status !== 'DRAFT') {
-            let sumDep = 0, sumWid = 0;
-            itemsData.forEach(i => {
-                sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
-                sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-            });
-            if (sumDep !== sumWid) {
-                return showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
-            }
+            return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Document must have at least one item.'), 'warning');
         }
 
         setIsLoading(true);
@@ -377,8 +359,7 @@
                 cost_type_id: item.cost_type_id || null,
                 income_type_id: item.income_type_id || null,
                 currency: item.currency || 'IRR',
-                deposit_amount: parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0,
-                withdrawal_amount: parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0,
+                amount: parseFloat(String(item.amount || '0').replace(/,/g, '')) || 0,
                 description: item.description || ''
             }));
 
@@ -399,7 +380,7 @@
         if (inlineItemEdit) return showToast(t('ابتدا با زدن دکمه Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
         setInlineItemEdit({
             id: 'new',
-            data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', deposit_amount: '', withdrawal_amount: '0', description: '' }
+            data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', amount: '', description: '' }
         });
     };
 
@@ -408,7 +389,7 @@
         const accObj = lookups.leafAccounts.find(a => String(a.id) === String(row.account_id)) || null;
         setInlineItemEdit({
             id: row._tempId || row.id,
-            data: { ...row, account_obj: accObj, deposit_amount: row.deposit_amount ? String(row.deposit_amount).replace(/,/g, '') : '0', withdrawal_amount: row.withdrawal_amount ? String(row.withdrawal_amount).replace(/,/g, '') : '0' }
+            data: { ...row, account_obj: accObj, amount: row.amount ? String(row.amount).replace(/,/g, '') : '' }
         });
     };
 
@@ -416,21 +397,17 @@
         if (!inlineItemEdit) return;
         const form = inlineItemEdit.data;
         
-        if (!form.account_id || !form.description) {
-            return showToast(t('حساب و شرح اجباری هستند.', 'Account and Description required.'), 'warning');
+        if (!form.account_id || !form.amount || !form.description) {
+            return showToast(t('حساب، مبلغ و شرح اجباری هستند.', 'Account, Amount, and Description required.'), 'warning');
         }
 
-        const cleanDeposit = String(form.deposit_amount || '0').replace(/,/g, '');
-        const cleanWithdrawal = String(form.withdrawal_amount || '0').replace(/,/g, '');
-        
-        if ((isNaN(cleanDeposit) || cleanDeposit === '') && (isNaN(cleanWithdrawal) || cleanWithdrawal === '')) {
-            return showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
-        }
+        const cleanAmount = String(form.amount || '0').replace(/,/g, '');
+        if (isNaN(cleanAmount) || cleanAmount === '') return showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
 
         let newRowNum = parseInt(form.row_number, 10);
         if (isNaN(newRowNum) || newRowNum < 1) newRowNum = itemsData.length + (inlineItemEdit.id === 'new' ? 1 : 0);
 
-        const dataToSave = { ...form, deposit_amount: cleanDeposit, withdrawal_amount: cleanWithdrawal };
+        const dataToSave = { ...form, amount: cleanAmount };
         if (inlineItemEdit.id === 'new') dataToSave._tempId = crypto.randomUUID();
 
         let otherItems = itemsData;
@@ -516,9 +493,9 @@
         }
     };
 
-    const handleDeleteAttachment = async (fileId) => {
+    const handleDeleteAttachment = async (file) => {
         try {
-            const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
+            const { error } = await supabase.from('fm_attachments').delete().eq('id', file.id);
             if (error) throw error;
             showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
             loadAttachments(attachModal.record.id);
@@ -534,17 +511,17 @@
         return parts.join('.');
     };
 
-    const handleAmountChange = (e, field) => {
+    const handleAmountChange = (e) => {
         const raw = e.target.value.replace(/,/g, '');
         if (raw === '' || !isNaN(raw)) {
-            setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, [field]: raw } }));
+            setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: raw } }));
         }
     };
 
     const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'ساختار حساب', width: '250px' },
-        { field: 'code', header_fa: 'کد حساب', width: '120px' },
-        { field: 'title_fa', header_fa: 'عنوان حساب', width: 'auto', render: (val, row) => (
+        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '120px' },
+        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px' },
+        { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
                 {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
@@ -553,8 +530,8 @@
     ];
 
     const costLovColumns = [
-        { field: 'code', header_fa: 'کد هزینه', width: '100px' },
-        { field: 'title_fa', header_fa: 'عنوان هزینه', width: 'auto', render: (val, row) => (
+        { field: 'code', header_fa: 'کد هزینه', header_en: 'Cost Code', width: '100px' },
+        { field: 'displayLabel', header_fa: 'عنوان هزینه', header_en: 'Cost Title', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
                 {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
@@ -563,8 +540,8 @@
     ];
 
     const incomeLovColumns = [
-        { field: 'code', header_fa: 'کد درآمد', width: '100px' },
-        { field: 'title_fa', header_fa: 'عنوان درآمد', width: 'auto', render: (val, row) => (
+        { field: 'code', header_fa: 'کد درآمد', header_en: 'Income Code', width: '100px' },
+        { field: 'displayLabel', header_fa: 'عنوان درآمد', header_en: 'Income Title', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
                 {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
@@ -590,8 +567,8 @@
                 return (
                     <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
                         <LOVField 
-                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[650px]"
-                            displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
+                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[400px]"
+                            displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.displayLabel}` : ''}
                             onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
                             isRtl={isRtl} wrapperClassName="m-0"
                         />
@@ -599,24 +576,11 @@
                 );
             }
             const acc = lookups.leafAccounts.find(a => String(a.id) === String(val));
-            return acc ? <span className="text-[12px] truncate block">{acc.code} - {acc.title_fa}</span> : '';
+            return acc ? <span className="text-[12px] truncate block">{acc.code} - {acc.displayLabel}</span> : '';
         }},
         { field: 'transaction_action', header_fa: 'نوع', width: '80px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[90]">
-                    <SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => {
-                        const action = e.target.value;
-                        setInlineItemEdit(prev => ({
-                            ...prev, 
-                            data: {
-                                ...prev.data, 
-                                transaction_action: action, 
-                                deposit_amount: action === 'DEPOSIT' ? prev.data.deposit_amount : '0', 
-                                withdrawal_amount: action === 'WITHDRAWAL' ? prev.data.withdrawal_amount : '0'
-                            }
-                        }));
-                    }} isRtl={isRtl} wrapperClassName="m-0" />
-                </div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[90]"><SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_action: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
             }
             return <span className="text-[12px]">{TRANSACTION_ACTIONS.find(a => a.value === val)?.label || val}</span>;
         }},
@@ -633,8 +597,8 @@
                     return (
                         <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[500px]"
-                                displayValue={lookups.costTypes.find(c => String(c.id) === String(inlineItemEdit.data.cost_type_id))?.title_fa || ''}
+                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[400px]"
+                                displayValue={lookups.costTypes.find(c => c.id === inlineItemEdit.data.cost_type_id)?.displayLabel || ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: r?.id}}))}
                                 isRtl={isRtl} wrapperClassName="m-0"
                             />
@@ -645,8 +609,8 @@
                     return (
                         <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[500px]"
-                                displayValue={lookups.incomeTypes.find(c => String(c.id) === String(inlineItemEdit.data.income_type_id))?.title_fa || ''}
+                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[400px]"
+                                displayValue={lookups.incomeTypes.find(c => c.id === inlineItemEdit.data.income_type_id)?.displayLabel || ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: r?.id}}))}
                                 isRtl={isRtl} wrapperClassName="m-0"
                             />
@@ -655,8 +619,8 @@
                 }
                 return <div className="h-[32px] w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
             }
-            if (group === 'COST') return <span className="text-[12px]">{lookups.costTypes.find(x => String(x.id) === String(row.cost_type_id))?.title_fa || ''}</span>;
-            if (group === 'INCOME') return <span className="text-[12px]">{lookups.incomeTypes.find(x => String(x.id) === String(row.income_type_id))?.title_fa || ''}</span>;
+            if (group === 'COST') return <span className="text-[12px]">{lookups.costTypes.find(x => String(x.id) === String(row.cost_type_id))?.displayLabel || ''}</span>;
+            if (group === 'INCOME') return <span className="text-[12px]">{lookups.incomeTypes.find(x => String(x.id) === String(row.income_type_id))?.displayLabel || ''}</span>;
             return '-';
         }},
         { field: 'currency', header_fa: 'ارز', width: '50px', render: (val, row) => {
@@ -665,19 +629,11 @@
             }
             return <span dir="ltr" className="text-[12px]">{val}</span>;
         }},
-        { field: 'deposit_amount', header_fa: 'واریز *', width: '100px', render: (val, row) => {
+        { field: 'amount', header_fa: 'مبلغ *', width: '100px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                const disabled = inlineItemEdit.data.transaction_action !== 'DEPOSIT';
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumber(inlineItemEdit.data.deposit_amount)} onChange={(e) => handleAmountChange(e, 'deposit_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" value={formatNumber(inlineItemEdit.data.amount)} onChange={handleAmountChange} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
-            return <span dir="ltr" className="text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{formatNumber(val)}</span>;
-        }},
-        { field: 'withdrawal_amount', header_fa: 'برداشت *', width: '100px', render: (val, row) => {
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                const disabled = inlineItemEdit.data.transaction_action !== 'WITHDRAWAL';
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumber(inlineItemEdit.data.withdrawal_amount)} onChange={(e) => handleAmountChange(e, 'withdrawal_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
-            }
-            return <span dir="ltr" className="text-[12px] font-medium text-rose-600 dark:text-rose-500">{formatNumber(val)}</span>;
+            return <span dir="ltr" className="text-[12px] font-medium">{formatNumber(val)}</span>;
         }},
         { field: 'description', header_fa: 'شرح *', width: 'auto', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
@@ -720,12 +676,12 @@
                                 {!isReadOnly && formMode !== 'CREATE' && (
                                     <div className="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-2">
                                         {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30">
                                                 {t('تبدیل به موقت', 'Set Temporary')}
                                             </Button>
                                         )}
                                         {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800">
                                                 {t('برگشت به یادداشت', 'Revert to Draft')}
                                             </Button>
                                         )}
@@ -736,27 +692,27 @@
                         language={language}
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
-                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Transaction Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
-                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Transaction Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند *', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
                             <div className="relative z-[80]">
-                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
+                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش *', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
                             
                             <div className="lg:col-span-3 sm:col-span-2 relative z-[70]">
-                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ *', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                         </div>
                     </Card>
 
                     <Card
-                        title={t('اقلام سند', 'Transaction Items')}
+                        title={t('اقلام سند', 'Document Items')}
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px] relative z-10"
@@ -776,11 +732,11 @@
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
                     <Button variant="outline" size="sm" onClick={onClose}>{t('بستن', 'Close')}</Button>
-                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Transaction')}</Button>}
+                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
                 </div>
             </div>
             
-            <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Attachments')} language={language} width="max-w-xl">
+            <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Document Attachments')} language={language} width="max-w-xl">
                 <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg">
                     <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0">
                         <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.document_code}</span>
@@ -791,7 +747,7 @@
                         <AttachmentManager 
                             files={attachModal.files}
                             onUpload={handleFileUpload}
-                            onDelete={(f) => handleDeleteAttachment(f.id)}
+                            onDelete={(f) => handleDeleteAttachment(f)}
                             onDownload={(f) => window.open(f.file_url, '_blank')}
                             readOnly={isAttachReadOnly}
                             isUploading={isUploading}
