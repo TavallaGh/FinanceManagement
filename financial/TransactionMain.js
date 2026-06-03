@@ -8,7 +8,7 @@
   const {
     FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon,
     Copy = FallbackIcon, AlertTriangle = FallbackIcon, Paperclip = FallbackIcon,
-    DollarSign = FallbackIcon
+    DollarSign = FallbackIcon, ChevronDown = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -351,21 +351,21 @@
     }, [transactions, filters, resolvedUserId]);
 
     const columns = useMemo(() => [
-        { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
-        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '110px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
-        { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
+        { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '80px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
+        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
+        { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '80px' },
         { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '90px', type: 'date' },
         { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '100px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
-        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'minmax(150px, 1fr)', render: (val) => <span className="text-[12px] truncate block" title={val}>{val || '-'}</span> },
-        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '80px', render: (val) => {
+        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '90px', render: (val) => {
             const s = STATUS_OPTIONS.find(x => x.value === val);
             const colors = { DRAFT: 'slate', TEMPORARY: 'orange', APPROVED: 'emerald' };
             return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
         }},
-        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '110px', render: (val) => {
+        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '130px', render: (val) => {
             if (!val || val === '00000000-0000-0000-0000-000000000000') return <span className="text-[12px] text-slate-500">{t('سیستمی', 'System')}</span>;
             return <span className="text-[12px] truncate font-medium text-slate-700 dark:text-slate-300 block">{usersMap[val] || val}</span>;
-        }}
+        }},
+        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => <span className="text-[12px] truncate block" title={val}>{val || '-'}</span> }
     ], [usersMap, t]);
 
     const summaryColumns = [
@@ -488,29 +488,26 @@
         const isBalancedIrr = diffIrr < 0.01;
 
         return (
-            <Modal isOpen={summaryModal.isOpen} onClose={() => setSummaryModal({isOpen: false, record: null})} title={t('خلاصه ارزی سند', 'Document Currency Summary')} width="max-w-7xl" language={language}>
-                <div className="p-4 flex flex-col lg:flex-row gap-4 bg-slate-50 dark:bg-slate-900 rounded-b-lg h-[60vh] md:h-[500px]">
+            <Modal isOpen={summaryModal.isOpen} onClose={() => setSummaryModal({isOpen: false, record: null})} title={t('خلاصه ارزی سند', 'Document Currency Summary')} width="max-w-3xl" language={language}>
+                <div className="p-4 flex flex-col gap-3 bg-slate-50 dark:bg-slate-900 rounded-b-lg">
                     
-                    {/* Cards Column (Right side in RTL) */}
-                    <div className="w-full lg:w-80 flex flex-col gap-4 overflow-y-auto custom-scrollbar shrink-0">
-                        {/* USD Card */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Card noPadding className="border border-slate-200 dark:border-slate-700 shadow-sm" language={language}>
-                            <div className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between">
-                                <span className="font-bold text-slate-700 dark:text-slate-300">{t('اطلاعات به ارز دلار (USD)', 'USD Information')}</span>
-                                <DollarSign size={16} className="text-indigo-500" />
+                            <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2 flex items-center justify-between shrink-0">
+                                <span className="font-bold text-slate-700 dark:text-slate-300 text-[12px]">{t('اطلاعات به دلار (USD)', 'USD Info')}</span>
+                                <DollarSign size={14} className="text-indigo-500" />
                             </div>
-                            <div className="p-4 flex flex-col gap-3">
+                            <div className="p-3 flex flex-col gap-2 text-[12px]">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('جمع مبلغ واریز:', 'Total Deposit:')}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع مبلغ واریز:', 'Total Deposit:')}</span>
                                     <span className="font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(depUsd)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('جمع مبلغ برداشت:', 'Total Withdrawal:')}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع مبلغ برداشت:', 'Total Withdrawal:')}</span>
                                     <span className="font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(widUsd)}</span>
                                 </div>
-                                <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-1"></div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('وضعیت تراز دلاری:', 'USD Balance Status:')}</span>
+                                <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-2 mt-1">
+                                    <span className="text-slate-500 dark:text-slate-400">{t('وضعیت تراز:', 'Balance Status:')}</span>
                                     {isBalancedUsd ? (
                                         <Badge variant="emerald" size="sm">{t('تراز', 'Balanced')}</Badge>
                                     ) : (
@@ -520,24 +517,22 @@
                             </div>
                         </Card>
 
-                        {/* IRR Card */}
                         <Card noPadding className="border border-slate-200 dark:border-slate-700 shadow-sm" language={language}>
-                            <div className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between">
-                                <span className="font-bold text-slate-700 dark:text-slate-300">{t('اطلاعات به ارز ریال (IRR)', 'IRR Information')}</span>
+                            <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2 flex items-center justify-between shrink-0">
+                                <span className="font-bold text-slate-700 dark:text-slate-300 text-[12px]">{t('اطلاعات به ریال (IRR)', 'IRR Info')}</span>
                                 <span className="font-bold text-emerald-500 text-sm">﷼</span>
                             </div>
-                            <div className="p-4 flex flex-col gap-3">
+                            <div className="p-3 flex flex-col gap-2 text-[12px]">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('جمع مبلغ واریز:', 'Total Deposit:')}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع مبلغ واریز:', 'Total Deposit:')}</span>
                                     <span className="font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(depIrr)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('جمع مبلغ برداشت:', 'Total Withdrawal:')}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع مبلغ برداشت:', 'Total Withdrawal:')}</span>
                                     <span className="font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(widIrr)}</span>
                                 </div>
-                                <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-1"></div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('وضعیت تراز:', 'Balance Status:')}</span>
+                                <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-2 mt-1">
+                                    <span className="text-slate-500 dark:text-slate-400">{t('وضعیت تراز:', 'Balance Status:')}</span>
                                     {isBalancedIrr ? (
                                         <Badge variant="emerald" size="sm">{t('تراز', 'Balanced')}</Badge>
                                     ) : (
@@ -548,11 +543,28 @@
                         </Card>
                     </div>
 
-                    {/* Data Grid Column (Left side in RTL) */}
-                    <div className="flex-1 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 flex flex-col min-w-0">
-                        <DataGrid data={mappedItems} columns={summaryColumns} language={language} formCode={formCode} />
-                    </div>
+                    <details className="group border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm bg-white dark:bg-slate-800">
+                        <summary className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-[12px] font-bold text-slate-700 dark:text-slate-300 cursor-pointer list-none flex justify-between items-center rounded-lg">
+                            {t('نمایش جزئیات اقلام', 'Show Item Details')}
+                            <ChevronDown size={14} className="text-slate-500 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        <div className="h-[250px] border-t border-slate-200 dark:border-slate-700">
+                            <DataGrid 
+                                data={mappedItems} 
+                                columns={summaryColumns} 
+                                language={language} 
+                                formCode={formCode} 
+                                showExport={false}
+                                exportable={false}
+                                hideToolbar={true}
+                                selectable={false}
+                            />
+                        </div>
+                    </details>
 
+                </div>
+                <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
+                    <Button variant="outline" size="sm" onClick={() => setSummaryModal({isOpen: false, record: null})}>{t('بستن', 'Close')}</Button>
                 </div>
             </Modal>
         );
