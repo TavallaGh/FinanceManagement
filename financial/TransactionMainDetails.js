@@ -128,7 +128,7 @@
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title'),
-                supabase.from('fm_currencies').select('id, code, title') // اصلاح فیلدهای جدول ارز برای رفع خطای 400
+                supabase.from('fm_currencies').select('id, code, title')
             ]);
             
             const uMap = {};
@@ -240,7 +240,7 @@
             if (formMode === 'CREATE' || formMode === 'COPY') {
                 if (window.AutoNumberingService) {
                     try {
-                        const preview = await window.AutoNumberingService.previewNext('TRANSACTION');
+                        const preview = await window.AutoNumberingService.previewNext('TRANSACTIONS');
                         if (preview && preview.formattedCode) {
                             nextDocCode = preview.formattedCode;
                         } else if (typeof preview === 'string') {
@@ -465,7 +465,7 @@
                 
                 if (window.AutoNumberingService) {
                     try {
-                        await window.AutoNumberingService.consumeNext('TRANSACTION');
+                        await window.AutoNumberingService.consumeNext('TRANSACTIONS');
                     } catch(err) {
                         console.error('AutoNumbering consume error:', err);
                     }
@@ -500,7 +500,7 @@
                             row_number: index + 1,
                             account_id: item.account_id || null,
                             transaction_action: action,
-                            transaction_group: item.transaction_group,
+                            transaction_group: item.transaction_group || null,
                             cost_type_id: item.cost_type_id || null,
                             income_type_id: item.income_type_id || null,
                             currency: cur,
@@ -509,7 +509,7 @@
                             exchange_rate_usd_to_irr: usdToIrr,
                             amount_usd: originalAmount * toUsd,
                             amount_irr: (originalAmount * toUsd) * usdToIrr,
-                            description: item.description || ''
+                            description: item.description || null
                         };
                     });
 
