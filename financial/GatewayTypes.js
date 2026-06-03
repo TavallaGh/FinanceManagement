@@ -237,7 +237,7 @@
         
         if (isNew && window.AutoNumberingService) {
            try {
-               await window.AutoNumberingService.consumeNext('GATEWAY_TYPE');
+               await window.AutoNumberingService.consumeNext('GATEWAYS');
            } catch(err) {
                console.error('AutoNumbering consume error:', err);
            }
@@ -350,7 +350,7 @@
       let nextCode = '';
       if (!record && window.AutoNumberingService) {
         try {
-            const preview = await window.AutoNumberingService.previewNext('GATEWAY_TYPE');
+            const preview = await window.AutoNumberingService.previewNext('GATEWAYS');
             if (preview && preview.formattedCode) {
                 nextCode = preview.formattedCode;
             } else if (typeof preview === 'string') {
