@@ -6,7 +6,7 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const {
-    FileText = FallbackIcon, AlertTriangle = FallbackIcon, Check = FallbackIcon
+    AlertTriangle = FallbackIcon, Check = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -14,7 +14,7 @@
   const { Button = FallbackComponent, Badge = FallbackComponent, Card = FallbackComponent } = Core;
 
   const Forms = window.DSForms || DS || {};
-  const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
+  const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent, AttachmentManager = FallbackComponent } = Forms;
 
   const Feedback = window.DSFeedback || DS || {};
   const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
@@ -38,16 +38,17 @@
     }, [securityCtx, formCode]);
 
     const TRANSACTION_TYPES = [
-        { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
-        { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
+        { value: 'OPENING', label: t('افتتاحیه', 'Opening') },
+        { value: 'CLOSING', label: t('اختتامیه', 'Closing') },
         { value: 'GENERAL', label: t('عمومی', 'General') },
-        { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
+        { value: 'TRANSFER', label: t('انتقال', 'Transfer') }
     ];
 
     const STATUS_OPTIONS = [
         { value: 'DRAFT', label: t('یادداشت', 'Draft') },
         { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
-        { value: 'APPROVED', label: t('تایید شده', 'Approved') }
+        { value: 'APPROVED', label: t('تایید شده', 'Approved') },
+        { value: 'FINAL', label: t('قطعی شده', 'Final') }
     ];
 
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
@@ -56,6 +57,9 @@
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
     const [copyWarning, setCopyWarning] = useState(null);
+
+    const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
+    const [isUploading, setIsUploading] = useState(false);
 
     const [lookups, setLookups] = useState({
         accounts: [],
@@ -67,7 +71,6 @@
         usersList: []
     });
 
-    const isFetchingDeps = useRef(false);
     const hasInitialized = useRef(false);
 
     const isReadOnly = useMemo(() => {
@@ -75,6 +78,10 @@
         if (!headerData.status) return false;
         return headerData.status !== 'DRAFT' && headerData.status !== 'TEMPORARY';
     }, [headerData.status, formMode]);
+
+    const isAttachReadOnly = useMemo(() => {
+        return attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
+    }, [attachModal.record]);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -98,10 +105,10 @@
         if (!supabase) return null;
         try {
             const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, code, currency_id, parent_id, chart_id').eq('is_active', true),
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
-                supabase.from('fm_cost_types').select('id, title_fa, code, parent_id').eq('is_active', true),
-                supabase.from('fm_income_types').select('id, title_fa, code, parent_id').eq('is_active', true),
+                supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+                supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title')
@@ -135,18 +142,21 @@
                     if (charts && !activeChartIds.has(i.chart_id)) return false; 
                     return true;
                 }).map(i => {
-                    let pathArr = [i.title_fa || i.title]; 
+                    let pathArrFa = [i.title_fa || i.title || i.code]; 
+                    let pathArrEn = [i.title_en || i.title_fa || i.title || i.code]; 
                     let curr = i;
                     while (curr && curr.parent_id) {
                         const parent = items.find(p => p.id === curr.parent_id);
                         if (parent) {
-                            pathArr.unshift(parent.title_fa || parent.title);
+                            pathArrFa.unshift(parent.title_fa || parent.title || parent.code);
+                            pathArrEn.unshift(parent.title_en || parent.title_fa || parent.title || parent.code);
                             curr = parent;
                         } else break;
                     }
                     return {
                         ...i,
-                        pathTitle: pathArr.join(' / '),
+                        pathTitle_fa: pathArrFa.join(' / '),
+                        pathTitle_en: pathArrEn.join(' / '),
                         chart_name: charts ? (charts.find(c => c.id === i.chart_id)?.title || '') : ''
                     };
                 });
@@ -178,6 +188,13 @@
 
     const generateDocumentCode = () => {
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+    };
+
+    const loadAttachments = async (recordId) => {
+        try {
+            const { data } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
+            setAttachModal(prev => ({ ...prev, files: data || [] }));
+        } catch (err) {}
     };
 
     useEffect(() => {
@@ -213,9 +230,10 @@
                     registered_at: new Date().toISOString()
                 });
                 setItemsData([]);
+                setAttachModal({ isOpen: false, record: null, files: [] });
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
                 if (formMode === 'COPY') {
-                    setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of document ${initialRecord.document_code} and requires review.`));
+                    setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of transaction ${initialRecord.document_code} and requires review.`));
                 }
                 
                 const parsedDate = formMode === 'COPY' ? todayStr : (initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr);
@@ -242,11 +260,29 @@
                 })).sort((a, b) => a.row_number - b.row_number);
                 
                 setItemsData(mappedItems);
+
+                if (formMode === 'EDIT') {
+                    loadAttachments(initialRecord.id);
+                    setAttachModal(prev => ({ ...prev, record: initialRecord }));
+                } else {
+                    setAttachModal({ isOpen: false, record: null, files: [] });
+                }
             }
         });
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
     const handleChangeStatus = async (newStatus) => {
+        if (headerData.transaction_type === 'TRANSFER' && newStatus !== 'DRAFT') {
+            let sumDep = 0, sumWid = 0;
+            itemsData.forEach(i => {
+                sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
+                sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+            });
+            if (sumDep !== sumWid) {
+                return showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Cannot change status of unbalanced transfer.'), 'warning');
+            }
+        }
+        
         setHeaderData(prev => ({ ...prev, status: newStatus }));
         if (headerData.id) {
             setIsLoading(true);
@@ -254,10 +290,10 @@
                 const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).eq('id', headerData.id);
                 if (error) throw error;
                 await logAction('status_update', headerData.id, `تغییر وضعیت سند به ${newStatus}`);
-                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Document status updated successfully.'));
+                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
                 onSuccess();
             } catch (err) {
-                showToast(t('خطا در تغییر وضعیت سند.', 'Error updating document status.'), 'error');
+                showToast(t('خطا در تغییر وضعیت سند.', 'Error updating transaction status.'), 'error');
                 setHeaderData(prev => ({ ...prev, status: initialRecord?.status || 'DRAFT' }));
             } finally {
                 setIsLoading(false);
@@ -271,7 +307,18 @@
         }
         
         if (itemsData.length === 0) {
-            return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Document must have at least one item.'), 'warning');
+            return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Transaction must have at least one item.'), 'warning');
+        }
+
+        if (headerData.transaction_type === 'TRANSFER' && headerData.status !== 'DRAFT') {
+            let sumDep = 0, sumWid = 0;
+            itemsData.forEach(i => {
+                sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
+                sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+            });
+            if (sumDep !== sumWid) {
+                return showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
+            }
         }
 
         setIsLoading(true);
@@ -310,7 +357,8 @@
                 cost_type_id: item.cost_type_id || null,
                 income_type_id: item.income_type_id || null,
                 currency: item.currency || 'IRR',
-                amount: parseFloat(String(item.amount || '0').replace(/,/g, '')) || 0,
+                deposit_amount: parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0,
+                withdrawal_amount: parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0,
                 description: item.description || ''
             }));
 
@@ -326,9 +374,62 @@
         }
     };
 
-    const TransactionMainGrid = window.TransactionMainGrid || FallbackComponent;
+    const handleFileUpload = async (files) => {
+        if (!files || files.length === 0 || !attachModal.record) return;
+        const file = files[0];
+
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${attachModal.record.id}_${Date.now()}.${fileExt}`;
+            const filePath = `transactions/${fileName}`;
+
+            let fileUrl = '';
+            if (supabase.storage) {
+                const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file);
+                if (uploadError) throw uploadError;
+                const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+                fileUrl = urlData.publicUrl;
+            } else {
+                fileUrl = URL.createObjectURL(file); 
+            }
+
+            const payload = {
+                entity_type: 'TRANSACTION',
+                entity_id: attachModal.record.id,
+                file_name: file.name,
+                file_size: file.size,
+                file_type: file.type,
+                file_url: fileUrl,
+                created_by: currentUserId
+            };
+
+            const { error } = await supabase.from('fm_attachments').insert([payload]);
+            if (error) throw error;
+
+            showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
+            loadAttachments(attachModal.record.id);
+        } catch (error) {
+            showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleDeleteAttachment = async (fileId) => {
+        try {
+            const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
+            if (error) throw error;
+            showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
+            loadAttachments(attachModal.record.id);
+        } catch (error) {
+            showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
+        }
+    };
 
     if (!isOpen) return null;
+
+    const TransactionMainGrid = window.TransactionMainGrid || FallbackComponent;
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : (formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction'))} language={language} width="max-w-6xl">
@@ -357,12 +458,12 @@
                                 {!isReadOnly && formMode !== 'CREATE' && (
                                     <div className="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-2">
                                         {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                                                 {t('تبدیل به موقت', 'Set Temporary')}
                                             </Button>
                                         )}
                                         {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800">
+                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
                                                 {t('برگشت به یادداشت', 'Revert to Draft')}
                                             </Button>
                                         )}
@@ -373,51 +474,78 @@
                         language={language}
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
-                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Transaction Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
-                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند *', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Transaction Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
                             <div className="relative z-[80]">
-                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش *', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
+                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
                             
                             <div className="lg:col-span-3 sm:col-span-2 relative z-[70]">
-                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ *', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                         </div>
                     </Card>
 
                     <Card
-                        title={t('اقلام سند', 'Document Items')}
+                        title={t('اقلام سند', 'Transaction Items')}
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px] relative z-10"
                         headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
                         language={language}
                     >
-                        <TransactionMainGrid 
-                            items={itemsData}
-                            onItemsChange={setItemsData}
-                            lookups={lookups}
-                            isReadOnly={isReadOnly}
-                            language={language}
-                            isRtl={isRtl}
-                            formCode={formCode}
-                            showToast={showToast}
-                        />
+                        <div className="flex-1 w-full p-1 relative min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50 flex flex-col min-w-0">
+                            <TransactionMainGrid 
+                                itemsData={itemsData} 
+                                onItemsChange={setItemsData} 
+                                lookups={lookups} 
+                                isReadOnly={isReadOnly} 
+                                formCode={formCode} 
+                                language={language}
+                                showToast={showToast}
+                            />
+                        </div>
                     </Card>
                 </div>
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
                     <Button variant="outline" size="sm" onClick={onClose}>{t('بستن', 'Close')}</Button>
-                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
+                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Transaction')}</Button>}
                 </div>
             </div>
+            
+            <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Attachments')} language={language} width="max-w-xl">
+                <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg">
+                    <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0">
+                        <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.document_code}</span>
+                        {isAttachReadOnly && <Badge variant="slate" size="sm">{t('فقط خواندنی', 'Read Only')}</Badge>}
+                    </div>
+
+                    <div className="flex-1 overflow-hidden min-h-[300px] rounded-lg">
+                        <AttachmentManager 
+                            files={attachModal.files}
+                            onUpload={handleFileUpload}
+                            onDelete={(f) => handleDeleteAttachment(f.id)}
+                            onDownload={(f) => window.open(f.file_url, '_blank')}
+                            readOnly={isAttachReadOnly}
+                            isUploading={isUploading}
+                            language={language}
+                            formCode={formCode}
+                        />
+                    </div>
+                </div>
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
+                    <Button variant="primary" size="sm" onClick={() => setAttachModal({ isOpen: false, record: null, files: [] })}>{t('بستن', 'Close')}</Button>
+                </div>
+            </Modal>
+            
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </Modal>
     );
