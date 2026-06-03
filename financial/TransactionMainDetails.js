@@ -6,8 +6,7 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const {
-    FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon, Save = FallbackIcon,
-    X = FallbackIcon, List = FallbackIcon, AlertTriangle = FallbackIcon, Check = FallbackIcon
+    FileText = FallbackIcon, AlertTriangle = FallbackIcon, Check = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -15,10 +14,7 @@
   const { Button = FallbackComponent, Badge = FallbackComponent, Card = FallbackComponent } = Core;
 
   const Forms = window.DSForms || DS || {};
-  const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent, AttachmentManager = FallbackComponent } = Forms;
-
-  const Grid = window.DSGrid || DS || {};
-  const { DataGrid = FallbackComponent, LOVField = FallbackComponent } = Grid;
+  const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
 
   const Feedback = window.DSFeedback || DS || {};
   const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
@@ -48,18 +44,6 @@
         { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
     ];
 
-    const TRANSACTION_ACTIONS = [
-        { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
-        { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') }
-    ];
-
-    const TRANSACTION_GROUPS = [
-        { value: 'COST', label: t('هزینه', 'Cost') },
-        { value: 'INCOME', label: t('درآمد', 'Income') },
-        { value: 'BALANCE', label: t('بالانس', 'Balance') },
-        { value: 'OTHER', label: t('سایر', 'Other') }
-    ];
-
     const STATUS_OPTIONS = [
         { value: 'DRAFT', label: t('یادداشت', 'Draft') },
         { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
@@ -71,11 +55,7 @@
     
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
-    const [inlineItemEdit, setInlineItemEdit] = useState(null);
     const [copyWarning, setCopyWarning] = useState(null);
-
-    const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
-    const [isUploading, setIsUploading] = useState(false);
 
     const [lookups, setLookups] = useState({
         accounts: [],
@@ -95,10 +75,6 @@
         if (!headerData.status) return false;
         return headerData.status !== 'DRAFT' && headerData.status !== 'TEMPORARY';
     }, [headerData.status, formMode]);
-
-    const isAttachReadOnly = useMemo(() => {
-        return attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
-    }, [attachModal.record]);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -122,10 +98,10 @@
         if (!supabase) return null;
         try {
             const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
+                supabase.from('fm_coa_accounts').select('id, title_fa, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
-                supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
-                supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+                supabase.from('fm_cost_types').select('id, title_fa, code, parent_id').eq('is_active', true),
+                supabase.from('fm_income_types').select('id, title_fa, code, parent_id').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title')
@@ -159,22 +135,17 @@
                     if (charts && !activeChartIds.has(i.chart_id)) return false; 
                     return true;
                 }).map(i => {
-                    const titleFa = i.title_fa || i.title;
-                    const titleEn = i.title_en || i.title_fa || i.title;
-                    let pathArr = [isRtl ? titleFa : titleEn]; 
+                    let pathArr = [i.title_fa || i.title]; 
                     let curr = i;
                     while (curr && curr.parent_id) {
                         const parent = items.find(p => p.id === curr.parent_id);
                         if (parent) {
-                            const pTitleFa = parent.title_fa || parent.title;
-                            const pTitleEn = parent.title_en || parent.title_fa || parent.title;
-                            pathArr.unshift(isRtl ? pTitleFa : pTitleEn);
+                            pathArr.unshift(parent.title_fa || parent.title);
                             curr = parent;
                         } else break;
                     }
                     return {
                         ...i,
-                        displayLabel: isRtl ? titleFa : titleEn,
                         pathTitle: pathArr.join(' / '),
                         chart_name: charts ? (charts.find(c => c.id === i.chart_id)?.title || '') : ''
                     };
@@ -203,17 +174,10 @@
             showToast(t('خطا در دریافت اطلاعات پایه', 'Error fetching dependencies'), 'error');
             return null;
         }
-    }, [supabase, showToast, t, currentUserId, isRtl]);
+    }, [supabase, showToast, t, currentUserId]);
 
     const generateDocumentCode = () => {
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-    };
-
-    const loadAttachments = async (recordId) => {
-        try {
-            const { data } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
-            setAttachModal(prev => ({ ...prev, files: data || [] }));
-        } catch (err) {}
     };
 
     useEffect(() => {
@@ -228,7 +192,6 @@
             if (!newLookups) return;
 
             const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
-            setInlineItemEdit(null);
             setCopyWarning(null);
 
             let safeFinalRegistrar = currentUserId;
@@ -250,7 +213,6 @@
                     registered_at: new Date().toISOString()
                 });
                 setItemsData([]);
-                setAttachModal({ isOpen: false, record: null, files: [] });
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
                 if (formMode === 'COPY') {
                     setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of document ${initialRecord.document_code} and requires review.`));
@@ -280,13 +242,6 @@
                 })).sort((a, b) => a.row_number - b.row_number);
                 
                 setItemsData(mappedItems);
-
-                if (formMode === 'EDIT') {
-                    loadAttachments(initialRecord.id);
-                    setAttachModal(prev => ({ ...prev, record: initialRecord }));
-                } else {
-                    setAttachModal({ isOpen: false, record: null, files: [] });
-                }
             }
         });
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
@@ -311,10 +266,6 @@
     };
 
     const handleSaveTransaction = async () => {
-        if (inlineItemEdit) {
-            return showToast(t('لطفاً با زدن دکمه Enter تغییرات سطر باز را ذخیره کنید.', 'Please save inline edits first using Enter key.'), 'warning');
-        }
-
         if (!headerData.document_date || !headerData.transaction_type || !headerData.description) {
             return showToast(t('تکمیل فیلدهای اجباری سربرگ (تاریخ، نوع، شرح) الزامی است.', 'Header required fields missing.'), 'warning');
         }
@@ -375,277 +326,7 @@
         }
     };
 
-    const handleAddItemClick = () => {
-        if (isReadOnly) return;
-        if (inlineItemEdit) return showToast(t('ابتدا با زدن دکمه Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
-        setInlineItemEdit({
-            id: 'new',
-            data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', amount: '', description: '' }
-        });
-    };
-
-    const handleEditItemClick = (row) => {
-        if (isReadOnly || inlineItemEdit) return;
-        const accObj = lookups.leafAccounts.find(a => String(a.id) === String(row.account_id)) || null;
-        setInlineItemEdit({
-            id: row._tempId || row.id,
-            data: { ...row, account_obj: accObj, amount: row.amount ? String(row.amount).replace(/,/g, '') : '' }
-        });
-    };
-
-    const handleSaveItemInline = () => {
-        if (!inlineItemEdit) return;
-        const form = inlineItemEdit.data;
-        
-        if (!form.account_id || !form.amount || !form.description) {
-            return showToast(t('حساب، مبلغ و شرح اجباری هستند.', 'Account, Amount, and Description required.'), 'warning');
-        }
-
-        const cleanAmount = String(form.amount || '0').replace(/,/g, '');
-        if (isNaN(cleanAmount) || cleanAmount === '') return showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
-
-        let newRowNum = parseInt(form.row_number, 10);
-        if (isNaN(newRowNum) || newRowNum < 1) newRowNum = itemsData.length + (inlineItemEdit.id === 'new' ? 1 : 0);
-
-        const dataToSave = { ...form, amount: cleanAmount };
-        if (inlineItemEdit.id === 'new') dataToSave._tempId = crypto.randomUUID();
-
-        let otherItems = itemsData;
-        if (inlineItemEdit.id !== 'new') {
-            otherItems = itemsData.filter(item => item._tempId !== inlineItemEdit.id && item.id !== inlineItemEdit.id);
-        }
-
-        otherItems.sort((a, b) => a.row_number - b.row_number);
-        
-        const targetIndex = Math.min(Math.max(0, newRowNum - 1), otherItems.length);
-        otherItems.splice(targetIndex, 0, dataToSave);
-        
-        const finalItems = otherItems.map((item, idx) => ({ ...item, row_number: idx + 1 }));
-        setItemsData(finalItems);
-        setInlineItemEdit(null);
-    };
-
-    const handleRemoveItem = (row) => {
-        if (isReadOnly) return;
-        const newItems = itemsData.filter(item => item._tempId !== row._tempId && item.id !== row.id);
-        setItemsData(newItems.map((item, idx) => ({ ...item, row_number: idx + 1 })));
-    };
-
-    const handleBulkDeleteItems = (ids) => {
-        if (isReadOnly) return;
-        const newItems = itemsData.filter(item => !ids.includes(item.id) && !ids.includes(item._tempId));
-        setItemsData(newItems.map((item, idx) => ({ ...item, row_number: idx + 1 })));
-        setInlineItemEdit(null);
-        showToast(t('اقلام انتخاب شده حذف شدند.', 'Selected items deleted.'));
-    };
-
-    const handleInlineKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSaveItemInline();
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            e.stopPropagation();
-            setInlineItemEdit(null);
-        }
-    };
-
-    const handleFileUpload = async (files) => {
-        if (!files || files.length === 0 || !attachModal.record) return;
-        const file = files[0];
-
-        setIsUploading(true);
-        try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${attachModal.record.id}_${Date.now()}.${fileExt}`;
-            const filePath = `transactions/${fileName}`;
-
-            let fileUrl = '';
-            if (supabase.storage) {
-                const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file);
-                if (uploadError) throw uploadError;
-                const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
-                fileUrl = urlData.publicUrl;
-            } else {
-                fileUrl = URL.createObjectURL(file); 
-            }
-
-            const payload = {
-                entity_type: 'TRANSACTION',
-                entity_id: attachModal.record.id,
-                file_name: file.name,
-                file_size: file.size,
-                file_type: file.type,
-                file_url: fileUrl,
-                created_by: currentUserId
-            };
-
-            const { error } = await supabase.from('fm_attachments').insert([payload]);
-            if (error) throw error;
-
-            showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
-            loadAttachments(attachModal.record.id);
-        } catch (error) {
-            showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
-        } finally {
-            setIsUploading(false);
-        }
-    };
-
-    const handleDeleteAttachment = async (file) => {
-        try {
-            const { error } = await supabase.from('fm_attachments').delete().eq('id', file.id);
-            if (error) throw error;
-            showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
-            loadAttachments(attachModal.record.id);
-        } catch (error) {
-            showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
-        }
-    };
-
-    const formatNumber = (num) => {
-        if (!num && num !== 0) return '';
-        const parts = num.toString().split('.');
-        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        return parts.join('.');
-    };
-
-    const handleAmountChange = (e) => {
-        const raw = e.target.value.replace(/,/g, '');
-        if (raw === '' || !isNaN(raw)) {
-            setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: raw } }));
-        }
-    };
-
-    const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '120px' },
-        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px' },
-        { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (val, row) => (
-            <div className="flex flex-col">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
-            </div>
-        )}
-    ];
-
-    const costLovColumns = [
-        { field: 'code', header_fa: 'کد هزینه', header_en: 'Cost Code', width: '100px' },
-        { field: 'displayLabel', header_fa: 'عنوان هزینه', header_en: 'Cost Title', width: 'auto', render: (val, row) => (
-            <div className="flex flex-col">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
-            </div>
-        )}
-    ];
-
-    const incomeLovColumns = [
-        { field: 'code', header_fa: 'کد درآمد', header_en: 'Income Code', width: '100px' },
-        { field: 'displayLabel', header_fa: 'عنوان درآمد', header_en: 'Income Title', width: 'auto', render: (val, row) => (
-            <div className="flex flex-col">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
-            </div>
-        )}
-    ];
-
-    const itemGridData = useMemo(() => {
-        const data = [...itemsData];
-        if (inlineItemEdit && inlineItemEdit.id === 'new') data.unshift({ id: 'new', _isNew: true, ...inlineItemEdit.data });
-        return data;
-    }, [itemsData, inlineItemEdit]);
-
-    const itemColumns = [
-        { field: 'row_number', header_fa: '#', width: '40px', render: (val, row) => {
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="number" min="1" value={inlineItemEdit.data.row_number || ''} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, row_number: e.target.value}}))} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
-            }
-            return row._isNew ? <span className="text-emerald-600 font-bold">*</span> : <span className="text-[12px]">{val}</span>;
-        }},
-        { field: 'account_id', header_fa: 'حساب *', width: '200px', render: (val, row) => {
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return (
-                    <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
-                        <LOVField 
-                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[400px]"
-                            displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.displayLabel}` : ''}
-                            onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
-                            isRtl={isRtl} wrapperClassName="m-0"
-                        />
-                    </div>
-                );
-            }
-            const acc = lookups.leafAccounts.find(a => String(a.id) === String(val));
-            return acc ? <span className="text-[12px] truncate block">{acc.code} - {acc.displayLabel}</span> : '';
-        }},
-        { field: 'transaction_action', header_fa: 'نوع', width: '80px', render: (val, row) => {
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[90]"><SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_action: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
-            }
-            return <span className="text-[12px]">{TRANSACTION_ACTIONS.find(a => a.value === val)?.label || val}</span>;
-        }},
-        { field: 'transaction_group', header_fa: 'گروه', width: '80px', render: (val, row) => {
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[80]"><SelectField size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: ''}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
-            }
-            return <span className="text-[12px]">{TRANSACTION_GROUPS.find(a => a.value === val)?.label || val}</span>;
-        }},
-        { field: 'sub_type', header_fa: 'هزینه/درآمد', width: '150px', render: (_, row) => {
-            const group = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId) ? inlineItemEdit.data.transaction_group : row.transaction_group;
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                if (group === 'COST') {
-                    return (
-                        <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
-                            <LOVField 
-                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[400px]"
-                                displayValue={lookups.costTypes.find(c => c.id === inlineItemEdit.data.cost_type_id)?.displayLabel || ''}
-                                onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: r?.id}}))}
-                                isRtl={isRtl} wrapperClassName="m-0"
-                            />
-                        </div>
-                    );
-                }
-                if (group === 'INCOME') {
-                    return (
-                        <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
-                            <LOVField 
-                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[400px]"
-                                displayValue={lookups.incomeTypes.find(c => c.id === inlineItemEdit.data.income_type_id)?.displayLabel || ''}
-                                onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: r?.id}}))}
-                                isRtl={isRtl} wrapperClassName="m-0"
-                            />
-                        </div>
-                    );
-                }
-                return <div className="h-[32px] w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
-            }
-            if (group === 'COST') return <span className="text-[12px]">{lookups.costTypes.find(x => String(x.id) === String(row.cost_type_id))?.displayLabel || ''}</span>;
-            if (group === 'INCOME') return <span className="text-[12px]">{lookups.incomeTypes.find(x => String(x.id) === String(row.income_type_id))?.displayLabel || ''}</span>;
-            return '-';
-        }},
-        { field: 'currency', header_fa: 'ارز', width: '50px', render: (val, row) => {
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
-            }
-            return <span dir="ltr" className="text-[12px]">{val}</span>;
-        }},
-        { field: 'amount', header_fa: 'مبلغ *', width: '100px', render: (val, row) => {
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" value={formatNumber(inlineItemEdit.data.amount)} onChange={handleAmountChange} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
-            }
-            return <span dir="ltr" className="text-[12px] font-medium">{formatNumber(val)}</span>;
-        }},
-        { field: 'description', header_fa: 'شرح *', width: 'auto', render: (val, row) => {
-            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.description} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, description: e.target.value}}))} isRtl={isRtl} required wrapperClassName="m-0" placeholder={t('Enter برای ثبت', 'Enter to save')} /></div>;
-            }
-            return <span className="text-[12px] truncate">{val}</span>;
-        }}
-    ];
-
-    const itemBulkActions = isReadOnly ? [] : [
-        { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => handleBulkDeleteItems(ids) }
-    ];
+    const TransactionMainGrid = window.TransactionMainGrid || FallbackComponent;
 
     if (!isOpen) return null;
 
@@ -719,14 +400,16 @@
                         headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
                         language={language}
                     >
-                        <div className="flex-1 w-full p-1 relative min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50 flex flex-col min-w-0">
-                            <DataGrid 
-                                data={itemGridData} columns={itemColumns}
-                                language={language} onAdd={isReadOnly ? undefined : handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
-                                selectable={!isReadOnly} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)}
-                                className="h-full"
-                            />
-                        </div>
+                        <TransactionMainGrid 
+                            items={itemsData}
+                            onItemsChange={setItemsData}
+                            lookups={lookups}
+                            isReadOnly={isReadOnly}
+                            language={language}
+                            isRtl={isRtl}
+                            formCode={formCode}
+                            showToast={showToast}
+                        />
                     </Card>
                 </div>
 
@@ -735,32 +418,6 @@
                     {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
                 </div>
             </div>
-            
-            <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Document Attachments')} language={language} width="max-w-xl">
-                <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg">
-                    <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0">
-                        <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.document_code}</span>
-                        {isAttachReadOnly && <Badge variant="slate" size="sm">{t('فقط خواندنی', 'Read Only')}</Badge>}
-                    </div>
-
-                    <div className="flex-1 overflow-hidden min-h-[300px] rounded-lg">
-                        <AttachmentManager 
-                            files={attachModal.files}
-                            onUpload={handleFileUpload}
-                            onDelete={(f) => handleDeleteAttachment(f)}
-                            onDownload={(f) => window.open(f.file_url, '_blank')}
-                            readOnly={isAttachReadOnly}
-                            isUploading={isUploading}
-                            language={language}
-                            formCode={formCode}
-                        />
-                    </div>
-                </div>
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
-                    <Button variant="primary" size="sm" onClick={() => setAttachModal({ isOpen: false, record: null, files: [] })}>{t('بستن', 'Close')}</Button>
-                </div>
-            </Modal>
-            
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </Modal>
     );
