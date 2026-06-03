@@ -77,8 +77,11 @@
         const cleanDeposit = String(form.deposit_amount || '0').replace(/,/g, '');
         const cleanWithdrawal = String(form.withdrawal_amount || '0').replace(/,/g, '');
         
-        if ((isNaN(cleanDeposit) || cleanDeposit === '') && (isNaN(cleanWithdrawal) || cleanWithdrawal === '')) {
-            return showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
+        const numDep = parseFloat(cleanDeposit) || 0;
+        const numWid = parseFloat(cleanWithdrawal) || 0;
+
+        if (numDep === 0 && numWid === 0) {
+            return showToast(t('برای هر قلم سند، مبلغ واریز یا برداشت باید بزرگتر از صفر باشد.', 'Amount must be greater than zero.'), 'warning');
         }
 
         let newRowNum = parseInt(form.row_number, 10);
@@ -168,7 +171,7 @@
     const itemColumns = [
         { field: 'row_number', header_fa: '#', header_en: '#', width: '40px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="number" min="1" value={inlineItemEdit.data.row_number || ''} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, row_number: e.target.value}}))} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="number" min="1" value={inlineItemEdit.data.row_number || ''} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, row_number: e.target.value}}))} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" id="grid-inline-edit-marker" /></div>;
             }
             return row._isNew ? <span className="text-emerald-600 font-bold">*</span> : <span className="text-[12px]">{val}</span>;
         }},

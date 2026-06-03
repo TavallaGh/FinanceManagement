@@ -271,17 +271,51 @@
         });
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
-    const handleChangeStatus = async (newStatus) => {
-        if (headerData.transaction_type === 'TRANSFER' && newStatus !== 'DRAFT') {
-            let sumDep = 0, sumWid = 0;
-            itemsData.forEach(i => {
-                sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
-                sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-            });
+    const validateTransactionLogic = (targetStatus) => {
+        if (targetStatus === 'DRAFT') return true;
+
+        if (itemsData.length === 0) {
+            showToast(t('سند باید حداقل دارای یک قلم باشد.', 'Transaction must have at least one item.'), 'warning');
+            return false;
+        }
+
+        let sumDep = 0, sumWid = 0;
+        let hasZeroItem = false;
+
+        itemsData.forEach(i => {
+            const dep = parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
+            const wid = parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+            if (dep === 0 && wid === 0) hasZeroItem = true;
+            sumDep += dep;
+            sumWid += wid;
+        });
+
+        if (hasZeroItem) {
+            showToast(t('مبلغ تمام اقلام سند باید بزرگتر از صفر باشد.', 'All items must have an amount greater than zero.'), 'warning');
+            return false;
+        }
+
+        if (sumDep === 0 && sumWid === 0) {
+            showToast(t('جمع مبالغ سند صفر است و قابلیت تایید یا نهایی شدن ندارد.', 'Total transaction amount cannot be zero.'), 'warning');
+            return false;
+        }
+
+        if (headerData.transaction_type === 'TRANSFER') {
             if (sumDep !== sumWid) {
-                return showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Cannot change status of unbalanced transfer.'), 'warning');
+                showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
+                return false;
+            }
+            if (sumDep === 0) {
+                showToast(t('مبلغ تراکنش انتقال نمی‌تواند صفر باشد.', 'Transfer amount cannot be zero.'), 'warning');
+                return false;
             }
         }
+
+        return true;
+    };
+
+    const handleChangeStatus = async (newStatus) => {
+        if (!validateTransactionLogic(newStatus)) return;
         
         setHeaderData(prev => ({ ...prev, status: newStatus }));
         if (headerData.id) {
@@ -302,24 +336,15 @@
     };
 
     const handleSaveTransaction = async () => {
+        if (document.getElementById('grid-inline-edit-marker')) {
+            return showToast(t('لطفاً ابتدا با زدن دکمه Enter تغییرات سطر باز را در اقلام ذخیره کنید.', 'Please save inline edits first using Enter key.'), 'warning');
+        }
+
         if (!headerData.document_date || !headerData.transaction_type || !headerData.description) {
             return showToast(t('تکمیل فیلدهای اجباری سربرگ (تاریخ، نوع، شرح) الزامی است.', 'Header required fields missing.'), 'warning');
         }
         
-        if (itemsData.length === 0) {
-            return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Transaction must have at least one item.'), 'warning');
-        }
-
-        if (headerData.transaction_type === 'TRANSFER' && headerData.status !== 'DRAFT') {
-            let sumDep = 0, sumWid = 0;
-            itemsData.forEach(i => {
-                sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
-                sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-            });
-            if (sumDep !== sumWid) {
-                return showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
-            }
-        }
+        if (!validateTransactionLogic(headerData.status)) return;
 
         setIsLoading(true);
         try {
@@ -348,22 +373,24 @@
                 await logAction('update_transaction', txId, `ویرایش تراکنش: ${headerData.document_code}`);
             }
 
-            const itemsPayload = itemsData.map((item, index) => ({
-                transaction_id: txId,
-                row_number: index + 1,
-                account_id: item.account_id || null,
-                transaction_action: item.transaction_action,
-                transaction_group: item.transaction_group,
-                cost_type_id: item.cost_type_id || null,
-                income_type_id: item.income_type_id || null,
-                currency: item.currency || 'IRR',
-                deposit_amount: parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0,
-                withdrawal_amount: parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0,
-                description: item.description || ''
-            }));
+            if (itemsData.length > 0) {
+                const itemsPayload = itemsData.map((item, index) => ({
+                    transaction_id: txId,
+                    row_number: index + 1,
+                    account_id: item.account_id || null,
+                    transaction_action: item.transaction_action,
+                    transaction_group: item.transaction_group,
+                    cost_type_id: item.cost_type_id || null,
+                    income_type_id: item.income_type_id || null,
+                    currency: item.currency || 'IRR',
+                    deposit_amount: parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0,
+                    withdrawal_amount: parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0,
+                    description: item.description || ''
+                }));
 
-            const { error: itemsError } = await supabase.from('fm_transaction_items').insert(itemsPayload);
-            if (itemsError) throw itemsError;
+                const { error: itemsError } = await supabase.from('fm_transaction_items').insert(itemsPayload);
+                if (itemsError) throw itemsError;
+            }
 
             showToast(t('سند با موفقیت ثبت شد.', 'Transaction saved successfully.'));
             onSuccess();
