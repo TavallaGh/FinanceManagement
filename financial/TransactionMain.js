@@ -356,7 +356,6 @@
         { field: 'daily_number', header_fa: 'شماره روزانه', header_en: 'Daily Num', width: '90px' },
         { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '110px', type: 'date' },
         { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '110px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
-        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => <span className="text-[12px] truncate max-w-[200px] block" title={val}>{val || '-'}</span> },
         { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '90px', render: (val) => {
             const s = STATUS_OPTIONS.find(x => x.value === val);
             const colors = { DRAFT: 'slate', TEMPORARY: 'orange', APPROVED: 'emerald' };
@@ -365,7 +364,8 @@
         { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '140px', render: (val) => {
             if (!val || val === '00000000-0000-0000-0000-000000000000') return <span className="text-[12px] text-slate-500">{t('ثبت سیستمی', 'System')}</span>;
             return <span className="text-[12px] truncate font-medium text-slate-700 dark:text-slate-300">{usersMap[val] || val}</span>;
-        }}
+        }},
+        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => <span className="text-[12px] truncate max-w-[200px] block" title={val}>{val || '-'}</span> }        
     ], [usersMap, t]);
 
     const summaryColumns = [
