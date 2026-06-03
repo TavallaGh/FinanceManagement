@@ -521,6 +521,7 @@
                                 formCode={formCode} 
                                 language={language}
                                 showToast={showToast}
+                                transactionType={headerData.transaction_type}
                             />
                         </div>
                     </Card>

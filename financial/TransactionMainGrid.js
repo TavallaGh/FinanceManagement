@@ -5,9 +5,12 @@
 
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
-  const { Trash2 = FallbackIcon } = LucideIcons;
+  const { Trash2 = FallbackIcon, Scale = FallbackIcon, AlertTriangle = FallbackIcon } = LucideIcons;
 
   const DS = window.DesignSystem || {};
+  const Core = window.DSCore || DS || {};
+  const { Button = FallbackComponent } = Core;
+
   const Forms = window.DSForms || DS || {};
   const { TextField = FallbackComponent, SelectField = FallbackComponent } = Forms;
 
@@ -16,7 +19,7 @@
 
   function FallbackComponent() { return null; }
 
-  const TransactionMainGrid = ({ itemsData = [], onItemsChange, lookups, isReadOnly, formCode, language = 'fa', showToast }) => {
+  const TransactionMainGrid = ({ itemsData = [], onItemsChange, lookups, isReadOnly, formCode, language = 'fa', showToast, transactionType }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
 
@@ -129,6 +132,47 @@
             e.stopPropagation();
             setInlineItemEdit(null);
         }
+    };
+
+    const balanceInfo = useMemo(() => {
+        if (transactionType !== 'TRANSFER' || itemsData.length === 0 || isReadOnly) return { isUnbalanced: false };
+        let sumDep = 0, sumWid = 0;
+        itemsData.forEach(i => {
+            sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
+            sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+        });
+        const diff = sumDep - sumWid;
+        return {
+            isUnbalanced: diff !== 0,
+            diff: diff,
+            sumDep,
+            sumWid
+        };
+    }, [itemsData, transactionType, isReadOnly]);
+
+    const handleBalanceClick = () => {
+        if (inlineItemEdit) return showToast(t('ابتدا با زدن دکمه Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
+        
+        const diff = balanceInfo.diff;
+        const reqDep = diff < 0 ? Math.abs(diff) : 0;
+        const reqWid = diff > 0 ? diff : 0;
+
+        setInlineItemEdit({
+            id: 'new',
+            data: {
+                row_number: itemsData.length + 1,
+                account_id: '',
+                account_obj: null,
+                transaction_action: diff < 0 ? 'DEPOSIT' : 'WITHDRAWAL',
+                transaction_group: 'BALANCE',
+                cost_type_id: '',
+                income_type_id: '',
+                currency: itemsData.length > 0 ? itemsData[0].currency : 'IRR',
+                deposit_amount: String(reqDep),
+                withdrawal_amount: String(reqWid),
+                description: t('تراز کردن سند', 'Balance transaction')
+            }
+        });
     };
 
     const accountLovColumns = [
@@ -294,12 +338,29 @@
     ];
 
     return (
-        <DataGrid 
-            data={itemGridData} columns={itemColumns}
-            language={language} onAdd={isReadOnly ? undefined : handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
-            selectable={!isReadOnly} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)}
-            className="h-full" formCode={formCode}
-        />
+        <div className="flex flex-col h-full w-full">
+            {balanceInfo.isUnbalanced && (
+                <div className="p-2.5 bg-orange-50 dark:bg-orange-900/20 border-b border-orange-200 dark:border-orange-800 flex items-center justify-between shrink-0 animate-in fade-in slide-in-from-top-1 z-20">
+                    <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                        <AlertTriangle size={16} />
+                        <span className="text-[12px] font-bold">
+                            {t('سند انتقال تراز نیست. اختلاف:', 'Unbalanced transfer. Difference:')} <span dir="ltr" className="inline-block px-1 font-black">{formatNumber(Math.abs(balanceInfo.diff))}</span>
+                        </span>
+                    </div>
+                    <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-7 !py-0" icon={Scale} onClick={handleBalanceClick}>
+                        {t('تراز کردن تراکنش', 'Balance Transaction')}
+                    </Button>
+                </div>
+            )}
+            <div className="flex-1 min-h-0 relative z-10">
+                <DataGrid 
+                    data={itemGridData} columns={itemColumns}
+                    language={language} onAdd={isReadOnly ? undefined : handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
+                    selectable={!isReadOnly} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)}
+                    className="h-full border-0" formCode={formCode}
+                />
+            </div>
+        </div>
     );
   };
 
