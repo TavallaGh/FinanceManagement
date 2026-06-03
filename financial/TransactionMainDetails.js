@@ -464,8 +464,32 @@
 
     const TransactionMainGrid = window.TransactionMainGrid || FallbackComponent;
 
+    const headerCardTitle = (
+        <div className="flex items-center gap-4 w-full">
+            <span>{t('اطلاعات سربرگ', 'Header Data')}</span>
+            <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'orange' : 'slate'} className="shadow-none">
+                {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
+            </Badge>
+        </div>
+    );
+
+    const headerCardAction = (!isReadOnly && formMode !== 'CREATE') ? (
+        <div className="flex items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
+            {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
+                <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
+                    {t('تبدیل به موقت', 'Set Temporary')}
+                </Button>
+            )}
+            {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
+                <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
+                    {t('برگشت به یادداشت', 'Revert to Draft')}
+                </Button>
+            )}
+        </div>
+    ) : null;
+
     const itemsCardTitle = (
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 w-full">
             <span>{t('اقلام سند', 'Transaction Items')}</span>
             {balanceInfo.isUnbalanced && (
                 <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800/50">
@@ -497,33 +521,12 @@
                     )}
 
                     <Card
-                        title={t('اطلاعات سربرگ', 'Header Data')}
+                        title={headerCardTitle}
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 relative z-20"
                         headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
-                        action={
-                            <div className="flex items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
-                                <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'orange' : 'slate'} size="sm" className="shadow-sm">
-                                    {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
-                                </Badge>
-                                
-                                {!isReadOnly && formMode !== 'CREATE' && (
-                                    <div className="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-2">
-                                        {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
-                                                {t('تبدیل به موقت', 'Set Temporary')}
-                                            </Button>
-                                        )}
-                                        {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
-                                                {t('برگشت به یادداشت', 'Revert to Draft')}
-                                            </Button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        }
+                        action={headerCardAction}
                         language={language}
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">

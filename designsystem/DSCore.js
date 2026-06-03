@@ -201,7 +201,7 @@
                   {collapsed ? (isRtl ? <ChevronLeft size={16}/> : <ChevronRight size={16}/>) : <ChevronDown size={16}/>}
                 </span>
               )}
-              <h3 className="font-black text-[12px] text-slate-800 dark:text-slate-100 truncate">{title}</h3>
+              <div className="font-black text-[12px] text-slate-800 dark:text-slate-100 truncate flex items-center gap-2 w-full">{title}</div>
             </div>
             {action && <div className="shrink-0" onClick={e => e.stopPropagation()}>{action}</div>}
           </div>
@@ -217,16 +217,17 @@
 
   const Badge = ({ children, variant = 'gray', className = '' }) => {
     const variants = {
-      gray: "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-slate-600", 
-      success: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800",
-      warning: "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800", 
-      danger: "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800", 
-      indigo: "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800",
-      blue: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800",
-      orange: "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800",
-      emerald: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+      gray: "bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300", 
+      slate: "bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300", 
+      success: "bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
+      warning: "bg-amber-100/50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400", 
+      danger: "bg-red-100/50 dark:bg-red-900/30 text-red-600 dark:text-red-400", 
+      indigo: "bg-indigo-100/50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400",
+      blue: "bg-blue-100/50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
+      orange: "bg-orange-100/50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
+      emerald: "bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
     };
-    return <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-black tracking-wide ${variants[variant] || variants.gray} ${className}`}>{children}</span>;
+    return <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide ${variants[variant] || variants.gray} ${className}`}>{children}</span>;
   };
 
   const PageHeader = ({ title, icon: Icon, breadcrumbs = [], language = 'fa', actions, viewConfig }) => {
