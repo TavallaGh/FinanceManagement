@@ -53,6 +53,7 @@
 
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [isLoading, setIsLoading] = useState(false);
+    const [isDirty, setIsDirty] = useState(false);
     
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
@@ -232,6 +233,7 @@
                 });
                 setItemsData([]);
                 setAttachModal({ isOpen: false, record: null, files: [] });
+                setIsDirty(false);
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
                 if (formMode === 'COPY') {
                     setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of transaction ${initialRecord.document_code} and requires review.`));
@@ -261,6 +263,7 @@
                 })).sort((a, b) => a.row_number - b.row_number);
                 
                 setItemsData(mappedItems);
+                setIsDirty(formMode === 'COPY');
 
                 if (formMode === 'EDIT') {
                     loadAttachments(initialRecord.id);
@@ -360,7 +363,7 @@
                 description: headerData.description || ''
             };
 
-            if (formMode === 'CREATE' || formMode === 'COPY' || !txId) {
+            if (!txId) {
                 const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
                 if (error) throw error;
                 txId = data[0].id;
@@ -369,37 +372,48 @@
             } else {
                 const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
                 if (error) throw error;
-                await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
-                await logAction('update_transaction', txId, `ویرایش تراکنش: ${headerData.document_code}`);
+                
+                if (statusToSave !== headerData.status) {
+                    await logAction('status_update', txId, `تغییر وضعیت تراکنش به: ${statusToSave}`);
+                } else if (isDirty) {
+                    await logAction('update_transaction', txId, `ویرایش تراکنش: ${headerData.document_code}`);
+                }
             }
 
-            if (itemsData.length > 0) {
-                const itemsPayload = itemsData.map((item, index) => ({
-                    transaction_id: txId,
-                    row_number: index + 1,
-                    account_id: item.account_id || null,
-                    transaction_action: item.transaction_action,
-                    transaction_group: item.transaction_group,
-                    cost_type_id: item.cost_type_id || null,
-                    income_type_id: item.income_type_id || null,
-                    currency: item.currency || 'IRR',
-                    deposit_amount: parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0,
-                    withdrawal_amount: parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0,
-                    description: item.description || ''
-                }));
+            if (isDirty || !headerData.id) {
+                await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
+                
+                if (itemsData.length > 0) {
+                    const itemsPayload = itemsData.map((item, index) => ({
+                        transaction_id: txId,
+                        row_number: index + 1,
+                        account_id: item.account_id || null,
+                        transaction_action: item.transaction_action,
+                        transaction_group: item.transaction_group,
+                        cost_type_id: item.cost_type_id || null,
+                        income_type_id: item.income_type_id || null,
+                        currency: item.currency || 'IRR',
+                        deposit_amount: parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0,
+                        withdrawal_amount: parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0,
+                        description: item.description || ''
+                    }));
 
-                const { error: itemsError } = await supabase.from('fm_transaction_items').insert(itemsPayload);
-                if (itemsError) throw itemsError;
+                    const { data: newItems, error: itemsError } = await supabase.from('fm_transaction_items').insert(itemsPayload).select();
+                    if (itemsError) throw itemsError;
+
+                    const mappedItems = newItems.map(item => ({
+                        ...item,
+                        _tempId: crypto.randomUUID()
+                    })).sort((a, b) => a.row_number - b.row_number);
+                    setItemsData(mappedItems);
+                }
             }
 
             setHeaderData(prev => ({ ...prev, status: statusToSave }));
+            setIsDirty(false);
             
-            if (typeof overrideStatus === 'string') {
-                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
-            } else {
-                showToast(t('سند با موفقیت ثبت شد.', 'Transaction saved successfully.'));
-            }
-            onSuccess();
+            showToast(t('عملیات با موفقیت انجام شد.', 'Operation successful.'));
+            if (onSuccess) onSuccess({ keepOpen: true, data: { id: txId, status: statusToSave } });
         } catch (error) {
             showToast(t('خطا در عملیات.', 'Operation failed.'), 'error');
         } finally {
@@ -473,7 +487,7 @@
         </div>
     );
 
-    const headerCardAction = (!isReadOnly && formMode !== 'CREATE') ? (
+    const headerCardAction = (!isReadOnly) ? (
         <div className="flex items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
             {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
                 <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
@@ -534,17 +548,17 @@
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
-                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Transaction Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Transaction Date')} value={headerData.document_date || ''} onChange={val => { setHeaderData({...headerData, document_date: val}); setIsDirty(true); }} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
                             <div className="relative z-[80]">
-                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
+                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => { setHeaderData({...headerData, transaction_type: e.target.value}); setIsDirty(true); }} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
                             
                             <div className="lg:col-span-3 sm:col-span-2 relative z-[70]">
-                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => { setHeaderData({...headerData, description: e.target.value}); setIsDirty(true); }} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                         </div>
                     </Card>
@@ -562,7 +576,7 @@
                             <TransactionMainGrid 
                                 ref={gridRef}
                                 itemsData={itemsData} 
-                                onItemsChange={setItemsData} 
+                                onItemsChange={(newItems) => { setItemsData(newItems); setIsDirty(true); }} 
                                 lookups={lookups} 
                                 isReadOnly={isReadOnly} 
                                 formCode={formCode} 
@@ -575,7 +589,11 @@
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
                     <Button variant="outline" size="sm" onClick={onClose}>{t('بستن', 'Close')}</Button>
-                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={() => handleSaveTransaction()} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Transaction')}</Button>}
+                    {!isReadOnly && access.canEdit && (
+                        <Button variant="primary" size="sm" icon={Check} onClick={() => handleSaveTransaction()} isLoading={isLoading} disabled={!isDirty}>
+                            {t('ذخیره', 'Save')}
+                        </Button>
+                    )}
                 </div>
             </div>
             
