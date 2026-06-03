@@ -274,7 +274,7 @@
     const validateTransactionLogic = (targetStatus) => {
         if (targetStatus === 'DRAFT') return true;
 
-        if (itemsData.length === 0) {
+        if (!itemsData || itemsData.length === 0) {
             showToast(t('سند باید حداقل دارای یک قلم باشد.', 'Transaction must have at least one item.'), 'warning');
             return false;
         }
@@ -291,12 +291,12 @@
         });
 
         if (hasZeroItem) {
-            showToast(t('مبلغ تمام اقلام سند باید بزرگتر از صفر باشد.', 'All items must have an amount greater than zero.'), 'warning');
+            showToast(t('مبلغ تمام اقلام سند باید پر شود و نمی‌تواند صفر باشد.', 'All items must have a valid amount.'), 'warning');
             return false;
         }
 
         if (sumDep === 0 && sumWid === 0) {
-            showToast(t('جمع مبالغ سند صفر است و قابلیت تایید یا نهایی شدن ندارد.', 'Total transaction amount cannot be zero.'), 'warning');
+            showToast(t('جمع مبالغ سند صفر است و قابلیت تغییر وضعیت ندارد.', 'Total transaction amount cannot be zero.'), 'warning');
             return false;
         }
 
@@ -305,37 +305,14 @@
                 showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
                 return false;
             }
-            if (sumDep === 0) {
-                showToast(t('مبلغ تراکنش انتقال نمی‌تواند صفر باشد.', 'Transfer amount cannot be zero.'), 'warning');
-                return false;
-            }
         }
 
         return true;
     };
 
-    const handleChangeStatus = async (newStatus) => {
-        if (!validateTransactionLogic(newStatus)) return;
-        
-        setHeaderData(prev => ({ ...prev, status: newStatus }));
-        if (headerData.id) {
-            setIsLoading(true);
-            try {
-                const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).eq('id', headerData.id);
-                if (error) throw error;
-                await logAction('status_update', headerData.id, `تغییر وضعیت سند به ${newStatus}`);
-                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
-                onSuccess();
-            } catch (err) {
-                showToast(t('خطا در تغییر وضعیت سند.', 'Error updating transaction status.'), 'error');
-                setHeaderData(prev => ({ ...prev, status: initialRecord?.status || 'DRAFT' }));
-            } finally {
-                setIsLoading(false);
-            }
-        }
-    };
+    const handleSaveTransaction = async (overrideStatus) => {
+        const statusToSave = typeof overrideStatus === 'string' ? overrideStatus : headerData.status;
 
-    const handleSaveTransaction = async () => {
         if (document.getElementById('grid-inline-edit-marker')) {
             return showToast(t('لطفاً ابتدا با زدن دکمه Enter تغییرات سطر باز را در اقلام ذخیره کنید.', 'Please save inline edits first using Enter key.'), 'warning');
         }
@@ -344,7 +321,7 @@
             return showToast(t('تکمیل فیلدهای اجباری سربرگ (تاریخ، نوع، شرح) الزامی است.', 'Header required fields missing.'), 'warning');
         }
         
-        if (!validateTransactionLogic(headerData.status)) return;
+        if (!validateTransactionLogic(statusToSave)) return;
 
         setIsLoading(true);
         try {
@@ -357,14 +334,15 @@
                 registrar_id: headerData.registrar_id || null,
                 transaction_type: headerData.transaction_type,
                 department_id: validDeptId,
-                status: headerData.status || 'DRAFT',
+                status: statusToSave || 'DRAFT',
                 description: headerData.description || ''
             };
 
-            if (formMode === 'CREATE' || formMode === 'COPY') {
+            if (formMode === 'CREATE' || formMode === 'COPY' || !txId) {
                 const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
                 if (error) throw error;
                 txId = data[0].id;
+                setHeaderData(prev => ({ ...prev, id: txId }));
                 await logAction('create_transaction', txId, `ایجاد تراکنش: ${headerData.document_code}`);
             } else {
                 const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
@@ -392,10 +370,16 @@
                 if (itemsError) throw itemsError;
             }
 
-            showToast(t('سند با موفقیت ثبت شد.', 'Transaction saved successfully.'));
+            setHeaderData(prev => ({ ...prev, status: statusToSave }));
+            
+            if (typeof overrideStatus === 'string') {
+                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
+            } else {
+                showToast(t('سند با موفقیت ثبت شد.', 'Transaction saved successfully.'));
+            }
             onSuccess();
         } catch (error) {
-            showToast(t('خطا در ثبت سند.', 'Error saving transaction.'), 'error');
+            showToast(t('خطا در عملیات.', 'Operation failed.'), 'error');
         } finally {
             setIsLoading(false);
         }
@@ -485,12 +469,12 @@
                                 {!isReadOnly && formMode !== 'CREATE' && (
                                     <div className="flex items-center gap-2 pr-2 border-r border-slate-200 dark:border-slate-700 rtl:border-r-0 rtl:pr-0 rtl:border-l rtl:pl-2">
                                         {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
+                                            <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                                                 {t('تبدیل به موقت', 'Set Temporary')}
                                             </Button>
                                         )}
                                         {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                                            <Button variant="outline" size="sm" onClick={() => handleChangeStatus('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
+                                            <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
                                                 {t('برگشت به یادداشت', 'Revert to Draft')}
                                             </Button>
                                         )}
@@ -544,7 +528,7 @@
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
                     <Button variant="outline" size="sm" onClick={onClose}>{t('بستن', 'Close')}</Button>
-                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Transaction')}</Button>}
+                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={() => handleSaveTransaction()} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Transaction')}</Button>}
                 </div>
             </div>
             
