@@ -6,7 +6,7 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const {
-    AlertTriangle = FallbackIcon, Check = FallbackIcon, Scale = FallbackIcon, DollarSign = FallbackIcon
+    AlertTriangle = FallbackIcon, Check = FallbackIcon, Scale = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -54,11 +54,6 @@
         { value: 'TRANSFER', label: t('انتقال', 'Transfer') }
     ];
 
-    const TRANSACTION_ACTIONS = [
-        { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
-        { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') }
-    ];
-
     const STATUS_OPTIONS = [
         { value: 'DRAFT', label: t('یادداشت', 'Draft') },
         { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
@@ -77,7 +72,6 @@
 
     const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
     const [isUploading, setIsUploading] = useState(false);
-    const [summaryModalOpen, setSummaryModalOpen] = useState(false);
 
     const [currencyRates, setCurrencyRates] = useState({});
 
@@ -349,46 +343,29 @@
 
     const summaryStats = useMemo(() => {
         let totalDepUsd = 0, totalWidUsd = 0;
-        let totalDepIrr = 0, totalWidIrr = 0;
-        let itemsDetails = [];
         
         itemsData.forEach(i => {
             const dep = parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
             const wid = parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
             const cur = i.currency || 'IRR';
-            const { toUsd, usdToIrr } = getExchangeRates(cur);
+            const { toUsd } = getExchangeRates(cur);
             const action = i.transaction_action || (dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL');
             const amt = action === 'DEPOSIT' ? dep : wid;
             
             const aUsd = amt * toUsd;
-            const aIrr = aUsd * usdToIrr;
             
             if (action === 'DEPOSIT') {
                 totalDepUsd += aUsd;
-                totalDepIrr += aIrr;
             } else {
                 totalWidUsd += aUsd;
-                totalWidIrr += aIrr;
             }
-            
-            itemsDetails.push({
-               ...i,
-               amount: amt,
-               amount_usd: aUsd,
-               amount_irr: aIrr,
-               exchange_rate_to_usd: toUsd,
-               transaction_action: action
-            });
         });
         
         const diffUsd = totalDepUsd - totalWidUsd;
-        const diffIrr = totalDepIrr - totalWidIrr;
 
         return {
             totalDepUsd, totalWidUsd, diffUsd,
-            totalDepIrr, totalWidIrr, diffIrr,
-            isUnbalanced: Math.abs(diffUsd) >= 0.01,
-            itemsDetails
+            isUnbalanced: Math.abs(diffUsd) >= 0.01
         };
     }, [itemsData, getExchangeRates]);
 
@@ -645,9 +622,6 @@
 
     const itemsCardAction = (
         <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="!text-indigo-600 !border-indigo-500 hover:!bg-indigo-100 dark:hover:!bg-indigo-900/40 !h-6 !py-0 !text-[11px]" icon={DollarSign} onClick={(e) => { e.stopPropagation(); setSummaryModalOpen(true); }}>
-                {t('خلاصه و تراز ارزی', 'Currency Summary')}
-            </Button>
             {balanceInfo.isUnbalanced && !isReadOnly && (
                 <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[11px]" icon={Scale} onClick={(e) => { e.stopPropagation(); gridRef.current?.triggerBalanceRow(balanceInfo.diff); }}>
                     {t('تراز کردن ارزی', 'Balance (USD)')}
@@ -655,16 +629,6 @@
             )}
         </div>
     );
-
-    const summaryColumns = [
-        { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px' },
-        { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '80px' },
-        { field: 'amount', header_fa: 'مبلغ اصلی', header_en: 'Original Amount', width: '120px', render: val => <span dir="ltr" className="font-bold">{formatNumber(val)}</span> },
-        { field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '90px', render: val => TRANSACTION_ACTIONS.find(x => x.value === val)?.label || val },
-        { field: 'exchange_rate_to_usd', header_fa: 'نرخ دلار', header_en: 'USD Rate', width: '100px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
-        { field: 'amount_usd', header_fa: 'معادل دلاری', header_en: 'USD Eq', width: '120px', render: val => <span dir="ltr" className="text-indigo-600 dark:text-indigo-400 font-bold">{formatNumber(val)}</span> },
-        { field: 'amount_irr', header_fa: 'معادل ریالی', header_en: 'IRR Eq', width: '120px', render: val => <span dir="ltr" className="text-emerald-600 dark:text-emerald-400 font-bold">{formatNumber(val)}</span> },
-    ];
 
     return (
         <Modal isOpen={isOpen} onClose={handleCloseModal} title={isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : (formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction'))} language={language} width="max-w-6xl">
@@ -766,43 +730,6 @@
                 </div>
             </Modal>
 
-            <Modal isOpen={summaryModalOpen} onClose={() => setSummaryModalOpen(false)} title={t('خلاصه وضعیت ارزی در حال ثبت', 'Current Currency Summary')} width="max-w-4xl" language={language}>
-                <div className="p-4 flex flex-col gap-4 bg-slate-50 dark:bg-slate-900 rounded-b-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card noPadding className="p-4 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 shadow-sm" language={language}>
-                           <div className="flex flex-col gap-2">
-                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('جمع واریز (بدهکار)', 'Total Deposits')}</span>
-                               <span className="text-xl font-black text-indigo-600 dark:text-indigo-400" dir="ltr">{formatNumber(summaryStats.totalDepUsd)} USD</span>
-                               <span className="text-sm font-medium text-slate-600 dark:text-slate-400" dir="ltr">{formatNumber(summaryStats.totalDepIrr)} IRR</span>
-                           </div>
-                        </Card>
-                        <Card noPadding className="p-4 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 shadow-sm" language={language}>
-                           <div className="flex flex-col gap-2">
-                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('جمع برداشت (بستانکار)', 'Total Withdrawals')}</span>
-                               <span className="text-xl font-black text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(summaryStats.totalWidUsd)} USD</span>
-                               <span className="text-sm font-medium text-slate-600 dark:text-slate-400" dir="ltr">{formatNumber(summaryStats.totalWidIrr)} IRR</span>
-                           </div>
-                        </Card>
-                        <Card noPadding className={`p-4 bg-white dark:bg-slate-800 border shadow-sm ${!summaryStats.isUnbalanced ? 'border-slate-200 dark:border-slate-700' : 'border-orange-300 dark:border-orange-700'}`} language={language}>
-                           <div className="flex flex-col gap-2">
-                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('وضعیت تراز ارزی (USD)', 'USD Balance Status')}</span>
-                               {!summaryStats.isUnbalanced ? (
-                                   <Badge variant="emerald" size="lg" className="w-fit">{t('تراز (Balanced)', 'Balanced')}</Badge>
-                               ) : (
-                                   <>
-                                       <Badge variant="orange" size="lg" className="w-fit">{t('اختلاف تراز', 'Unbalanced')}</Badge>
-                                       <span className="text-sm font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(Math.abs(summaryStats.diffUsd))} USD</span>
-                                   </>
-                               )}
-                           </div>
-                        </Card>
-                    </div>
-                    <div className="h-[250px] border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
-                        <DataGrid data={summaryStats.itemsDetails} columns={summaryColumns} language={language} formCode={formCode} />
-                    </div>
-                </div>
-            </Modal>
-            
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </Modal>
     );
