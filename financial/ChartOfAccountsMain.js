@@ -278,10 +278,12 @@
       if (!validateNodeUniqueness()) return;
 
       try {
-        // Safe check for currency ID to prevent 400 Bad Request on empty or 'null' strings
         let safeCurrencyId = nodeFormData.currencyId;
         if (!safeCurrencyId || safeCurrencyId === '' || safeCurrencyId === 'null' || safeCurrencyId === 'undefined') {
             safeCurrencyId = null;
+        } else {
+            safeCurrencyId = parseInt(safeCurrencyId, 10);
+            if (isNaN(safeCurrencyId)) safeCurrencyId = null;
         }
 
         const payload = {
@@ -297,7 +299,6 @@
 
         let targetId = null;
         if (isCreatingNode) {
-          // Add chart_id only on creation, updating it might cause 400 bad request if it's immutable
           payload.chart_id = chart.id; 
           const { data, error } = await supabase.from('fm_coa_accounts').insert([payload]).select();
           if (error) throw error;
