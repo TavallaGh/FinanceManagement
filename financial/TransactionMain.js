@@ -351,31 +351,36 @@
     }, [transactions, filters, resolvedUserId]);
 
     const columns = useMemo(() => [
-        { field: 'reference_code', header_fa: 'کد عطف', header_en: 'Ref Code', width: '90px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
-        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '130px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
-        { field: 'daily_number', header_fa: 'شماره روزانه', header_en: 'Daily Num', width: '90px' },
-        { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '110px', type: 'date' },
-        { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '110px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
-        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '90px', render: (val) => {
+        { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
+        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '110px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
+        { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
+        { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '90px', type: 'date' },
+        { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '100px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
+        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'minmax(150px, 1fr)', render: (val) => <span className="text-[12px] truncate block" title={val}>{val || '-'}</span> },
+        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '80px', render: (val) => {
             const s = STATUS_OPTIONS.find(x => x.value === val);
             const colors = { DRAFT: 'slate', TEMPORARY: 'orange', APPROVED: 'emerald' };
             return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
         }},
-        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '140px', render: (val) => {
-            if (!val || val === '00000000-0000-0000-0000-000000000000') return <span className="text-[12px] text-slate-500">{t('ثبت سیستمی', 'System')}</span>;
-            return <span className="text-[12px] truncate font-medium text-slate-700 dark:text-slate-300">{usersMap[val] || val}</span>;
-        }},
-        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => <span className="text-[12px] truncate max-w-[200px] block" title={val}>{val || '-'}</span> }        
+        { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '110px', render: (val) => {
+            if (!val || val === '00000000-0000-0000-0000-000000000000') return <span className="text-[12px] text-slate-500">{t('سیستمی', 'System')}</span>;
+            return <span className="text-[12px] truncate font-medium text-slate-700 dark:text-slate-300 block">{usersMap[val] || val}</span>;
+        }}
     ], [usersMap, t]);
 
     const summaryColumns = [
         { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px' },
-        { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '80px' },
-        { field: 'amount', header_fa: 'مبلغ اصلی', header_en: 'Original Amount', width: '120px', render: val => <span dir="ltr" className="font-bold">{formatNumber(val)}</span> },
-        { field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '90px', render: val => TRANSACTION_ACTIONS.find(x => x.value === val)?.label || val },
-        { field: 'exchange_rate_to_usd', header_fa: 'نرخ دلار', header_en: 'USD Rate', width: '100px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
-        { field: 'amount_usd', header_fa: 'معادل دلاری', header_en: 'USD Eq', width: '120px', render: val => <span dir="ltr" className="text-indigo-600 dark:text-indigo-400 font-bold">{formatNumber(val)}</span> },
-        { field: 'amount_irr', header_fa: 'معادل ریالی', header_en: 'IRR Eq', width: '120px', render: val => <span dir="ltr" className="text-emerald-600 dark:text-emerald-400 font-bold">{formatNumber(val)}</span> },
+        { field: 'account_id', header_fa: 'حساب', header_en: 'Account', width: 'minmax(120px, 1fr)', render: val => {
+            const acc = lookups.accounts.find(a => a.id === val);
+            return <span className="font-bold text-slate-700 dark:text-slate-300 truncate block" title={acc ? acc.displayLabel : val}>{acc ? acc.displayLabel : val}</span>;
+        }},
+        { field: 'deposit_amount', header_fa: 'مبلغ واریز', header_en: 'Deposit', width: '110px', render: val => <span dir="ltr" className="text-emerald-600 dark:text-emerald-400 font-bold">{formatNumber(val)}</span> },
+        { field: 'withdrawal_amount', header_fa: 'مبلغ برداشت', header_en: 'Withdrawal', width: '110px', render: val => <span dir="ltr" className="text-orange-600 dark:text-orange-400 font-bold">{formatNumber(val)}</span> },
+        { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '60px', render: val => <Badge size="sm" variant="slate">{val}</Badge> },
+        { field: 'exchange_rate_to_usd', header_fa: 'نرخ دلار', header_en: 'USD Rate', width: '80px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
+        { field: 'amount_usd', header_fa: 'مبلغ به دلار', header_en: 'USD Amount', width: '110px', render: val => <span dir="ltr" className="font-bold text-slate-800 dark:text-slate-200">{formatNumber(val)}</span> },
+        { field: 'exchange_rate_usd_to_irr', header_fa: 'نرخ دلار به ریال', header_en: 'USD to IRR Rate', width: '110px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
+        { field: 'amount_irr', header_fa: 'مبلغ به ریال', header_en: 'IRR Amount', width: '120px', render: val => <span dir="ltr" className="font-bold text-slate-800 dark:text-slate-200">{formatNumber(val)}</span> },
     ];
 
     const accountLovColumns = [
@@ -452,60 +457,102 @@
 
     const renderSummaryModal = () => {
         if (!summaryModal.record) return null;
-        const items = summaryModal.record.fm_transaction_items || [];
+        
+        const rawItems = summaryModal.record.fm_transaction_items || [];
         let depUsd = 0, widUsd = 0, depIrr = 0, widIrr = 0;
         
-        items.forEach(i => {
-            const action = i.transaction_action || 'DEPOSIT';
-            const usd = parseFloat(i.amount_usd || 0);
-            const irr = parseFloat(i.amount_irr || 0);
-            if (action === 'DEPOSIT') {
+        const mappedItems = rawItems.map(item => {
+            const isDep = item.transaction_action === 'DEPOSIT';
+            const usd = parseFloat(item.amount_usd || 0);
+            const irr = parseFloat(item.amount_irr || 0);
+            
+            if (isDep) {
                 depUsd += usd;
                 depIrr += irr;
             } else {
                 widUsd += usd;
                 widIrr += irr;
             }
+
+            return {
+                ...item,
+                deposit_amount: isDep ? item.amount : 0,
+                withdrawal_amount: !isDep ? item.amount : 0
+            };
         });
         
         const diffUsd = Math.abs(depUsd - widUsd);
-        const isBalanced = diffUsd < 0.01;
+        const isBalancedUsd = diffUsd < 0.01;
+
+        const diffIrr = Math.abs(depIrr - widIrr);
+        const isBalancedIrr = diffIrr < 0.01;
 
         return (
-            <Modal isOpen={summaryModal.isOpen} onClose={() => setSummaryModal({isOpen: false, record: null})} title={t('خلاصه وضعیت ارزی سند', 'Currency Summary')} width="max-w-4xl" language={language}>
-                <div className="p-4 flex flex-col gap-4 bg-slate-50 dark:bg-slate-900 rounded-b-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card noPadding className="p-4 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 shadow-sm" language={language}>
-                           <div className="flex flex-col gap-2">
-                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('جمع واریز (بدهکار)', 'Total Deposits')}</span>
-                               <span className="text-xl font-black text-indigo-600 dark:text-indigo-400" dir="ltr">{formatNumber(depUsd)} USD</span>
-                               <span className="text-sm font-medium text-slate-600 dark:text-slate-400" dir="ltr">{formatNumber(depIrr)} IRR</span>
-                           </div>
+            <Modal isOpen={summaryModal.isOpen} onClose={() => setSummaryModal({isOpen: false, record: null})} title={t('خلاصه ارزی سند', 'Document Currency Summary')} width="max-w-7xl" language={language}>
+                <div className="p-4 flex flex-col lg:flex-row gap-4 bg-slate-50 dark:bg-slate-900 rounded-b-lg h-[60vh] md:h-[500px]">
+                    
+                    {/* Cards Column (Right side in RTL) */}
+                    <div className="w-full lg:w-80 flex flex-col gap-4 overflow-y-auto custom-scrollbar shrink-0">
+                        {/* USD Card */}
+                        <Card noPadding className="border border-slate-200 dark:border-slate-700 shadow-sm" language={language}>
+                            <div className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between">
+                                <span className="font-bold text-slate-700 dark:text-slate-300">{t('اطلاعات به ارز دلار (USD)', 'USD Information')}</span>
+                                <DollarSign size={16} className="text-indigo-500" />
+                            </div>
+                            <div className="p-4 flex flex-col gap-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('جمع مبلغ واریز:', 'Total Deposit:')}</span>
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(depUsd)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('جمع مبلغ برداشت:', 'Total Withdrawal:')}</span>
+                                    <span className="font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(widUsd)}</span>
+                                </div>
+                                <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-1"></div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('وضعیت تراز دلاری:', 'USD Balance Status:')}</span>
+                                    {isBalancedUsd ? (
+                                        <Badge variant="emerald" size="sm">{t('تراز', 'Balanced')}</Badge>
+                                    ) : (
+                                        <Badge variant="orange" size="sm">{t('ناتراز', 'Unbalanced')}</Badge>
+                                    )}
+                                </div>
+                            </div>
                         </Card>
-                        <Card noPadding className="p-4 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 shadow-sm" language={language}>
-                           <div className="flex flex-col gap-2">
-                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('جمع برداشت (بستانکار)', 'Total Withdrawals')}</span>
-                               <span className="text-xl font-black text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(widUsd)} USD</span>
-                               <span className="text-sm font-medium text-slate-600 dark:text-slate-400" dir="ltr">{formatNumber(widIrr)} IRR</span>
-                           </div>
-                        </Card>
-                        <Card noPadding className={`p-4 bg-white dark:bg-slate-800 border shadow-sm ${isBalanced ? 'border-slate-200 dark:border-slate-700' : 'border-orange-300 dark:border-orange-700'}`} language={language}>
-                           <div className="flex flex-col gap-2">
-                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('وضعیت تراز ارزی (USD)', 'USD Balance Status')}</span>
-                               {isBalanced ? (
-                                   <Badge variant="emerald" size="lg" className="w-fit">{t('تراز (Balanced)', 'Balanced')}</Badge>
-                               ) : (
-                                   <>
-                                       <Badge variant="orange" size="lg" className="w-fit">{t('اختلاف تراز', 'Unbalanced')}</Badge>
-                                       <span className="text-sm font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(diffUsd)} USD</span>
-                                   </>
-                               )}
-                           </div>
+
+                        {/* IRR Card */}
+                        <Card noPadding className="border border-slate-200 dark:border-slate-700 shadow-sm" language={language}>
+                            <div className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between">
+                                <span className="font-bold text-slate-700 dark:text-slate-300">{t('اطلاعات به ارز ریال (IRR)', 'IRR Information')}</span>
+                                <span className="font-bold text-emerald-500 text-sm">﷼</span>
+                            </div>
+                            <div className="p-4 flex flex-col gap-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('جمع مبلغ واریز:', 'Total Deposit:')}</span>
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(depIrr)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('جمع مبلغ برداشت:', 'Total Withdrawal:')}</span>
+                                    <span className="font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(widIrr)}</span>
+                                </div>
+                                <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-1"></div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('وضعیت تراز:', 'Balance Status:')}</span>
+                                    {isBalancedIrr ? (
+                                        <Badge variant="emerald" size="sm">{t('تراز', 'Balanced')}</Badge>
+                                    ) : (
+                                        <Badge variant="orange" size="sm">{t('ناتراز', 'Unbalanced')}</Badge>
+                                    )}
+                                </div>
+                            </div>
                         </Card>
                     </div>
-                    <div className="h-[250px] border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
-                        <DataGrid data={items} columns={summaryColumns} language={language} formCode={formCode} />
+
+                    {/* Data Grid Column (Left side in RTL) */}
+                    <div className="flex-1 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 flex flex-col min-w-0">
+                        <DataGrid data={mappedItems} columns={summaryColumns} language={language} formCode={formCode} />
                     </div>
+
                 </div>
             </Modal>
         );
@@ -521,11 +568,11 @@
           viewConfig={viewConfig}
         />
 
-        <div className="flex-1 min-h-0 flex flex-col gap-2 mt-4">
+        <div className="flex-1 min-h-0 flex flex-col gap-2 mt-4 overflow-hidden">
           <AdvancedFilter 
             fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} columns={6}
           />
-          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden">
             <DataGrid
               data={filteredTransactions} columns={columns} language={language} formCode={formCode}
               gridState={gridState} onGridStateChange={setGridState}
