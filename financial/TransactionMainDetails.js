@@ -6,12 +6,15 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const {
-    AlertTriangle = FallbackIcon, Check = FallbackIcon, Scale = FallbackIcon
+    AlertTriangle = FallbackIcon, Check = FallbackIcon, Scale = FallbackIcon, DollarSign = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
   const { Button = FallbackComponent, Badge = FallbackComponent, Card = FallbackComponent } = Core;
+
+  const Grid = window.DSGrid || DS || {};
+  const { DataGrid = FallbackComponent } = Grid;
 
   const Forms = window.DSForms || DS || {};
   const { TextField = FallbackComponent, SelectField = FallbackComponent, DatePicker = FallbackComponent, AttachmentManager = FallbackComponent } = Forms;
@@ -20,6 +23,13 @@
   const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
 
   function FallbackComponent() { return null; }
+
+  const formatNumber = (num) => {
+      if (!num && num !== 0) return '0';
+      const parts = parseFloat(num).toFixed(2).toString().split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return parts[1] === '00' ? parts[0] : parts.join('.');
+  };
 
   const TransactionMainDetails = ({ isOpen, onClose, onSuccess, formMode, initialRecord, language = 'fa', formCode }) => {
     const isRtl = language === 'fa';
@@ -44,6 +54,11 @@
         { value: 'TRANSFER', label: t('انتقال', 'Transfer') }
     ];
 
+    const TRANSACTION_ACTIONS = [
+        { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
+        { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') }
+    ];
+
     const STATUS_OPTIONS = [
         { value: 'DRAFT', label: t('یادداشت', 'Draft') },
         { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
@@ -62,6 +77,9 @@
 
     const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
     const [isUploading, setIsUploading] = useState(false);
+    const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+
+    const [currencyRates, setCurrencyRates] = useState({});
 
     const gridRef = useRef(null);
     const hasInitialized = useRef(false);
@@ -261,12 +279,17 @@
                     registrar_id: formMode === 'COPY' ? safeFinalRegistrar : initialRecord.registrar_id
                 });
                 
-                const mappedItems = (initialRecord.fm_transaction_items || []).map(item => ({
-                    ...item,
-                    _tempId: crypto.randomUUID(),
-                    id: formMode === 'COPY' ? undefined : item.id,
-                    transaction_id: formMode === 'COPY' ? undefined : item.transaction_id
-                })).sort((a, b) => a.row_number - b.row_number);
+                const mappedItems = (initialRecord.fm_transaction_items || []).map(item => {
+                    const isDep = item.transaction_action === 'DEPOSIT';
+                    return {
+                        ...item,
+                        _tempId: crypto.randomUUID(),
+                        id: formMode === 'COPY' ? undefined : item.id,
+                        transaction_id: formMode === 'COPY' ? undefined : item.transaction_id,
+                        deposit_amount: isDep ? item.amount : 0,
+                        withdrawal_amount: !isDep ? item.amount : 0
+                    };
+                }).sort((a, b) => a.row_number - b.row_number);
                 
                 setItemsData(mappedItems);
                 setIsDirty(formMode === 'COPY');
@@ -282,26 +305,100 @@
         });
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
-    const balanceInfo = useMemo(() => {
-        if (headerData.transaction_type !== 'TRANSFER' || itemsData.length === 0 || isReadOnly) return { isUnbalanced: false };
-        let sumDep = 0, sumWid = 0;
-        itemsData.forEach(i => {
-            sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
-            sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-        });
-        const diff = sumDep - sumWid;
-        return {
-            isUnbalanced: diff !== 0,
-            diff: diff
-        };
-    }, [itemsData, headerData.transaction_type, isReadOnly]);
+    useEffect(() => {
+        if (headerData.document_date && supabase) {
+            const fetchRates = async () => {
+                try {
+                    const formattedDate = headerData.document_date.replace(/\//g, '-');
+                    const { data } = await supabase.from('fm_currency_rates')
+                        .select('base_currency, target_currency, rate, rate_date')
+                        .lte('rate_date', formattedDate)
+                        .order('rate_date', { ascending: false });
+                    
+                    const latestRates = {};
+                    (data || []).forEach(r => {
+                        const key = `${r.base_currency}_${r.target_currency}`;
+                        if (!latestRates[key]) latestRates[key] = r.rate;
+                    });
+                    setCurrencyRates(latestRates);
+                } catch (e) {}
+            };
+            fetchRates();
+        }
+    }, [headerData.document_date, supabase]);
 
-    const formatNumber = (num) => {
-        if (!num && num !== 0) return '';
-        const parts = num.toString().split('.');
-        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        return parts.join('.');
-    };
+    const getExchangeRates = useCallback((currency) => {
+        let toUsd = 1;
+        if (currency !== 'USD') {
+            const direct = currencyRates[`${currency}_USD`];
+            if (direct) {
+                toUsd = direct;
+            } else {
+                const inverse = currencyRates[`USD_${currency}`];
+                if (inverse) toUsd = 1 / inverse;
+            }
+        }
+        
+        let usdToIrr = currencyRates[`USD_IRR`] || 1;
+        if (!currencyRates[`USD_IRR`] && currencyRates[`IRR_USD`]) {
+             usdToIrr = 1 / currencyRates[`IRR_USD`];
+        }
+        
+        return { toUsd, usdToIrr };
+    }, [currencyRates]);
+
+    const summaryStats = useMemo(() => {
+        let totalDepUsd = 0, totalWidUsd = 0;
+        let totalDepIrr = 0, totalWidIrr = 0;
+        let itemsDetails = [];
+        
+        itemsData.forEach(i => {
+            const dep = parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
+            const wid = parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+            const cur = i.currency || 'IRR';
+            const { toUsd, usdToIrr } = getExchangeRates(cur);
+            const action = i.transaction_action || (dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL');
+            const amt = action === 'DEPOSIT' ? dep : wid;
+            
+            const aUsd = amt * toUsd;
+            const aIrr = aUsd * usdToIrr;
+            
+            if (action === 'DEPOSIT') {
+                totalDepUsd += aUsd;
+                totalDepIrr += aIrr;
+            } else {
+                totalWidUsd += aUsd;
+                totalWidIrr += aIrr;
+            }
+            
+            itemsDetails.push({
+               ...i,
+               amount: amt,
+               amount_usd: aUsd,
+               amount_irr: aIrr,
+               exchange_rate_to_usd: toUsd,
+               transaction_action: action
+            });
+        });
+        
+        const diffUsd = totalDepUsd - totalWidUsd;
+        const diffIrr = totalDepIrr - totalWidIrr;
+
+        return {
+            totalDepUsd, totalWidUsd, diffUsd,
+            totalDepIrr, totalWidIrr, diffIrr,
+            isUnbalanced: Math.abs(diffUsd) >= 0.01,
+            itemsDetails
+        };
+    }, [itemsData, getExchangeRates]);
+
+    const balanceInfo = useMemo(() => {
+        if (headerData.transaction_type !== 'TRANSFER' || itemsData.length === 0 || isReadOnly) return { isUnbalanced: false, diff: 0 };
+        return {
+            isUnbalanced: summaryStats.isUnbalanced,
+            diff: summaryStats.diffUsd
+        };
+    }, [summaryStats, headerData.transaction_type, isReadOnly, itemsData.length]);
 
     const validateTransactionLogic = (targetStatus) => {
         if (targetStatus === 'DRAFT') return true;
@@ -311,15 +408,11 @@
             return false;
         }
 
-        let sumDep = 0, sumWid = 0;
         let hasZeroItem = false;
-
         itemsData.forEach(i => {
             const dep = parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
             const wid = parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
             if (dep === 0 && wid === 0) hasZeroItem = true;
-            sumDep += dep;
-            sumWid += wid;
         });
 
         if (hasZeroItem) {
@@ -327,16 +420,14 @@
             return false;
         }
 
-        if (sumDep === 0 && sumWid === 0) {
+        if (summaryStats.totalDepUsd === 0 && summaryStats.totalWidUsd === 0) {
             showToast(t('جمع مبالغ سند صفر است و قابلیت تغییر وضعیت ندارد.', 'Total transaction amount cannot be zero.'), 'warning');
             return false;
         }
 
-        if (headerData.transaction_type === 'TRANSFER') {
-            if (sumDep !== sumWid) {
-                showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
-                return false;
-            }
+        if (headerData.transaction_type === 'TRANSFER' && summaryStats.isUnbalanced) {
+            showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت ارزی باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
+            return false;
         }
 
         return true;
@@ -391,27 +482,44 @@
                 await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
                 
                 if (itemsData.length > 0) {
-                    const itemsPayload = itemsData.map((item, index) => ({
-                        transaction_id: txId,
-                        row_number: index + 1,
-                        account_id: item.account_id || null,
-                        transaction_action: item.transaction_action,
-                        transaction_group: item.transaction_group,
-                        cost_type_id: item.cost_type_id || null,
-                        income_type_id: item.income_type_id || null,
-                        currency: item.currency || 'IRR',
-                        deposit_amount: parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0,
-                        withdrawal_amount: parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0,
-                        description: item.description || ''
-                    }));
+                    const itemsPayload = itemsData.map((item, index) => {
+                        const dep = parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0;
+                        const wid = parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+                        const action = item.transaction_action || (dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL');
+                        const originalAmount = action === 'DEPOSIT' ? dep : wid;
+                        const cur = item.currency || 'IRR';
+                        const { toUsd, usdToIrr } = getExchangeRates(cur);
+                        
+                        return {
+                            transaction_id: txId,
+                            row_number: index + 1,
+                            account_id: item.account_id || null,
+                            transaction_action: action,
+                            transaction_group: item.transaction_group,
+                            cost_type_id: item.cost_type_id || null,
+                            income_type_id: item.income_type_id || null,
+                            currency: cur,
+                            amount: originalAmount,
+                            exchange_rate_to_usd: toUsd,
+                            exchange_rate_usd_to_irr: usdToIrr,
+                            amount_usd: originalAmount * toUsd,
+                            amount_irr: (originalAmount * toUsd) * usdToIrr,
+                            description: item.description || ''
+                        };
+                    });
 
                     const { data: newItems, error: itemsError } = await supabase.from('fm_transaction_items').insert(itemsPayload).select();
                     if (itemsError) throw itemsError;
 
-                    const mappedItems = newItems.map(item => ({
-                        ...item,
-                        _tempId: crypto.randomUUID()
-                    })).sort((a, b) => a.row_number - b.row_number);
+                    const mappedItems = newItems.map(item => {
+                        const isDep = item.transaction_action === 'DEPOSIT';
+                        return {
+                            ...item,
+                            _tempId: crypto.randomUUID(),
+                            deposit_amount: isDep ? item.amount : 0,
+                            withdrawal_amount: !isDep ? item.amount : 0
+                        };
+                    }).sort((a, b) => a.row_number - b.row_number);
                     setItemsData(mappedItems);
                 }
             }
@@ -528,18 +636,35 @@
                 <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800/50">
                     <AlertTriangle size={14} />
                     <span className="text-[11px] font-bold">
-                        {t('اختلاف تراز:', 'Balance diff:')} <span dir="ltr" className="inline-block px-1 font-black">{formatNumber(Math.abs(balanceInfo.diff))}</span>
+                        {t('اختلاف تراز دلاری:', 'USD Diff:')} <span dir="ltr" className="inline-block px-1 font-black">{formatNumber(Math.abs(balanceInfo.diff))}</span>
                     </span>
                 </div>
             )}
         </div>
     );
 
-    const itemsCardAction = balanceInfo.isUnbalanced ? (
-        <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[11px]" icon={Scale} onClick={(e) => { e.stopPropagation(); gridRef.current?.triggerBalanceRow(balanceInfo.diff); }}>
-            {t('تراز کردن تراکنش', 'Balance Transaction')}
-        </Button>
-    ) : null;
+    const itemsCardAction = (
+        <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="!text-indigo-600 !border-indigo-500 hover:!bg-indigo-100 dark:hover:!bg-indigo-900/40 !h-6 !py-0 !text-[11px]" icon={DollarSign} onClick={(e) => { e.stopPropagation(); setSummaryModalOpen(true); }}>
+                {t('خلاصه و تراز ارزی', 'Currency Summary')}
+            </Button>
+            {balanceInfo.isUnbalanced && !isReadOnly && (
+                <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[11px]" icon={Scale} onClick={(e) => { e.stopPropagation(); gridRef.current?.triggerBalanceRow(balanceInfo.diff); }}>
+                    {t('تراز کردن ارزی', 'Balance (USD)')}
+                </Button>
+            )}
+        </div>
+    );
+
+    const summaryColumns = [
+        { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px' },
+        { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '80px' },
+        { field: 'amount', header_fa: 'مبلغ اصلی', header_en: 'Original Amount', width: '120px', render: val => <span dir="ltr" className="font-bold">{formatNumber(val)}</span> },
+        { field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '90px', render: val => TRANSACTION_ACTIONS.find(x => x.value === val)?.label || val },
+        { field: 'exchange_rate_to_usd', header_fa: 'نرخ دلار', header_en: 'USD Rate', width: '100px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
+        { field: 'amount_usd', header_fa: 'معادل دلاری', header_en: 'USD Eq', width: '120px', render: val => <span dir="ltr" className="text-indigo-600 dark:text-indigo-400 font-bold">{formatNumber(val)}</span> },
+        { field: 'amount_irr', header_fa: 'معادل ریالی', header_en: 'IRR Eq', width: '120px', render: val => <span dir="ltr" className="text-emerald-600 dark:text-emerald-400 font-bold">{formatNumber(val)}</span> },
+    ];
 
     return (
         <Modal isOpen={isOpen} onClose={handleCloseModal} title={isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : (formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction'))} language={language} width="max-w-6xl">
@@ -638,6 +763,43 @@
                 </div>
                 <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
                     <Button variant="primary" size="sm" onClick={() => setAttachModal({ isOpen: false, record: null, files: [] })}>{t('بستن', 'Close')}</Button>
+                </div>
+            </Modal>
+
+            <Modal isOpen={summaryModalOpen} onClose={() => setSummaryModalOpen(false)} title={t('خلاصه وضعیت ارزی در حال ثبت', 'Current Currency Summary')} width="max-w-4xl" language={language}>
+                <div className="p-4 flex flex-col gap-4 bg-slate-50 dark:bg-slate-900 rounded-b-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card noPadding className="p-4 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 shadow-sm" language={language}>
+                           <div className="flex flex-col gap-2">
+                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('جمع واریز (بدهکار)', 'Total Deposits')}</span>
+                               <span className="text-xl font-black text-indigo-600 dark:text-indigo-400" dir="ltr">{formatNumber(summaryStats.totalDepUsd)} USD</span>
+                               <span className="text-sm font-medium text-slate-600 dark:text-slate-400" dir="ltr">{formatNumber(summaryStats.totalDepIrr)} IRR</span>
+                           </div>
+                        </Card>
+                        <Card noPadding className="p-4 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 shadow-sm" language={language}>
+                           <div className="flex flex-col gap-2">
+                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('جمع برداشت (بستانکار)', 'Total Withdrawals')}</span>
+                               <span className="text-xl font-black text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(summaryStats.totalWidUsd)} USD</span>
+                               <span className="text-sm font-medium text-slate-600 dark:text-slate-400" dir="ltr">{formatNumber(summaryStats.totalWidIrr)} IRR</span>
+                           </div>
+                        </Card>
+                        <Card noPadding className={`p-4 bg-white dark:bg-slate-800 border shadow-sm ${!summaryStats.isUnbalanced ? 'border-slate-200 dark:border-slate-700' : 'border-orange-300 dark:border-orange-700'}`} language={language}>
+                           <div className="flex flex-col gap-2">
+                               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold">{t('وضعیت تراز ارزی (USD)', 'USD Balance Status')}</span>
+                               {!summaryStats.isUnbalanced ? (
+                                   <Badge variant="emerald" size="lg" className="w-fit">{t('تراز (Balanced)', 'Balanced')}</Badge>
+                               ) : (
+                                   <>
+                                       <Badge variant="orange" size="lg" className="w-fit">{t('اختلاف تراز', 'Unbalanced')}</Badge>
+                                       <span className="text-sm font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(Math.abs(summaryStats.diffUsd))} USD</span>
+                                   </>
+                               )}
+                           </div>
+                        </Card>
+                    </div>
+                    <div className="h-[250px] border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
+                        <DataGrid data={summaryStats.itemsDetails} columns={summaryColumns} language={language} formCode={formCode} />
+                    </div>
                 </div>
             </Modal>
             
