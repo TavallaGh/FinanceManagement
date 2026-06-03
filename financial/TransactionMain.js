@@ -1,3 +1,8 @@
+/* پاسخ به سوال شما: افزایش حجم کد به دو دلیل است:
+۱. طبق قانون "ممنوعیت مطلقِ خلاصه‌سازی" (Full File Output) که برای من تعیین کرده‌اید، من موظفم حتی برای تغییر یک خط کد، تمام ساختار فایل را از ابتدا تا انتها بدون استفاده از کامنت‌های جایگزین (Placeholders) بازنویسی کنم.
+۲. افزوده شدن منطق جدید محاسبات ارزی، فراخوانی نرخ‌ها، توابع تبدیل، و کامپوننت‌های بصری جدید (مثل مودال خلاصه ارزی و انیمیشن‌های تغییر سایز) به صورت طبیعی لاین‌های جدیدی به فایل اضافه کرده است.
+*/
+
 /* Filename: financial/TransactionMain.js */
 (() => {
   const React = window.React;
@@ -492,12 +497,14 @@
             setSummaryModal(prev => ({ ...prev, showGrid: !prev.showGrid }));
         };
 
+        const modalWidthClass = isGridOpen ? "max-w-6xl" : "max-w-xs";
+
         return (
-            <Modal isOpen={summaryModal.isOpen} onClose={() => setSummaryModal({isOpen: false, record: null, showGrid: false})} title={t('خلاصه ارزی سند', 'Document Currency Summary')} width={isGridOpen ? "max-w-6xl" : "max-w-sm"} language={language}>
-                <div className="p-4 flex flex-col md:flex-row gap-4 bg-slate-50 dark:bg-slate-900 rounded-b-lg transition-all duration-300">
+            <Modal isOpen={summaryModal.isOpen} onClose={() => setSummaryModal({isOpen: false, record: null, showGrid: false})} title={t('خلاصه ارزی سند', 'Document Currency Summary')} width={modalWidthClass} language={language}>
+                <div className={`p-4 flex gap-4 bg-slate-50 dark:bg-slate-900 rounded-b-lg transition-all duration-300 ${isGridOpen ? 'flex-col md:flex-row' : 'flex-col'}`}>
                     
-                    {/* Cards Column (Right side in RTL) */}
-                    <div className="w-full md:w-[280px] flex flex-col gap-3 shrink-0">
+                    {/* Cards Column */}
+                    <div className={`flex flex-col gap-3 shrink-0 ${isGridOpen ? 'w-full md:w-[280px]' : 'w-full'}`}>
                         {/* USD Card */}
                         <Card noPadding className="border border-slate-200 dark:border-slate-700 shadow-sm" language={language}>
                             <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2 flex items-center justify-between shrink-0">
@@ -506,11 +513,11 @@
                             </div>
                             <div className="p-3 flex flex-col gap-2 text-[12px]">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع مبلغ واریز:', 'Total Deposit:')}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع واریز:', 'Total Deposit:')}</span>
                                     <span className="font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(depUsd)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع مبلغ برداشت:', 'Total Withdrawal:')}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع برداشت:', 'Total Withdrawal:')}</span>
                                     <span className="font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(widUsd)}</span>
                                 </div>
                                 <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-2 mt-1">
@@ -532,11 +539,11 @@
                             </div>
                             <div className="p-3 flex flex-col gap-2 text-[12px]">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع مبلغ واریز:', 'Total Deposit:')}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع واریز:', 'Total Deposit:')}</span>
                                     <span className="font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">{formatNumber(depIrr)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع مبلغ برداشت:', 'Total Withdrawal:')}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">{t('جمع برداشت:', 'Total Withdrawal:')}</span>
                                     <span className="font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(widIrr)}</span>
                                 </div>
                                 <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-2 mt-1">
@@ -561,7 +568,7 @@
                         </Button>
                     </div>
 
-                    {/* Data Grid Column (Left side in RTL) */}
+                    {/* Data Grid Column */}
                     {isGridOpen && (
                         <div className="flex-1 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 flex flex-col min-w-0 min-h-[350px] animate-in fade-in zoom-in-95 duration-200">
                             <DataGrid 
@@ -571,6 +578,7 @@
                                 formCode={formCode} 
                                 showExport={false}
                                 exportable={false}
+                                importable={false}
                                 hideToolbar={true}
                                 selectable={false}
                             />
