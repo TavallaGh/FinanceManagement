@@ -138,7 +138,7 @@
       let nextCode = '';
       if (window.AutoNumberingService) {
         try {
-            const preview = await window.AutoNumberingService.previewNext('COST_TYPES');
+            const preview = await window.AutoNumberingService.previewNext('COST_TYPE');
             if (preview && preview.formattedCode) {
                 nextCode = preview.formattedCode;
             } else if (typeof preview === 'string') {
@@ -160,7 +160,7 @@
       let nextCode = '';
       if (window.AutoNumberingService) {
         try {
-            const preview = await window.AutoNumberingService.previewNext('COST_TYPES');
+            const preview = await window.AutoNumberingService.previewNext('COST_TYPE');
             if (preview && preview.formattedCode) {
                 nextCode = preview.formattedCode;
             } else if (typeof preview === 'string') {
@@ -236,7 +236,7 @@
           
           if (window.AutoNumberingService) {
              try {
-                 await window.AutoNumberingService.consumeNext('COST_TYPES');
+                 await window.AutoNumberingService.consumeNext('COST_TYPE');
              } catch(err) {
                  console.error('AutoNumbering consume error:', err);
              }

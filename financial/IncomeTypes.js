@@ -138,7 +138,7 @@
       let nextCode = '';
       if (window.AutoNumberingService) {
         try {
-            const preview = await window.AutoNumberingService.previewNext('INCOME_TYPES');
+            const preview = await window.AutoNumberingService.previewNext('INCOME_TYPE');
             if (preview && preview.formattedCode) {
                 nextCode = preview.formattedCode;
             } else if (typeof preview === 'string') {
@@ -160,7 +160,7 @@
       let nextCode = '';
       if (window.AutoNumberingService) {
         try {
-            const preview = await window.AutoNumberingService.previewNext('INCOME_TYPES');
+            const preview = await window.AutoNumberingService.previewNext('INCOME_TYPE');
             if (preview && preview.formattedCode) {
                 nextCode = preview.formattedCode;
             } else if (typeof preview === 'string') {
@@ -236,7 +236,7 @@
           
           if (window.AutoNumberingService) {
              try {
-                 await window.AutoNumberingService.consumeNext('INCOME_TYPES');
+                 await window.AutoNumberingService.consumeNext('INCOME_TYPE');
              } catch(err) {
                  console.error('AutoNumbering consume error:', err);
              }
