@@ -515,7 +515,7 @@
     };
 
     const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'ساختار حساب', width: '120px' },
+        { field: 'chart_name', header_fa: 'ساختار حساب', width: '180px' },
         { field: 'code', header_fa: 'کد حساب', width: '100px' },
         { field: 'title_fa', header_fa: 'عنوان حساب', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
