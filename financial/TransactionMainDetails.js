@@ -99,9 +99,9 @@
         return attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
     }, [attachModal.record]);
 
-    const showToast = useCallback((message, type = 'success', duration = 3000) => {
+    const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
-      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), duration);
+      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
     }, []);
 
     const logAction = useCallback(async (action, recordId, details = '') => {
@@ -237,59 +237,21 @@
             }
 
             let nextDocCode = '';
-            let debugMessages = [];
-            
             if (formMode === 'CREATE' || formMode === 'COPY') {
-                console.warn("==== شروع دیباگ سرویس شماره‌گذاری اتوماتیک ====");
-                try {
-                    const dbCheck = await supabase.from('fm_auto_numbering').select('*').eq('entity_code', 'TRANSACTIONS');
-                    console.warn("۱. نتیجه جستجوی مستقیم در دیتابیس برای 'TRANSACTIONS':", dbCheck);
-                    
-                    if (dbCheck.error) {
-                        debugMessages.push(`خطای دیتابیس: ${dbCheck.error.message}`);
-                    } else if (!dbCheck.data || dbCheck.data.length === 0) {
-                        debugMessages.push("رکوردی با شناسه TRANSACTIONS در دیتابیس یافت نشد.");
-                    } else {
-                        console.warn("رکورد در دیتابیس یافت شد:", dbCheck.data[0]);
-                    }
-
-                    if (!window.AutoNumberingService) {
-                        console.warn("۲. وضعیت سرویس: window.AutoNumberingService یافت نشد (undefined)");
-                        debugMessages.push("سرویس AutoNumberingService در مرورگر لود نشده است.");
-                    } else {
-                        console.warn("۲. وضعیت سرویس: window.AutoNumberingService وجود دارد. فراخوانی تابع previewNext...");
-                        
-                        if (typeof window.AutoNumberingService.previewNext !== 'function') {
-                            debugMessages.push("متد previewNext در سرویس یافت نشد.");
-                        } else {
-                            const preview = await window.AutoNumberingService.previewNext('TRANSACTIONS');
-                            console.warn("۳. نتیجه خام دریافتی از سرویس (preview):", preview);
-                            
-                            if (preview && preview.formattedCode) {
-                                nextDocCode = preview.formattedCode;
-                                console.warn("۴. کد اتوماتیک با موفقیت تولید شد:", nextDocCode);
-                            } else if (typeof preview === 'string') {
-                                nextDocCode = preview;
-                                console.warn("۴. کد اتوماتیک به صورت رشته مستقیم تولید شد:", nextDocCode);
-                            } else {
-                                debugMessages.push(`سرویس خروجی نامعتبر یا Null برگرداند: ${JSON.stringify(preview)}`);
-                            }
+                if (window.AutoNumberingService) {
+                    try {
+                        const preview = await window.AutoNumberingService.previewNext('TRANSACTIONS');
+                        if (preview && preview.formattedCode) {
+                            nextDocCode = preview.formattedCode;
+                        } else if (typeof preview === 'string') {
+                            nextDocCode = preview;
                         }
+                    } catch (err) {
+                        console.error('AutoNumbering Error:', err);
                     }
-                } catch (err) {
-                    console.error('استثنا در زمان تولید کد:', err);
-                    debugMessages.push(`بروز Exception: ${err.message}`);
                 }
-                console.warn("==== پایان دیباگ سرویس شماره‌گذاری اتوماتیک ====");
-
                 if (!nextDocCode) {
                     nextDocCode = generateFallbackCode();
-                    console.warn("استفاده از Fallback (تولید رندوم):", nextDocCode);
-                    if (debugMessages.length > 0) {
-                        setTimeout(() => {
-                            showToast(`خطا در شماره‌گذاری خودکار. لطفاً کنسول مرورگر را بررسی کنید: ${debugMessages.join(' | ')}`, 'error', 10000);
-                        }, 1000);
-                    }
                 }
             }
 
@@ -354,7 +316,7 @@
                 }
             }
         });
-    }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t, showToast]);
+    }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
     useEffect(() => {
         if (headerData.document_date && supabase) {

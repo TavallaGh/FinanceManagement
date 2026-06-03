@@ -1,5 +1,59 @@
-/* Filename: settings/AutoNumbering.js */
+/* Filename: financial/AutoNumbering.js */
 (() => {
+  if (!window.AutoNumberingService) {
+    window.AutoNumberingService = {
+        async previewNext(entityCode) {
+            try {
+                const supabase = window.supabase;
+                if (!supabase) return null;
+                const { data, error } = await supabase
+                    .from('fm_auto_numbering')
+                    .select('*')
+                    .eq('entity_code', entityCode)
+                    .eq('is_active', true)
+                    .single();
+
+                if (error || !data) return null;
+
+                let nextNum = parseInt(data.current_number) + 1;
+                const startNum = parseInt(data.start_number) || 1;
+                if (nextNum < startNum) nextNum = startNum;
+
+                const prefix = data.prefix || '';
+                const suffix = data.suffix || '';
+                const padLen = parseInt(data.number_length) || 4;
+
+                const paddedNumber = String(nextNum).padStart(padLen, '0');
+                return {
+                    formattedCode: `${prefix}${paddedNumber}${suffix}`,
+                    nextNumber: nextNum,
+                    recordId: data.id
+                };
+            } catch (err) {
+                return null;
+            }
+        },
+        async consumeNext(entityCode) {
+            try {
+                const supabase = window.supabase;
+                if (!supabase) return null;
+                const preview = await this.previewNext(entityCode);
+                if (!preview) return null;
+
+                const { error } = await supabase
+                    .from('fm_auto_numbering')
+                    .update({ current_number: preview.nextNumber, updated_at: new Date().toISOString() })
+                    .eq('id', preview.recordId);
+
+                if (error) throw error;
+                return preview.formattedCode;
+            } catch (err) {
+                return null;
+            }
+        }
+    };
+  }
+
   const React = window.React;
   const { useState, useEffect, useCallback } = React;
 
@@ -63,7 +117,7 @@
       { value: 'GATEWAY_TYPE', label: t('درگاه‌های پرداخت', 'Gateway Types'), fa: 'درگاه‌های پرداخت', en: 'Gateway Types' },
       { value: 'CHART_OF_ACCOUNTS', label: t('ساختار حساب‌ها', 'Chart of Accounts'), fa: 'ساختار حساب‌ها', en: 'Chart of Accounts' },
       { value: 'BALANCE_GROUP', label: t('گروه‌های بالانس', 'Balance Groups'), fa: 'گروه‌های بالانس', en: 'Balance Groups' },
-      { value: 'BROKER', label: t('بروکرها', 'Brokers'), fa: 'بروکرها', en: 'Brokers' },
+      { value: 'BROKER_MGMT', label: t('بروکرها', 'Brokers'), fa: 'بروکرها', en: 'Brokers' },
       { value: 'TRANSACTION', label: t('تراکنش‌ها', 'Transactions'), fa: 'تراکنش‌ها', en: 'Transactions' },
       { value: 'TRANSACTIONS', label: t('تراکنش‌ها', 'Transactions'), fa: 'تراکنش‌ها', en: 'Transactions' }
     ];
