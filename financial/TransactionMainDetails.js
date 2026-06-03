@@ -240,11 +240,15 @@
             if (formMode === 'CREATE' || formMode === 'COPY') {
                 if (window.AutoNumberingService) {
                     try {
-                        const preview = await window.AutoNumberingService.previewNext('TRANSACTIONS');
+                        const preview = await window.AutoNumberingService.previewNext('TRANSACTION');
                         if (preview && preview.formattedCode) {
                             nextDocCode = preview.formattedCode;
+                        } else if (typeof preview === 'string') {
+                            nextDocCode = preview;
                         }
-                    } catch (err) {}
+                    } catch (err) {
+                        console.error('AutoNumbering Error:', err);
+                    }
                 }
                 if (!nextDocCode) {
                     nextDocCode = generateFallbackCode();
@@ -461,8 +465,10 @@
                 
                 if (window.AutoNumberingService) {
                     try {
-                        await window.AutoNumberingService.consumeNext('TRANSACTIONS');
-                    } catch(err) {}
+                        await window.AutoNumberingService.consumeNext('TRANSACTION');
+                    } catch(err) {
+                        console.error('AutoNumbering consume error:', err);
+                    }
                 }
 
                 await logAction('create_transaction', txId, `ایجاد تراکنش: ${headerData.document_code}`);
