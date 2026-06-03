@@ -128,7 +128,7 @@
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title'),
-                supabase.from('fm_currencies').select('id, code, title_fa, title_en')
+                supabase.from('fm_currencies').select('id, code, title') // اصلاح فیلدهای جدول ارز برای رفع خطای 400
             ]);
             
             const uMap = {};
