@@ -236,7 +236,11 @@
         if (error) throw error;
         
         if (isNew && window.AutoNumberingService) {
-           await window.AutoNumberingService.consumeNext('GATEWAY_TYPE');
+           try {
+               await window.AutoNumberingService.consumeNext('GATEWAY_TYPE');
+           } catch(err) {
+               console.error('AutoNumbering consume error:', err);
+           }
         }
 
         setIsModalOpen(false);
@@ -345,8 +349,16 @@
     const handleOpenModal = async (record = null) => {
       let nextCode = '';
       if (!record && window.AutoNumberingService) {
-        const preview = await window.AutoNumberingService.previewNext('GATEWAY_TYPE');
-        if (preview) nextCode = preview.formattedCode;
+        try {
+            const preview = await window.AutoNumberingService.previewNext('GATEWAY_TYPE');
+            if (preview && preview.formattedCode) {
+                nextCode = preview.formattedCode;
+            } else if (typeof preview === 'string') {
+                nextCode = preview;
+            }
+        } catch (err) {
+            console.error('AutoNumbering Error:', err);
+        }
       }
 
       setFormData(record ? { ...record } : { 
