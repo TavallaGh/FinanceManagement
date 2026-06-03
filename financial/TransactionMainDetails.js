@@ -6,7 +6,7 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const {
-    AlertTriangle = FallbackIcon, Check = FallbackIcon
+    AlertTriangle = FallbackIcon, Check = FallbackIcon, Scale = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -61,6 +61,9 @@
     const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
     const [isUploading, setIsUploading] = useState(false);
 
+    const gridRef = useRef(null);
+    const hasInitialized = useRef(false);
+
     const [lookups, setLookups] = useState({
         accounts: [],
         leafAccounts: [],
@@ -70,8 +73,6 @@
         usersMap: {},
         usersList: []
     });
-
-    const hasInitialized = useRef(false);
 
     const isReadOnly = useMemo(() => {
         if (formMode === 'CREATE' || formMode === 'COPY') return false;
@@ -271,6 +272,27 @@
         });
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
+    const balanceInfo = useMemo(() => {
+        if (headerData.transaction_type !== 'TRANSFER' || itemsData.length === 0 || isReadOnly) return { isUnbalanced: false };
+        let sumDep = 0, sumWid = 0;
+        itemsData.forEach(i => {
+            sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
+            sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+        });
+        const diff = sumDep - sumWid;
+        return {
+            isUnbalanced: diff !== 0,
+            diff: diff
+        };
+    }, [itemsData, headerData.transaction_type, isReadOnly]);
+
+    const formatNumber = (num) => {
+        if (!num && num !== 0) return '';
+        const parts = num.toString().split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join('.');
+    };
+
     const validateTransactionLogic = (targetStatus) => {
         if (targetStatus === 'DRAFT') return true;
 
@@ -442,6 +464,26 @@
 
     const TransactionMainGrid = window.TransactionMainGrid || FallbackComponent;
 
+    const itemsCardTitle = (
+        <div className="flex items-center gap-4">
+            <span>{t('اقلام سند', 'Transaction Items')}</span>
+            {balanceInfo.isUnbalanced && (
+                <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800/50">
+                    <AlertTriangle size={14} />
+                    <span className="text-[11px] font-bold">
+                        {t('اختلاف تراز:', 'Balance diff:')} <span dir="ltr" className="inline-block px-1 font-black">{formatNumber(Math.abs(balanceInfo.diff))}</span>
+                    </span>
+                </div>
+            )}
+        </div>
+    );
+
+    const itemsCardAction = balanceInfo.isUnbalanced ? (
+        <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[11px]" icon={Scale} onClick={(e) => { e.stopPropagation(); gridRef.current?.triggerBalanceRow(balanceInfo.diff); }}>
+            {t('تراز کردن تراکنش', 'Balance Transaction')}
+        </Button>
+    ) : null;
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : (formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction'))} language={language} width="max-w-6xl">
             <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
@@ -505,7 +547,8 @@
                     </Card>
 
                     <Card
-                        title={t('اقلام سند', 'Transaction Items')}
+                        title={itemsCardTitle}
+                        action={itemsCardAction}
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px] relative z-10"
@@ -514,6 +557,7 @@
                     >
                         <div className="flex-1 w-full p-1 relative min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50 flex flex-col min-w-0">
                             <TransactionMainGrid 
+                                ref={gridRef}
                                 itemsData={itemsData} 
                                 onItemsChange={setItemsData} 
                                 lookups={lookups} 
@@ -521,7 +565,6 @@
                                 formCode={formCode} 
                                 language={language}
                                 showToast={showToast}
-                                transactionType={headerData.transaction_type}
                             />
                         </div>
                     </Card>
