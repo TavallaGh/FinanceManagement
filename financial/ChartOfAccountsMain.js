@@ -278,13 +278,18 @@
       if (!validateNodeUniqueness()) return;
 
       try {
+        // Safe check for currency ID to prevent 400 Bad Request on empty or 'null' strings
+        let safeCurrencyId = nodeFormData.currencyId;
+        if (!safeCurrencyId || safeCurrencyId === '' || safeCurrencyId === 'null' || safeCurrencyId === 'undefined') {
+            safeCurrencyId = null;
+        }
+
         const payload = {
-          chart_id: chart.id,
           parent_id: nodeFormData.parentId || null,
           code: nodeFormData.code?.trim(),
           title_fa: nodeFormData.titleFa?.trim(),
           title_en: nodeFormData.titleEn?.trim() || null,
-          currency_id: nodeFormData.currencyId || null,
+          currency_id: safeCurrencyId,
           is_active: nodeFormData.isActive !== false,
           account_type: nodeFormData.accountType || 'main',
           control_inventory: !!nodeFormData.controlInventory
@@ -292,8 +297,11 @@
 
         let targetId = null;
         if (isCreatingNode) {
+          // Add chart_id only on creation, updating it might cause 400 bad request if it's immutable
+          payload.chart_id = chart.id; 
           const { data, error } = await supabase.from('fm_coa_accounts').insert([payload]).select();
           if (error) throw error;
+          
           if (data && data.length > 0) {
             targetId = data[0].id;
           } else {
@@ -495,11 +503,23 @@
                           
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <TextField size="sm" formCode={formCode} label={t('کد حساب (ترکیبی اتوماتیک)', 'Account Code')} value={nodeFormData.code || ''} onChange={(e) => setNodeFormData({ ...nodeFormData, code: e.target.value })} isRtl={isRtl} required dir="ltr" />
-                            <SelectField size="sm" formCode={formCode} label={t('نوع ارز', 'Currency Type')} value={nodeFormData.currencyId || ''} onChange={(e) => setNodeFormData({ ...nodeFormData, currencyId: e.target.value })} options={[{ value: '', label: t('بدون محدودیت ارزی', 'No Currency Restriction') }, ...lookups.currencies.map(c => {
-                               const cNameFa = c.name_fa || c.title_fa || c.name || c.title || '';
-                               const cNameEn = c.name_en || c.title_en || c.name || c.title || '';
-                               return { value: c.id, label: `${c.code || c.id} - ${isRtl ? cNameFa : cNameEn}` };
-                            })]} isRtl={isRtl} />
+                            <SelectField 
+                                size="sm" 
+                                formCode={formCode} 
+                                label={t('نوع ارز', 'Currency Type')} 
+                                value={nodeFormData.currencyId || ''} 
+                                onChange={(e) => setNodeFormData({ ...nodeFormData, currencyId: e.target.value })} 
+                                options={[
+                                    { value: '', label: t('بدون محدودیت ارزی', 'No Currency Restriction') }, 
+                                    ...lookups.currencies.map(c => {
+                                        const cId = c.id || c.currency_id || c.code;
+                                        const cNameFa = c.name_fa || c.title_fa || c.name || c.title || '';
+                                        const cNameEn = c.name_en || c.title_en || c.name || c.title || '';
+                                        return { value: cId, label: `${c.code || cId} - ${isRtl ? cNameFa : cNameEn}` };
+                                    })
+                                ]} 
+                                isRtl={isRtl} 
+                            />
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
