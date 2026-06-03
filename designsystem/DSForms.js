@@ -67,6 +67,8 @@
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
     const inputRef = useRef(null);
+    const [rect, setRect] = useState(null);
+    const ReactDOM = window.ReactDOM;
     const t = (fa, en) => isRtl ? fa : en;
     const isXs = size === 'xs';
     
@@ -91,12 +93,51 @@
       if (isOpen && inputRef.current) inputRef.current.focus();
     }, [isOpen]);
 
+    useEffect(() => {
+      const updateRect = () => {
+        if (containerRef.current) {
+          setRect(containerRef.current.getBoundingClientRect());
+        }
+      };
+      if (isOpen) {
+        updateRect();
+        window.addEventListener('scroll', updateRect, true);
+        window.addEventListener('resize', updateRect);
+      }
+      return () => {
+        window.removeEventListener('scroll', updateRect, true);
+        window.removeEventListener('resize', updateRect);
+      };
+    }, [isOpen]);
+
     const filteredOptions = options.filter(o => 
       o.label.toLowerCase().includes(searchTerm.toLowerCase()) || 
       String(o.value).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const inputHeights = { xs: 'h-6 text-[10px]', sm: 'h-8 text-[12px]', md: 'h-10 text-[14px]', lg: 'h-12 text-[14px]' };
+
+    const dropdownContent = (
+      <div className="max-h-60 overflow-y-auto custom-scrollbar">
+        {filteredOptions.length > 0 ? filteredOptions.map((opt, idx) => (
+          <div 
+            key={idx} 
+            className={`px-3 py-2 text-[12px] cursor-pointer transition-colors ${String(value) === String(opt.value) ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold' : 'text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 hover:text-indigo-700 dark:hover:text-indigo-300'}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if(onChange) onChange({ target: { name: name || id, value: opt.value } });
+              setIsOpen(false);
+              setSearchTerm('');
+            }}
+          >
+            {opt.label}
+          </div>
+        )) : (
+          <div className="px-3 py-4 text-center text-[12px] text-slate-400 dark:text-slate-500">{t('موردی یافت نشد', 'No results')}</div>
+        )}
+      </div>
+    );
 
     return (
       <div ref={containerRef} className={`flex flex-col ${isXs ? 'gap-0.5' : size === 'sm' ? 'gap-1' : 'gap-1.5'} w-full relative ${isOpen ? 'z-[9999]' : 'z-10'} ${wrapperClassName}`}>
@@ -122,26 +163,20 @@
           </div>
         </div>
         
-        {isOpen && (
-          <div className={`absolute top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] max-h-60 overflow-y-auto custom-scrollbar ${isRtl ? 'right-0' : 'left-0'}`}>
-            {filteredOptions.length > 0 ? filteredOptions.map((opt, idx) => (
-              <div 
-                key={idx} 
-                className={`px-3 py-2 text-[12px] cursor-pointer transition-colors ${String(value) === String(opt.value) ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold' : 'text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 hover:text-indigo-700 dark:hover:text-indigo-300'}`}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if(onChange) onChange({ target: { name: name || id, value: opt.value } });
-                  setIsOpen(false);
-                  setSearchTerm('');
-                }}
-              >
-                {opt.label}
-              </div>
-            )) : (
-              <div className="px-3 py-4 text-center text-[12px] text-slate-400 dark:text-slate-500">{t('موردی یافت نشد', 'No results')}</div>
-            )}
-          </div>
+        {isOpen && rect && (
+          ReactDOM ? ReactDOM.createPortal(
+            <div 
+              style={{ position: 'fixed', top: rect.bottom + 4, left: isRtl ? undefined : rect.left, right: isRtl ? (window.innerWidth - rect.right) : undefined, width: containerRef.current ? containerRef.current.offsetWidth : 'auto', zIndex: 999999 }}
+              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+            >
+              {dropdownContent}
+            </div>,
+            document.body
+          ) : (
+            <div className={`absolute top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ${isRtl ? 'right-0' : 'left-0'}`}>
+              {dropdownContent}
+            </div>
+          )
         )}
         {error && <div className="flex items-center gap-1 text-red-500 dark:text-red-400 text-[10px] font-bold mt-0.5"><AlertCircle size={10} /><span>{error}</span></div>}
       </div>
@@ -274,6 +309,8 @@
     const [currentYear, setCurrentYear] = useState(initToday.y);
     
     const containerRef = useRef(null);
+    const [rect, setRect] = useState(null);
+    const ReactDOM = window.ReactDOM;
     const [generatedId] = useState(() => `datepicker-${Math.random().toString(36).substr(2, 9)}`);
     const inputId = id || generatedId;
     const inputHeights = { xs: 'h-6 text-[10px]', sm: 'h-8 text-[12px]', md: 'h-10 text-[14px]', lg: 'h-12 text-[14px]' };
@@ -287,6 +324,23 @@
       document.addEventListener('mousedown', clickOutside);
       return () => document.removeEventListener('mousedown', clickOutside);
     }, []);
+
+    useEffect(() => {
+      const updateRect = () => {
+        if (containerRef.current) {
+          setRect(containerRef.current.getBoundingClientRect());
+        }
+      };
+      if (isOpen) {
+        updateRect();
+        window.addEventListener('scroll', updateRect, true);
+        window.addEventListener('resize', updateRect);
+      }
+      return () => {
+        window.removeEventListener('scroll', updateRect, true);
+        window.removeEventListener('resize', updateRect);
+      };
+    }, [isOpen]);
 
     useEffect(() => {
       if (value && value.length === 10) {
@@ -379,6 +433,64 @@
     const ti = getTodayInfo(calendarMode);
     const todayStr = `${ti.y}/${ti.m < 10 ? '0'+ti.m : ti.m}/${ti.d < 10 ? '0'+ti.d : ti.d}`;
 
+    const calendarContent = (
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-3 bg-slate-50 dark:bg-slate-900/50 p-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
+          <button type="button" onClick={() => { if(currentMonth===1){setCurrentMonth(12); setCurrentYear(currentYear-1)}else setCurrentMonth(currentMonth-1) }} className="p-1 rounded text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all"><ChevronRight size={14} className={isRtl ? '' : 'rotate-180'} /></button>
+          <div className="text-[12px] font-black text-slate-800 dark:text-slate-100 flex items-center gap-1">
+            <span>{monthName}</span>
+            <span className="text-indigo-600 dark:text-indigo-400">{currentYear}</span>
+          </div>
+          <button type="button" onClick={() => { if(currentMonth===12){setCurrentMonth(1); setCurrentYear(currentYear+1)}else setCurrentMonth(currentMonth+1) }} className="p-1 rounded text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all"><ChevronLeft size={14} className={isRtl ? '' : 'rotate-180'} /></button>
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1 mb-1" dir={isRtl ? 'rtl' : 'ltr'}>
+          {weekDays.map((d, i) => <div key={i} className="text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 py-1">{d}</div>)}
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1" dir={isRtl ? 'rtl' : 'ltr'}>
+          {blanksArray.map(b => <div key={`blank-${b}`} className="h-7"></div>)}
+          {daysArray.map(day => {
+            const dStr = day < 10 ? '0'+day : day;
+            const mStr = currentMonth < 10 ? '0'+currentMonth : currentMonth;
+            const currentIterDate = calendarMode === 'jalali' && j2g
+              ? (() => { const [gy,gm,gd] = j2g(currentYear, currentMonth, day); return `${gy}/${gm<10?'0'+gm:gm}/${gd<10?'0'+gd:gd}`; })()
+              : `${currentYear}/${mStr}/${dStr}`;
+            const isSelected = value === currentIterDate;
+            const isToday = (() => { const d=new Date(); return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`})() === currentIterDate;
+            
+            let btnClass = 'h-7 w-full rounded flex items-center justify-center text-[12px] font-bold transition-all ';
+            if (isSelected) {
+              btnClass += 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-md';
+            } else if (isToday) {
+              btnClass += 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800';
+            } else {
+              btnClass += 'text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300';
+            }
+
+            return (
+              <button 
+                key={day} type="button" onClick={() => handleDayClick(day)}
+                className={btnClass}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+        
+        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-center">
+          <button 
+            type="button" 
+            onClick={(e) => { e.stopPropagation(); handleTodayClick(); }}
+            className="text-[12px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-1.5 rounded transition-colors w-full border border-indigo-100 dark:border-indigo-800"
+          >
+            {t('امروز', 'Today')}
+          </button>
+        </div>
+      </div>
+    );
+
     return (
       <div ref={containerRef} className={`flex flex-col ${isXs ? 'gap-0.5' : size === 'sm' ? 'gap-1' : 'gap-1.5'} w-full relative ${isOpen ? 'z-[9999]' : 'z-10'} ${wrapperClassName}`}>
         {label && <label htmlFor={inputId} className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">{label} {required && <span className="text-red-500 dark:text-red-400">*</span>}</label>}
@@ -404,62 +516,20 @@
           </div>
         </div>
 
-        {isOpen && !isDisabled && (
-          <div className={`absolute top-full mt-1 ${isRtl ? 'right-0' : 'left-0'} z-[9999] w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-xl p-3 animate-in zoom-in-95 duration-150`}>
-            <div className="flex items-center justify-between mb-3 bg-slate-50 dark:bg-slate-900/50 p-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
-              <button type="button" onClick={() => { if(currentMonth===1){setCurrentMonth(12); setCurrentYear(currentYear-1)}else setCurrentMonth(currentMonth-1) }} className="p-1 rounded text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all"><ChevronRight size={14} className={isRtl ? '' : 'rotate-180'} /></button>
-              <div className="text-[12px] font-black text-slate-800 dark:text-slate-100 flex items-center gap-1">
-                <span>{monthName}</span>
-                <span className="text-indigo-600 dark:text-indigo-400">{currentYear}</span>
-              </div>
-              <button type="button" onClick={() => { if(currentMonth===12){setCurrentMonth(1); setCurrentYear(currentYear+1)}else setCurrentMonth(currentMonth+1) }} className="p-1 rounded text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all"><ChevronLeft size={14} className={isRtl ? '' : 'rotate-180'} /></button>
+        {isOpen && !isDisabled && rect && (
+          ReactDOM ? ReactDOM.createPortal(
+            <div 
+              style={{ position: 'fixed', top: rect.bottom + 4, left: isRtl ? undefined : rect.left, right: isRtl ? (window.innerWidth - rect.right) : undefined, zIndex: 999999 }}
+              className="w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-xl animate-in zoom-in-95 duration-150"
+            >
+              {calendarContent}
+            </div>,
+            document.body
+          ) : (
+            <div className={`absolute top-full mt-1 ${isRtl ? 'right-0' : 'left-0'} z-[9999] w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-xl animate-in zoom-in-95 duration-150`}>
+              {calendarContent}
             </div>
-            
-            <div className="grid grid-cols-7 gap-1 mb-1" dir={isRtl ? 'rtl' : 'ltr'}>
-              {weekDays.map((d, i) => <div key={i} className="text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 py-1">{d}</div>)}
-            </div>
-            
-            <div className="grid grid-cols-7 gap-1" dir={isRtl ? 'rtl' : 'ltr'}>
-              {blanksArray.map(b => <div key={`blank-${b}`} className="h-7"></div>)}
-              {daysArray.map(day => {
-                const dStr = day < 10 ? '0'+day : day;
-                const mStr = currentMonth < 10 ? '0'+currentMonth : currentMonth;
-                const currentIterDate = calendarMode === 'jalali' && j2g
-                  ? (() => { const [gy,gm,gd] = j2g(currentYear, currentMonth, day); return `${gy}/${gm<10?'0'+gm:gm}/${gd<10?'0'+gd:gd}`; })()
-                  : `${currentYear}/${mStr}/${dStr}`;
-                const isSelected = value === currentIterDate;
-                const isToday = (() => { const d=new Date(); return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`})() === currentIterDate;
-                
-                let btnClass = 'h-7 w-full rounded flex items-center justify-center text-[12px] font-bold transition-all ';
-                if (isSelected) {
-                  btnClass += 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-md';
-                } else if (isToday) {
-                  btnClass += 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800';
-                } else {
-                  btnClass += 'text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300';
-                }
-
-                return (
-                  <button 
-                    key={day} type="button" onClick={() => handleDayClick(day)}
-                    className={btnClass}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-            
-            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-center">
-              <button 
-                type="button" 
-                onClick={(e) => { e.stopPropagation(); handleTodayClick(); }}
-                className="text-[12px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-1.5 rounded transition-colors w-full border border-indigo-100 dark:border-indigo-800"
-              >
-                {t('امروز', 'Today')}
-              </button>
-            </div>
-          </div>
+          )
         )}
       </div>
     );
@@ -587,6 +657,8 @@
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
     const searchInputRef = useRef(null);
+    const [rect, setRect] = useState(null);
+    const ReactDOM = window.ReactDOM;
     const t = (fa, en) => isRtl ? fa : en;
     const isXs = size === 'xs';
 
@@ -606,6 +678,23 @@
 
     useEffect(() => {
       if (isOpen && searchInputRef.current) searchInputRef.current.focus();
+    }, [isOpen]);
+
+    useEffect(() => {
+      const updateRect = () => {
+        if (containerRef.current) {
+          setRect(containerRef.current.getBoundingClientRect());
+        }
+      };
+      if (isOpen) {
+        updateRect();
+        window.addEventListener('scroll', updateRect, true);
+        window.addEventListener('resize', updateRect);
+      }
+      return () => {
+        window.removeEventListener('scroll', updateRect, true);
+        window.removeEventListener('resize', updateRect);
+      };
     }, [isOpen]);
 
     const filteredOptions = unitOptions.filter(o => 
@@ -629,6 +718,28 @@
     };
 
     const heights = { xs: 'h-6 text-[10px]', sm: 'h-8 text-[12px]', md: 'h-10 text-[14px]', lg: 'h-12 text-[14px]' };
+
+    const suffixDropdownContent = (
+      <div className="max-h-60 overflow-y-auto custom-scrollbar">
+        {filteredOptions.length > 0 ? filteredOptions.map((opt, idx) => (
+          <div 
+            key={idx} 
+            className={`px-3 py-2 text-[12px] cursor-pointer transition-colors ${String(unitValue) === String(opt.value) ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold' : 'text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 hover:text-indigo-700 dark:hover:text-indigo-300'}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if(onUnitChange) onUnitChange(opt.value);
+              setIsOpen(false);
+              setSearchTerm('');
+            }}
+          >
+            {opt.label}
+          </div>
+        )) : (
+          <div className="px-3 py-4 text-center text-[12px] text-slate-400 dark:text-slate-500">{t('موردی یافت نشد', 'No results')}</div>
+        )}
+      </div>
+    );
 
     return (
       <div className={`flex flex-col ${isXs ? 'gap-0.5' : size === 'sm' ? 'gap-1' : 'gap-1.5'} w-full relative ${isOpen ? 'z-[9999]' : 'z-10'} ${wrapperClassName}`}>
@@ -670,26 +781,20 @@
             <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
           </div>
 
-          {isOpen && (
-            <div className={`absolute top-full mt-1 ${isRtl ? 'left-0' : 'right-0'} w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] max-h-60 overflow-y-auto custom-scrollbar`}>
-              {filteredOptions.length > 0 ? filteredOptions.map((opt, idx) => (
-                <div 
-                  key={idx} 
-                  className={`px-3 py-2 text-[12px] cursor-pointer transition-colors ${String(unitValue) === String(opt.value) ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold' : 'text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 hover:text-indigo-700 dark:hover:text-indigo-300'}`}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if(onUnitChange) onUnitChange(opt.value);
-                    setIsOpen(false);
-                    setSearchTerm('');
-                  }}
-                >
-                  {opt.label}
-                </div>
-              )) : (
-                <div className="px-3 py-4 text-center text-[12px] text-slate-400 dark:text-slate-500">{t('موردی یافت نشد', 'No results')}</div>
-              )}
-            </div>
+          {isOpen && rect && (
+            ReactDOM ? ReactDOM.createPortal(
+              <div 
+                style={{ position: 'fixed', top: rect.bottom + 4, left: isRtl ? rect.left : undefined, right: isRtl ? undefined : (window.innerWidth - rect.right), zIndex: 999999 }}
+                className="w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+              >
+                {suffixDropdownContent}
+              </div>,
+              document.body
+            ) : (
+              <div className={`absolute top-full mt-1 ${isRtl ? 'left-0' : 'right-0'} w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] overflow-hidden`}>
+                {suffixDropdownContent}
+              </div>
+            )
           )}
         </div>
         {error && <div className="flex items-center gap-1 text-red-500 dark:text-red-400 text-[10px] font-bold mt-0.5"><AlertCircle size={10} /><span>{error}</span></div>}

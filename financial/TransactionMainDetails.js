@@ -288,6 +288,17 @@
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
     const handleChangeStatus = async (newStatus) => {
+        if (headerData.transaction_type === 'TRANSFER' && newStatus !== 'DRAFT') {
+            let sumDep = 0, sumWid = 0;
+            itemsData.forEach(i => {
+                sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
+                sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+            });
+            if (sumDep !== sumWid) {
+                return showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Cannot change status of unbalanced transfer.'), 'warning');
+            }
+        }
+        
         setHeaderData(prev => ({ ...prev, status: newStatus }));
         if (headerData.id) {
             setIsLoading(true);
@@ -317,6 +328,17 @@
         
         if (itemsData.length === 0) {
             return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Transaction must have at least one item.'), 'warning');
+        }
+
+        if (headerData.transaction_type === 'TRANSFER' && headerData.status !== 'DRAFT') {
+            let sumDep = 0, sumWid = 0;
+            itemsData.forEach(i => {
+                sumDep += parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
+                sumWid += parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+            });
+            if (sumDep !== sumWid) {
+                return showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
+            }
         }
 
         setIsLoading(true);
@@ -355,7 +377,8 @@
                 cost_type_id: item.cost_type_id || null,
                 income_type_id: item.income_type_id || null,
                 currency: item.currency || 'IRR',
-                amount: parseFloat(String(item.amount || '0').replace(/,/g, '')) || 0,
+                deposit_amount: parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0,
+                withdrawal_amount: parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0,
                 description: item.description || ''
             }));
 
@@ -376,7 +399,7 @@
         if (inlineItemEdit) return showToast(t('ابتدا با زدن دکمه Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
         setInlineItemEdit({
             id: 'new',
-            data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', amount: '', description: '' }
+            data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', deposit_amount: '', withdrawal_amount: '0', description: '' }
         });
     };
 
@@ -385,7 +408,7 @@
         const accObj = lookups.leafAccounts.find(a => String(a.id) === String(row.account_id)) || null;
         setInlineItemEdit({
             id: row._tempId || row.id,
-            data: { ...row, account_obj: accObj, amount: row.amount ? String(row.amount).replace(/,/g, '') : '' }
+            data: { ...row, account_obj: accObj, deposit_amount: row.deposit_amount ? String(row.deposit_amount).replace(/,/g, '') : '0', withdrawal_amount: row.withdrawal_amount ? String(row.withdrawal_amount).replace(/,/g, '') : '0' }
         });
     };
 
@@ -393,17 +416,21 @@
         if (!inlineItemEdit) return;
         const form = inlineItemEdit.data;
         
-        if (!form.account_id || !form.amount || !form.description) {
-            return showToast(t('حساب، مبلغ و شرح اجباری هستند.', 'Account, Amount, and Description required.'), 'warning');
+        if (!form.account_id || !form.description) {
+            return showToast(t('حساب و شرح اجباری هستند.', 'Account and Description required.'), 'warning');
         }
 
-        const cleanAmount = String(form.amount || '0').replace(/,/g, '');
-        if (isNaN(cleanAmount) || cleanAmount === '') return showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
+        const cleanDeposit = String(form.deposit_amount || '0').replace(/,/g, '');
+        const cleanWithdrawal = String(form.withdrawal_amount || '0').replace(/,/g, '');
+        
+        if ((isNaN(cleanDeposit) || cleanDeposit === '') && (isNaN(cleanWithdrawal) || cleanWithdrawal === '')) {
+            return showToast(t('مبلغ نامعتبر است.', 'Invalid amount.'), 'warning');
+        }
 
         let newRowNum = parseInt(form.row_number, 10);
         if (isNaN(newRowNum) || newRowNum < 1) newRowNum = itemsData.length + (inlineItemEdit.id === 'new' ? 1 : 0);
 
-        const dataToSave = { ...form, amount: cleanAmount };
+        const dataToSave = { ...form, deposit_amount: cleanDeposit, withdrawal_amount: cleanWithdrawal };
         if (inlineItemEdit.id === 'new') dataToSave._tempId = crypto.randomUUID();
 
         let otherItems = itemsData;
@@ -507,10 +534,10 @@
         return parts.join('.');
     };
 
-    const handleAmountChange = (e) => {
+    const handleAmountChange = (e, field) => {
         const raw = e.target.value.replace(/,/g, '');
         if (raw === '' || !isNaN(raw)) {
-            setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, amount: raw } }));
+            setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, [field]: raw } }));
         }
     };
 
@@ -576,7 +603,20 @@
         }},
         { field: 'transaction_action', header_fa: 'نوع', width: '80px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[90]"><SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_action: e.target.value}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[90]">
+                    <SelectField size="sm" options={TRANSACTION_ACTIONS} value={inlineItemEdit.data.transaction_action} onChange={e => {
+                        const action = e.target.value;
+                        setInlineItemEdit(prev => ({
+                            ...prev, 
+                            data: {
+                                ...prev.data, 
+                                transaction_action: action, 
+                                deposit_amount: action === 'DEPOSIT' ? prev.data.deposit_amount : '0', 
+                                withdrawal_amount: action === 'WITHDRAWAL' ? prev.data.withdrawal_amount : '0'
+                            }
+                        }));
+                    }} isRtl={isRtl} wrapperClassName="m-0" />
+                </div>;
             }
             return <span className="text-[12px]">{TRANSACTION_ACTIONS.find(a => a.value === val)?.label || val}</span>;
         }},
@@ -625,11 +665,19 @@
             }
             return <span dir="ltr" className="text-[12px]">{val}</span>;
         }},
-        { field: 'amount', header_fa: 'مبلغ *', width: '100px', render: (val, row) => {
+        { field: 'deposit_amount', header_fa: 'واریز *', width: '100px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" value={formatNumber(inlineItemEdit.data.amount)} onChange={handleAmountChange} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                const disabled = inlineItemEdit.data.transaction_action !== 'DEPOSIT';
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumber(inlineItemEdit.data.deposit_amount)} onChange={(e) => handleAmountChange(e, 'deposit_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
-            return <span dir="ltr" className="text-[12px] font-medium">{formatNumber(val)}</span>;
+            return <span dir="ltr" className="text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{formatNumber(val)}</span>;
+        }},
+        { field: 'withdrawal_amount', header_fa: 'برداشت *', width: '100px', render: (val, row) => {
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                const disabled = inlineItemEdit.data.transaction_action !== 'WITHDRAWAL';
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumber(inlineItemEdit.data.withdrawal_amount)} onChange={(e) => handleAmountChange(e, 'withdrawal_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+            }
+            return <span dir="ltr" className="text-[12px] font-medium text-rose-600 dark:text-rose-500">{formatNumber(val)}</span>;
         }},
         { field: 'description', header_fa: 'شرح *', width: 'auto', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {

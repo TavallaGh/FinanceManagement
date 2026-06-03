@@ -42,9 +42,11 @@
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
     const inputRef = useRef(null);
+    const [rect, setRect] = useState(null);
     const t = (fa, en) => isRtl ? fa : en;
     const access = useSecureAccess(formCode);
     const isDisabled = (!access.canEdit && !access.canCreate) || disabled;
+    const ReactDOM = window.ReactDOM;
     
     useEffect(() => {
       const handleClickOutside = (e) => {
@@ -60,6 +62,23 @@
       if (isOpen && inputRef.current) inputRef.current.focus();
     }, [isOpen]);
 
+    useEffect(() => {
+      const updateRect = () => {
+        if (containerRef.current) {
+          setRect(containerRef.current.getBoundingClientRect());
+        }
+      };
+      if (isOpen) {
+        updateRect();
+        window.addEventListener('scroll', updateRect, true);
+        window.addEventListener('resize', updateRect);
+      }
+      return () => {
+        window.removeEventListener('scroll', updateRect, true);
+        window.removeEventListener('resize', updateRect);
+      };
+    }, [isOpen]);
+
     const filteredData = useMemo(() => {
       if (!searchTerm) return data;
       const lowerSearch = searchTerm.toLowerCase();
@@ -72,6 +91,43 @@
     }, [data, columns, searchTerm]);
 
     const heights = { xs: 'h-6 text-[10px]', sm: 'h-8 text-[12px]', md: 'h-10 text-[14px]', lg: 'h-12 text-[14px]' };
+
+    const dropdownContentBox = (
+      <div className="max-h-64 overflow-y-auto custom-scrollbar">
+        {filteredData.length > 0 ? (
+          <table className="w-full text-start border-collapse">
+            <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm z-10">
+              <tr>
+                {columns.map((col, idx) => (
+                  <th key={idx} className={`p-2.5 text-[11px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 ${isRtl ? 'text-right' : 'text-left'}`} style={{ width: col.width || 'auto' }}>
+                    {t(col.header_fa, col.header_en)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData.map((row, rIdx) => (
+                <tr 
+                  key={rIdx} 
+                  onClick={(e) => { e.stopPropagation(); onChange(row); setIsOpen(false); setSearchTerm(''); }}
+                  className="cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors"
+                >
+                  {columns.map((col, cIdx) => (
+                    <td key={cIdx} className="p-2.5 text-[12px] text-slate-700 dark:text-slate-300">
+                      {col.render ? col.render(row[col.field], row) : (row[col.field] || '-')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="p-4 text-center text-[12px] text-slate-400 dark:text-slate-500">
+            {t('موردی یافت نشد', 'No results found')}
+          </div>
+        )}
+      </div>
+    );
 
     return (
       <div ref={containerRef} className={`flex flex-col ${size === 'sm' ? 'gap-1' : 'gap-1.5'} w-full relative ${isOpen ? 'z-[9999]' : 'z-10'} ${wrapperClassName}`}>
@@ -112,43 +168,27 @@
           )}
         </div>
 
-        {isOpen && (
-          <div className={`absolute top-full mt-1 ${isRtl ? 'right-0' : 'left-0'} w-full ${dropdownWidth} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150`}>
-            <div className="max-h-64 overflow-y-auto custom-scrollbar">
-              {filteredData.length > 0 ? (
-                <table className="w-full text-start border-collapse">
-                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm z-10">
-                    <tr>
-                      {columns.map((col, idx) => (
-                        <th key={idx} className={`p-2.5 text-[11px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 ${isRtl ? 'text-right' : 'text-left'}`} style={{ width: col.width || 'auto' }}>
-                          {t(col.header_fa, col.header_en)}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredData.map((row, rIdx) => (
-                      <tr 
-                        key={rIdx} 
-                        onClick={() => { onChange(row); setIsOpen(false); setSearchTerm(''); }}
-                        className="cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors"
-                      >
-                        {columns.map((col, cIdx) => (
-                          <td key={cIdx} className="p-2.5 text-[12px] text-slate-700 dark:text-slate-300">
-                            {col.render ? col.render(row[col.field], row) : (row[col.field] || '-')}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="p-4 text-center text-[12px] text-slate-400 dark:text-slate-500">
-                  {t('موردی یافت نشد', 'No results found')}
-                </div>
-              )}
+        {isOpen && rect && (
+          ReactDOM ? ReactDOM.createPortal(
+            <div 
+              style={{
+                position: 'fixed',
+                top: rect.bottom + 4,
+                left: isRtl ? undefined : rect.left,
+                right: isRtl ? (window.innerWidth - rect.right) : undefined,
+                width: containerRef.current ? containerRef.current.offsetWidth : 'auto',
+                zIndex: 999999
+              }}
+              className={`w-full ${dropdownWidth} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg flex flex-col animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}
+            >
+              {dropdownContentBox}
+            </div>,
+            document.body
+          ) : (
+            <div className={`absolute top-full mt-1 ${isRtl ? 'right-0' : 'left-0'} w-full ${dropdownWidth} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150`}>
+              {dropdownContentBox}
             </div>
-          </div>
+          )
         )}
       </div>
     );
