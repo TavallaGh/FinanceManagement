@@ -42,10 +42,10 @@
     }, [securityCtx, formCode]);
 
     const TRANSACTION_TYPES = [
-        { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
-        { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
+        { value: 'OPENING', label: t('افتتاحیه', 'Opening') },
+        { value: 'CLOSING', label: t('اختتامیه', 'Closing') },
         { value: 'GENERAL', label: t('عمومی', 'General') },
-        { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
+        { value: 'TRANSFER', label: t('انتقال', 'Transfer') }
     ];
 
     const TRANSACTION_ACTIONS = [
@@ -63,7 +63,8 @@
     const STATUS_OPTIONS = [
         { value: 'DRAFT', label: t('یادداشت', 'Draft') },
         { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
-        { value: 'APPROVED', label: t('تایید شده', 'Approved') }
+        { value: 'APPROVED', label: t('تایید شده', 'Approved') },
+        { value: 'FINAL', label: t('قطعی شده', 'Final') }
     ];
 
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
@@ -691,17 +692,17 @@
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
-                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند *', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
                             <div className="relative z-[80]">
-                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش *', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
+                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => setHeaderData({...headerData, transaction_type: e.target.value})} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
                             
                             <div className="lg:col-span-3 sm:col-span-2 relative z-[70]">
-                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ *', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => setHeaderData({...headerData, description: e.target.value})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                         </div>
                     </Card>
