@@ -5,7 +5,7 @@
 
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
-  const { Trash2 = FallbackIcon, Scale = FallbackIcon, AlertTriangle = FallbackIcon, Check = FallbackIcon, X = FallbackIcon } = LucideIcons;
+  const { Trash2 = FallbackIcon, Scale = FallbackIcon, AlertTriangle = FallbackIcon, Save = FallbackIcon, X = FallbackIcon } = LucideIcons;
 
   const DS = window.DesignSystem || {};
   const Forms = window.DSForms || DS || {};
@@ -155,6 +155,7 @@
         } else if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
+            setInlineItemEdit(null);
         }
     };
 
@@ -209,7 +210,11 @@
                         <LOVField 
                             size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[650px]"
                             displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${isRtl ? inlineItemEdit.data.account_obj.title_fa : (inlineItemEdit.data.account_obj.title_en || inlineItemEdit.data.account_obj.title_fa)}` : ''}
-                            onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
+                            onChange={(r) => {
+                                const currObj = lookups.currencies?.find(c => String(c.id) === String(r?.currency_id));
+                                const cCode = currObj ? currObj.code : 'IRR';
+                                setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: cCode }}));
+                            }}
                             isRtl={isRtl} wrapperClassName="m-0"
                         />
                     </div>
@@ -318,23 +323,23 @@
 
     const rowActions = isReadOnly ? [] : [
         {
-            icon: Check,
-            tooltip: t('ثبت سطر', 'Save Row'),
-            className: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50',
+            icon: Save,
+            tooltip: t('ذخیره سطر', 'Save Row'),
+            className: 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/50',
             hidden: (row) => !(inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
             onClick: () => handleSaveItemInline()
         },
         {
             icon: X,
             tooltip: t('انصراف', 'Cancel'),
-            className: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 dark:hover:bg-rose-900/50',
+            className: 'text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/50',
             hidden: (row) => !(inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
             onClick: () => setInlineItemEdit(null)
         },
         {
             icon: Trash2,
             tooltip: t('حذف', 'Delete'),
-            className: 'text-slate-400 hover:text-rose-500',
+            className: 'text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/50',
             hidden: (row) => (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
             onClick: (row) => handleRemoveItem(row)
         }
@@ -346,7 +351,7 @@
 
     return (
         <DataGrid 
-            data={itemGridData} columns={itemColumns}
+            data={itemGridData} columns={itemColumns} actionWidth="80px"
             language={language} onAdd={isReadOnly ? undefined : handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
             selectable={!isReadOnly} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)} actions={rowActions}
             className="h-full border-0" formCode={formCode}

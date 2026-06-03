@@ -267,7 +267,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, onImport, formCode }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, onImport, formCode, actionWidth = '120px' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -774,7 +774,7 @@
                   )
                 })}
                 {filteredActions.length > 0 && (
-                  <th style={{...getStickyStyles('ACTIONS', true, true)}} className="p-1.5 text-[12px] font-black text-slate-700 dark:text-slate-200 w-[120px] bg-slate-100 dark:bg-slate-900 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none border-0">
+                  <th style={{...getStickyStyles('ACTIONS', true, true), width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className="p-1.5 text-[12px] font-black text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-900 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none border-0">
                     {t('عملیات', 'Actions')}
                   </th>
                 )}
@@ -822,7 +822,7 @@
                   );
                 })}
                 {filteredActions.length > 0 && (
-                  <td style={getStickyStyles('ACTIONS', true, true)} className="p-1 bg-slate-100 dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-700 shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none">
+                  <td style={{...getStickyStyles('ACTIONS', true, true), width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className="p-1 bg-slate-100 dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-700 shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none">
                     <div className="flex items-center justify-center gap-1">
                       <button onClick={applyInlineFilters} title={t('اعمال فیلتر', 'Apply Filter')} className="p-1 rounded bg-indigo-500 hover:bg-indigo-600 text-white shadow-sm transition-colors">
                         <Search size={12} strokeWidth={2.5} />
@@ -893,7 +893,7 @@
                     ))}
                     
                     {filteredActions.length > 0 && (
-                      <td style={{...getStickyStyles('ACTIONS', true), backgroundColor: 'inherit'}} className={`p-1 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.01)] dark:shadow-none bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} border-slate-100 dark:border-slate-700/50`}>
+                      <td style={{...getStickyStyles('ACTIONS', true), backgroundColor: 'inherit', width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className={`p-1 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.01)] dark:shadow-none bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} border-slate-100 dark:border-slate-700/50`}>
                         <div className="flex items-center justify-center gap-0.5">
                           {filteredActions.map((act, i) => {
                             if (act.hidden && act.hidden(row)) return null;
@@ -939,7 +939,7 @@
                       </td>
                     );
                   })}
-                  {filteredActions.length > 0 && <td style={getStickyStyles('ACTIONS', true, false, true)} className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none"></td>}
+                  {filteredActions.length > 0 && <td style={{...getStickyStyles('ACTIONS', true, false, true), width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none"></td>}
                 </tr>
               </tfoot>
             )}

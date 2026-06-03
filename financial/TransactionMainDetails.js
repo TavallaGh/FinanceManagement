@@ -73,7 +73,8 @@
         incomeTypes: [],
         departments: [],
         usersMap: {},
-        usersList: []
+        usersList: [],
+        currencies: []
     });
 
     const isReadOnly = useMemo(() => {
@@ -107,14 +108,15 @@
     const fetchDependencies = useCallback(async () => {
         if (!supabase) return null;
         try {
-            const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes] = await Promise.all([
+            const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes, currRes] = await Promise.all([
                 supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
                 supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
-                supabase.from('fm_org_chart_nodes').select('id, title')
+                supabase.from('fm_org_chart_nodes').select('id, title'),
+                supabase.from('fm_currencies').select('id, code, title_fa, title_en')
             ]);
             
             const uMap = {};
@@ -178,7 +180,8 @@
                 usersMap: uMap,
                 usersList: usersRes.data || [],
                 currentUserDeptId: myDeptId,
-                currentUserDeptTitle: myDeptTitle
+                currentUserDeptTitle: myDeptTitle,
+                currencies: currRes.data || []
             };
 
             setLookups(newLookups);
