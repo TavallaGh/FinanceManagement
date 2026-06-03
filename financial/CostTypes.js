@@ -137,7 +137,7 @@
       
       let nextCode = '';
       if (window.AutoNumberingService) {
-        const preview = await window.AutoNumberingService.previewNext('COST_TYPES');
+        const preview = await window.AutoNumberingService.previewNext('COST_TYPE');
         if (preview) nextCode = preview.formattedCode;
       }
       
@@ -151,7 +151,7 @@
       
       let nextCode = '';
       if (window.AutoNumberingService) {
-        const preview = await window.AutoNumberingService.previewNext('COST_TYPES');
+        const preview = await window.AutoNumberingService.previewNext('COST_TYPE');
         if (preview) nextCode = preview.formattedCode;
       }
       
@@ -219,7 +219,7 @@
           if (error) throw error;
           
           if (window.AutoNumberingService) {
-             await window.AutoNumberingService.consumeNext('COST_TYPES');
+             await window.AutoNumberingService.consumeNext('COST_TYPE');
           }
           
           if (data && data[0]) {
