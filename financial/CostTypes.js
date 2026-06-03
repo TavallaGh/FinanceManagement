@@ -137,8 +137,16 @@
       
       let nextCode = '';
       if (window.AutoNumberingService) {
-        const preview = await window.AutoNumberingService.previewNext('COST_TYPE');
-        if (preview) nextCode = preview.formattedCode;
+        try {
+            const preview = await window.AutoNumberingService.previewNext('COST_TYPES');
+            if (preview && preview.formattedCode) {
+                nextCode = preview.formattedCode;
+            } else if (typeof preview === 'string') {
+                nextCode = preview;
+            }
+        } catch (err) {
+            console.error('AutoNumbering Error:', err);
+        }
       }
       
       setTreeFormData({ code: nextCode, titleFa: '', titleEn: '', parentId: null, isActive: true });
@@ -151,8 +159,16 @@
       
       let nextCode = '';
       if (window.AutoNumberingService) {
-        const preview = await window.AutoNumberingService.previewNext('COST_TYPE');
-        if (preview) nextCode = preview.formattedCode;
+        try {
+            const preview = await window.AutoNumberingService.previewNext('COST_TYPES');
+            if (preview && preview.formattedCode) {
+                nextCode = preview.formattedCode;
+            } else if (typeof preview === 'string') {
+                nextCode = preview;
+            }
+        } catch (err) {
+            console.error('AutoNumbering Error:', err);
+        }
       }
       
       setTreeFormData({ code: nextCode, titleFa: '', titleEn: '', parentId: parentNode.id, isActive: true });
@@ -219,7 +235,11 @@
           if (error) throw error;
           
           if (window.AutoNumberingService) {
-             await window.AutoNumberingService.consumeNext('COST_TYPE');
+             try {
+                 await window.AutoNumberingService.consumeNext('COST_TYPES');
+             } catch(err) {
+                 console.error('AutoNumbering consume error:', err);
+             }
           }
           
           if (data && data[0]) {
