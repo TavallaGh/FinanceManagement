@@ -249,7 +249,7 @@
                 setAttachModal({ isOpen: false, record: null, files: [] });
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
                 if (formMode === 'COPY') {
-                    setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of document ${initialRecord.document_code} and requires review.`));
+                    setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of transaction ${initialRecord.document_code} and requires review.`));
                 }
                 
                 const parsedDate = formMode === 'COPY' ? todayStr : (initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr);
@@ -295,10 +295,10 @@
                 const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).eq('id', headerData.id);
                 if (error) throw error;
                 await logAction('status_update', headerData.id, `تغییر وضعیت سند به ${newStatus}`);
-                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Document status updated successfully.'));
+                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
                 onSuccess();
             } catch (err) {
-                showToast(t('خطا در تغییر وضعیت سند.', 'Error updating document status.'), 'error');
+                showToast(t('خطا در تغییر وضعیت سند.', 'Error updating transaction status.'), 'error');
                 setHeaderData(prev => ({ ...prev, status: initialRecord?.status || 'DRAFT' }));
             } finally {
                 setIsLoading(false);
@@ -316,7 +316,7 @@
         }
         
         if (itemsData.length === 0) {
-            return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Document must have at least one item.'), 'warning');
+            return showToast(t('سند حداقل یک قلم نیاز دارد.', 'Transaction must have at least one item.'), 'warning');
         }
 
         setIsLoading(true);
@@ -688,11 +688,11 @@
                         language={language}
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
-                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Document Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Transaction Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
-                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Document Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
+                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Transaction Date')} value={headerData.document_date || ''} onChange={val => setHeaderData({...headerData, document_date: val})} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
@@ -708,7 +708,7 @@
                     </Card>
 
                     <Card
-                        title={t('اقلام سند', 'Document Items')}
+                        title={t('اقلام سند', 'Transaction Items')}
                         isCollapsible={true}
                         noPadding={true}
                         className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[350px] relative z-10"
@@ -728,11 +728,11 @@
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
                     <Button variant="outline" size="sm" onClick={onClose}>{t('بستن', 'Close')}</Button>
-                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Document')}</Button>}
+                    {!isReadOnly && access.canEdit && <Button variant="primary" size="sm" icon={Check} onClick={handleSaveTransaction} isLoading={isLoading}>{t('ثبت نهایی سند', 'Save Transaction')}</Button>}
                 </div>
             </div>
             
-            <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Document Attachments')} language={language} width="max-w-xl">
+            <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Attachments')} language={language} width="max-w-xl">
                 <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg">
                     <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0">
                         <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.document_code}</span>
