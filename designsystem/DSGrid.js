@@ -109,7 +109,7 @@
               {filteredData.map((row, rIdx) => (
                 <tr 
                   key={rIdx} 
-                  onClick={(e) => { e.stopPropagation(); onChange(row); setIsOpen(false); setSearchTerm(''); }}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onChange(row); setIsOpen(false); setSearchTerm(''); }}
                   className="cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors"
                 >
                   {columns.map((col, cIdx) => (

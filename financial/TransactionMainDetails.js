@@ -542,8 +542,8 @@
     };
 
     const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'ساختار حساب', width: '180px' },
-        { field: 'code', header_fa: 'کد حساب', width: '100px' },
+        { field: 'chart_name', header_fa: 'ساختار حساب', width: '250px' },
+        { field: 'code', header_fa: 'کد حساب', width: '120px' },
         { field: 'title_fa', header_fa: 'عنوان حساب', width: 'auto', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
@@ -590,7 +590,7 @@
                 return (
                     <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
                         <LOVField 
-                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[400px]"
+                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[650px]"
                             displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${inlineItemEdit.data.account_obj.title_fa}` : ''}
                             onChange={(r) => setInlineItemEdit(prev => ({...prev, data: { ...prev.data, account_id: r?.id, account_obj: r, currency: r?.currency_id || 'IRR' }}))}
                             isRtl={isRtl} wrapperClassName="m-0"
@@ -633,8 +633,8 @@
                     return (
                         <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[400px]"
-                                displayValue={lookups.costTypes.find(c => c.id === inlineItemEdit.data.cost_type_id)?.title_fa || ''}
+                                size="sm" formCode={formCode} data={lookups.costTypes} columns={costLovColumns} dropdownWidth="min-w-[500px]"
+                                displayValue={lookups.costTypes.find(c => String(c.id) === String(inlineItemEdit.data.cost_type_id))?.title_fa || ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, cost_type_id: r?.id}}))}
                                 isRtl={isRtl} wrapperClassName="m-0"
                             />
@@ -645,8 +645,8 @@
                     return (
                         <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
                             <LOVField 
-                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[400px]"
-                                displayValue={lookups.incomeTypes.find(c => c.id === inlineItemEdit.data.income_type_id)?.title_fa || ''}
+                                size="sm" formCode={formCode} data={lookups.incomeTypes} columns={incomeLovColumns} dropdownWidth="min-w-[500px]"
+                                displayValue={lookups.incomeTypes.find(c => String(c.id) === String(inlineItemEdit.data.income_type_id))?.title_fa || ''}
                                 onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, income_type_id: r?.id}}))}
                                 isRtl={isRtl} wrapperClassName="m-0"
                             />
