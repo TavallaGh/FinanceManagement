@@ -5,7 +5,7 @@
 
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
-  const { Trash2 = FallbackIcon } = LucideIcons;
+  const { Trash2 = FallbackIcon, Scale = FallbackIcon, AlertTriangle = FallbackIcon, Check = FallbackIcon, X = FallbackIcon } = LucideIcons;
 
   const DS = window.DesignSystem || {};
   const Forms = window.DSForms || DS || {};
@@ -155,7 +155,6 @@
         } else if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            setInlineItemEdit(null);
         }
     };
 
@@ -317,6 +316,30 @@
         }}
     ];
 
+    const rowActions = isReadOnly ? [] : [
+        {
+            icon: Check,
+            tooltip: t('ثبت سطر', 'Save Row'),
+            className: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50',
+            hidden: (row) => !(inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
+            onClick: () => handleSaveItemInline()
+        },
+        {
+            icon: X,
+            tooltip: t('انصراف', 'Cancel'),
+            className: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 dark:hover:bg-rose-900/50',
+            hidden: (row) => !(inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
+            onClick: () => setInlineItemEdit(null)
+        },
+        {
+            icon: Trash2,
+            tooltip: t('حذف', 'Delete'),
+            className: 'text-slate-400 hover:text-rose-500',
+            hidden: (row) => (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
+            onClick: (row) => handleRemoveItem(row)
+        }
+    ];
+
     const itemBulkActions = isReadOnly ? [] : [
         { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => handleBulkDeleteItems(ids) }
     ];
@@ -325,7 +348,7 @@
         <DataGrid 
             data={itemGridData} columns={itemColumns}
             language={language} onAdd={isReadOnly ? undefined : handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
-            selectable={!isReadOnly} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)}
+            selectable={!isReadOnly} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)} actions={rowActions}
             className="h-full border-0" formCode={formCode}
         />
     );

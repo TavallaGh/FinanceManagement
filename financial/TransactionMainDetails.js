@@ -54,6 +54,7 @@
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [isLoading, setIsLoading] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
+    const [hasSaved, setHasSaved] = useState(false);
     
     const [headerData, setHeaderData] = useState({});
     const [itemsData, setItemsData] = useState([]);
@@ -202,6 +203,7 @@
     useEffect(() => {
         if (!isOpen) {
             hasInitialized.current = false;
+            setHasSaved(false);
             return;
         }
         if (hasInitialized.current) return;
@@ -234,6 +236,7 @@
                 setItemsData([]);
                 setAttachModal({ isOpen: false, record: null, files: [] });
                 setIsDirty(false);
+                setHasSaved(false);
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
                 if (formMode === 'COPY') {
                     setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of transaction ${initialRecord.document_code} and requires review.`));
@@ -264,6 +267,7 @@
                 
                 setItemsData(mappedItems);
                 setIsDirty(formMode === 'COPY');
+                setHasSaved(false);
 
                 if (formMode === 'EDIT') {
                     loadAttachments(initialRecord.id);
@@ -339,7 +343,7 @@
         const statusToSave = typeof overrideStatus === 'string' ? overrideStatus : headerData.status;
 
         if (document.getElementById('grid-inline-edit-marker')) {
-            return showToast(t('لطفاً ابتدا با زدن دکمه Enter تغییرات سطر باز را در اقلام ذخیره کنید.', 'Please save inline edits first using Enter key.'), 'warning');
+            return showToast(t('لطفاً ابتدا با زدن دکمه Enter یا دکمه تایید تغییرات سطر باز را در اقلام ذخیره کنید.', 'Please save inline edits first.'), 'warning');
         }
 
         if (!headerData.document_date || !headerData.transaction_type || !headerData.description) {
@@ -411,9 +415,13 @@
 
             setHeaderData(prev => ({ ...prev, status: statusToSave }));
             setIsDirty(false);
+            setHasSaved(true);
             
-            showToast(t('عملیات با موفقیت انجام شد.', 'Operation successful.'));
-            if (onSuccess) onSuccess({ keepOpen: true, data: { id: txId, status: statusToSave } });
+            if (typeof overrideStatus === 'string') {
+                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
+            } else {
+                showToast(t('سند با موفقیت ثبت شد.', 'Transaction saved successfully.'));
+            }
         } catch (error) {
             showToast(t('خطا در عملیات.', 'Operation failed.'), 'error');
         } finally {
@@ -474,6 +482,14 @@
         }
     };
 
+    const handleCloseModal = () => {
+        if (hasSaved && onSuccess) {
+            onSuccess();
+        } else {
+            onClose();
+        }
+    };
+
     if (!isOpen) return null;
 
     const TransactionMainGrid = window.TransactionMainGrid || FallbackComponent;
@@ -523,7 +539,7 @@
     ) : null;
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : (formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction'))} language={language} width="max-w-6xl">
+        <Modal isOpen={isOpen} onClose={handleCloseModal} title={isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : (formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction'))} language={language} width="max-w-6xl">
             <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
                 <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
                     
@@ -588,7 +604,7 @@
                 </div>
 
                 <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
-                    <Button variant="outline" size="sm" onClick={onClose}>{t('بستن', 'Close')}</Button>
+                    <Button variant="outline" size="sm" onClick={handleCloseModal}>{t('بستن', 'Close')}</Button>
                     {!isReadOnly && access.canEdit && (
                         <Button variant="primary" size="sm" icon={Check} onClick={() => handleSaveTransaction()} isLoading={isLoading} disabled={!isDirty}>
                             {t('ذخیره', 'Save')}
