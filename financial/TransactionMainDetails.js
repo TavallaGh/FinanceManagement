@@ -204,7 +204,7 @@
         }
     }, [supabase, showToast, t, currentUserId]);
 
-    const generateDocumentCode = () => {
+    const generateFallbackCode = () => {
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
     };
 
@@ -224,7 +224,7 @@
         if (hasInitialized.current) return;
         hasInitialized.current = true;
         
-        fetchDependencies().then((newLookups) => {
+        fetchDependencies().then(async (newLookups) => {
             if (!newLookups) return;
 
             const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
@@ -236,9 +236,24 @@
                 if (matchingUser) safeFinalRegistrar = matchingUser.id;
             }
 
+            let nextDocCode = '';
+            if (formMode === 'CREATE' || formMode === 'COPY') {
+                if (window.AutoNumberingService) {
+                    try {
+                        const preview = await window.AutoNumberingService.previewNext('TRANSACTIONS');
+                        if (preview && preview.formattedCode) {
+                            nextDocCode = preview.formattedCode;
+                        }
+                    } catch (err) {}
+                }
+                if (!nextDocCode) {
+                    nextDocCode = generateFallbackCode();
+                }
+            }
+
             if (formMode === 'CREATE') {
                 setHeaderData({
-                    document_code: generateDocumentCode(),
+                    document_code: nextDocCode,
                     document_date: todayStr,
                     transaction_type: 'GENERAL',
                     department_id: newLookups.currentUserDeptId,
@@ -262,7 +277,7 @@
                 setHeaderData({
                     ...initialRecord,
                     id: formMode === 'COPY' ? undefined : initialRecord.id,
-                    document_code: formMode === 'COPY' ? generateDocumentCode() : initialRecord.document_code,
+                    document_code: formMode === 'COPY' ? nextDocCode : initialRecord.document_code,
                     status: formMode === 'COPY' ? 'DRAFT' : initialRecord.status,
                     reference_code: formMode === 'COPY' ? '' : initialRecord.reference_code,
                     daily_number: formMode === 'COPY' ? '' : initialRecord.daily_number,
@@ -443,6 +458,13 @@
                 if (error) throw error;
                 txId = data[0].id;
                 setHeaderData(prev => ({ ...prev, id: txId }));
+                
+                if (window.AutoNumberingService) {
+                    try {
+                        await window.AutoNumberingService.consumeNext('TRANSACTIONS');
+                    } catch(err) {}
+                }
+
                 await logAction('create_transaction', txId, `ایجاد تراکنش: ${headerData.document_code}`);
             } else {
                 const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
