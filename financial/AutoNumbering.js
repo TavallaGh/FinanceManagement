@@ -216,7 +216,7 @@
       },
       { field: 'prefix', header_fa: 'پیشوند', header_en: 'Prefix', width: '100px', render: (val) => <span dir="ltr">{val || '-'}</span> },
       { field: 'suffix', header_fa: 'پسوند', header_en: 'Suffix', width: '100px', render: (val) => <span dir="ltr">{val || '-'}</span> },
-      { field: 'current_number', header_fa: 'مقدار فعلی (آخرین شماره)', header_en: 'Current Value', width: '180px', render: (val) => <span className="font-mono text-[13px] font-bold" dir="ltr">{val}</span> },
+      { field: 'current_number', header_fa: 'مقدار فعلی (آخرین شماره)', header_en: 'Current Value', width: '180px', render: (val) => <span className="font-sans text-[13px] font-bold" dir="ltr">{val}</span> },
       { field: 'number_length', header_fa: 'طول ارقام (Padding)', header_en: 'Pad Length', width: '150px' },
       { field: 'start_number', header_fa: 'شماره شروع', header_en: 'Start Number', width: '100px' },
       { 
@@ -312,7 +312,7 @@
                  
                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
                     <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('پیش‌نمایش شماره بعدی:', 'Next Number Preview:')}</span>
-                    <span className="font-mono text-[14px] font-black text-indigo-600 dark:text-indigo-400" dir="ltr">{generatePreview()}</span>
+                    <span className="font-sans text-[14px] font-black text-indigo-600 dark:text-indigo-400" dir="ltr">{generatePreview()}</span>
                  </div>
               </div>
             </div>
