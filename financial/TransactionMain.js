@@ -4,7 +4,7 @@
   const { useState, useEffect, useMemo, useCallback } = React;
 
   const FallbackComponent = () => null;
-  const FallbackIcon = ({ size = 16 }) => <span style={{ display: 'inline-block', width: size, height: size }} />;
+  const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
 
   const safeComp = (moduleObj, compName) => {
       const comp = moduleObj && moduleObj[compName];
@@ -28,9 +28,9 @@
   const Badge = safeComp(Core, 'Badge');
   const Card = safeComp(Core, 'Card');
 
-  const Grid = window.DSGrid || DS || {};
-  const DataGrid = safeComp(Grid, 'DataGrid');
-  const AdvancedFilter = safeComp(Grid, 'AdvancedFilter');
+  const DSGrid = window.DSGrid || DS || {};
+  const DataGrid = safeComp(DSGrid, 'DataGrid');
+  const AdvancedFilter = safeComp(DSGrid, 'AdvancedFilter');
 
   const Forms = window.DSForms || DS || {};
   const AttachmentManager = safeComp(Forms, 'AttachmentManager');
@@ -375,51 +375,45 @@
     }, [transactions, filters, resolvedUserId]);
 
     const columns = useMemo(() => [
-        { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => <span className="font-bold text-slate-700 dark:text-slate-300">{val || '-'}</span> },
-        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => <span className="text-indigo-600 dark:text-indigo-400 font-bold">{val}</span> },
+        { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-300" }, val || '-') },
+        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: "text-indigo-600 dark:text-indigo-400 font-bold" }, val) },
         { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
         { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '90px', type: 'date' },
         { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '100px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
         { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '90px', render: (val) => {
             const s = STATUS_OPTIONS.find(x => x.value === val);
             const colors = { DRAFT: 'slate', TEMPORARY: 'orange', APPROVED: 'emerald' };
-            return <Badge variant={colors[val] || 'gray'} size="sm">{s ? s.label : val}</Badge>;
+            return React.createElement(Badge, { variant: colors[val] || 'gray', size: "sm" }, s ? s.label : val);
         }},
         { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '110px', render: (val) => {
-            if (!val || val === '00000000-0000-0000-0000-000000000000') return <span className="text-[12px] text-slate-500">{t('سیستمی', 'System')}</span>;
-            return <span className="text-[12px] truncate font-medium text-slate-700 dark:text-slate-300 block">{usersMap[val] || val}</span>;
+            if (!val || val === '00000000-0000-0000-0000-000000000000') return React.createElement('span', { className: "text-[12px] text-slate-500" }, t('سیستمی', 'System'));
+            return React.createElement('span', { className: "text-[12px] truncate font-medium text-slate-700 dark:text-slate-300 block" }, usersMap[val] || val);
         }},
-        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => <span className="text-[12px] truncate block max-w-xs" title={val}>{val || '-'}</span> }
+        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => React.createElement('span', { className: "text-[12px] truncate block max-w-xs", title: val }, val || '-') }
     ], [usersMap, t]);
 
     const accountLovColumns = [
         { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '120px' },
         { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px' },
-        { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (val, row) => (
-            <div className="flex flex-col">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
-            </div>
+        { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (val, row) => React.createElement('div', { className: "flex flex-col" },
+            React.createElement('span', { className: "font-bold text-slate-800 dark:text-slate-200" }, val),
+            row.pathTitle && React.createElement('span', { className: "text-[10px] text-slate-500 truncate", title: row.pathTitle }, row.pathTitle)
         )}
     ];
 
     const costLovColumns = [
         { field: 'code', header_fa: 'کد هزینه', header_en: 'Cost Code', width: '100px' },
-        { field: 'displayLabel', header_fa: 'عنوان هزینه', header_en: 'Cost Title', width: 'auto', render: (val, row) => (
-            <div className="flex flex-col">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
-            </div>
+        { field: 'displayLabel', header_fa: 'عنوان هزینه', header_en: 'Cost Title', width: 'auto', render: (val, row) => React.createElement('div', { className: "flex flex-col" },
+            React.createElement('span', { className: "font-bold text-slate-800 dark:text-slate-200" }, val),
+            row.pathTitle && React.createElement('span', { className: "text-[10px] text-slate-500 truncate", title: row.pathTitle }, row.pathTitle)
         )}
     ];
 
     const incomeLovColumns = [
         { field: 'code', header_fa: 'کد درآمد', header_en: 'Income Code', width: '100px' },
-        { field: 'displayLabel', header_fa: 'عنوان درآمد', header_en: 'Income Title', width: 'auto', render: (val, row) => (
-            <div className="flex flex-col">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
-            </div>
+        { field: 'displayLabel', header_fa: 'عنوان درآمد', header_en: 'Income Title', width: 'auto', render: (val, row) => React.createElement('div', { className: "flex flex-col" },
+            React.createElement('span', { className: "font-bold text-slate-800 dark:text-slate-200" }, val),
+            row.pathTitle && React.createElement('span', { className: "text-[10px] text-slate-500 truncate", title: row.pathTitle }, row.pathTitle)
         )}
     ];
 
@@ -471,103 +465,125 @@
 
     const DetailsModal = safeComp(window, 'TransactionMainDetails');
     const TransactionSummaryModal = safeComp(window, 'TransactionSummary');
-    const TransactionPrintModal = safeComp(window, 'TransactionPrint');
     
     const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
 
-    return (
-      <div className="p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
-        <PageHeader
-          title={t('مدیریت تراکنش‌ها', 'Transactions Management')}
-          icon={FileText} language={language}
-          description={t('ثبت و پیگیری اسناد مالی چندسطری ارزی', 'Manage multi-currency financial documents')}
-          breadcrumbs={[{ label: t('مدیریت مالی', 'Financial Setup') }, { label: t('تراکنش‌ها', 'Transactions') }]}
-          viewConfig={viewConfig}
-        />
+    return React.createElement('div', { className: "p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900", dir: isRtl ? 'rtl' : 'ltr' },
+        React.createElement(PageHeader, {
+            title: t('مدیریت تراکنش‌ها', 'Transactions Management'),
+            icon: FileText,
+            language: language,
+            description: t('ثبت و پیگیری اسناد مالی چندسطری ارزی', 'Manage multi-currency financial documents'),
+            breadcrumbs: [{ label: t('مدیریت مالی', 'Financial Setup') }, { label: t('تراکنش‌ها', 'Transactions') }],
+            viewConfig: viewConfig
+        }),
 
-        <div className="flex-1 min-h-0 flex flex-col gap-2 mt-4 overflow-hidden">
-          <AdvancedFilter 
-            fields={filterFields} initialValues={filters} onFilter={setFilters} onClear={() => setFilters({})} language={language} columns={6}
-          />
-          <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden">
-            <DataGrid
-              data={filteredTransactions} columns={columns} language={language} formCode={formCode}
-              gridState={gridState} onGridStateChange={setGridState}
-              onAdd={access.canCreate ? () => handleOpenForm('CREATE') : undefined}
-              onRowDoubleClick={(row) => handleOpenForm('EDIT', row)}
-              selectable={true} actions={gridActions} bulkActions={bulkActions} isLoading={isLoading}
-            />
-          </div>
-        </div>
+        React.createElement('div', { className: "flex-1 min-h-0 flex flex-col gap-2 mt-4 overflow-hidden" },
+            React.createElement(AdvancedFilter, {
+                fields: filterFields,
+                initialValues: filters,
+                onFilter: setFilters,
+                onClear: () => setFilters({}),
+                language: language,
+                columns: 6
+            }),
+            React.createElement('div', { className: "flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden" },
+                React.createElement(DataGrid, {
+                    data: filteredTransactions,
+                    columns: columns,
+                    language: language,
+                    formCode: formCode,
+                    gridState: gridState,
+                    onGridStateChange: setGridState,
+                    onAdd: access.canCreate ? () => handleOpenForm('CREATE') : undefined,
+                    onRowDoubleClick: (row) => handleOpenForm('EDIT', row),
+                    selectable: true,
+                    actions: gridActions,
+                    bulkActions: bulkActions,
+                    isLoading: isLoading
+                })
+            )
+        ),
 
-        <DetailsModal 
-            isOpen={isFormModalOpen}
-            onClose={() => setIsFormModalOpen(false)}
-            onSuccess={handleModalSuccess}
-            formMode={formMode}
-            initialRecord={currentRecord}
-            language={language}
-            formCode={formCode}
-        />
+        React.createElement(DetailsModal, {
+            isOpen: isFormModalOpen,
+            onClose: () => setIsFormModalOpen(false),
+            onSuccess: handleModalSuccess,
+            formMode: formMode,
+            initialRecord: currentRecord,
+            language: language,
+            formCode: formCode
+        }),
 
-        <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
-          <EmptyState
-            icon={AlertTriangle}
-            title={t('هشدار', 'Warning')}
-            description={deleteConfirm.type === 'bulk' ? t(`آیا از حذف ${deleteConfirm.data?.length} سند اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} documents?`) : t(`آیا از حذف این سند اطمینان دارید؟`, `Delete this document?`)}
-            action={
-              <div className="flex gap-2 w-full mt-4 px-4">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
-                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Confirm')}</Button>
-              </div>
-            }
-          />
-        </Modal>
+        React.createElement(Modal, {
+            isOpen: deleteConfirm.isOpen,
+            onClose: () => setDeleteConfirm({ isOpen: false, type: null, data: null }),
+            title: t('تایید عملیات حذف', 'Confirm Deletion'),
+            language: language,
+            width: "max-w-sm"
+        },
+            React.createElement(EmptyState, {
+                icon: AlertTriangle,
+                title: t('هشدار', 'Warning'),
+                description: deleteConfirm.type === 'bulk' ? t(`آیا از حذف ${deleteConfirm.data?.length} سند اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} documents?`) : t(`آیا از حذف این سند اطمینان دارید؟`, `Delete this document?`),
+                action: React.createElement('div', { className: "flex gap-2 w-full mt-4 px-4" },
+                    React.createElement(Button, { variant: "outline", size: "sm", className: "flex-1", onClick: () => setDeleteConfirm({ isOpen: false, type: null, data: null }) }, t('انصراف', 'Cancel')),
+                    React.createElement(Button, { variant: "danger", size: "sm", onClick: executeDelete, isLoading: isLoading, className: "flex-1" }, t('تایید حذف', 'Confirm'))
+                )
+            })
+        ),
 
-        <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Document Attachments')} language={language} width="max-w-xl">
-            <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg">
-                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0">
-                    <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.document_code}</span>
-                    {isAttachReadOnly && <Badge variant="slate" size="sm">{t('فقط خواندنی', 'Read Only')}</Badge>}
-                </div>
+        React.createElement(Modal, {
+            isOpen: attachModal.isOpen,
+            onClose: () => setAttachModal({ isOpen: false, record: null, files: [] }),
+            title: t('پیوست‌های سند', 'Document Attachments'),
+            language: language,
+            width: "max-w-xl"
+        },
+            React.createElement('div', { className: "p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg" },
+                React.createElement('div', { className: "bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0" },
+                    React.createElement('span', { className: "text-[12px] font-bold text-indigo-800 dark:text-indigo-300" }, attachModal.record?.document_code),
+                    isAttachReadOnly && React.createElement(Badge, { variant: "slate", size: "sm" }, t('فقط خواندنی', 'Read Only'))
+                ),
+                React.createElement('div', { className: "flex-1 overflow-hidden min-h-[300px] rounded-lg" },
+                    React.createElement(AttachmentManager, {
+                        files: attachModal.files,
+                        onUpload: handleFileUpload,
+                        onDelete: handleDeleteAttachment,
+                        onDownload: (f) => window.open(f.file_url, '_blank'),
+                        readOnly: isAttachReadOnly,
+                        isUploading: isUploading,
+                        language: language,
+                        formCode: formCode
+                    })
+                )
+            ),
+            React.createElement('div', { className: "p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg" },
+                React.createElement(Button, { variant: "primary", size: "sm", onClick: () => setAttachModal({ isOpen: false, record: null, files: [] }) }, t('بستن', 'Close'))
+            )
+        ),
 
-                <div className="flex-1 overflow-hidden min-h-[300px] rounded-lg">
-                    <AttachmentManager 
-                        files={attachModal.files}
-                        onUpload={handleFileUpload}
-                        onDelete={handleDeleteAttachment}
-                        onDownload={(f) => window.open(f.file_url, '_blank')}
-                        readOnly={isAttachReadOnly}
-                        isUploading={isUploading}
-                        language={language}
-                        formCode={formCode}
-                    />
-                </div>
-            </div>
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
-                <Button variant="primary" size="sm" onClick={() => setAttachModal({ isOpen: false, record: null, files: [] })}>{t('بستن', 'Close')}</Button>
-            </div>
-        </Modal>
+        React.createElement(TransactionSummaryModal, {
+            isOpen: summaryModal.isOpen,
+            onClose: () => setSummaryModal({ isOpen: false, record: null }),
+            record: summaryModal.record,
+            lookups: lookups,
+            language: language,
+            formCode: formCode
+        }),
 
-        <TransactionSummaryModal 
-            isOpen={summaryModal.isOpen} 
-            onClose={() => setSummaryModal({isOpen: false, record: null})} 
-            record={summaryModal.record} 
-            lookups={lookups} 
-            language={language} 
-            formCode={formCode} 
-        />
+        printModal.isOpen && window.TransactionPrint ? React.createElement(window.TransactionPrint, {
+            transactionId: printModal.transactionId,
+            onClose: () => setPrintModal({ isOpen: false, transactionId: null }),
+            language: language
+        }) : null,
 
-        {printModal.isOpen && (
-            <TransactionPrintModal
-                transactionId={printModal.transactionId}
-                onClose={() => setPrintModal({ isOpen: false, transactionId: null })}
-                language={language}
-            />
-        )}
-
-        <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
-      </div>
+        React.createElement(Toast, {
+            isVisible: toast.isVisible,
+            message: toast.message,
+            type: toast.type,
+            onClose: () => setToast(prev => ({ ...prev, isVisible: false }))
+        })
     );
   };
 
