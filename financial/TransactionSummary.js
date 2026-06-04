@@ -167,12 +167,13 @@
                             data={mappedItems} 
                             columns={summaryColumns} 
                             language={language} 
-                            formCode={formCode} 
-                            showExport={false}
+                            formCode={formCode}                             
                             exportable={false}
                             importable={false}
                             hideToolbar={true}
-                            selectable={false}
+                            selectable={false}                            
+                            hideImport={true} 
+                            showExport={false}
                         />
                     </div>
                 )}
