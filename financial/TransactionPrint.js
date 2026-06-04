@@ -15,6 +15,15 @@
         return null;
     };
 
+    const formatNumberSafe = (val) => {
+        if (val === null || val === undefined || val === '') return '0';
+        const strVal = String(val).replace(/,/g, '');
+        if (strVal.trim() === '' || isNaN(Number(strVal))) return '0';
+        const parts = strVal.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join('.');
+    };
+
     const SafePrinterIcon = ({ size = 16, className = '' }) => React.createElement('svg', { className, width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
         React.createElement('polyline', { points: '6 9 6 2 18 2 18 9' }),
         React.createElement('path', { d: 'M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2' }),
@@ -42,18 +51,6 @@
         React.createElement('polyline', { points: '15 18 9 12 15 6' })
     );
 
-    const Card = safeGet('Card') || (({ children, className }) => React.createElement('div', { className: `bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-full overflow-hidden ${className || ''}` }, children));
-    
-    const CardHeader = safeGet('CardHeader') || (({ title, icon: Icon, action }) => React.createElement('div', { className: "p-3 border-b border-slate-200 dark:border-slate-700 font-bold flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50 text-sm text-slate-800 dark:text-slate-100" },
-        React.createElement('div', { className: "flex items-center gap-2" },
-            Icon && (typeof Icon === 'function' ? React.createElement(Icon, { size: 16, className: "text-slate-500" }) : Icon),
-            title
-        ),
-        action && React.createElement('div', null, action)
-    ));
-
-    const CardBody = safeGet('CardBody') || (({ children, className }) => React.createElement('div', { className: `p-3 flex-1 ${className || ''}` }, children));
-    
     const Flex = safeGet('Flex') || (({ children, direction = 'row', gap = 'md', align = 'stretch', justify = 'start', className = '', style }) => {
         const gapCls = gap === 'xs' ? 'gap-1' : gap === 'sm' ? 'gap-2' : gap === 'lg' ? 'gap-6' : gap === 'xl' ? 'gap-8' : 'gap-4';
         const dirCls = direction === 'col' ? 'flex-col' : 'flex-row';
@@ -79,11 +76,7 @@
         let baseCls = "flex items-center justify-center gap-2 rounded-lg font-medium transition-all disabled:opacity-50 outline-none";
         if (size === 'sm') baseCls += " py-1.5 px-3 text-xs";
         else baseCls += " py-2 px-4 text-sm";
-        
         let varCls = "bg-indigo-600 text-white hover:bg-indigo-700";
-        if (variant === 'outline') varCls = "border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800";
-        if (variant === 'ghost') varCls = "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800";
-        
         return React.createElement('button', { onClick, disabled, className: `${baseCls} ${varCls} ${fullWidth ? 'w-full' : ''} ${className}` },
             Icon && (typeof Icon === 'function' ? React.createElement(Icon, { size: size === 'sm' ? 14 : 16 }) : Icon),
             children
@@ -92,9 +85,9 @@
 
     const Badge = safeGet('Badge') || (({ children, variant = 'primary', className = '' }) => {
         const colors = {
-            success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
-            warning: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800',
-            primary: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
+            success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200',
+            warning: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200',
+            primary: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200'
         };
         return React.createElement('span', { className: `px-2 py-0.5 text-[11px] font-bold border rounded-md whitespace-nowrap ${colors[variant] || colors.primary} ${className}` }, children);
     });
@@ -106,16 +99,15 @@
 
     let Modal = safeGet('Modal');
     if (!Modal) {
-        Modal = ({ isOpen, onClose, title, children, size, width }) => {
+        Modal = ({ isOpen, onClose, title, children, width }) => {
             if (!isOpen) return null;
-            const wCls = width || (size === 'xl' ? 'max-w-[1200px]' : 'max-w-[800px]');
             return React.createElement('div', { className: "fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" },
-                React.createElement('div', { className: `bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 ${wCls}` },
+                React.createElement('div', { className: `bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 ${width}` },
                     React.createElement('div', { className: "p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80" },
                         React.createElement('h2', { className: "text-lg font-bold text-slate-800 dark:text-slate-100" }, title),
                         React.createElement('button', { onClick: onClose, className: "text-slate-500 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" }, '✕')
                     ),
-                    React.createElement('div', { className: "p-0 flex-1 overflow-auto max-h-[90vh] bg-slate-100/50 dark:bg-slate-900 flex" }, children)
+                    React.createElement('div', { className: "p-0 flex-1 overflow-auto max-h-[90vh] bg-slate-100/50 dark:bg-slate-900 flex relative" }, children)
                 )
             );
         };
@@ -153,10 +145,10 @@
                             colSpan: columns.findIndex(c => c.field === 'deposit_amount'), 
                             className: `px-3 py-2 border-x border-slate-300 ${isRtl ? 'text-left' : 'text-right'}` 
                         }, totals.label),
-                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700", dir: "ltr" }, totals.deposit),
-                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700", dir: "ltr" }, totals.withdrawal),
-                        totals.fcDeposit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700", dir: "ltr" }, totals.fcDeposit),
-                        totals.fcWithdrawal !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700", dir: "ltr" }, totals.fcWithdrawal)
+                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700 font-extrabold", dir: "ltr" }, totals.deposit),
+                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700 font-extrabold", dir: "ltr" }, totals.withdrawal),
+                        totals.fcDeposit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700 font-extrabold", dir: "ltr" }, totals.fcDeposit),
+                        totals.fcWithdrawal !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700 font-extrabold", dir: "ltr" }, totals.fcWithdrawal)
                     )
                 )
             )
@@ -178,7 +170,7 @@
             accountLevel: 'subsidiary', 
             calendarType: 'jalali',
             showTotals: true,
-            showCurrencies: false,
+            showCurrencies: true,
             showStatus: true,
             showSignatures: true,
             signatures: {
@@ -313,13 +305,13 @@
                 { field: 'account_code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px', align: 'center' },
                 { field: 'account_name', header_fa: 'نام حساب', header_en: 'Account Name', width: 'auto', align: isRtl ? 'right' : 'left' },
                 { field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto', align: isRtl ? 'right' : 'left' },
-                { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '60px', align: 'center' },
+                { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '50px', align: 'center' },
                 { field: 'deposit_amount', header_fa: 'مبلغ واریز', header_en: 'Deposit', width: '120px', align: 'right' },
                 { field: 'withdrawal_amount', header_fa: 'مبلغ برداشت', header_en: 'Withdrawal', width: '120px', align: 'right' }
             ];
 
             if (printSettings.showCurrencies) {
-                cols.splice(5, 0, 
+                cols.splice(7, 0, 
                     { field: 'fc_deposit_amount', header_fa: 'واریز ارزی', header_en: 'FC Deposit', width: '100px', align: 'right' },
                     { field: 'fc_withdrawal_amount', header_fa: 'برداشت ارزی', header_en: 'FC Withdrawal', width: '100px', align: 'right' }
                 );
@@ -353,7 +345,6 @@
                         }
                         .print-container { width: 100%; box-sizing: border-box; }
                         
-                        /* Native CSS Grid/Flex supporting LTR and RTL perfectly */
                         .header-flex { 
                             display: flex; 
                             justify-content: space-between; 
@@ -363,7 +354,7 @@
                             border-radius: 4px;
                             margin-bottom: 10px;
                         }
-                        .header-col { display: flex; flex-direction: column; gap: 5px; justify-content: center; }
+                        .header-col { display: flex; flex-direction: column; gap: 5px; justify-content: center; flex: 1; }
                         .header-start { align-items: flex-start; text-align: start; }
                         .header-center { align-items: center; text-align: center; }
                         .header-end { align-items: flex-end; text-align: end; }
@@ -401,20 +392,20 @@
                 <body>
                     <div class="print-container">
                         <div class="header-flex">
-                            <div class="header-col header-start" style="flex: 1;">
+                            <div class="header-col header-start">
                                 <div class="info-line"><span class="info-label">${isRtl ? 'شماره سند:' : 'Doc Code:'}</span><span class="info-val">${headerData.document_code}</span></div>
                                 <div class="info-line"><span class="info-label">${isRtl ? 'تاریخ سند:' : 'Date:'}</span><span class="info-val">${formatDate(headerData.document_date, printSettings.calendarType)}</span></div>
                                 <div class="info-line"><span class="info-label">${isRtl ? 'شماره عطف:' : 'Ref Code:'}</span><span class="info-val">${headerData.reference_code || '-'}</span></div>
                                 <div class="info-line"><span class="info-label">${isRtl ? 'شماره روزانه:' : 'Daily No:'}</span><span class="info-val">${headerData.daily_number || '-'}</span></div>
                             </div>
                             
-                            <div class="header-col header-center" style="flex: 1;">
+                            <div class="header-col header-center">
                                 <h1 class="title">${isRtl ? 'سند حسابداری' : 'Accounting Voucher'}</h1>
                                 ${printSettings.showStatus ? `<span class="badge">${headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') : (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')}</span>` : ''}
                             </div>
                             
-                            <div class="header-col header-end" style="flex: 1;">
-                                <div class="info-line"><span class="info-label">${isRtl ? 'تنظیم کننده:' : 'Prepared By:'}</span><span class="info-val">${usersMap[headerData.registrar_id] || headerData.registrar_id || '---'}</span></div>
+                            <div class="header-col header-end">
+                                <div class="info-line"><span class="info-label">${isRtl ? 'ثبت کننده:' : 'Prepared By:'}</span><span class="info-val">${usersMap[headerData.registrar_id] || headerData.registrar_id || '---'}</span></div>
                                 <div class="info-line"><span class="info-label">${isRtl ? 'تایید کننده:' : 'Approved By:'}</span><span class="info-val">---</span></div>
                             </div>
                         </div>
@@ -432,11 +423,11 @@
                                     <th style="width: 5%">${isRtl ? 'ردیف' : 'Row'}</th>
                                     <th style="width: 15%">${isRtl ? 'کد حساب' : 'Code'}</th>
                                     <th style="width: 25%">${isRtl ? 'نام حساب' : 'Account Name'}</th>
-                                    <th style="width: 25%">${isRtl ? 'شرح' : 'Description'}</th>
+                                    <th style="width: 20%">${isRtl ? 'شرح' : 'Description'}</th>
                                     <th style="width: 5%">${isRtl ? 'ارز' : 'Cur'}</th>
+                                    <th style="width: 15%">${isRtl ? 'مبلغ واریز' : 'Deposit'}</th>
+                                    <th style="width: 15%">${isRtl ? 'مبلغ برداشت' : 'Withdrawal'}</th>
                                     ${printSettings.showCurrencies ? `<th>${isRtl ? 'واریز ارزی' : 'FC Deposit'}</th><th>${isRtl ? 'برداشت ارزی' : 'FC Withdrawal'}</th>` : ''}
-                                    <th style="width: 12%">${isRtl ? 'مبلغ واریز' : 'Deposit'}</th>
-                                    <th style="width: 12%">${isRtl ? 'مبلغ برداشت' : 'Withdrawal'}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -449,12 +440,12 @@
                                         <td class="text-${isRtl ? 'right' : 'left'}">${accName || '-'}</td>
                                         <td class="text-${isRtl ? 'right' : 'left'}">${item.description || '-'}</td>
                                         <td class="text-center">${item.currency || item.currency_code || '-'}</td>
+                                        <td class="text-right" dir="ltr">${item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-'}</td>
+                                        <td class="text-right" dir="ltr">${item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-'}</td>
                                         ${printSettings.showCurrencies ? `
-                                            <td class="text-right" dir="ltr">${item.transaction_action === 'DEPOSIT' ? item.currency_amount?.toLocaleString() : '-'}</td>
-                                            <td class="text-right" dir="ltr">${item.transaction_action === 'WITHDRAWAL' ? item.currency_amount?.toLocaleString() : '-'}</td>
+                                            <td class="text-right" dir="ltr">${item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.currency_amount) : '-'}</td>
+                                            <td class="text-right" dir="ltr">${item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.currency_amount) : '-'}</td>
                                         ` : ''}
-                                        <td class="text-right" dir="ltr">${item.transaction_action === 'DEPOSIT' ? item.amount?.toLocaleString() : '-'}</td>
-                                        <td class="text-right" dir="ltr">${item.transaction_action === 'WITHDRAWAL' ? item.amount?.toLocaleString() : '-'}</td>
                                     </tr>
                                     `;
                                 }).join('')}
@@ -463,12 +454,12 @@
                             <tfoot>
                                 <tr>
                                     <td colspan="5" style="text-align: ${isRtl ? 'left' : 'right'}; padding-right: 10px; padding-left: 10px;">${isRtl ? 'جمع کل:' : 'Total:'}</td>
+                                    <td class="text-right" dir="ltr">${formatNumberSafe(totals.debit)}</td>
+                                    <td class="text-right" dir="ltr">${formatNumberSafe(totals.credit)}</td>
                                     ${printSettings.showCurrencies ? `
-                                        <td class="text-right" dir="ltr">${totals.fcDebit.toLocaleString()}</td>
-                                        <td class="text-right" dir="ltr">${totals.fcCredit.toLocaleString()}</td>
+                                        <td class="text-right" dir="ltr">${formatNumberSafe(totals.fcDebit)}</td>
+                                        <td class="text-right" dir="ltr">${formatNumberSafe(totals.fcCredit)}</td>
                                     ` : ''}
-                                    <td class="text-right" dir="ltr">${totals.debit.toLocaleString()}</td>
-                                    <td class="text-right" dir="ltr">${totals.credit.toLocaleString()}</td>
                                 </tr>
                             </tfoot>
                             ` : ''}
@@ -527,9 +518,9 @@
                         )
                     ),
 
-                    React.createElement(Flex, { direction: "col", gap: "xs", align: "end", className: "flex-1" },
-                        React.createElement(Flex, { align: "center", gap: "xs" }, React.createElement(Text, { variant: "caption" }, isRtl ? 'تنظیم کننده:' : 'Prepared By:'), React.createElement(Text, { weight: "bold" }, usersMap[headerData.registrar_id] || headerData.registrar_id || '---')),
-                        React.createElement(Flex, { align: "center", gap: "xs" }, React.createElement(Text, { variant: "caption" }, isRtl ? 'تایید کننده:' : 'Approved By:'), React.createElement(Text, { weight: "bold" }, '---'))
+                    React.createElement(Flex, { direction: "col", gap: "xs", align: "end", className: "flex-1 text-left" },
+                        React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'ثبت کننده:' : 'Prepared By:'), React.createElement(Text, { weight: "bold" }, usersMap[headerData.registrar_id] || headerData.registrar_id || '---')),
+                        React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'تایید کننده:' : 'Approved By:'), React.createElement(Text, { weight: "bold" }, '---'))
                     )
                 ),
 
@@ -543,10 +534,10 @@
                     language: language,
                     totals: printSettings.showTotals ? {
                         label: isRtl ? 'جمع کل:' : 'Total:',
-                        deposit: totals.debit.toLocaleString(),
-                        withdrawal: totals.credit.toLocaleString(),
-                        fcDeposit: printSettings.showCurrencies ? totals.fcDebit.toLocaleString() : undefined,
-                        fcWithdrawal: printSettings.showCurrencies ? totals.fcCredit.toLocaleString() : undefined
+                        deposit: formatNumberSafe(totals.debit),
+                        withdrawal: formatNumberSafe(totals.credit),
+                        fcDeposit: printSettings.showCurrencies ? formatNumberSafe(totals.fcDebit) : undefined,
+                        fcWithdrawal: printSettings.showCurrencies ? formatNumberSafe(totals.fcCredit) : undefined
                     } : null,
                     data: itemsData.map((item, index) => ({
                         row_number: index + 1,
@@ -554,10 +545,10 @@
                         account_name: isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en || '-',
                         description: item.description,
                         currency: item.currency || item.currency_code || '-',
-                        deposit_amount: item.transaction_action === 'DEPOSIT' ? item.amount?.toLocaleString() : '-',
-                        withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? item.amount?.toLocaleString() : '-',
-                        fc_deposit_amount: item.transaction_action === 'DEPOSIT' ? item.currency_amount?.toLocaleString() : '-',
-                        fc_withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? item.currency_amount?.toLocaleString() : '-'
+                        deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-',
+                        withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-',
+                        fc_deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.currency_amount) : '-',
+                        fc_withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.currency_amount) : '-'
                     }))
                 }),
 
@@ -572,9 +563,6 @@
                 )
             );
         };
-
-        const togglePos = isSettingsOpen ? 260 : 0;
-        const toggleStyle = isRtl ? { right: `${togglePos}px` } : { left: `${togglePos}px` };
 
         return React.createElement(Modal, {
             isOpen: true,
@@ -636,11 +624,10 @@
                     )
                 ),
 
-                React.createElement('div', { className: "flex-1 flex flex-col min-w-0 bg-slate-100/50 dark:bg-slate-900 relative overflow-hidden" },
+                React.createElement('div', { className: "flex-1 flex flex-col min-w-0 bg-slate-100/50 dark:bg-slate-900 relative" },
                     React.createElement('button', {
                         onClick: () => setIsSettingsOpen(!isSettingsOpen),
-                        style: toggleStyle,
-                        className: `absolute top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md text-slate-500 hover:text-indigo-600 transition-all duration-300 cursor-pointer hover:bg-slate-50 ${isRtl ? 'rounded-l-md border-r-0' : 'rounded-r-md border-l-0'}`,
+                        className: `absolute top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md text-slate-500 hover:text-indigo-600 transition-all cursor-pointer hover:bg-slate-50 ${isRtl ? 'right-0 rounded-l-md border-r-0' : 'left-0 rounded-r-md border-l-0'}`,
                         title: isRtl ? 'تنظیمات' : 'Settings'
                     },
                         isRtl 
