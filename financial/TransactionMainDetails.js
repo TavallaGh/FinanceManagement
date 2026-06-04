@@ -294,13 +294,14 @@
                 
                 const mappedItems = (initialRecord.fm_transaction_items || []).map(item => {
                     const isDep = item.transaction_action === 'DEPOSIT';
+                    const rawAmt = item.amount !== undefined && item.amount !== null ? item.amount : 0;
                     return {
                         ...item,
                         _tempId: crypto.randomUUID(),
                         id: formMode === 'COPY' ? undefined : item.id,
                         transaction_id: formMode === 'COPY' ? undefined : item.transaction_id,
-                        deposit_amount: isDep ? item.amount : 0,
-                        withdrawal_amount: !isDep ? item.amount : 0
+                        deposit_amount: isDep ? rawAmt : 0,
+                        withdrawal_amount: !isDep ? rawAmt : 0
                     };
                 }).sort((a, b) => a.row_number - b.row_number);
                 
@@ -518,11 +519,12 @@
 
                     const mappedItems = newItems.map(item => {
                         const isDep = item.transaction_action === 'DEPOSIT';
+                        const rawAmt = item.amount !== undefined && item.amount !== null ? item.amount : 0;
                         return {
                             ...item,
                             _tempId: crypto.randomUUID(),
-                            deposit_amount: isDep ? item.amount : 0,
-                            withdrawal_amount: !isDep ? item.amount : 0
+                            deposit_amount: isDep ? rawAmt : 0,
+                            withdrawal_amount: !isDep ? rawAmt : 0
                         };
                     }).sort((a, b) => a.row_number - b.row_number);
                     setItemsData(mappedItems);

@@ -16,6 +16,16 @@
 
   function FallbackComponent() { return null; }
 
+  const formatNumberSafe = (val, forDisplay = false) => {
+      if (val === null || val === undefined || val === '') return forDisplay ? '0' : '';
+      const strVal = String(val).replace(/,/g, '');
+      const parsed = parseFloat(strVal);
+      if (isNaN(parsed)) return forDisplay ? '0' : '';
+      const parts = strVal.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return parts.join('.');
+  };
+
   const TransactionMainGrid = React.forwardRef(({ itemsData = [], onItemsChange, lookups, isReadOnly, formCode, language = 'fa', showToast }, ref) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
@@ -62,13 +72,6 @@
         { value: 'OTHER', label: t('سایر', 'Other') }
     ];
 
-    const formatNumber = (num) => {
-        if (!num && num !== 0) return '';
-        const parts = num.toString().split('.');
-        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        return parts.join('.');
-    };
-
     const handleAmountChange = (e, field) => {
         const raw = e.target.value.replace(/,/g, '');
         if (raw === '' || !isNaN(raw)) {
@@ -90,7 +93,12 @@
         const accObj = lookups.leafAccounts.find(a => String(a.id) === String(row.account_id)) || null;
         setInlineItemEdit({
             id: row._tempId || row.id,
-            data: { ...row, account_obj: accObj, deposit_amount: row.deposit_amount ? String(row.deposit_amount).replace(/,/g, '') : '0', withdrawal_amount: row.withdrawal_amount ? String(row.withdrawal_amount).replace(/,/g, '') : '0' }
+            data: { 
+                ...row, 
+                account_obj: accObj, 
+                deposit_amount: row.deposit_amount !== undefined && row.deposit_amount !== null ? String(row.deposit_amount).replace(/,/g, '') : '0', 
+                withdrawal_amount: row.withdrawal_amount !== undefined && row.withdrawal_amount !== null ? String(row.withdrawal_amount).replace(/,/g, '') : '0' 
+            }
         });
     };
 
@@ -300,18 +308,20 @@
             return <span dir="ltr" className="text-[12px]">{val}</span>;
         }},
         { field: 'deposit_amount', header_fa: 'واریز *', header_en: 'Deposit *', width: '100px', render: (val, row) => {
+            const rawVal = row.deposit_amount !== undefined ? row.deposit_amount : val;
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 const disabled = inlineItemEdit.data.transaction_action !== 'DEPOSIT';
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumber(inlineItemEdit.data.deposit_amount)} onChange={(e) => handleAmountChange(e, 'deposit_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumberSafe(inlineItemEdit.data.deposit_amount)} onChange={(e) => handleAmountChange(e, 'deposit_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
-            return <span dir="ltr" className="text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{formatNumber(val)}</span>;
+            return <span dir="ltr" className="block w-full text-left text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{formatNumberSafe(rawVal, true)}</span>;
         }},
         { field: 'withdrawal_amount', header_fa: 'برداشت *', header_en: 'Withdrawal *', width: '100px', render: (val, row) => {
+            const rawVal = row.withdrawal_amount !== undefined ? row.withdrawal_amount : val;
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 const disabled = inlineItemEdit.data.transaction_action !== 'WITHDRAWAL';
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumber(inlineItemEdit.data.withdrawal_amount)} onChange={(e) => handleAmountChange(e, 'withdrawal_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumberSafe(inlineItemEdit.data.withdrawal_amount)} onChange={(e) => handleAmountChange(e, 'withdrawal_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
-            return <span dir="ltr" className="text-[12px] font-medium text-rose-600 dark:text-rose-500">{formatNumber(val)}</span>;
+            return <span dir="ltr" className="block w-full text-left text-[12px] font-medium text-rose-600 dark:text-rose-500">{formatNumberSafe(rawVal, true)}</span>;
         }},
         { field: 'description', header_fa: 'شرح *', header_en: 'Description *', width: 'auto', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
