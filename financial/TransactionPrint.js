@@ -56,6 +56,7 @@
         const fetchTransactionData = async () => {
             setLoading(true);
             try {
+                // Fetch the transaction header
                 const { data: header, error: headerError } = await supabase
                     .from('fm_transactions')
                     .select('*')
@@ -64,23 +65,39 @@
 
                 if (headerError) throw headerError;
 
+                // Fetch the transaction items
                 const { data: items, error: itemsError } = await supabase
                     .from('fm_transaction_items')
-                    .select(`
-                        *,
-                        fm_coa_accounts (
-                            code,
-                            title_fa,
-                            title_en
-                        )
-                    `)
+                    .select('*')
                     .eq('transaction_id', transactionId)
                     .order('created_at', { ascending: true });
 
                 if (itemsError) throw itemsError;
 
+                let mappedItems = items || [];
+
+                // Fetch related accounts independently to bypass Join/FK constraint errors
+                const accountIds = [...new Set(mappedItems.map(i => i.account_id))].filter(Boolean);
+                
+                if (accountIds.length > 0) {
+                    const { data: accountsData, error: accountsError } = await supabase
+                        .from('fm_coa_accounts')
+                        .select('id, code, title_fa, title_en')
+                        .in('id', accountIds);
+
+                    if (!accountsError && accountsData) {
+                        mappedItems = mappedItems.map(item => {
+                            const accountMatch = accountsData.find(a => a.id === item.account_id);
+                            return {
+                                ...item,
+                                fm_coa_accounts: accountMatch || null
+                            };
+                        });
+                    }
+                }
+
                 setHeaderData(header);
-                setItemsData(items || []);
+                setItemsData(mappedItems);
             } catch (error) {
                 console.error('Error fetching transaction data for print:', error);
             } finally {
