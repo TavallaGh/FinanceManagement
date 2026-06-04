@@ -434,7 +434,21 @@
     ];
 
     const gridActions = [
-        { id: 'print', icon: Printer, tooltip: t('چاپ سند', 'Print Document'), onClick: (row) => setPrintModal({ isOpen: true, transactionId: row.id }), requiredAccess: 'view', className: 'text-blue-500 hover:text-blue-600' },
+        { 
+            id: 'print', 
+            icon: Printer, 
+            tooltip: t('چاپ سند', 'Print Document'), 
+            onClick: (row) => {
+                console.log('DEBUG: Print Clicked for ID', row.id);
+                if (!window.TransactionPrint) {
+                    alert('دیباگ سیستم: کامپوننت چاپ (TransactionPrint) هنوز لود نشده است! بررسی کنید که در index.html تعریف شده باشد.');
+                    return;
+                }
+                setPrintModal({ isOpen: true, transactionId: row.id });
+            }, 
+            requiredAccess: 'view', 
+            className: 'text-blue-500 hover:text-blue-600' 
+        },
         { id: 'summary', icon: DollarSign, tooltip: t('خلاصه ارزی', 'Currency Summary'), onClick: (row) => openSummary(row), className: 'text-indigo-500 hover:text-indigo-600' },
         { id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: (row) => (attachmentCounts[row.id] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600') },
         { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
@@ -464,8 +478,6 @@
 
     const DetailsModal = safeComp(window, 'TransactionMainDetails');
     const TransactionSummaryModal = safeComp(window, 'TransactionSummary');
-    const TransactionPrintModal = safeComp(window, 'TransactionPrint');
-    
     const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
 
     return (
@@ -551,13 +563,16 @@
             formCode={formCode} 
         />
 
-        {printModal.isOpen && (
-            <TransactionPrintModal
-                transactionId={printModal.transactionId}
-                onClose={() => setPrintModal({ isOpen: false, transactionId: null })}
-                language={language}
-            />
-        )}
+        {printModal.isOpen && window.TransactionPrint && (() => {
+            const PrintComp = window.TransactionPrint;
+            return (
+                <PrintComp
+                    transactionId={printModal.transactionId}
+                    onClose={() => setPrintModal({ isOpen: false, transactionId: null })}
+                    language={language}
+                />
+            );
+        })()}
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
       </div>

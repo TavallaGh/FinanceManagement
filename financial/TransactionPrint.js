@@ -3,20 +3,25 @@
     const React = window.React;
     const { useState, useEffect, useRef } = React;
 
-    const FallbackComponent = () => null;
-    const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
+    const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size, backgroundColor: '#fee2e2', color: '#991b1b', fontSize: '10px' } }, 'X');
 
+    // Visual Debugging Extractor
     const safeComp = (moduleObj, compName) => {
         const comp = moduleObj && moduleObj[compName];
         if (typeof comp === 'function' || (comp && typeof comp === 'object' && comp.$$typeof)) return comp;
-        if (comp && comp.default && (typeof comp.default === 'function' || comp.default.$$typeof)) return comp.default;
-        return FallbackComponent;
+        
+        return (props) => React.createElement('div', { 
+            style: { 
+                backgroundColor: '#fee2e2', color: '#991b1b', padding: '8px', 
+                margin: '4px', border: '1px solid #ef4444', borderRadius: '4px', 
+                fontSize: '12px', fontWeight: 'bold' 
+            } 
+        }, `[DEBUG] Missing Component: ${compName} from DesignSystem`);
     };
 
     const safeIcon = (moduleObj, iconName) => {
         const icon = moduleObj && moduleObj[iconName];
         if (typeof icon === 'function' || (icon && typeof icon === 'object' && icon.$$typeof)) return icon;
-        if (icon && icon.default && (typeof icon.default === 'function' || icon.default.$$typeof)) return icon.default;
         return FallbackIcon;
     };
 
@@ -42,6 +47,7 @@
     const Select = safeComp(Forms, 'Select');
 
     const DSGrid = window.DSGrid || DS || {};
+    // Fallback logic: check for Table, if not use DataGrid, if not use safe fallback
     const Table = (DSGrid && DSGrid.Table) ? safeComp(DSGrid, 'Table') : safeComp(DSGrid, 'DataGrid');
 
     const LucideIcons = window.LucideIcons || {};
@@ -57,6 +63,7 @@
         const [loading, setLoading] = useState(false);
         const [headerData, setHeaderData] = useState(null);
         const [itemsData, setItemsData] = useState([]);
+        const [debugError, setDebugError] = useState(null);
         
         const [printSettings, setPrintSettings] = useState({
             accountLevel: 'subsidiary', 
@@ -73,6 +80,7 @@
         ];
 
         useEffect(() => {
+            console.log("DEBUG: TransactionPrint mounted for ID", transactionId);
             if (transactionId) {
                 fetchTransactionData();
             }
@@ -80,6 +88,7 @@
 
         const fetchTransactionData = async () => {
             setLoading(true);
+            setDebugError(null);
             try {
                 const { data: header, error: headerError } = await supabase
                     .from('fm_transactions')
@@ -98,7 +107,6 @@
                 if (itemsError) throw itemsError;
 
                 let mappedItems = items || [];
-
                 const accountIds = [...new Set(mappedItems.map(i => i.account_id))].filter(Boolean);
                 
                 if (accountIds.length > 0) {
@@ -121,7 +129,8 @@
                 setHeaderData(header);
                 setItemsData(mappedItems);
             } catch (error) {
-                console.error('Error fetching transaction data for print:', error);
+                console.error('DEBUG - API Error in TransactionPrint:', error);
+                setDebugError(error.message || 'خطا در ارتباط با سرور');
             } finally {
                 setLoading(false);
             }
@@ -160,25 +169,33 @@
 
         const getColumns = () => {
             let cols = [
-                { field: 'row_number', header: isRtl ? 'ردیف' : 'Row', width: '60px' },
-                { field: 'account_code', header: isRtl ? 'کد حساب' : 'Account Code', width: '120px' },
-                { field: 'account_name', header: isRtl ? 'نام حساب' : 'Account Name', width: 'flex-1' },
-                { field: 'description', header: isRtl ? 'شرح آرتیکل' : 'Description', width: 'flex-1' },
-                { field: 'debit_amount', header: isRtl ? 'بدهکار' : 'Debit', width: '150px' },
-                { field: 'credit_amount', header: isRtl ? 'بستانکار' : 'Credit', width: '150px' }
+                { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px' },
+                { field: 'account_code', header_fa: 'کد حساب', header_en: 'Account Code', width: '120px' },
+                { field: 'account_name', header_fa: 'نام حساب', header_en: 'Account Name', width: 'auto' },
+                { field: 'description', header_fa: 'شرح آرتیکل', header_en: 'Description', width: 'auto' },
+                { field: 'debit_amount', header_fa: 'بدهکار', header_en: 'Debit', width: '150px' },
+                { field: 'credit_amount', header_fa: 'بستانکار', header_en: 'Credit', width: '150px' }
             ];
 
             if (printSettings.showCurrencies) {
                 cols.splice(4, 0, 
-                    { field: 'fc_debit_amount', header: isRtl ? 'بدهکار (ارزی)' : 'Debit (FC)', width: '120px' },
-                    { field: 'fc_credit_amount', header: isRtl ? 'بستانکار (ارزی)' : 'Credit (FC)', width: '120px' }
+                    { field: 'fc_debit_amount', header_fa: 'بدهکار (ارزی)', header_en: 'Debit (FC)', width: '120px' },
+                    { field: 'fc_credit_amount', header_fa: 'بستانکار (ارزی)', header_en: 'Credit (FC)', width: '120px' }
                 );
             }
 
-            return cols;
+            return cols.map(c => ({
+                field: c.field,
+                header: isRtl ? c.header_fa : c.header_en,
+                width: c.width
+            }));
         };
 
         const renderPrintPreview = () => {
+            if (debugError) {
+                return React.createElement('div', { className: 'p-4 bg-red-100 text-red-700 border border-red-400 rounded' }, `Error: ${debugError}`);
+            }
+
             if (!headerData) return null;
 
             return (
@@ -233,6 +250,7 @@
                                     fc_debit_amount: item.transaction_action === 'DEPOSIT' ? item.currency_amount?.toLocaleString() : '-',
                                     fc_credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.currency_amount?.toLocaleString() : '-'
                                 }))}
+                                language={language}
                                 striped={true}
                             />
                             
