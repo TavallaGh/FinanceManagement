@@ -4,7 +4,7 @@
   const { useState, useEffect, useMemo, useCallback } = React;
 
   const FallbackComponent = () => null;
-  const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
+  const FallbackIcon = ({ size = 16 }) => <span style={{ display: 'inline-block', width: size, height: size }} />;
 
   const safeComp = (moduleObj, compName) => {
       const comp = moduleObj && moduleObj[compName];
@@ -438,14 +438,7 @@
             id: 'print', 
             icon: Printer, 
             tooltip: t('چاپ سند', 'Print Document'), 
-            onClick: (row) => {
-                console.log('DEBUG: Print Clicked for ID', row.id);
-                if (!window.TransactionPrint) {
-                    alert('دیباگ سیستم: کامپوننت چاپ (TransactionPrint) هنوز لود نشده است! بررسی کنید که در index.html تعریف شده باشد.');
-                    return;
-                }
-                setPrintModal({ isOpen: true, transactionId: row.id });
-            }, 
+            onClick: (row) => setPrintModal({ isOpen: true, transactionId: row.id }), 
             requiredAccess: 'view', 
             className: 'text-blue-500 hover:text-blue-600' 
         },
@@ -478,6 +471,8 @@
 
     const DetailsModal = safeComp(window, 'TransactionMainDetails');
     const TransactionSummaryModal = safeComp(window, 'TransactionSummary');
+    const TransactionPrintModal = safeComp(window, 'TransactionPrint');
+    
     const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
 
     return (
@@ -563,16 +558,13 @@
             formCode={formCode} 
         />
 
-        {printModal.isOpen && window.TransactionPrint && (() => {
-            const PrintComp = window.TransactionPrint;
-            return (
-                <PrintComp
-                    transactionId={printModal.transactionId}
-                    onClose={() => setPrintModal({ isOpen: false, transactionId: null })}
-                    language={language}
-                />
-            );
-        })()}
+        {printModal.isOpen && (
+            <TransactionPrintModal
+                transactionId={printModal.transactionId}
+                onClose={() => setPrintModal({ isOpen: false, transactionId: null })}
+                language={language}
+            />
+        )}
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
       </div>
