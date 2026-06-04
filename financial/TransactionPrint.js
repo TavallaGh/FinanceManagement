@@ -8,21 +8,23 @@
     const { Printer = FallbackIcon, Settings = FallbackIcon, FileText = FallbackIcon } = LucideIcons;
 
     const DS = window.DesignSystem || {};
+    
     const Core = window.DSCore || DS || {};
+    const SafeFC = (props) => React.createElement('div', null, props.children || '');
     const { 
-        Card = () => null, CardHeader = () => null, CardBody = () => null, 
-        Flex = () => null, Grid = () => null, Text = () => null, 
-        Button = () => null, Badge = () => null, Divider = () => null, Container = () => null 
+        Card = SafeFC, CardHeader = SafeFC, CardBody = SafeFC, 
+        Flex = SafeFC, Grid = SafeFC, Text = SafeFC, 
+        Button = SafeFC, Badge = SafeFC, Divider = SafeFC, Container = SafeFC 
     } = Core;
 
-    const Overlays = window.DSOverlays || DS || {};
-    const { Modal = () => null } = Overlays;
+    const Overlays = window.DSOverlays || window.DSFeedback || DS || {};
+    const { Modal = SafeFC } = Overlays;
 
     const Forms = window.DSForms || DS || {};
-    const { Checkbox = () => null, Select = () => null } = Forms;
+    const { Checkbox = SafeFC, Select = SafeFC } = Forms;
 
     const DSGrid = window.DSGrid || DS || {};
-    const { Table = () => null } = DSGrid;
+    const { Table = SafeFC, DataGrid = SafeFC } = DSGrid;
 
     const TransactionPrint = ({ transactionId, onClose, language = 'fa' }) => {
         const isRtl = language === 'fa';
@@ -56,7 +58,6 @@
         const fetchTransactionData = async () => {
             setLoading(true);
             try {
-                // Fetch the transaction header
                 const { data: header, error: headerError } = await supabase
                     .from('fm_transactions')
                     .select('*')
@@ -65,7 +66,6 @@
 
                 if (headerError) throw headerError;
 
-                // Fetch the transaction items
                 const { data: items, error: itemsError } = await supabase
                     .from('fm_transaction_items')
                     .select('*')
@@ -76,7 +76,6 @@
 
                 let mappedItems = items || [];
 
-                // Fetch related accounts independently to bypass Join/FK constraint errors
                 const accountIds = [...new Set(mappedItems.map(i => i.account_id))].filter(Boolean);
                 
                 if (accountIds.length > 0) {

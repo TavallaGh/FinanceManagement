@@ -21,7 +21,7 @@
   const Forms = window.DSForms || DS || {};
   const { AttachmentManager = FallbackComponent } = Forms;
 
-  const Feedback = window.DSFeedback || DS || {};
+  const Feedback = window.DSFeedback || window.DSOverlays || DS || {};
   const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
 
   function FallbackComponent() { return null; }
@@ -411,7 +411,7 @@
     ];
 
     const gridActions = [
-        { id: 'print', icon: Printer, tooltip: t('چاپ سند', 'Print Document'), onClick: (row) => setPrintModal({ isOpen: true, transactionId: row.id }), requiredAccess: 'print', className: 'text-blue-500 hover:text-blue-600' },
+        { id: 'print', icon: Printer, tooltip: t('چاپ سند', 'Print Document'), onClick: (row) => setPrintModal({ isOpen: true, transactionId: row.id }), requiredAccess: 'view', className: 'text-blue-500 hover:text-blue-600' },
         { id: 'summary', icon: DollarSign, tooltip: t('خلاصه ارزی', 'Currency Summary'), onClick: (row) => openSummary(row), className: 'text-indigo-500 hover:text-indigo-600' },
         { id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: (row) => (attachmentCounts[row.id] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600') },
         { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
@@ -441,7 +441,16 @@
 
     const DetailsModal = window.TransactionMainDetails || (() => null);
     const TransactionSummaryModal = window.TransactionSummary || FallbackComponent;
-    const TransactionPrintModal = window.TransactionPrint || FallbackComponent;
+    
+    // Safety Fallback for Print Modal to alert user if script is missing
+    const TransactionPrintModal = window.TransactionPrint || function MissingPrintComponent({ onClose }) {
+        useEffect(() => {
+            alert('فایل TransactionPrint.js بارگذاری نشده است. لطفاً تگ <script> آن را در فایل index.html اضافه کنید.');
+            if (onClose) onClose();
+        }, [onClose]);
+        return null;
+    };
+
     const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
 
     return (
