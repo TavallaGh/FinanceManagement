@@ -3,28 +3,51 @@
   const React = window.React;
   const { useState, useEffect, useMemo, useCallback } = React;
 
+  const FallbackComponent = () => null;
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
-  const LucideIcons = window.LucideIcons || {};
-  const {
-    FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon,
-    Copy = FallbackIcon, AlertTriangle = FallbackIcon, Paperclip = FallbackIcon,
-    DollarSign = FallbackIcon, Printer = FallbackIcon
-  } = LucideIcons;
+
+  const safeComp = (moduleObj, compName) => {
+      const comp = moduleObj && moduleObj[compName];
+      if (typeof comp === 'function' || (comp && typeof comp === 'object' && comp.$$typeof)) return comp;
+      if (comp && comp.default && (typeof comp.default === 'function' || comp.default.$$typeof)) return comp.default;
+      return FallbackComponent;
+  };
+
+  const safeIcon = (moduleObj, iconName) => {
+      const icon = moduleObj && moduleObj[iconName];
+      if (typeof icon === 'function' || (icon && typeof icon === 'object' && icon.$$typeof)) return icon;
+      if (icon && icon.default && (typeof icon.default === 'function' || icon.default.$$typeof)) return icon.default;
+      return FallbackIcon;
+  };
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
-  const { Button = FallbackComponent, PageHeader = FallbackComponent, EmptyState = FallbackComponent, Badge = FallbackComponent, Card = FallbackComponent } = Core;
+  const Button = safeComp(Core, 'Button');
+  const PageHeader = safeComp(Core, 'PageHeader');
+  const EmptyState = safeComp(Core, 'EmptyState');
+  const Badge = safeComp(Core, 'Badge');
+  const Card = safeComp(Core, 'Card');
 
   const Grid = window.DSGrid || DS || {};
-  const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent } = Grid;
+  const DataGrid = safeComp(Grid, 'DataGrid');
+  const AdvancedFilter = safeComp(Grid, 'AdvancedFilter');
 
   const Forms = window.DSForms || DS || {};
-  const { AttachmentManager = FallbackComponent } = Forms;
+  const AttachmentManager = safeComp(Forms, 'AttachmentManager');
 
   const Feedback = window.DSFeedback || window.DSOverlays || DS || {};
-  const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
+  const Modal = safeComp(Feedback, 'Modal');
+  const Toast = safeComp(Feedback, 'Toast');
 
-  function FallbackComponent() { return null; }
+  const LucideIcons = window.LucideIcons || {};
+  const FileText = safeIcon(LucideIcons, 'FileText');
+  const Edit = safeIcon(LucideIcons, 'Edit');
+  const Trash2 = safeIcon(LucideIcons, 'Trash2');
+  const Copy = safeIcon(LucideIcons, 'Copy');
+  const AlertTriangle = safeIcon(LucideIcons, 'AlertTriangle');
+  const Paperclip = safeIcon(LucideIcons, 'Paperclip');
+  const DollarSign = safeIcon(LucideIcons, 'DollarSign');
+  const Printer = safeIcon(LucideIcons, 'Printer');
 
   const formatNumber = (num) => {
       if (!num && num !== 0) return '0';
@@ -439,18 +462,10 @@
       }
     }), [filters, gridState]);
 
-    const DetailsModal = window.TransactionMainDetails || (() => null);
-    const TransactionSummaryModal = window.TransactionSummary || FallbackComponent;
+    const DetailsModal = safeComp(window, 'TransactionMainDetails');
+    const TransactionSummaryModal = safeComp(window, 'TransactionSummary');
+    const TransactionPrintModal = safeComp(window, 'TransactionPrint');
     
-    // Safety Fallback for Print Modal to alert user if script is missing
-    const TransactionPrintModal = window.TransactionPrint || function MissingPrintComponent({ onClose }) {
-        useEffect(() => {
-            alert('فایل TransactionPrint.js بارگذاری نشده است. لطفاً تگ <script> آن را در فایل index.html اضافه کنید.');
-            if (onClose) onClose();
-        }, [onClose]);
-        return null;
-    };
-
     const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
 
     return (
@@ -478,17 +493,15 @@
           </div>
         </div>
 
-        {window.TransactionMainDetails && (
-            <DetailsModal 
-                isOpen={isFormModalOpen}
-                onClose={() => setIsFormModalOpen(false)}
-                onSuccess={handleModalSuccess}
-                formMode={formMode}
-                initialRecord={currentRecord}
-                language={language}
-                formCode={formCode}
-            />
-        )}
+        <DetailsModal 
+            isOpen={isFormModalOpen}
+            onClose={() => setIsFormModalOpen(false)}
+            onSuccess={handleModalSuccess}
+            formMode={formMode}
+            initialRecord={currentRecord}
+            language={language}
+            formCode={formCode}
+        />
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
           <EmptyState

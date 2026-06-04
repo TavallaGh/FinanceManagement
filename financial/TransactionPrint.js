@@ -3,28 +3,51 @@
     const React = window.React;
     const { useState, useEffect, useRef } = React;
 
+    const FallbackComponent = () => null;
     const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
-    const LucideIcons = window.LucideIcons || {};
-    const { Printer = FallbackIcon, Settings = FallbackIcon, FileText = FallbackIcon } = LucideIcons;
+
+    const safeComp = (moduleObj, compName) => {
+        const comp = moduleObj && moduleObj[compName];
+        if (typeof comp === 'function' || (comp && typeof comp === 'object' && comp.$$typeof)) return comp;
+        if (comp && comp.default && (typeof comp.default === 'function' || comp.default.$$typeof)) return comp.default;
+        return FallbackComponent;
+    };
+
+    const safeIcon = (moduleObj, iconName) => {
+        const icon = moduleObj && moduleObj[iconName];
+        if (typeof icon === 'function' || (icon && typeof icon === 'object' && icon.$$typeof)) return icon;
+        if (icon && icon.default && (typeof icon.default === 'function' || icon.default.$$typeof)) return icon.default;
+        return FallbackIcon;
+    };
 
     const DS = window.DesignSystem || {};
     
     const Core = window.DSCore || DS || {};
-    const SafeFC = (props) => React.createElement('div', null, props.children || '');
-    const { 
-        Card = SafeFC, CardHeader = SafeFC, CardBody = SafeFC, 
-        Flex = SafeFC, Grid = SafeFC, Text = SafeFC, 
-        Button = SafeFC, Badge = SafeFC, Divider = SafeFC, Container = SafeFC 
-    } = Core;
+    const Card = safeComp(Core, 'Card');
+    const CardHeader = safeComp(Core, 'CardHeader');
+    const CardBody = safeComp(Core, 'CardBody');
+    const Flex = safeComp(Core, 'Flex');
+    const Grid = safeComp(Core, 'Grid');
+    const Text = safeComp(Core, 'Text');
+    const Button = safeComp(Core, 'Button');
+    const Badge = safeComp(Core, 'Badge');
+    const Divider = safeComp(Core, 'Divider');
+    const Container = safeComp(Core, 'Container');
 
     const Overlays = window.DSOverlays || window.DSFeedback || DS || {};
-    const { Modal = SafeFC } = Overlays;
+    const Modal = safeComp(Overlays, 'Modal');
 
     const Forms = window.DSForms || DS || {};
-    const { Checkbox = SafeFC, Select = SafeFC } = Forms;
+    const Checkbox = safeComp(Forms, 'Checkbox');
+    const Select = safeComp(Forms, 'Select');
 
     const DSGrid = window.DSGrid || DS || {};
-    const { Table = SafeFC, DataGrid = SafeFC } = DSGrid;
+    const Table = (DSGrid && DSGrid.Table) ? safeComp(DSGrid, 'Table') : safeComp(DSGrid, 'DataGrid');
+
+    const LucideIcons = window.LucideIcons || {};
+    const Printer = safeIcon(LucideIcons, 'Printer');
+    const Settings = safeIcon(LucideIcons, 'Settings');
+    const FileText = safeIcon(LucideIcons, 'FileText');
 
     const TransactionPrint = ({ transactionId, onClose, language = 'fa' }) => {
         const isRtl = language === 'fa';
@@ -260,7 +283,7 @@
                 <Grid cols={12} gap="lg">
                     <Grid span={3} direction="col" gap="md">
                         <Card>
-                            <CardHeader title={isRtl ? 'تنظیمات چاپ' : 'Print Settings'} icon={<Settings size={18} />} />
+                            <CardHeader title={isRtl ? 'تنظیمات چاپ' : 'Print Settings'} icon={React.createElement(Settings, { size: 18 })} />
                             <CardBody>
                                 <Flex direction="col" gap="lg">
                                     <Select 
@@ -302,7 +325,7 @@
                                 <Button 
                                     variant="primary" 
                                     fullWidth 
-                                    icon={<Printer size={18} />}
+                                    icon={React.createElement(Printer, { size: 18 })}
                                     onClick={handlePrint}
                                     disabled={loading}
                                 >
@@ -314,7 +337,7 @@
 
                     <Grid span={9}>
                         <Card>
-                            <CardHeader title={isRtl ? 'پیش‌نمایش' : 'Preview'} icon={<FileText size={18} />} />
+                            <CardHeader title={isRtl ? 'پیش‌نمایش' : 'Preview'} icon={React.createElement(FileText, { size: 18 })} />
                             <CardBody>
                                 {loading ? (
                                     <Flex justify="center" align="center" className="p-xl">
