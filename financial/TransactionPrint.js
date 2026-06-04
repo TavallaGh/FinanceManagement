@@ -3,57 +3,133 @@
     const React = window.React;
     const { useState, useEffect, useRef } = React;
 
-    const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size, backgroundColor: '#fee2e2', color: '#991b1b', fontSize: '10px' } }, 'X');
+    const FallbackIcon = ({ size = 16 }) => React.createElement(
+        'svg', 
+        { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
+        React.createElement('circle', { cx: '12', cy: '12', r: '10' })
+    );
 
-    // Visual Debugging Extractor
-    const safeComp = (moduleObj, compName) => {
-        const comp = moduleObj && moduleObj[compName];
-        if (typeof comp === 'function' || (comp && typeof comp === 'object' && comp.$$typeof)) return comp;
-        
-        return (props) => React.createElement('div', { 
-            style: { 
-                backgroundColor: '#fee2e2', color: '#991b1b', padding: '8px', 
-                margin: '4px', border: '1px solid #ef4444', borderRadius: '4px', 
-                fontSize: '12px', fontWeight: 'bold' 
-            } 
-        }, `[DEBUG] Missing Component: ${compName} from DesignSystem`);
+    const safeComp = (compName) => {
+        const sources = [window.DSCore, window.DSOverlays, window.DSForms, window.DSGrid, window.DSFeedback, window.DesignSystem];
+        for (const source of sources) {
+            if (source && source[compName]) {
+                const comp = source[compName];
+                if (typeof comp === 'function' || (comp && typeof comp === 'object' && comp.$$typeof)) return comp;
+                if (comp && comp.default && (typeof comp.default === 'function' || comp.default.$$typeof)) return comp.default;
+            }
+        }
+        return null;
     };
 
-    const safeIcon = (moduleObj, iconName) => {
-        const icon = moduleObj && moduleObj[iconName];
+    const safeIcon = (iconName) => {
+        const source = window.LucideIcons || {};
+        const icon = source[iconName];
         if (typeof icon === 'function' || (icon && typeof icon === 'object' && icon.$$typeof)) return icon;
         return FallbackIcon;
     };
 
-    const DS = window.DesignSystem || {};
+    const Card = safeComp('Card') || (({children}) => React.createElement('div', {className: 'bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-full'}, children));
+    const CardHeader = safeComp('CardHeader') || (({title, icon}) => React.createElement('div', {className: 'p-4 border-b border-slate-200 dark:border-slate-700 font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/50'}, icon, title));
+    const CardBody = safeComp('CardBody') || (({children, className}) => React.createElement('div', {className: `p-4 flex-1 ${className||''}`}, children));
     
-    const Core = window.DSCore || DS || {};
-    const Card = safeComp(Core, 'Card');
-    const CardHeader = safeComp(Core, 'CardHeader');
-    const CardBody = safeComp(Core, 'CardBody');
-    const Flex = safeComp(Core, 'Flex');
-    const Grid = safeComp(Core, 'Grid');
-    const Text = safeComp(Core, 'Text');
-    const Button = safeComp(Core, 'Button');
-    const Badge = safeComp(Core, 'Badge');
-    const Divider = safeComp(Core, 'Divider');
-    const Container = safeComp(Core, 'Container');
+    const Flex = safeComp('Flex') || (({children, direction='row', gap='md', justify='start', align='stretch', className=''}) => {
+        const gapClass = gap === 'sm' ? 'gap-2' : gap === 'lg' ? 'gap-6' : 'gap-4';
+        const dirClass = direction === 'col' ? 'flex-col' : 'flex-row';
+        const justClass = justify === 'between' ? 'justify-between' : justify === 'center' ? 'justify-center' : justify === 'end' ? 'justify-end' : 'justify-start';
+        const alignClass = align === 'center' ? 'items-center' : 'items-stretch';
+        return React.createElement('div', {className: `flex ${dirClass} ${gapClass} ${justClass} ${alignClass} ${className}`}, children);
+    });
 
-    const Overlays = window.DSOverlays || window.DSFeedback || DS || {};
-    const Modal = safeComp(Overlays, 'Modal');
+    const Grid = safeComp('Grid') || (({children, cols=1, span, gap='md'}) => {
+        const gapClass = gap === 'sm' ? 'gap-2' : gap === 'lg' ? 'gap-6' : 'gap-4';
+        const spanClass = span ? `col-span-${span}` : '';
+        const gridClass = cols === 12 ? 'grid-cols-12' : cols === 3 ? 'grid-cols-3' : 'grid-cols-1';
+        return React.createElement('div', {className: `grid ${gridClass} ${gapClass} ${spanClass}`}, children);
+    });
 
-    const Forms = window.DSForms || DS || {};
-    const Checkbox = safeComp(Forms, 'Checkbox');
-    const Select = safeComp(Forms, 'Select');
+    const Text = safeComp('Text') || (({children, variant='body', weight='normal', color='default'}) => {
+        let cls = 'text-sm text-slate-700 dark:text-slate-300';
+        if (variant === 'h3') cls = 'text-lg font-bold text-slate-900 dark:text-white';
+        if (variant === 'caption') cls = 'text-xs text-slate-500';
+        if (weight === 'bold') cls += ' font-bold';
+        if (color === 'primary') cls += ' text-indigo-600 dark:text-indigo-400';
+        if (color === 'secondary') cls += ' text-slate-500 dark:text-slate-400';
+        return React.createElement('span', {className: cls}, children);
+    });
 
-    const DSGrid = window.DSGrid || DS || {};
-    // Fallback logic: check for Table, if not use DataGrid, if not use safe fallback
-    const Table = (DSGrid && DSGrid.Table) ? safeComp(DSGrid, 'Table') : safeComp(DSGrid, 'DataGrid');
+    const Button = safeComp('Button') || (({children, onClick, disabled, fullWidth, icon}) => React.createElement(
+        'button', 
+        {onClick, disabled, className: `flex items-center justify-center gap-2 bg-indigo-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${fullWidth ? 'w-full' : ''}`}, 
+        icon, children
+    ));
 
-    const LucideIcons = window.LucideIcons || {};
-    const Printer = safeIcon(LucideIcons, 'Printer');
-    const Settings = safeIcon(LucideIcons, 'Settings');
-    const FileText = safeIcon(LucideIcons, 'FileText');
+    const Badge = safeComp('Badge') || (({children, variant='primary'}) => {
+        const colors = {
+            success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+            warning: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+            primary: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
+        };
+        return React.createElement('span', {className: `px-2 py-1 text-xs font-bold border rounded-md ${colors[variant] || colors.primary}`}, children);
+    });
+
+    const Divider = safeComp('Divider') || (({margin='md'}) => {
+        const my = margin === 'sm' ? 'my-2' : margin === 'lg' ? 'my-6' : 'my-4';
+        return React.createElement('hr', {className: `border-slate-200 dark:border-slate-700 w-full ${my}`});
+    });
+
+    const Container = safeComp('Container') || (({children, className}) => React.createElement('div', {className: `w-full flex flex-col gap-6 ${className||''}`}, children));
+    
+    let Modal = safeComp('Modal');
+    if (!Modal) {
+        Modal = ({ isOpen, onClose, title, children, size }) => {
+            if (!isOpen) return null;
+            return React.createElement('div', { className: 'fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4' },
+                React.createElement('div', { className: `bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 ${size === 'xl' ? 'max-w-[1200px]' : 'max-w-[800px]'}` },
+                    React.createElement('div', { className: 'p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80' },
+                        React.createElement('h2', { className: 'text-lg font-bold text-slate-800 dark:text-slate-100' }, title),
+                        React.createElement('button', { onClick: onClose, className: 'text-slate-500 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors' }, '✕')
+                    ),
+                    React.createElement('div', { className: 'p-6 flex-1 overflow-auto max-h-[85vh]' }, children)
+                )
+            );
+        };
+    }
+
+    const Checkbox = safeComp('Checkbox') || (({label, checked, onChange}) => React.createElement(
+        'label', 
+        {className: 'flex items-center gap-3 text-sm cursor-pointer group'}, 
+        React.createElement('input', {type: 'checkbox', checked, onChange: (e) => onChange(e.target.checked), className: 'w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer dark:bg-slate-800 dark:border-slate-600'}), 
+        React.createElement('span', {className: 'text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors'}, label)
+    ));
+
+    const Select = safeComp('Select') || (({label, options, value, onChange, fullWidth}) => React.createElement(
+        'div', 
+        {className: `flex flex-col gap-1.5 ${fullWidth ? 'w-full' : ''}`}, 
+        React.createElement('label', {className: 'text-xs font-medium text-slate-600 dark:text-slate-400'}, label), 
+        React.createElement('select', {value, onChange: (e) => onChange(e.target.value), className: 'w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none'}, 
+            options.map(o => React.createElement('option', {key: o.value, value: o.value}, o.label))
+        )
+    ));
+
+    let Table = safeComp('Table') || safeComp('DataGrid');
+    if (!Table) {
+        Table = ({ columns, data, striped }) => React.createElement('div', {className: 'w-full overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700'}, 
+            React.createElement('table', {className: 'w-full text-sm text-left rtl:text-right border-collapse'}, 
+                React.createElement('thead', {className: 'text-xs text-slate-700 uppercase bg-slate-100 dark:bg-slate-800 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700'}, 
+                    React.createElement('tr', null, columns.map((c, i) => React.createElement('th', {key: i, className: 'px-4 py-3 whitespace-nowrap', style: {width: c.width}}, c.header)))
+                ),
+                React.createElement('tbody', null, data.map((row, i) => React.createElement(
+                    'tr', 
+                    {key: i, className: `border-b dark:border-slate-700 ${striped && i%2===0 ? 'bg-slate-50 dark:bg-slate-800/30' : 'bg-white dark:bg-slate-900'}`}, 
+                    columns.map((c, j) => React.createElement('td', {key: j, className: 'px-4 py-3 text-slate-700 dark:text-slate-300'}, row[c.field] || '-'))
+                )))
+            )
+        );
+    }
+
+    const PrinterIcon = safeIcon('Printer');
+    const SettingsIcon = safeIcon('Settings');
+    const FileTextIcon = safeIcon('FileText');
 
     const TransactionPrint = ({ transactionId, onClose, language = 'fa' }) => {
         const isRtl = language === 'fa';
@@ -63,7 +139,7 @@
         const [loading, setLoading] = useState(false);
         const [headerData, setHeaderData] = useState(null);
         const [itemsData, setItemsData] = useState([]);
-        const [debugError, setDebugError] = useState(null);
+        const [usersMap, setUsersMap] = useState({});
         
         const [printSettings, setPrintSettings] = useState({
             accountLevel: 'subsidiary', 
@@ -80,15 +156,25 @@
         ];
 
         useEffect(() => {
-            console.log("DEBUG: TransactionPrint mounted for ID", transactionId);
             if (transactionId) {
                 fetchTransactionData();
+                fetchUsers();
             }
         }, [transactionId]);
 
+        const fetchUsers = async () => {
+            try {
+                const { data } = await supabase.from('sec_users').select('id, full_name, username');
+                const uMap = {};
+                (data || []).forEach(u => {
+                    uMap[u.id] = u.full_name || u.username;
+                });
+                setUsersMap(uMap);
+            } catch (error) {}
+        };
+
         const fetchTransactionData = async () => {
             setLoading(true);
-            setDebugError(null);
             try {
                 const { data: header, error: headerError } = await supabase
                     .from('fm_transactions')
@@ -129,8 +215,7 @@
                 setHeaderData(header);
                 setItemsData(mappedItems);
             } catch (error) {
-                console.error('DEBUG - API Error in TransactionPrint:', error);
-                setDebugError(error.message || 'خطا در ارتباط با سرور');
+                console.error('Error fetching transaction print data:', error);
             } finally {
                 setLoading(false);
             }
@@ -147,12 +232,36 @@
             const printContent = printRef.current;
             if (!printContent) return;
 
-            const originalContents = document.body.innerHTML;
-            const printContents = printContent.innerHTML;
+            // Simple CSS for print to force layout and hide everything else
+            const printStyles = `
+                <style>
+                    @media print {
+                        body * { visibility: hidden; }
+                        #printable-area, #printable-area * { visibility: visible; }
+                        #printable-area { position: absolute; left: 0; top: 0; width: 100%; direction: ${isRtl ? 'rtl' : 'ltr'}; font-family: Tahoma, Arial, sans-serif; }
+                        .no-print { display: none !important; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: ${isRtl ? 'right' : 'left'}; font-size: 12px; }
+                        th { background-color: #f3f4f6; font-weight: bold; }
+                        .text-center { text-align: center; }
+                        .font-bold { font-weight: bold; }
+                        .flex { display: flex; }
+                        .justify-between { justify-content: space-between; }
+                        .mb-4 { margin-bottom: 1rem; }
+                        .p-4 { padding: 1rem; }
+                        .border { border: 1px solid #ddd; }
+                        .bg-gray-100 { background-color: #f3f4f6; }
+                    }
+                </style>
+            `;
 
-            document.body.innerHTML = printContents;
+            const originalContents = document.body.innerHTML;
+            const printContents = `<div id="printable-area">${printContent.innerHTML}</div>`;
+            
+            document.body.innerHTML = printStyles + printContents;
             window.print();
-            document.body.innerHTML = originalContents;
+            
+            // Reload to restore React app state perfectly without memory leaks
             window.location.reload(); 
         };
 
@@ -192,106 +301,86 @@
         };
 
         const renderPrintPreview = () => {
-            if (debugError) {
-                return React.createElement('div', { className: 'p-4 bg-red-100 text-red-700 border border-red-400 rounded' }, `Error: ${debugError}`);
-            }
-
             if (!headerData) return null;
 
             return (
-                <Container ref={printRef} direction="col" gap="lg" className="print-section">
-                    <Card variant="outline">
-                        <CardBody>
-                            <Flex direction="col" gap="md" align="center" justify="center">
-                                <Text variant="h3" weight="bold">
-                                    {isRtl ? 'سند حسابداری' : 'Accounting Voucher'}
-                                </Text>
-                                {printSettings.showStatus && (
-                                    <Badge variant={headerData.status === 'APPROVED' ? 'success' : 'warning'}>
-                                        {headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') : (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')}
-                                    </Badge>
-                                )}
-                            </Flex>
-                            
-                            <Divider margin="md" />
-                            
-                            <Grid cols={3} gap="md">
-                                <Flex direction="col" gap="sm">
-                                    <Text variant="caption" color="secondary">{isRtl ? 'شماره سند:' : 'Doc Code:'}</Text>
-                                    <Text variant="body" weight="bold">{headerData.document_code}</Text>
-                                </Flex>
-                                <Flex direction="col" gap="sm">
-                                    <Text variant="caption" color="secondary">{isRtl ? 'تاریخ سند:' : 'Date:'}</Text>
-                                    <Text variant="body" weight="bold">{headerData.document_date ? new Date(headerData.document_date).toLocaleDateString(isRtl ? 'fa-IR' : 'en-US') : '-'}</Text>
-                                </Flex>
-                                <Flex direction="col" gap="sm">
-                                    <Text variant="caption" color="secondary">{isRtl ? 'شماره عطف:' : 'Ref Code:'}</Text>
-                                    <Text variant="body" weight="bold">{headerData.reference_code || '-'}</Text>
-                                </Flex>
-                                <Flex direction="col" gap="sm" span={3}>
-                                    <Text variant="caption" color="secondary">{isRtl ? 'شرح سند:' : 'Description:'}</Text>
-                                    <Text variant="body">{headerData.description}</Text>
-                                </Flex>
-                            </Grid>
-                        </CardBody>
-                    </Card>
-
-                    <Card variant="outline">
-                        <CardBody>
-                            <Table 
-                                columns={getColumns()}
-                                data={itemsData.map((item, index) => ({
-                                    row_number: index + 1,
-                                    account_code: item.fm_coa_accounts?.code || '-',
-                                    account_name: isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en || '-',
-                                    description: item.description,
-                                    debit_amount: item.transaction_action === 'DEPOSIT' ? item.amount?.toLocaleString() : '-',
-                                    credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.amount?.toLocaleString() : '-',
-                                    fc_debit_amount: item.transaction_action === 'DEPOSIT' ? item.currency_amount?.toLocaleString() : '-',
-                                    fc_credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.currency_amount?.toLocaleString() : '-'
-                                }))}
-                                language={language}
-                                striped={true}
-                            />
-                            
-                            {printSettings.showTotals && (
-                                <Flex direction="row" justify="end" gap="lg" className="p-md bg-secondary-light">
-                                    <Flex direction="row" gap="md">
-                                        <Text variant="body" weight="bold">{isRtl ? 'جمع بدهکار:' : 'Total Debit:'}</Text>
-                                        <Text variant="body" weight="bold" color="primary">{totals.debit.toLocaleString()}</Text>
-                                    </Flex>
-                                    <Flex direction="row" gap="md">
-                                        <Text variant="body" weight="bold">{isRtl ? 'جمع بستانکار:' : 'Total Credit:'}</Text>
-                                        <Text variant="body" weight="bold" color="primary">{totals.credit.toLocaleString()}</Text>
-                                    </Flex>
-                                </Flex>
+                <Container className="print-section bg-white dark:bg-slate-900 rounded-xl">
+                    <div ref={printRef} className="p-8 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm bg-white text-slate-900">
+                        <Flex direction="col" gap="lg" align="center" justify="center" className="mb-6">
+                            <h1 className="text-2xl font-bold text-slate-900">
+                                {isRtl ? 'سند حسابداری' : 'Accounting Voucher'}
+                            </h1>
+                            {printSettings.showStatus && (
+                                <span className={`px-4 py-1 rounded-full text-sm font-bold border ${headerData.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
+                                    {headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') : (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')}
+                                </span>
                             )}
-                        </CardBody>
-                    </Card>
+                        </Flex>
+                        
+                        <div className="grid grid-cols-3 gap-6 mb-8 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <Flex direction="col" gap="sm">
+                                <span className="text-xs text-slate-500 font-medium">{isRtl ? 'شماره سند:' : 'Doc Code:'}</span>
+                                <span className="text-base font-bold text-indigo-700">{headerData.document_code}</span>
+                            </Flex>
+                            <Flex direction="col" gap="sm">
+                                <span className="text-xs text-slate-500 font-medium">{isRtl ? 'تاریخ سند:' : 'Date:'}</span>
+                                <span className="text-base font-bold">{headerData.document_date ? new Date(headerData.document_date).toLocaleDateString(isRtl ? 'fa-IR' : 'en-US') : '-'}</span>
+                            </Flex>
+                            <Flex direction="col" gap="sm">
+                                <span className="text-xs text-slate-500 font-medium">{isRtl ? 'شماره عطف:' : 'Ref Code:'}</span>
+                                <span className="text-base font-bold">{headerData.reference_code || '-'}</span>
+                            </Flex>
+                            <Flex direction="col" gap="sm" className="col-span-3 mt-2 pt-4 border-t border-slate-200">
+                                <span className="text-xs text-slate-500 font-medium">{isRtl ? 'شرح سند:' : 'Description:'}</span>
+                                <span className="text-sm">{headerData.description || '-'}</span>
+                            </Flex>
+                        </div>
 
-                    {printSettings.showSummary && (
-                        <Card variant="outline">
-                            <CardBody>
-                                <Grid cols={3} gap="lg">
-                                    <Flex direction="col" gap="md" align="center">
-                                        <Text variant="caption" color="secondary">{isRtl ? 'تنظیم کننده' : 'Prepared By'}</Text>
-                                        <Divider margin="sm" />
-                                        <Text variant="body">{headerData.registrar_id || '---'}</Text>
-                                    </Flex>
-                                    <Flex direction="col" gap="md" align="center">
-                                        <Text variant="caption" color="secondary">{isRtl ? 'بررسی کننده' : 'Checked By'}</Text>
-                                        <Divider margin="sm" />
-                                        <Text variant="body">---</Text>
-                                    </Flex>
-                                    <Flex direction="col" gap="md" align="center">
-                                        <Text variant="caption" color="secondary">{isRtl ? 'تایید کننده' : 'Approved By'}</Text>
-                                        <Divider margin="sm" />
-                                        <Text variant="body">---</Text>
-                                    </Flex>
-                                </Grid>
-                            </CardBody>
-                        </Card>
-                    )}
+                        <Table 
+                            columns={getColumns()}
+                            data={itemsData.map((item, index) => ({
+                                row_number: index + 1,
+                                account_code: item.fm_coa_accounts?.code || '-',
+                                account_name: isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en || '-',
+                                description: item.description,
+                                debit_amount: item.transaction_action === 'DEPOSIT' ? item.amount?.toLocaleString() : '-',
+                                credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.amount?.toLocaleString() : '-',
+                                fc_debit_amount: item.transaction_action === 'DEPOSIT' ? item.currency_amount?.toLocaleString() : '-',
+                                fc_credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.currency_amount?.toLocaleString() : '-'
+                            }))}
+                            striped={true}
+                        />
+                        
+                        {printSettings.showTotals && (
+                            <div className="flex justify-end gap-12 p-4 mt-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+                                <Flex direction="row" gap="md" align="center">
+                                    <span className="text-sm font-bold text-slate-700">{isRtl ? 'جمع بدهکار:' : 'Total Debit:'}</span>
+                                    <span className="text-lg font-bold text-indigo-700">{totals.debit.toLocaleString()}</span>
+                                </Flex>
+                                <Flex direction="row" gap="md" align="center">
+                                    <span className="text-sm font-bold text-slate-700">{isRtl ? 'جمع بستانکار:' : 'Total Credit:'}</span>
+                                    <span className="text-lg font-bold text-indigo-700">{totals.credit.toLocaleString()}</span>
+                                </Flex>
+                            </div>
+                        )}
+
+                        {printSettings.showSummary && (
+                            <div className="grid grid-cols-3 gap-8 mt-12 p-6 border border-slate-200 rounded-lg">
+                                <Flex direction="col" gap="md" align="center">
+                                    <span className="text-sm text-slate-500 font-bold mb-8">{isRtl ? 'تنظیم کننده' : 'Prepared By'}</span>
+                                    <span className="text-base font-medium">{usersMap[headerData.registrar_id] || headerData.registrar_id || '---'}</span>
+                                </Flex>
+                                <Flex direction="col" gap="md" align="center">
+                                    <span className="text-sm text-slate-500 font-bold mb-8">{isRtl ? 'بررسی کننده' : 'Checked By'}</span>
+                                    <span className="text-base font-medium">---</span>
+                                </Flex>
+                                <Flex direction="col" gap="md" align="center">
+                                    <span className="text-sm text-slate-500 font-bold mb-8">{isRtl ? 'تایید کننده' : 'Approved By'}</span>
+                                    <span className="text-base font-medium">---</span>
+                                </Flex>
+                            </div>
+                        )}
+                    </div>
                 </Container>
             );
         };
@@ -301,19 +390,19 @@
                 <Grid cols={12} gap="lg">
                     <Grid span={3} direction="col" gap="md">
                         <Card>
-                            <CardHeader title={isRtl ? 'تنظیمات چاپ' : 'Print Settings'} icon={React.createElement(Settings, { size: 18 })} />
-                            <CardBody>
-                                <Flex direction="col" gap="lg">
-                                    <Select 
-                                        label={isRtl ? 'سطح نمایش حساب' : 'Account Level'}
-                                        options={accountLevelOptions}
-                                        value={printSettings.accountLevel}
-                                        onChange={(val) => handleSettingChange('accountLevel', val)}
-                                        fullWidth
-                                    />
-                                    
-                                    <Divider />
-                                    
+                            <CardHeader title={isRtl ? 'تنظیمات چاپ' : 'Print Settings'} icon={React.createElement(SettingsIcon, { size: 18 })} />
+                            <CardBody className="flex flex-col gap-6">
+                                <Select 
+                                    label={isRtl ? 'سطح نمایش حساب' : 'Account Level'}
+                                    options={accountLevelOptions}
+                                    value={printSettings.accountLevel}
+                                    onChange={(val) => handleSettingChange('accountLevel', val)}
+                                    fullWidth
+                                />
+                                
+                                <Divider margin="sm" />
+                                
+                                <div className="flex flex-col gap-4">
                                     <Checkbox 
                                         label={isRtl ? 'نمایش جمع کل' : 'Show Totals'}
                                         checked={printSettings.showTotals}
@@ -327,7 +416,7 @@
                                     />
                                     
                                     <Checkbox 
-                                        label={isRtl ? 'نمایش خلاصه و امضاها' : 'Show Summary & Signatures'}
+                                        label={isRtl ? 'نمایش امضاها' : 'Show Signatures'}
                                         checked={printSettings.showSummary}
                                         onChange={(val) => handleSettingChange('showSummary', val)}
                                     />
@@ -337,29 +426,30 @@
                                         checked={printSettings.showStatus}
                                         onChange={(val) => handleSettingChange('showStatus', val)}
                                     />
-                                </Flex>
-                            </CardBody>
-                            <CardBody>
-                                <Button 
-                                    variant="primary" 
-                                    fullWidth 
-                                    icon={React.createElement(Printer, { size: 18 })}
-                                    onClick={handlePrint}
-                                    disabled={loading}
-                                >
-                                    {isRtl ? 'چاپ' : 'Print'}
-                                </Button>
+                                </div>
+
+                                <div className="mt-auto pt-6">
+                                    <Button 
+                                        variant="primary" 
+                                        fullWidth 
+                                        icon={React.createElement(PrinterIcon, { size: 18 })}
+                                        onClick={handlePrint}
+                                        disabled={loading}
+                                    >
+                                        {isRtl ? 'تایید و چاپ' : 'Print Document'}
+                                    </Button>
+                                </div>
                             </CardBody>
                         </Card>
                     </Grid>
 
                     <Grid span={9}>
                         <Card>
-                            <CardHeader title={isRtl ? 'پیش‌نمایش' : 'Preview'} icon={React.createElement(FileText, { size: 18 })} />
-                            <CardBody>
+                            <CardHeader title={isRtl ? 'پیش‌نمایش فرم' : 'Document Preview'} icon={React.createElement(FileTextIcon, { size: 18 })} />
+                            <CardBody className="bg-slate-100 dark:bg-slate-900/50 p-6 overflow-y-auto">
                                 {loading ? (
-                                    <Flex justify="center" align="center" className="p-xl">
-                                        <Text>{isRtl ? 'در حال بارگذاری...' : 'Loading...'}</Text>
+                                    <Flex justify="center" align="center" className="h-[400px]">
+                                        <Text variant="h3" color="secondary">{isRtl ? 'در حال بارگذاری اطلاعات...' : 'Loading Data...'}</Text>
                                     </Flex>
                                 ) : (
                                     renderPrintPreview()
