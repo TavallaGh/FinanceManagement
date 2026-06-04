@@ -15,43 +15,55 @@
         return null;
     };
 
-    // Safe Static Icons that will NEVER trigger React Error #130
-    const SafePrinterIcon = ({ size = 18 }) => React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
-        React.createElement('polyline', { points: '6 9 6 2 18 2 18 9' }),
-        React.createElement('path', { d: 'M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2' }),
-        React.createElement('rect', { x: '6', y: '14', width: '12', height: '8' })
+    const SafePrinterIcon = ({ size = 18 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+        </svg>
     );
 
-    const SafeSettingsIcon = ({ size = 18 }) => React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
-        React.createElement('circle', { cx: '12', cy: '12', r: '3' }),
-        React.createElement('path', { d: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z' })
+    const SafeSettingsIcon = ({ size = 18 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
     );
 
-    const SafeFileTextIcon = ({ size = 18 }) => React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
-        React.createElement('path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }),
-        React.createElement('polyline', { points: '14 2 14 8 20 8' }),
-        React.createElement('line', { x1: '16', y1: '13', x2: '8', y2: '13' }),
-        React.createElement('line', { x1: '16', y1: '17', x2: '8', y2: '17' }),
-        React.createElement('polyline', { points: '10 9 9 9 8 9' })
+    const SafeFileTextIcon = ({ size = 18 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
     );
 
-    const Card = safeGet('Card') || (({ children }) => React.createElement('div', { className: "bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-full overflow-hidden" }, children));
-    const CardHeader = safeGet('CardHeader') || (({ title, icon }) => React.createElement('div', { className: "p-4 border-b border-slate-200 dark:border-slate-700 font-bold flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/50" }, icon, title));
-    const CardBody = safeGet('CardBody') || (({ children, className }) => React.createElement('div', { className: `p-4 flex-1 ${className || ''}` }, children));
+    const Card = safeGet('Card') || (({ children }) => <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-full overflow-hidden">{children}</div>);
+    
+    const CardHeader = safeGet('CardHeader') || (({ title, icon: Icon }) => (
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 font-bold flex items-center gap-2 bg-slate-50/50 dark:bg-slate-800/50">
+            {Icon && (typeof Icon === 'function' ? <Icon size={18} /> : Icon)}
+            {title}
+        </div>
+    ));
+
+    const CardBody = safeGet('CardBody') || (({ children, className }) => <div className={`p-4 flex-1 ${className || ''}`}>{children}</div>);
     
     const Flex = safeGet('Flex') || (({ children, direction = 'row', gap = 'md', align = 'stretch', justify = 'start', className = '' }) => {
         const gapCls = gap === 'sm' ? 'gap-2' : gap === 'lg' ? 'gap-6' : 'gap-4';
         const dirCls = direction === 'col' ? 'flex-col' : 'flex-row';
         const alignCls = align === 'center' ? 'items-center' : 'items-stretch';
         const justCls = justify === 'center' ? 'justify-center' : justify === 'between' ? 'justify-between' : justify === 'end' ? 'justify-end' : 'justify-start';
-        return React.createElement('div', { className: `flex ${dirCls} ${gapCls} ${alignCls} ${justCls} ${className}` }, children);
+        return <div className={`flex ${dirCls} ${gapCls} ${alignCls} ${justCls} ${className}`}>{children}</div>;
     });
 
     const Grid = safeGet('Grid') || (({ children, cols = 1, span, gap = 'md' }) => {
         const gapCls = gap === 'sm' ? 'gap-2' : gap === 'lg' ? 'gap-6' : 'gap-4';
         const colsCls = cols === 12 ? 'grid-cols-12' : cols === 3 ? 'grid-cols-3' : 'grid-cols-1';
         const spanCls = span ? `col-span-${span}` : '';
-        return React.createElement('div', { className: `grid ${colsCls} ${gapCls} ${spanCls}` }, children);
+        return <div className={`grid ${colsCls} ${gapCls} ${spanCls}`}>{children}</div>;
     });
 
     const Text = safeGet('Text') || (({ children, variant = 'body', weight = 'normal', color = 'default' }) => {
@@ -61,13 +73,14 @@
         if (weight === 'bold') cls += ' font-bold';
         if (color === 'primary') cls += ' text-indigo-600 dark:text-indigo-400';
         if (color === 'secondary') cls += ' text-slate-500 dark:text-slate-400';
-        return React.createElement('span', { className: cls }, children);
+        return <span className={cls}>{children}</span>;
     });
 
-    const Button = safeGet('Button') || (({ children, onClick, disabled, fullWidth, icon }) => React.createElement(
-        'button', 
-        { onClick, disabled, className: `flex items-center justify-center gap-2 bg-indigo-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-indigo-700 transition-all disabled:opacity-50 ${fullWidth ? 'w-full' : ''}` }, 
-        icon, children
+    const Button = safeGet('Button') || (({ children, onClick, disabled, fullWidth, icon: Icon }) => (
+        <button onClick={onClick} disabled={disabled} className={`flex items-center justify-center gap-2 bg-indigo-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-indigo-700 transition-all disabled:opacity-50 ${fullWidth ? 'w-full' : ''}`}>
+            {Icon && (typeof Icon === 'function' ? <Icon size={18} /> : Icon)}
+            {children}
+        </button>
     ));
 
     const Badge = safeGet('Badge') || (({ children, variant = 'primary' }) => {
@@ -76,59 +89,69 @@
             warning: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200',
             primary: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200'
         };
-        return React.createElement('span', { className: `px-2 py-1 text-xs font-bold border rounded-md ${colors[variant] || colors.primary}` }, children);
+        return <span className={`px-2 py-1 text-xs font-bold border rounded-md ${colors[variant] || colors.primary}`}>{children}</span>;
     });
 
     const Divider = safeGet('Divider') || (({ margin = 'md' }) => {
         const my = margin === 'sm' ? 'my-2' : margin === 'lg' ? 'my-6' : 'my-4';
-        return React.createElement('hr', { className: `border-slate-200 dark:border-slate-700 w-full ${my}` });
+        return <hr className={`border-slate-200 dark:border-slate-700 w-full ${my}`} />;
     });
 
-    const Container = safeGet('Container') || (({ children, className }) => React.createElement('div', { className: `w-full flex flex-col gap-6 ${className || ''}` }, children));
+    const Container = safeGet('Container') || (({ children, className }) => <div className={`w-full flex flex-col gap-6 ${className || ''}`}>{children}</div>);
 
     let Modal = safeGet('Modal');
     if (!Modal) {
         Modal = ({ isOpen, onClose, title, children, size }) => {
             if (!isOpen) return null;
-            return React.createElement('div', { className: "fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" },
-                React.createElement('div', { className: `bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 ${size === 'xl' ? 'max-w-[1200px]' : 'max-w-[800px]'}` },
-                    React.createElement('div', { className: "p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80" },
-                        React.createElement('h2', { className: "text-lg font-bold text-slate-800 dark:text-slate-100" }, title),
-                        React.createElement('button', { onClick: onClose, className: "text-slate-500 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors" }, '✕')
-                    ),
-                    React.createElement('div', { className: "p-6 flex-1 overflow-auto max-h-[85vh]" }, children)
-                )
+            return (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div className={`bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 ${size === 'xl' ? 'max-w-[1200px]' : 'max-w-[800px]'}`}>
+                        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80">
+                            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{title}</h2>
+                            <button onClick={onClose} className="text-slate-500 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors">✕</button>
+                        </div>
+                        <div className="p-6 flex-1 overflow-auto max-h-[85vh]">{children}</div>
+                    </div>
+                </div>
             );
         };
     }
 
-    const Checkbox = safeGet('Checkbox') || (({ label, checked, onChange }) => React.createElement(
-        'label', { className: "flex items-center gap-3 text-sm cursor-pointer group" },
-        React.createElement('input', { type: "checkbox", checked, onChange: (e) => onChange(e.target.checked), className: "w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" }),
-        React.createElement('span', { className: "text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" }, label)
+    const Checkbox = safeGet('Checkbox') || (({ label, checked, onChange }) => (
+        <label className="flex items-center gap-3 text-sm cursor-pointer group">
+            <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+            <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{label}</span>
+        </label>
     ));
 
-    const Select = safeGet('Select') || (({ label, options, value, onChange, fullWidth }) => React.createElement(
-        'div', { className: `flex flex-col gap-1.5 ${fullWidth ? 'w-full' : ''}` },
-        React.createElement('label', { className: "text-xs font-medium text-slate-600 dark:text-slate-400" }, label),
-        React.createElement('select', { value, onChange: (e) => onChange(e.target.value), className: "w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 outline-none" },
-            options.map(o => React.createElement('option', { key: o.value, value: o.value }, o.label))
-        )
+    const Select = safeGet('Select') || (({ label, options, value, onChange, fullWidth }) => (
+        <div className={`flex flex-col gap-1.5 ${fullWidth ? 'w-full' : ''}`}>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{label}</label>
+            <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 outline-none">
+                {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+        </div>
     ));
 
     let Table = safeGet('Table') || safeGet('DataGrid');
     if (!Table) {
-        Table = ({ columns, data, striped }) => React.createElement(
-            'div', { className: "w-full overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700" },
-            React.createElement('table', { className: "w-full text-sm text-left rtl:text-right border-collapse" },
-                React.createElement('thead', { className: "text-xs text-slate-700 uppercase bg-slate-100 dark:bg-slate-800 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700" },
-                    React.createElement('tr', null, columns.map((c, i) => React.createElement('th', { key: i, className: "px-4 py-3 whitespace-nowrap", style: { width: c.width } }, c.header)))
-                ),
-                React.createElement('tbody', null, data.map((row, i) => React.createElement(
-                    'tr', { key: i, className: `border-b dark:border-slate-700 ${striped && i % 2 === 0 ? 'bg-slate-50 dark:bg-slate-800/30' : 'bg-white dark:bg-slate-900'}` },
-                    columns.map((c, j) => React.createElement('td', { key: j, className: "px-4 py-3 text-slate-700 dark:text-slate-300" }, row[c.field] || '-'))
-                )))
-            )
+        Table = ({ columns, data, striped }) => (
+            <div className="w-full overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-sm text-left rtl:text-right border-collapse">
+                    <thead className="text-xs text-slate-700 uppercase bg-slate-100 dark:bg-slate-800 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                            {columns.map((c, i) => <th key={i} className="px-4 py-3 whitespace-nowrap" style={{ width: c.width }}>{c.header}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.map((row, i) => (
+                            <tr key={i} className={`border-b dark:border-slate-700 ${striped && i % 2 === 0 ? 'bg-slate-50 dark:bg-slate-800/30' : 'bg-white dark:bg-slate-900'}`}>
+                                {columns.map((c, j) => <td key={j} className="px-4 py-3 text-slate-700 dark:text-slate-300">{row[c.field] || '-'}</td>)}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         );
     }
 
@@ -212,7 +235,9 @@
 
                 setHeaderData(header);
                 setItemsData(mappedItems);
-            } catch (error) {} finally {
+            } catch (error) {
+                console.error('Error fetching transaction print data:', error);
+            } finally {
                 setLoading(false);
             }
         };
@@ -366,133 +391,172 @@
                 );
             }
 
-            return cols;
+            return cols.map(c => ({
+                field: c.field,
+                header: isRtl ? c.header_fa : c.header_en,
+                width: c.width
+            }));
         };
 
         const renderPrintPreview = () => {
             if (!headerData) return null;
 
-            return React.createElement(Container, { className: "bg-white dark:bg-slate-900 rounded-xl" },
-                React.createElement('div', { ref: printRef, className: "p-8 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm bg-white text-slate-900" },
-                    React.createElement(Flex, { direction: "col", gap: "lg", align: "center", justify: "center", className: "mb-6" },
-                        React.createElement('h1', { className: "text-2xl font-bold text-slate-900" }, isRtl ? 'سند حسابداری' : 'Accounting Voucher'),
-                        printSettings.showStatus && React.createElement('span', { className: `px-4 py-1 rounded-full text-sm font-bold border ${headerData.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-orange-50 text-orange-700 border-orange-200'}` },
-                            headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') : (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')
-                        )
-                    ),
-                    
-                    React.createElement('div', { className: "grid grid-cols-3 gap-6 mb-8 p-4 bg-slate-50 border border-slate-200 rounded-lg" },
-                        React.createElement(Flex, { direction: "col", gap: "sm" },
-                            React.createElement('span', { className: "text-xs text-slate-500 font-medium" }, isRtl ? 'شماره سند:' : 'Doc Code:'),
-                            React.createElement('span', { className: "text-base font-bold text-indigo-700" }, headerData.document_code)
-                        ),
-                        React.createElement(Flex, { direction: "col", gap: "sm" },
-                            React.createElement('span', { className: "text-xs text-slate-500 font-medium" }, isRtl ? 'تاریخ سند:' : 'Date:'),
-                            React.createElement('span', { className: "text-base font-bold" }, headerData.document_date ? new Date(headerData.document_date).toLocaleDateString(isRtl ? 'fa-IR' : 'en-US') : '-')
-                        ),
-                        React.createElement(Flex, { direction: "col", gap: "sm" },
-                            React.createElement('span', { className: "text-xs text-slate-500 font-medium" }, isRtl ? 'شماره عطف:' : 'Ref Code:'),
-                            React.createElement('span', { className: "text-base font-bold" }, headerData.reference_code || '-')
-                        ),
-                        React.createElement(Flex, { direction: "col", gap: "sm", className: "col-span-3 mt-2 pt-4 border-t border-slate-200" },
-                            React.createElement('span', { className: "text-xs text-slate-500 font-medium" }, isRtl ? 'شرح سند:' : 'Description:'),
-                            React.createElement('span', { className: "text-sm" }, headerData.description || '-')
-                        )
-                    ),
+            return (
+                <Container className="bg-white dark:bg-slate-900 rounded-xl">
+                    <div ref={printRef} className="p-8 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm bg-white text-slate-900">
+                        <Flex direction="col" gap="lg" align="center" justify="center" className="mb-6">
+                            <h1 className="text-2xl font-bold text-slate-900">
+                                {isRtl ? 'سند حسابداری' : 'Accounting Voucher'}
+                            </h1>
+                            {printSettings.showStatus && (
+                                <span className={`px-4 py-1 rounded-full text-sm font-bold border ${headerData.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
+                                    {headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') : (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')}
+                                </span>
+                            )}
+                        </Flex>
+                        
+                        <div className="grid grid-cols-3 gap-6 mb-8 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <Flex direction="col" gap="sm">
+                                <span className="text-xs text-slate-500 font-medium">{isRtl ? 'شماره سند:' : 'Doc Code:'}</span>
+                                <span className="text-base font-bold text-indigo-700">{headerData.document_code}</span>
+                            </Flex>
+                            <Flex direction="col" gap="sm">
+                                <span className="text-xs text-slate-500 font-medium">{isRtl ? 'تاریخ سند:' : 'Date:'}</span>
+                                <span className="text-base font-bold">{headerData.document_date ? new Date(headerData.document_date).toLocaleDateString(isRtl ? 'fa-IR' : 'en-US') : '-'}</span>
+                            </Flex>
+                            <Flex direction="col" gap="sm">
+                                <span className="text-xs text-slate-500 font-medium">{isRtl ? 'شماره عطف:' : 'Ref Code:'}</span>
+                                <span className="text-base font-bold">{headerData.reference_code || '-'}</span>
+                            </Flex>
+                            <Flex direction="col" gap="sm" className="col-span-3 mt-2 pt-4 border-t border-slate-200">
+                                <span className="text-xs text-slate-500 font-medium">{isRtl ? 'شرح سند:' : 'Description:'}</span>
+                                <span className="text-sm">{headerData.description || '-'}</span>
+                            </Flex>
+                        </div>
 
-                    React.createElement(Table, {
-                        columns: getColumns(),
-                        data: itemsData.map((item, index) => ({
-                            row_number: index + 1,
-                            account_code: item.fm_coa_accounts?.code || '-',
-                            account_name: isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en || '-',
-                            description: item.description,
-                            debit_amount: item.transaction_action === 'DEPOSIT' ? item.amount?.toLocaleString() : '-',
-                            credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.amount?.toLocaleString() : '-',
-                            fc_debit_amount: item.transaction_action === 'DEPOSIT' ? item.currency_amount?.toLocaleString() : '-',
-                            fc_credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.currency_amount?.toLocaleString() : '-'
-                        })),
-                        striped: true
-                    }),
-                    
-                    printSettings.showTotals && React.createElement('div', { className: "flex justify-end gap-12 p-4 mt-4 bg-indigo-50 border border-indigo-100 rounded-lg" },
-                        React.createElement(Flex, { direction: "row", gap: "md", align: "center" },
-                            React.createElement('span', { className: "text-sm font-bold text-slate-700" }, isRtl ? 'جمع بدهکار:' : 'Total Debit:'),
-                            React.createElement('span', { className: "text-lg font-bold text-indigo-700" }, totals.debit.toLocaleString())
-                        ),
-                        React.createElement(Flex, { direction: "row", gap: "md", align: "center" },
-                            React.createElement('span', { className: "text-sm font-bold text-slate-700" }, isRtl ? 'جمع بستانکار:' : 'Total Credit:'),
-                            React.createElement('span', { className: "text-lg font-bold text-indigo-700" }, totals.credit.toLocaleString())
-                        )
-                    ),
+                        <Table 
+                            columns={getColumns()}
+                            data={itemsData.map((item, index) => ({
+                                row_number: index + 1,
+                                account_code: item.fm_coa_accounts?.code || '-',
+                                account_name: isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en || '-',
+                                description: item.description,
+                                debit_amount: item.transaction_action === 'DEPOSIT' ? item.amount?.toLocaleString() : '-',
+                                credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.amount?.toLocaleString() : '-',
+                                fc_debit_amount: item.transaction_action === 'DEPOSIT' ? item.currency_amount?.toLocaleString() : '-',
+                                fc_credit_amount: item.transaction_action === 'WITHDRAWAL' ? item.currency_amount?.toLocaleString() : '-'
+                            }))}
+                            striped={true}
+                        />
+                        
+                        {printSettings.showTotals && (
+                            <div className="flex justify-end gap-12 p-4 mt-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+                                <Flex direction="row" gap="md" align="center">
+                                    <span className="text-sm font-bold text-slate-700">{isRtl ? 'جمع بدهکار:' : 'Total Debit:'}</span>
+                                    <span className="text-lg font-bold text-indigo-700">{totals.debit.toLocaleString()}</span>
+                                </Flex>
+                                <Flex direction="row" gap="md" align="center">
+                                    <span className="text-sm font-bold text-slate-700">{isRtl ? 'جمع بستانکار:' : 'Total Credit:'}</span>
+                                    <span className="text-lg font-bold text-indigo-700">{totals.credit.toLocaleString()}</span>
+                                </Flex>
+                            </div>
+                        )}
 
-                    printSettings.showSummary && React.createElement('div', { className: "grid grid-cols-3 gap-8 mt-12 p-6 border border-slate-200 rounded-lg" },
-                        React.createElement(Flex, { direction: "col", gap: "md", align: "center" },
-                            React.createElement('span', { className: "text-sm text-slate-500 font-bold mb-8" }, isRtl ? 'تنظیم کننده' : 'Prepared By'),
-                            React.createElement('span', { className: "text-base font-medium" }, usersMap[headerData.registrar_id] || headerData.registrar_id || '---')
-                        ),
-                        React.createElement(Flex, { direction: "col", gap: "md", align: "center" },
-                            React.createElement('span', { className: "text-sm text-slate-500 font-bold mb-8" }, isRtl ? 'بررسی کننده' : 'Checked By'),
-                            React.createElement('span', { className: "text-base font-medium" }, '---')
-                        ),
-                        React.createElement(Flex, { direction: "col", gap: "md", align: "center" },
-                            React.createElement('span', { className: "text-sm text-slate-500 font-bold mb-8" }, isRtl ? 'تایید کننده' : 'Approved By'),
-                            React.createElement('span', { className: "text-base font-medium" }, '---')
-                        )
-                    )
-                )
+                        {printSettings.showSummary && (
+                            <div className="grid grid-cols-3 gap-8 mt-12 p-6 border border-slate-200 rounded-lg">
+                                <Flex direction="col" gap="md" align="center">
+                                    <span className="text-sm text-slate-500 font-bold mb-8">{isRtl ? 'تنظیم کننده' : 'Prepared By'}</span>
+                                    <span className="text-base font-medium">{usersMap[headerData.registrar_id] || headerData.registrar_id || '---'}</span>
+                                </Flex>
+                                <Flex direction="col" gap="md" align="center">
+                                    <span className="text-sm text-slate-500 font-bold mb-8">{isRtl ? 'بررسی کننده' : 'Checked By'}</span>
+                                    <span className="text-base font-medium">---</span>
+                                </Flex>
+                                <Flex direction="col" gap="md" align="center">
+                                    <span className="text-sm text-slate-500 font-bold mb-8">{isRtl ? 'تایید کننده' : 'Approved By'}</span>
+                                    <span className="text-base font-medium">---</span>
+                                </Flex>
+                            </div>
+                        )}
+                    </div>
+                </Container>
             );
         };
 
-        return React.createElement(Modal, {
-            isOpen: true,
-            onClose: onClose,
-            size: "xl",
-            title: isRtl ? 'چاپ سند حسابداری' : 'Print Voucher',
-            language: language
-        },
-            React.createElement(Grid, { cols: 12, gap: "lg" },
-                React.createElement(Grid, { span: 3, direction: "col", gap: "md" },
-                    React.createElement(Card, null,
-                        React.createElement(CardHeader, { title: isRtl ? 'تنظیمات چاپ' : 'Print Settings', icon: React.createElement(SafeSettingsIcon, { size: 18 }) }),
-                        React.createElement(CardBody, { className: "flex flex-col gap-6" },
-                            React.createElement(Select, {
-                                label: isRtl ? 'سطح نمایش حساب' : 'Account Level',
-                                options: accountLevelOptions,
-                                value: printSettings.accountLevel,
-                                onChange: (val) => handleSettingChange('accountLevel', val),
-                                fullWidth: true
-                            }),
-                            
-                            React.createElement(Divider, { margin: "sm" }),
-                            
-                            React.createElement('div', { className: "flex flex-col gap-4" },
-                                React.createElement(Checkbox, { label: isRtl ? 'نمایش جمع کل' : 'Show Totals', checked: printSettings.showTotals, onChange: (val) => handleSettingChange('showTotals', val) }),
-                                React.createElement(Checkbox, { label: isRtl ? 'نمایش مبالغ ارزی' : 'Show Currencies', checked: printSettings.showCurrencies, onChange: (val) => handleSettingChange('showCurrencies', val) }),
-                                React.createElement(Checkbox, { label: isRtl ? 'نمایش امضاها' : 'Show Signatures', checked: printSettings.showSummary, onChange: (val) => handleSettingChange('showSummary', val) }),
-                                React.createElement(Checkbox, { label: isRtl ? 'نمایش وضعیت سند' : 'Show Voucher Status', checked: printSettings.showStatus, onChange: (val) => handleSettingChange('showStatus', val) })
-                            ),
+        return (
+            <Modal isOpen={true} onClose={onClose} size="xl" title={isRtl ? 'چاپ سند حسابداری' : 'Print Voucher'}>
+                <Grid cols={12} gap="lg">
+                    <Grid span={3} direction="col" gap="md">
+                        <Card>
+                            <CardHeader title={isRtl ? 'تنظیمات چاپ' : 'Print Settings'} icon={SafeSettingsIcon} />
+                            <CardBody className="flex flex-col gap-6">
+                                <Select 
+                                    label={isRtl ? 'سطح نمایش حساب' : 'Account Level'}
+                                    options={accountLevelOptions}
+                                    value={printSettings.accountLevel}
+                                    onChange={(val) => handleSettingChange('accountLevel', val)}
+                                    fullWidth
+                                />
+                                
+                                <Divider margin="sm" />
+                                
+                                <div className="flex flex-col gap-4">
+                                    <Checkbox 
+                                        label={isRtl ? 'نمایش جمع کل' : 'Show Totals'}
+                                        checked={printSettings.showTotals}
+                                        onChange={(val) => handleSettingChange('showTotals', val)}
+                                    />
+                                    
+                                    <Checkbox 
+                                        label={isRtl ? 'نمایش مبالغ ارزی' : 'Show Currencies'}
+                                        checked={printSettings.showCurrencies}
+                                        onChange={(val) => handleSettingChange('showCurrencies', val)}
+                                    />
+                                    
+                                    <Checkbox 
+                                        label={isRtl ? 'نمایش امضاها' : 'Show Signatures'}
+                                        checked={printSettings.showSummary}
+                                        onChange={(val) => handleSettingChange('showSummary', val)}
+                                    />
+                                    
+                                    <Checkbox 
+                                        label={isRtl ? 'نمایش وضعیت سند' : 'Show Voucher Status'}
+                                        checked={printSettings.showStatus}
+                                        onChange={(val) => handleSettingChange('showStatus', val)}
+                                    />
+                                </div>
 
-                            React.createElement('div', { className: "mt-auto pt-6" },
-                                React.createElement(Button, { variant: "primary", fullWidth: true, icon: React.createElement(SafePrinterIcon, { size: 18 }), onClick: handlePrint, disabled: loading },
-                                    isRtl ? 'تایید و چاپ' : 'Print Document'
-                                )
-                            )
-                        )
-                    )
-                ),
+                                <div className="mt-auto pt-6">
+                                    <Button 
+                                        variant="primary" 
+                                        fullWidth 
+                                        icon={SafePrinterIcon}
+                                        onClick={handlePrint}
+                                        disabled={loading}
+                                    >
+                                        {isRtl ? 'تایید و چاپ' : 'Print Document'}
+                                    </Button>
+                                </div>
+                            </CardBody>
+                        </Card>
+                    </Grid>
 
-                React.createElement(Grid, { span: 9 },
-                    React.createElement(Card, null,
-                        React.createElement(CardHeader, { title: isRtl ? 'پیش‌نمایش فرم' : 'Document Preview', icon: React.createElement(SafeFileTextIcon, { size: 18 }) }),
-                        React.createElement(CardBody, { className: "bg-slate-100 dark:bg-slate-900/50 p-6 overflow-y-auto" },
-                            loading ? React.createElement(Flex, { justify: "center", align: "center", className: "h-[400px]" },
-                                React.createElement(Text, { variant: "h3", color: "secondary" }, isRtl ? 'در حال بارگذاری اطلاعات...' : 'Loading Data...')
-                            ) : renderPrintPreview()
-                        )
-                    )
-                )
-            )
+                    <Grid span={9}>
+                        <Card>
+                            <CardHeader title={isRtl ? 'پیش‌نمایش فرم' : 'Document Preview'} icon={SafeFileTextIcon} />
+                            <CardBody className="bg-slate-100 dark:bg-slate-900/50 p-6 overflow-y-auto">
+                                {loading ? (
+                                    <Flex justify="center" align="center" className="h-[400px]">
+                                        <Text variant="h3" color="secondary">{isRtl ? 'در حال بارگذاری اطلاعات...' : 'Loading Data...'}</Text>
+                                    </Flex>
+                                ) : (
+                                    renderPrintPreview()
+                                )}
+                            </CardBody>
+                        </Card>
+                    </Grid>
+                </Grid>
+            </Modal>
         );
     };
 
