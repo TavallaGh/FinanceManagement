@@ -170,10 +170,10 @@
                             formCode={formCode}                             
                             exportable={false}
                             importable={false}
-                            hideToolbar={true}
                             selectable={false}                            
                             hideImport={true} 
-                            showExport={false}
+                            hideExport={true} 
+                            hideToolbar={true}
                         />
                     </div>
                 )}

@@ -351,10 +351,20 @@
 
     return (
         <DataGrid 
-            data={itemGridData} columns={itemColumns} actionWidth="80px"
-            language={language} onAdd={isReadOnly ? undefined : handleAddItemClick} hideImport={true} hideExport={true} hideToolbar={true}
-            selectable={!isReadOnly} bulkActions={itemBulkActions} onRowDoubleClick={(row) => handleEditItemClick(row)} actions={rowActions}
-            className="h-full border-0" formCode={formCode}
+            data={itemGridData} 
+            columns={itemColumns} 
+            actionWidth="80px"
+            language={language} 
+            onAdd={isReadOnly ? undefined : handleAddItemClick} 
+            hideImport={true} 
+            hideExport={true} 
+            hideToolbar={true}
+            selectable={!isReadOnly} 
+            bulkActions={itemBulkActions} 
+            onRowDoubleClick={(row) => handleEditItemClick(row)} 
+            actions={rowActions}
+            className="h-full border-0" 
+            formCode={formCode}
         />
     );
   });
