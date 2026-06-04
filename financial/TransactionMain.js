@@ -8,7 +8,7 @@
   const {
     FileText = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon,
     Copy = FallbackIcon, AlertTriangle = FallbackIcon, Paperclip = FallbackIcon,
-    DollarSign = FallbackIcon
+    DollarSign = FallbackIcon, Printer = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -91,6 +91,7 @@
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
     const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
     const [summaryModal, setSummaryModal] = useState({ isOpen: false, record: null });
+    const [printModal, setPrintModal] = useState({ isOpen: false, transactionId: null });
     const [isUploading, setIsUploading] = useState(false);
 
     const showToast = useCallback((message, type = 'success') => {
@@ -410,6 +411,7 @@
     ];
 
     const gridActions = [
+        { id: 'print', icon: Printer, tooltip: t('چاپ سند', 'Print Document'), onClick: (row) => setPrintModal({ isOpen: true, transactionId: row.id }), requiredAccess: 'print', className: 'text-blue-500 hover:text-blue-600' },
         { id: 'summary', icon: DollarSign, tooltip: t('خلاصه ارزی', 'Currency Summary'), onClick: (row) => openSummary(row), className: 'text-indigo-500 hover:text-indigo-600' },
         { id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: (row) => (attachmentCounts[row.id] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600') },
         { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
@@ -439,6 +441,7 @@
 
     const DetailsModal = window.TransactionMainDetails || (() => null);
     const TransactionSummaryModal = window.TransactionSummary || FallbackComponent;
+    const TransactionPrintModal = window.TransactionPrint || FallbackComponent;
     const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
 
     return (
@@ -525,6 +528,14 @@
             language={language} 
             formCode={formCode} 
         />
+
+        {printModal.isOpen && (
+            <TransactionPrintModal
+                transactionId={printModal.transactionId}
+                onClose={() => setPrintModal({ isOpen: false, transactionId: null })}
+                language={language}
+            />
+        )}
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
       </div>
