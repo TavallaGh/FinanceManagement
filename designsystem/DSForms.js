@@ -67,6 +67,7 @@
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
     const inputRef = useRef(null);
+    const dropdownRef = useRef(null);
     const [rect, setRect] = useState(null);
     const ReactDOM = window.ReactDOM;
     const t = (fa, en) => isRtl ? fa : en;
@@ -80,7 +81,7 @@
 
     useEffect(() => {
       const handleClickOutside = (e) => {
-        if (containerRef.current && !containerRef.current.contains(e.target)) {
+        if (containerRef.current && !containerRef.current.contains(e.target) && (!dropdownRef.current || !dropdownRef.current.contains(e.target))) {
           setIsOpen(false);
           setSearchTerm('');
         }
@@ -166,6 +167,7 @@
         {isOpen && rect && (
           ReactDOM ? ReactDOM.createPortal(
             <div 
+              ref={dropdownRef}
               style={{ position: 'fixed', top: rect.bottom + 4, left: isRtl ? undefined : rect.left, right: isRtl ? (window.innerWidth - rect.right) : undefined, width: containerRef.current ? containerRef.current.offsetWidth : 'auto', zIndex: 999999 }}
               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
             >
@@ -173,7 +175,7 @@
             </div>,
             document.body
           ) : (
-            <div className={`absolute top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ${isRtl ? 'right-0' : 'left-0'}`}>
+            <div ref={dropdownRef} className={`absolute top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ${isRtl ? 'right-0' : 'left-0'}`}>
               {dropdownContent}
             </div>
           )
@@ -309,6 +311,7 @@
     const [currentYear, setCurrentYear] = useState(initToday.y);
     
     const containerRef = useRef(null);
+    const dropdownRef = useRef(null);
     const [rect, setRect] = useState(null);
     const ReactDOM = window.ReactDOM;
     const [generatedId] = useState(() => `datepicker-${Math.random().toString(36).substr(2, 9)}`);
@@ -319,7 +322,7 @@
 
     useEffect(() => {
       const clickOutside = (e) => { 
-        if (containerRef.current && !containerRef.current.contains(e.target)) setIsOpen(false); 
+        if (containerRef.current && !containerRef.current.contains(e.target) && (!dropdownRef.current || !dropdownRef.current.contains(e.target))) setIsOpen(false); 
       };
       document.addEventListener('mousedown', clickOutside);
       return () => document.removeEventListener('mousedown', clickOutside);
@@ -519,6 +522,7 @@
         {isOpen && !isDisabled && rect && (
           ReactDOM ? ReactDOM.createPortal(
             <div 
+              ref={dropdownRef}
               style={{ position: 'fixed', top: rect.bottom + 4, left: isRtl ? undefined : rect.left, right: isRtl ? (window.innerWidth - rect.right) : undefined, zIndex: 999999 }}
               className="w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-xl animate-in zoom-in-95 duration-150"
             >
@@ -526,7 +530,7 @@
             </div>,
             document.body
           ) : (
-            <div className={`absolute top-full mt-1 ${isRtl ? 'right-0' : 'left-0'} z-[9999] w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-xl animate-in zoom-in-95 duration-150`}>
+            <div ref={dropdownRef} className={`absolute top-full mt-1 ${isRtl ? 'right-0' : 'left-0'} z-[9999] w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-xl animate-in zoom-in-95 duration-150`}>
               {calendarContent}
             </div>
           )
@@ -657,6 +661,7 @@
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
     const searchInputRef = useRef(null);
+    const dropdownRef = useRef(null);
     const [rect, setRect] = useState(null);
     const ReactDOM = window.ReactDOM;
     const t = (fa, en) => isRtl ? fa : en;
@@ -667,7 +672,7 @@
 
     useEffect(() => {
       const handleClickOutside = (e) => {
-        if (containerRef.current && !containerRef.current.contains(e.target)) {
+        if (containerRef.current && !containerRef.current.contains(e.target) && (!dropdownRef.current || !dropdownRef.current.contains(e.target))) {
           setIsOpen(false);
           setSearchTerm('');
         }
@@ -784,6 +789,7 @@
           {isOpen && rect && (
             ReactDOM ? ReactDOM.createPortal(
               <div 
+                ref={dropdownRef}
                 style={{ position: 'fixed', top: rect.bottom + 4, left: isRtl ? rect.left : undefined, right: isRtl ? undefined : (window.innerWidth - rect.right), zIndex: 999999 }}
                 className="w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150"
               >
@@ -791,7 +797,7 @@
               </div>,
               document.body
             ) : (
-              <div className={`absolute top-full mt-1 ${isRtl ? 'left-0' : 'right-0'} w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] overflow-hidden`}>
+              <div ref={dropdownRef} className={`absolute top-full mt-1 ${isRtl ? 'left-0' : 'right-0'} w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] overflow-hidden`}>
                 {suffixDropdownContent}
               </div>
             )
