@@ -128,29 +128,29 @@
 
     const SimplePrintTable = ({ columns, data, totals, language }) => {
         const isRtl = language === 'fa';
-        return React.createElement('div', { className: "w-full overflow-hidden border border-slate-400 mt-4 rounded shadow-sm" },
+        return React.createElement('div', { className: "w-full overflow-hidden border border-slate-300 mt-4 rounded shadow-sm" },
             React.createElement('table', { className: `w-full text-[11px] text-slate-900 border-collapse ${isRtl ? 'text-right' : 'text-left'}` },
-                React.createElement('thead', { style: { backgroundColor: 'lavender' }, className: "border-b-2 border-slate-400" },
+                React.createElement('thead', { className: "bg-slate-100 border-b-2 border-slate-300 text-slate-800" },
                     React.createElement('tr', null,
-                        columns.map((c, i) => React.createElement('th', { key: i, className: "px-2 py-2 font-bold text-center border-x border-slate-300 text-slate-800", style: { width: c.width } }, c.header))
+                        columns.map((c, i) => React.createElement('th', { key: i, className: "px-2 py-2 font-bold text-center border-x border-slate-200", style: { width: c.width } }, c.header))
                     )
                 ),
                 React.createElement('tbody', null,
-                    data.map((row, i) => React.createElement('tr', { key: i, className: "border-b border-slate-300 last:border-b-0 hover:bg-slate-50" },
-                        columns.map((c, j) => React.createElement('td', { key: j, className: `px-2 py-2 border-x border-slate-300 ${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}`, dir: c.align === 'right' ? 'ltr' : 'auto' }, row[c.field] || '-'))
+                    data.map((row, i) => React.createElement('tr', { key: i, className: "border-b border-slate-200 last:border-b-0 hover:bg-slate-50" },
+                        columns.map((c, j) => React.createElement('td', { key: j, className: `px-2 py-2 border-x border-slate-200 ${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}`, dir: c.align === 'right' ? 'ltr' : 'auto' }, row[c.field] || '-'))
                     ))
                 ),
-                totals && React.createElement('tfoot', { className: "bg-slate-100 border-t-2 border-slate-400 font-bold text-slate-800" },
+                totals && React.createElement('tfoot', { className: "bg-slate-100 border-t-2 border-slate-300 font-bold text-slate-800" },
                     React.createElement('tr', null,
                         React.createElement('td', { 
                             colSpan: columns.findIndex(c => c.field === 'deposit_amount'), 
-                            className: `px-3 py-2 border-x border-slate-300 ${isRtl ? 'text-left' : 'text-right'}` 
+                            className: `px-3 py-2 border-x border-slate-200 ${isRtl ? 'text-left' : 'text-right'}` 
                         }, totals.label),
-                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 font-extrabold", dir: "ltr" }, totals.deposit),
-                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 font-extrabold", dir: "ltr" }, totals.withdrawal),
-                        totals.usdDebit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 font-extrabold", dir: "ltr" }, totals.usdDebit),
-                        totals.irrDebit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 font-extrabold", dir: "ltr" }, totals.irrDebit),
-                        React.createElement('td', { className: "border-x border-slate-300" })
+                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-200 font-extrabold", dir: "ltr" }, totals.deposit),
+                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-200 font-extrabold", dir: "ltr" }, totals.withdrawal),
+                        totals.usdDebit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-200 font-extrabold", dir: "ltr" }, totals.usdDebit),
+                        totals.irrDebit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-200 font-extrabold", dir: "ltr" }, totals.irrDebit),
+                        React.createElement('td', { className: "border-x border-slate-200" })
                     )
                 )
             )
@@ -166,6 +166,7 @@
         const [headerData, setHeaderData] = useState(null);
         const [itemsData, setItemsData] = useState([]);
         const [usersMap, setUsersMap] = useState({});
+        const [deptsMap, setDeptsMap] = useState({});
         const [currencyRates, setCurrencyRates] = useState({});
         const [isSettingsOpen, setIsSettingsOpen] = useState(true);
         
@@ -209,7 +210,7 @@
         useEffect(() => {
             if (transactionId) {
                 fetchTransactionData();
-                fetchUsers();
+                fetchDependencies();
             }
         }, [transactionId]);
 
@@ -255,14 +256,24 @@
             return { toUsd, usdToIrr };
         }, [currencyRates]);
 
-        const fetchUsers = async () => {
+        const fetchDependencies = async () => {
             try {
-                const { data } = await supabase.from('sec_users').select('id, full_name, username');
+                const [{ data: users }, { data: depts }] = await Promise.all([
+                    supabase.from('sec_users').select('id, full_name, username'),
+                    supabase.from('fm_org_chart_nodes').select('id, title')
+                ]);
+                
                 const uMap = {};
-                (data || []).forEach(u => {
+                (users || []).forEach(u => {
                     uMap[u.id] = u.full_name || u.username;
                 });
                 setUsersMap(uMap);
+
+                const dMap = {};
+                (depts || []).forEach(d => {
+                    dMap[d.id] = d.title;
+                });
+                setDeptsMap(dMap);
             } catch (error) {}
         };
 
@@ -376,7 +387,7 @@
                 );
             }
 
-            cols.push({ field: 'description', header_fa: 'شرح', header_en: 'Description', width: '25%', align: isRtl ? 'right' : 'left' });
+            cols.push({ field: 'description', header_fa: 'شرح', header_en: 'Description', width: '15%', align: isRtl ? 'right' : 'left' });
 
             return cols.map(c => ({ ...c, header: isRtl ? c.header_fa : c.header_en }));
         };
@@ -399,8 +410,8 @@
                     currency: cur,
                     deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-',
                     withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-',
-                    usd_amount: formatNumberSafe(usdVal),
-                    irr_amount: formatNumberSafe(irrVal),
+                    usd_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(usdVal) : '-',
+                    irr_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(irrVal) : '-',
                     description: item.description || '-'
                 };
             });
@@ -454,12 +465,12 @@
                         
                         table { width: 100%; border-collapse: collapse; margin-bottom: 0; font-size: 10px; }
                         th, td { border: 1px solid #000; padding: 4px 6px; text-align: ${isRtl ? 'right' : 'left'}; }
-                        th { background-color: lavender !important; -webkit-print-color-adjust: exact; font-weight: bold; text-align: center; color: #000; }
+                        th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; font-weight: bold; text-align: center; color: #1e293b; border-bottom: 2px solid #cbd5e1; }
                         .text-center { text-align: center; }
                         .text-right { text-align: right; }
                         .text-left { text-align: left; }
                         
-                        tfoot td { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; font-weight: bold; }
+                        tfoot td { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; font-weight: bold; color: #1e293b; border-top: 2px solid #cbd5e1; }
                         
                         .signatures-grid {
                             display: grid;
@@ -492,6 +503,7 @@
                             <div class="header-col header-end">
                                 <div class="info-line"><span class="info-label">${isRtl ? 'ثبت کننده:' : 'Prepared By:'}</span><span class="info-val">${usersMap[headerData.registrar_id] || headerData.registrar_id || '---'}</span></div>
                                 <div class="info-line"><span class="info-label">${isRtl ? 'تایید کننده:' : 'Approved By:'}</span><span class="info-val">---</span></div>
+                                <div class="info-line"><span class="info-label">${isRtl ? 'دپارتمان:' : 'Department:'}</span><span class="info-val">${deptsMap[headerData.department_id] || '---'}</span></div>
                             </div>
                         </div>
 
@@ -507,12 +519,12 @@
                                 <tr>
                                     <th style="width: 5%">${isRtl ? 'ردیف' : 'Row'}</th>
                                     <th style="width: 12%">${isRtl ? 'کد حساب' : 'Code'}</th>
-                                    <th style="width: 20%">${isRtl ? 'نام حساب' : 'Account Name'}</th>
+                                    <th style="width: 30%">${isRtl ? 'نام حساب' : 'Account Name'}</th>
                                     <th style="width: 5%">${isRtl ? 'ارز' : 'Cur'}</th>
                                     <th style="width: 12%">${isRtl ? 'مبلغ واریز' : 'Deposit'}</th>
                                     <th style="width: 12%">${isRtl ? 'مبلغ برداشت' : 'Withdrawal'}</th>
                                     ${printSettings.showCurrencies ? `<th>${isRtl ? 'مبلغ (دلار)' : 'Amount (USD)'}</th><th>${isRtl ? 'مبلغ (ریال)' : 'Amount (IRR)'}</th>` : ''}
-                                    <th style="width: 25%">${isRtl ? 'شرح' : 'Description'}</th>
+                                    <th style="width: 15%">${isRtl ? 'شرح' : 'Description'}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -586,7 +598,7 @@
         const renderPrintPreview = () => {
             if (!headerData) return null;
 
-            return React.createElement('div', { ref: printRef, className: "bg-white mx-auto w-full max-w-[950px] border border-slate-300 shadow-sm text-slate-900 font-sans p-6" },
+            return React.createElement('div', { ref: printRef, className: "bg-white mx-auto w-full max-w-[1000px] border border-slate-300 shadow-sm text-slate-900 font-sans p-6" },
                 React.createElement(Flex, { className: "border border-slate-800 rounded p-4 mb-4", align: "start", justify: "between" },
                     React.createElement(Flex, { direction: "col", gap: "xs", align: "start", className: "flex-1" },
                         React.createElement(Flex, { align: "center", gap: "xs" }, React.createElement(Text, { variant: "caption", className: "w-20" }, isRtl ? 'شماره سند:' : 'Doc Code:'), React.createElement(Text, { weight: "bold" }, headerData.document_code)),
@@ -604,7 +616,8 @@
 
                     React.createElement(Flex, { direction: "col", gap: "xs", align: "end", className: "flex-1 text-left" },
                         React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'ثبت کننده:' : 'Prepared By:'), React.createElement(Text, { weight: "bold" }, usersMap[headerData.registrar_id] || headerData.registrar_id || '---')),
-                        React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'تایید کننده:' : 'Approved By:'), React.createElement(Text, { weight: "bold" }, '---'))
+                        React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'تایید کننده:' : 'Approved By:'), React.createElement(Text, { weight: "bold" }, '---')),
+                        React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'دپارتمان:' : 'Department:'), React.createElement(Text, { weight: "bold" }, deptsMap[headerData.department_id] || '---'))
                     )
                 ),
 
@@ -696,20 +709,20 @@
                         React.createElement(Button, { variant: "primary", fullWidth: true, icon: SafePrinterIcon, onClick: handlePrint, disabled: loading },
                             isRtl ? 'چاپ سند' : 'Print Document'
                         )
-                    )
-                ),
-
-                React.createElement('div', { className: "flex-1 flex flex-col min-w-0 bg-slate-100/50 dark:bg-slate-900 relative" },
+                    ),
+                    
                     React.createElement('button', {
                         onClick: () => setIsSettingsOpen(!isSettingsOpen),
-                        className: `absolute top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md text-slate-500 hover:text-indigo-600 transition-all cursor-pointer hover:bg-slate-50 ${isRtl ? 'right-0 rounded-l-md border-r-0' : 'left-0 rounded-r-md border-l-0'}`,
+                        className: `absolute top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md text-slate-500 hover:text-indigo-600 transition-all duration-300 cursor-pointer hover:bg-slate-50 ${isRtl ? 'left-[-24px] rounded-l-md border-r-0' : 'right-[-24px] rounded-r-md border-l-0'}`,
                         title: isRtl ? 'تنظیمات' : 'Settings'
                     },
                         isRtl 
                             ? (isSettingsOpen ? React.createElement(SafeChevronRightIcon, { size: 14 }) : React.createElement(SafeChevronLeftIcon, { size: 14 })) 
                             : (isSettingsOpen ? React.createElement(SafeChevronLeftIcon, { size: 14 }) : React.createElement(SafeChevronRightIcon, { size: 14 }))
-                    ),
+                    )
+                ),
 
+                React.createElement('div', { className: "flex-1 flex flex-col min-w-0 bg-slate-100/50 dark:bg-slate-900 relative" },
                     React.createElement('div', { className: "flex-1 overflow-y-auto p-4 md:p-8 flex items-start justify-center w-full" },
                         loading ? React.createElement(Flex, { justify: "center", align: "center", className: "h-full w-full" },
                             React.createElement(Text, { variant: "h2", color: "secondary", className: "animate-pulse" }, isRtl ? 'در حال بارگذاری...' : 'Loading...')
