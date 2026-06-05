@@ -293,17 +293,13 @@
                 });
                 
                 const mappedItems = (initialRecord.fm_transaction_items || []).map(item => {
-                    const action = String(item.transaction_action || '').toUpperCase();
-                    const isDep = action === 'DEPOSIT';
-                    const rawAmt = item.amount != null ? parseFloat(item.amount) : 0;
-                    
                     return {
                         ...item,
                         _tempId: crypto.randomUUID(),
                         id: formMode === 'COPY' ? undefined : item.id,
                         transaction_id: formMode === 'COPY' ? undefined : item.transaction_id,
-                        deposit_amount: isDep ? rawAmt : 0,
-                        withdrawal_amount: action === 'WITHDRAWAL' ? rawAmt : (isDep ? 0 : rawAmt)
+                        deposit_amount: item.deposit_amount != null ? parseFloat(item.deposit_amount) : 0,
+                        withdrawal_amount: item.withdrawal_amount != null ? parseFloat(item.withdrawal_amount) : 0
                     };
                 }).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
                 
@@ -372,16 +368,11 @@
             const cur = i.currency || 'IRR';
             const { toUsd } = getExchangeRates(cur);
             
-            const action = (i.transaction_action || '').toUpperCase() || (dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL');
-            const amt = action === 'DEPOSIT' ? dep : wid;
+            const depUsd = dep * toUsd;
+            const widUsd = wid * toUsd;
             
-            const aUsd = amt * toUsd;
-            
-            if (action === 'DEPOSIT') {
-                totalDepUsd += aUsd;
-            } else {
-                totalWidUsd += aUsd;
-            }
+            totalDepUsd += depUsd;
+            totalWidUsd += widUsd;
         });
         
         const diffUsd = totalDepUsd - totalWidUsd;
@@ -494,25 +485,18 @@
                     const itemsPayload = itemsData.map((item, index) => {
                         const dep = parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0;
                         const wid = parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-                        
-                        let action = (item.transaction_action || '').toUpperCase();
-                        if (!action) {
-                            action = dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
-                        }
-                        
-                        const originalAmount = action === 'DEPOSIT' ? dep : wid;
                         const cur = item.currency || 'IRR';
                         
                         return {
                             transaction_id: txId,
                             row_number: index + 1,
                             account_id: item.account_id || null,
-                            transaction_action: action,
                             transaction_group: item.transaction_group || null,
                             cost_type_id: item.cost_type_id || null,
                             income_type_id: item.income_type_id || null,
                             currency: cur,
-                            amount: originalAmount,
+                            deposit_amount: dep,
+                            withdrawal_amount: wid,
                             description: item.description || null
                         };
                     });
@@ -521,14 +505,11 @@
                     if (itemsError) throw itemsError;
 
                     const mappedItems = newItems.map(item => {
-                        const action = String(item.transaction_action || '').toUpperCase();
-                        const isDep = action === 'DEPOSIT';
-                        const rawAmt = item.amount != null ? parseFloat(item.amount) : 0;
                         return {
                             ...item,
                             _tempId: crypto.randomUUID(),
-                            deposit_amount: isDep ? rawAmt : 0,
-                            withdrawal_amount: action === 'WITHDRAWAL' ? rawAmt : (isDep ? 0 : rawAmt)
+                            deposit_amount: item.deposit_amount != null ? parseFloat(item.deposit_amount) : 0,
+                            withdrawal_amount: item.withdrawal_amount != null ? parseFloat(item.withdrawal_amount) : 0
                         };
                     }).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
                     
