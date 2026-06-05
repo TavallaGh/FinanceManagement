@@ -126,7 +126,7 @@
         )
     ));
 
-    const SimplePrintTable = ({ columns, data, totals, language }) => {
+    const SimplePrintTable = ({ columns, rows, totals, language }) => {
         const isRtl = language === 'fa';
         return React.createElement('div', { className: "w-full overflow-hidden border border-slate-300 mt-4 rounded shadow-sm" },
             React.createElement('table', { className: `w-full text-[11px] text-slate-900 border-collapse ${isRtl ? 'text-right' : 'text-left'}` },
@@ -136,9 +136,25 @@
                     )
                 ),
                 React.createElement('tbody', null,
-                    data.map((row, i) => React.createElement('tr', { key: i, className: "border-b border-slate-200 last:border-b-0 hover:bg-slate-50" },
-                        columns.map((c, j) => React.createElement('td', { key: j, className: `px-2 py-2 border-x border-slate-200 ${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}`, dir: c.align === 'right' ? 'ltr' : 'auto' }, row[c.field] || '-'))
-                    ))
+                    rows.map((r, i) => {
+                        if (r.type === 'header') {
+                            const bgCls = r.level === 'group' ? 'bg-indigo-100/60 border-indigo-200' :
+                                          r.level === 'general' ? 'bg-slate-200 border-slate-300' :
+                                          'bg-slate-50 border-slate-200';
+                            const indent = r.level === 'group' ? '' : r.level === 'general' ? (isRtl ? 'pr-4' : 'pl-4') : (isRtl ? 'pr-8' : 'pl-8');
+                            const levelName = r.level === 'group' ? (isRtl ? 'گروه' : 'Group') : r.level === 'general' ? (isRtl ? 'کل' : 'General') : (isRtl ? 'معین' : 'Subsidiary');
+                            return React.createElement('tr', { key: `hdr-${i}`, className: `${bgCls} border-b` },
+                                React.createElement('td', { colSpan: columns.length, className: `px-3 py-2 font-bold text-slate-800 ${indent}` }, 
+                                    `${levelName}: ${r.data.code} - ${isRtl ? r.data.title_fa : (r.data.title_en || r.data.title_fa)}`
+                                )
+                            );
+                        } else {
+                            const item = r.data;
+                            return React.createElement('tr', { key: `itm-${i}`, className: "border-b border-slate-200 last:border-b-0 hover:bg-slate-50" },
+                                columns.map((c, j) => React.createElement('td', { key: j, className: `px-2 py-2 border-x border-slate-200 ${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}`, dir: c.align === 'right' ? 'ltr' : 'auto' }, item[c.field] || '-'))
+                            );
+                        }
+                    })
                 ),
                 totals && React.createElement('tfoot', { className: "bg-slate-100 border-t-2 border-slate-300 font-bold text-slate-800" },
                     React.createElement('tr', null,
@@ -167,11 +183,16 @@
         const [itemsData, setItemsData] = useState([]);
         const [usersMap, setUsersMap] = useState({});
         const [deptsMap, setDeptsMap] = useState({});
+        const [allAccounts, setAllAccounts] = useState([]);
         const [currencyRates, setCurrencyRates] = useState({});
         const [isSettingsOpen, setIsSettingsOpen] = useState(true);
         
         const [printSettings, setPrintSettings] = useState({
-            accountLevel: 'subsidiary', 
+            accountLevels: {
+                group: false,
+                general: false,
+                subsidiary: true
+            },
             calendarType: 'jalali',
             showTotals: true,
             showCurrencies: true,
@@ -186,12 +207,6 @@
                 ceo: false
             }
         });
-
-        const accountLevelOptions = [
-            { value: 'subsidiary', label: isRtl ? 'سطح معین' : 'Subsidiary Level' },
-            { value: 'general', label: isRtl ? 'سطح کل' : 'General Level' },
-            { value: 'group', label: isRtl ? 'سطح گروه' : 'Group Level' }
-        ];
 
         const calendarOptions = [
             { value: 'jalali', label: isRtl ? 'شمسی' : 'Jalali' },
@@ -296,22 +311,15 @@
 
                 if (itemsError) throw itemsError;
 
-                let mappedItems = items || [];
-                const accountIds = [...new Set(mappedItems.map(i => i.account_id))].filter(Boolean);
-                
-                if (accountIds.length > 0) {
-                    const { data: accountsData, error: accountsError } = await supabase
-                        .from('fm_coa_accounts')
-                        .select('id, code, title_fa, title_en')
-                        .in('id', accountIds);
+                const { data: allAccs } = await supabase.from('fm_coa_accounts').select('id, code, title_fa, title_en, parent_id');
+                const loadedAccounts = allAccs || [];
+                setAllAccounts(loadedAccounts);
 
-                    if (!accountsError && accountsData) {
-                        mappedItems = mappedItems.map(item => {
-                            const accountMatch = accountsData.find(a => a.id === item.account_id);
-                            return { ...item, fm_coa_accounts: accountMatch || null };
-                        });
-                    }
-                }
+                let mappedItems = items || [];
+                mappedItems = mappedItems.map(item => {
+                    const accountMatch = loadedAccounts.find(a => String(a.id) === String(item.account_id));
+                    return { ...item, fm_coa_accounts: accountMatch || null };
+                });
 
                 setHeaderData(header);
                 setItemsData(mappedItems);
@@ -373,29 +381,67 @@
         const getColumns = () => {
             let cols = [
                 { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '30px', align: 'center' },
-                { field: 'account_code', header_fa: 'کد حساب', header_en: 'Account Code', width: '80px', align: 'center' },
+                { field: 'account_code', header_fa: 'کد حساب', header_en: 'Account Code', width: '70px', align: 'center' },
                 { field: 'account_name', header_fa: 'نام حساب', header_en: 'Account Name', width: 'auto', align: isRtl ? 'right' : 'left' },
-                { field: 'currency', header_fa: 'ارز', header_en: 'Cur', width: '40px', align: 'center' },
-                { field: 'deposit_amount', header_fa: 'مبلغ واریز', header_en: 'Deposit', width: '90px', align: 'right' },
-                { field: 'withdrawal_amount', header_fa: 'مبلغ برداشت', header_en: 'Withdrawal', width: '90px', align: 'right' }
+                { field: 'currency', header_fa: 'ارز', header_en: 'Cur', width: '30px', align: 'center' },
+                { field: 'deposit_amount', header_fa: 'مبلغ واریز', header_en: 'Deposit', width: '80px', align: 'right' },
+                { field: 'withdrawal_amount', header_fa: 'مبلغ برداشت', header_en: 'Withdrawal', width: '80px', align: 'right' }
             ];
 
             if (printSettings.showCurrencies) {
                 cols.push(
-                    { field: 'usd_amount', header_fa: 'مبلغ (دلار)', header_en: 'Amount (USD)', width: '90px', align: 'right' },
-                    { field: 'irr_amount', header_fa: 'مبلغ (ریال)', header_en: 'Amount (IRR)', width: '100px', align: 'right' }
+                    { field: 'usd_amount', header_fa: 'مبلغ (دلار)', header_en: 'Amount (USD)', width: '80px', align: 'right' },
+                    { field: 'irr_amount', header_fa: 'مبلغ (ریال)', header_en: 'Amount (IRR)', width: '80px', align: 'right' }
                 );
             }
 
-            cols.push({ field: 'description', header_fa: 'شرح', header_en: 'Description', width: '15%', align: isRtl ? 'right' : 'left' });
+            cols.push({ field: 'description', header_fa: 'شرح', header_en: 'Description', width: '20%', align: isRtl ? 'right' : 'left' });
 
             return cols.map(c => ({ ...c, header: isRtl ? c.header_fa : c.header_en }));
         };
 
         const activeSignaturesList = signatureOptions.filter(opt => printSettings.signatures[opt.key]);
 
-        const getPreparedItems = () => {
-            return itemsData.map((item, index) => {
+        const getPreparedRows = () => {
+            const augmentedItems = itemsData.map(item => {
+                const path = [];
+                let curr = allAccounts.find(a => String(a.id) === String(item.account_id));
+                while (curr) {
+                    path.unshift(curr);
+                    curr = allAccounts.find(a => String(a.id) === String(curr.parent_id));
+                }
+                return {
+                    ...item,
+                    _group: path[0] || null,
+                    _general: path[1] || null,
+                    _subsidiary: path[2] || null,
+                    _sortCode: path.map(p => p.code).join('-')
+                };
+            }).sort((a, b) => a._sortCode.localeCompare(b._sortCode));
+
+            const rows = [];
+            let currentGroup = null;
+            let currentGeneral = null;
+            let currentSubsidiary = null;
+
+            augmentedItems.forEach((item, index) => {
+                const groupChanged = item._group?.id !== currentGroup?.id;
+                const generalChanged = groupChanged || item._general?.id !== currentGeneral?.id;
+                const subChanged = generalChanged || item._subsidiary?.id !== currentSubsidiary?.id;
+
+                if (printSettings.accountLevels.group && item._group && groupChanged) {
+                    rows.push({ type: 'header', level: 'group', data: item._group });
+                    currentGroup = item._group;
+                }
+                if (printSettings.accountLevels.general && item._general && generalChanged) {
+                    rows.push({ type: 'header', level: 'general', data: item._general });
+                    currentGeneral = item._general;
+                }
+                if (printSettings.accountLevels.subsidiary && item._subsidiary && subChanged) {
+                    rows.push({ type: 'header', level: 'subsidiary', data: item._subsidiary });
+                    currentSubsidiary = item._subsidiary;
+                }
+
                 const accName = isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en;
                 const cur = item.currency || item.currency_code || 'IRR';
                 const amt = parseFloat(item.amount || 0);
@@ -403,23 +449,31 @@
                 const usdVal = amt * toUsd;
                 const irrVal = usdVal * usdToIrr;
 
-                return {
-                    row_number: index + 1,
-                    account_code: item.fm_coa_accounts?.code || '-',
-                    account_name: accName || '-',
-                    currency: cur,
-                    deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-',
-                    withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-',
-                    usd_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(usdVal) : '-',
-                    irr_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(irrVal) : '-',
-                    description: item.description || '-'
-                };
+                rows.push({
+                    type: 'item',
+                    data: {
+                        row_number: index + 1,
+                        account_code: item.fm_coa_accounts?.code || '-',
+                        account_name: accName || '-',
+                        currency: cur,
+                        deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-',
+                        withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-',
+                        usd_amount: formatNumberSafe(usdVal),
+                        irr_amount: formatNumberSafe(irrVal),
+                        description: item.description || '-'
+                    }
+                });
             });
+
+            return rows;
         };
 
         const handlePrint = () => {
             const printContent = printRef.current;
             if (!printContent) return;
+
+            const rows = getPreparedRows();
+            const cols = getColumns();
 
             const printHTML = `
                 <!DOCTYPE html>
@@ -470,6 +524,10 @@
                         .text-right { text-align: right; }
                         .text-left { text-align: left; }
                         
+                        tr.hdr-group td { background-color: #e0e7ff !important; font-weight: bold; }
+                        tr.hdr-general td { background-color: #e2e8f0 !important; font-weight: bold; padding-${isRtl ? 'right' : 'left'}: 15px; }
+                        tr.hdr-sub td { background-color: #f8fafc !important; font-weight: bold; padding-${isRtl ? 'right' : 'left'}: 25px; }
+                        
                         tfoot td { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; font-weight: bold; color: #1e293b; border-top: 2px solid #cbd5e1; }
                         
                         .signatures-grid {
@@ -517,37 +575,25 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th style="width: 5%">${isRtl ? 'ردیف' : 'Row'}</th>
-                                    <th style="width: 12%">${isRtl ? 'کد حساب' : 'Code'}</th>
-                                    <th style="width: 30%">${isRtl ? 'نام حساب' : 'Account Name'}</th>
-                                    <th style="width: 5%">${isRtl ? 'ارز' : 'Cur'}</th>
-                                    <th style="width: 12%">${isRtl ? 'مبلغ واریز' : 'Deposit'}</th>
-                                    <th style="width: 12%">${isRtl ? 'مبلغ برداشت' : 'Withdrawal'}</th>
-                                    ${printSettings.showCurrencies ? `<th>${isRtl ? 'مبلغ (دلار)' : 'Amount (USD)'}</th><th>${isRtl ? 'مبلغ (ریال)' : 'Amount (IRR)'}</th>` : ''}
-                                    <th style="width: 15%">${isRtl ? 'شرح' : 'Description'}</th>
+                                    ${cols.map(c => `<th style="width: ${c.width}">${c.header}</th>`).join('')}
                                 </tr>
                             </thead>
                             <tbody>
-                                ${getPreparedItems().map((item) => `
-                                    <tr>
-                                        <td class="text-center">${item.row_number}</td>
-                                        <td class="text-center">${item.account_code}</td>
-                                        <td class="text-${isRtl ? 'right' : 'left'}">${item.account_name}</td>
-                                        <td class="text-center">${item.currency}</td>
-                                        <td class="text-right" dir="ltr">${item.deposit_amount}</td>
-                                        <td class="text-right" dir="ltr">${item.withdrawal_amount}</td>
-                                        ${printSettings.showCurrencies ? `
-                                            <td class="text-right" dir="ltr">${item.usd_amount}</td>
-                                            <td class="text-right" dir="ltr">${item.irr_amount}</td>
-                                        ` : ''}
-                                        <td class="text-${isRtl ? 'right' : 'left'}">${item.description}</td>
-                                    </tr>
-                                `).join('')}
+                                ${rows.map(r => {
+                                    if (r.type === 'header') {
+                                        const cls = r.level === 'group' ? 'hdr-group' : r.level === 'general' ? 'hdr-general' : 'hdr-sub';
+                                        const levelName = r.level === 'group' ? (isRtl ? 'گروه' : 'Group') : r.level === 'general' ? (isRtl ? 'کل' : 'General') : (isRtl ? 'معین' : 'Subsidiary');
+                                        return `<tr class="${cls}"><td colspan="${cols.length}">${levelName}: ${r.data.code} - ${isRtl ? r.data.title_fa : (r.data.title_en || r.data.title_fa)}</td></tr>`;
+                                    } else {
+                                        const item = r.data;
+                                        return `<tr>${cols.map(c => `<td class="${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}" ${c.align === 'right' ? 'dir="ltr"' : ''}>${item[c.field] || '-'}</td>`).join('')}</tr>`;
+                                    }
+                                }).join('')}
                             </tbody>
                             ${printSettings.showTotals ? `
                             <tfoot>
                                 <tr>
-                                    <td colspan="4" style="text-align: ${isRtl ? 'left' : 'right'}; padding-right: 10px; padding-left: 10px;">${isRtl ? 'جمع کل:' : 'Total:'}</td>
+                                    <td colspan="${cols.findIndex(c => c.field === 'deposit_amount')}" style="text-align: ${isRtl ? 'left' : 'right'}; padding-right: 10px; padding-left: 10px;">${isRtl ? 'جمع کل:' : 'Total:'}</td>
                                     <td class="text-right" dir="ltr">${formatNumberSafe(totals.debit)}</td>
                                     <td class="text-right" dir="ltr">${formatNumberSafe(totals.credit)}</td>
                                     ${printSettings.showCurrencies ? `
@@ -636,7 +682,7 @@
                         usdDebit: printSettings.showCurrencies ? formatNumberSafe(totals.usdDebit) : undefined,
                         irrDebit: printSettings.showCurrencies ? formatNumberSafe(totals.irrDebit) : undefined
                     } : null,
-                    data: getPreparedItems()
+                    rows: getPreparedRows()
                 }),
 
                 (printSettings.showSignatures && activeSignaturesList.length > 0) && React.createElement('div', { 
@@ -674,16 +720,18 @@
                                 onChange: (val) => handleSettingChange('calendarType', val),
                                 fullWidth: true
                             }),
-                            React.createElement(Select, {
-                                label: isRtl ? 'سطح نمایش حساب' : 'Account Level',
-                                options: accountLevelOptions,
-                                value: printSettings.accountLevel,
-                                onChange: (val) => handleSettingChange('accountLevel', val),
-                                fullWidth: true
-                            }),
                             
                             React.createElement(Divider, { margin: "sm" }),
                             
+                            React.createElement(Flex, { direction: "col", gap: "sm" },
+                                React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-400" }, isRtl ? 'سطح نمایش حساب' : 'Account Level'),
+                                React.createElement(Checkbox, { label: isRtl ? 'گروه حساب' : 'Account Group', checked: printSettings.accountLevels.group, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, group: val}) }),
+                                React.createElement(Checkbox, { label: isRtl ? 'حساب کل' : 'General Account', checked: printSettings.accountLevels.general, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, general: val}) }),
+                                React.createElement(Checkbox, { label: isRtl ? 'حساب معین' : 'Subsidiary Account', checked: printSettings.accountLevels.subsidiary, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, subsidiary: val}) })
+                            ),
+
+                            React.createElement(Divider, { margin: "sm" }),
+
                             React.createElement(Flex, { direction: "col", gap: "sm" },
                                 React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-400" }, isRtl ? 'گزینه‌های نمایش' : 'Display Options'),
                                 React.createElement(Checkbox, { label: isRtl ? 'نمایش جمع کل' : 'Show Totals', checked: printSettings.showTotals, onChange: (val) => handleSettingChange('showTotals', val) }),
@@ -709,20 +757,21 @@
                         React.createElement(Button, { variant: "primary", fullWidth: true, icon: SafePrinterIcon, onClick: handlePrint, disabled: loading },
                             isRtl ? 'چاپ سند' : 'Print Document'
                         )
-                    ),
-                    
+                    )
+                ),
+
+                React.createElement('div', { className: "flex-1 flex flex-col min-w-0 bg-slate-100/50 dark:bg-slate-900 relative overflow-hidden" },
                     React.createElement('button', {
                         onClick: () => setIsSettingsOpen(!isSettingsOpen),
-                        className: `absolute top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md text-slate-500 hover:text-indigo-600 transition-all duration-300 cursor-pointer hover:bg-slate-50 ${isRtl ? 'left-[-24px] rounded-l-md border-r-0' : 'right-[-24px] rounded-r-md border-l-0'}`,
+                        className: `absolute top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-6 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md text-slate-500 hover:text-indigo-600 transition-all duration-300 cursor-pointer hover:bg-slate-50 ${isRtl ? 'rounded-l-md border-r-0' : 'rounded-r-md border-l-0'}`,
+                        style: isRtl ? { right: isSettingsOpen ? '260px' : '0' } : { left: isSettingsOpen ? '260px' : '0' },
                         title: isRtl ? 'تنظیمات' : 'Settings'
                     },
                         isRtl 
                             ? (isSettingsOpen ? React.createElement(SafeChevronRightIcon, { size: 14 }) : React.createElement(SafeChevronLeftIcon, { size: 14 })) 
                             : (isSettingsOpen ? React.createElement(SafeChevronLeftIcon, { size: 14 }) : React.createElement(SafeChevronRightIcon, { size: 14 }))
-                    )
-                ),
+                    ),
 
-                React.createElement('div', { className: "flex-1 flex flex-col min-w-0 bg-slate-100/50 dark:bg-slate-900 relative" },
                     React.createElement('div', { className: "flex-1 overflow-y-auto p-4 md:p-8 flex items-start justify-center w-full" },
                         loading ? React.createElement(Flex, { justify: "center", align: "center", className: "h-full w-full" },
                             React.createElement(Text, { variant: "h2", color: "secondary", className: "animate-pulse" }, isRtl ? 'در حال بارگذاری...' : 'Loading...')
