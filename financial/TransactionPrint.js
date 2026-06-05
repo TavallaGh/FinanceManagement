@@ -1,7 +1,7 @@
 /* Filename: financial/TransactionPrint.js */
 (() => {
     const React = window.React;
-    const { useState, useEffect, useRef } = React;
+    const { useState, useEffect, useRef, useCallback } = React;
 
     const safeGet = (name) => {
         const spaces = [window.DSCore, window.DSForms, window.DSGrid, window.DSOverlays, window.DSFeedback, window.DesignSystem];
@@ -19,9 +19,10 @@
         if (val === null || val === undefined || val === '') return '0';
         const strVal = String(val).replace(/,/g, '');
         if (strVal.trim() === '' || isNaN(Number(strVal))) return '0';
-        const parts = strVal.split('.');
+        const parsed = parseFloat(strVal);
+        const parts = parsed.toFixed(2).split('.');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        return parts.join('.');
+        return parts[1] === '00' ? parts[0] : parts.join('.');
     };
 
     const SafePrinterIcon = ({ size = 16, className = '' }) => React.createElement('svg', { className, width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
@@ -129,9 +130,9 @@
         const isRtl = language === 'fa';
         return React.createElement('div', { className: "w-full overflow-hidden border border-slate-400 mt-4 rounded shadow-sm" },
             React.createElement('table', { className: `w-full text-[11px] text-slate-900 border-collapse ${isRtl ? 'text-right' : 'text-left'}` },
-                React.createElement('thead', { className: "bg-slate-200 border-b-2 border-slate-400" },
+                React.createElement('thead', { style: { backgroundColor: 'lavender' }, className: "border-b-2 border-slate-400" },
                     React.createElement('tr', null,
-                        columns.map((c, i) => React.createElement('th', { key: i, className: "px-2 py-2 font-bold text-center border-x border-slate-300", style: { width: c.width } }, c.header))
+                        columns.map((c, i) => React.createElement('th', { key: i, className: "px-2 py-2 font-bold text-center border-x border-slate-300 text-slate-800", style: { width: c.width } }, c.header))
                     )
                 ),
                 React.createElement('tbody', null,
@@ -139,16 +140,17 @@
                         columns.map((c, j) => React.createElement('td', { key: j, className: `px-2 py-2 border-x border-slate-300 ${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}`, dir: c.align === 'right' ? 'ltr' : 'auto' }, row[c.field] || '-'))
                     ))
                 ),
-                totals && React.createElement('tfoot', { className: "bg-slate-100 border-t-2 border-slate-400 font-bold" },
+                totals && React.createElement('tfoot', { className: "bg-slate-100 border-t-2 border-slate-400 font-bold text-slate-800" },
                     React.createElement('tr', null,
                         React.createElement('td', { 
                             colSpan: columns.findIndex(c => c.field === 'deposit_amount'), 
                             className: `px-3 py-2 border-x border-slate-300 ${isRtl ? 'text-left' : 'text-right'}` 
                         }, totals.label),
-                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700 font-extrabold", dir: "ltr" }, totals.deposit),
-                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700 font-extrabold", dir: "ltr" }, totals.withdrawal),
-                        totals.fcDeposit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700 font-extrabold", dir: "ltr" }, totals.fcDeposit),
-                        totals.fcWithdrawal !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 text-indigo-700 font-extrabold", dir: "ltr" }, totals.fcWithdrawal)
+                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 font-extrabold", dir: "ltr" }, totals.deposit),
+                        React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 font-extrabold", dir: "ltr" }, totals.withdrawal),
+                        totals.usdDebit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 font-extrabold", dir: "ltr" }, totals.usdDebit),
+                        totals.irrDebit !== undefined && React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-300 font-extrabold", dir: "ltr" }, totals.irrDebit),
+                        React.createElement('td', { className: "border-x border-slate-300" })
                     )
                 )
             )
@@ -164,6 +166,7 @@
         const [headerData, setHeaderData] = useState(null);
         const [itemsData, setItemsData] = useState([]);
         const [usersMap, setUsersMap] = useState({});
+        const [currencyRates, setCurrencyRates] = useState({});
         const [isSettingsOpen, setIsSettingsOpen] = useState(true);
         
         const [printSettings, setPrintSettings] = useState({
@@ -209,6 +212,48 @@
                 fetchUsers();
             }
         }, [transactionId]);
+
+        useEffect(() => {
+            if (headerData?.document_date && supabase) {
+                const fetchRates = async () => {
+                    try {
+                        const formattedDate = headerData.document_date.replace(/\//g, '-');
+                        const { data } = await supabase.from('fm_currency_rates')
+                            .select('base_currency, target_currency, rate, rate_date')
+                            .lte('rate_date', formattedDate)
+                            .order('rate_date', { ascending: false });
+                        
+                        const latestRates = {};
+                        (data || []).forEach(r => {
+                            const key = `${r.base_currency}_${r.target_currency}`;
+                            if (!latestRates[key]) latestRates[key] = r.rate;
+                        });
+                        setCurrencyRates(latestRates);
+                    } catch (e) {}
+                };
+                fetchRates();
+            }
+        }, [headerData?.document_date, supabase]);
+
+        const getExchangeRates = useCallback((currency) => {
+            let toUsd = 1;
+            if (currency !== 'USD') {
+                const direct = currencyRates[`${currency}_USD`];
+                if (direct) {
+                    toUsd = direct;
+                } else {
+                    const inverse = currencyRates[`USD_${currency}`];
+                    if (inverse) toUsd = 1 / inverse;
+                }
+            }
+            
+            let usdToIrr = currencyRates[`USD_IRR`] || 1;
+            if (!currencyRates[`USD_IRR`] && currencyRates[`IRR_USD`]) {
+                 usdToIrr = 1 / currencyRates[`IRR_USD`];
+            }
+            
+            return { toUsd, usdToIrr };
+        }, [currencyRates]);
 
         const fetchUsers = async () => {
             try {
@@ -289,38 +334,77 @@
         };
 
         const calculateTotals = () => {
-            return itemsData.reduce((acc, item) => ({
-                debit: acc.debit + (item.transaction_action === 'DEPOSIT' ? (item.amount || 0) : 0),
-                credit: acc.credit + (item.transaction_action === 'WITHDRAWAL' ? (item.amount || 0) : 0),
-                fcDebit: acc.fcDebit + (item.transaction_action === 'DEPOSIT' ? (item.currency_amount || 0) : 0),
-                fcCredit: acc.fcCredit + (item.transaction_action === 'WITHDRAWAL' ? (item.currency_amount || 0) : 0)
-            }), { debit: 0, credit: 0, fcDebit: 0, fcCredit: 0 });
+            let debit = 0, credit = 0, usdDebit = 0, usdCredit = 0, irrDebit = 0, irrCredit = 0;
+            
+            itemsData.forEach(item => {
+                const amt = parseFloat(item.amount || 0);
+                const cur = item.currency || item.currency_code || 'IRR';
+                const { toUsd, usdToIrr } = getExchangeRates(cur);
+                const usdVal = amt * toUsd;
+                const irrVal = usdVal * usdToIrr;
+
+                if (item.transaction_action === 'DEPOSIT') {
+                    debit += amt;
+                    usdDebit += usdVal;
+                    irrDebit += irrVal;
+                } else {
+                    credit += amt;
+                    usdCredit += usdVal;
+                    irrCredit += irrVal;
+                }
+            });
+
+            return { debit, credit, usdDebit, usdCredit, irrDebit, irrCredit };
         };
 
         const totals = calculateTotals();
 
         const getColumns = () => {
             let cols = [
-                { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '40px', align: 'center' },
-                { field: 'account_code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px', align: 'center' },
+                { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '30px', align: 'center' },
+                { field: 'account_code', header_fa: 'کد حساب', header_en: 'Account Code', width: '80px', align: 'center' },
                 { field: 'account_name', header_fa: 'نام حساب', header_en: 'Account Name', width: 'auto', align: isRtl ? 'right' : 'left' },
-                { field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto', align: isRtl ? 'right' : 'left' },
-                { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '50px', align: 'center' },
-                { field: 'deposit_amount', header_fa: 'مبلغ واریز', header_en: 'Deposit', width: '120px', align: 'right' },
-                { field: 'withdrawal_amount', header_fa: 'مبلغ برداشت', header_en: 'Withdrawal', width: '120px', align: 'right' }
+                { field: 'currency', header_fa: 'ارز', header_en: 'Cur', width: '40px', align: 'center' },
+                { field: 'deposit_amount', header_fa: 'مبلغ واریز', header_en: 'Deposit', width: '90px', align: 'right' },
+                { field: 'withdrawal_amount', header_fa: 'مبلغ برداشت', header_en: 'Withdrawal', width: '90px', align: 'right' }
             ];
 
             if (printSettings.showCurrencies) {
-                cols.splice(7, 0, 
-                    { field: 'fc_deposit_amount', header_fa: 'واریز ارزی', header_en: 'FC Deposit', width: '100px', align: 'right' },
-                    { field: 'fc_withdrawal_amount', header_fa: 'برداشت ارزی', header_en: 'FC Withdrawal', width: '100px', align: 'right' }
+                cols.push(
+                    { field: 'usd_amount', header_fa: 'مبلغ (دلار)', header_en: 'Amount (USD)', width: '90px', align: 'right' },
+                    { field: 'irr_amount', header_fa: 'مبلغ (ریال)', header_en: 'Amount (IRR)', width: '100px', align: 'right' }
                 );
             }
+
+            cols.push({ field: 'description', header_fa: 'شرح', header_en: 'Description', width: '25%', align: isRtl ? 'right' : 'left' });
 
             return cols.map(c => ({ ...c, header: isRtl ? c.header_fa : c.header_en }));
         };
 
         const activeSignaturesList = signatureOptions.filter(opt => printSettings.signatures[opt.key]);
+
+        const getPreparedItems = () => {
+            return itemsData.map((item, index) => {
+                const accName = isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en;
+                const cur = item.currency || item.currency_code || 'IRR';
+                const amt = parseFloat(item.amount || 0);
+                const { toUsd, usdToIrr } = getExchangeRates(cur);
+                const usdVal = amt * toUsd;
+                const irrVal = usdVal * usdToIrr;
+
+                return {
+                    row_number: index + 1,
+                    account_code: item.fm_coa_accounts?.code || '-',
+                    account_name: accName || '-',
+                    currency: cur,
+                    deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-',
+                    withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-',
+                    usd_amount: formatNumberSafe(usdVal),
+                    irr_amount: formatNumberSafe(irrVal),
+                    description: item.description || '-'
+                };
+            });
+        };
 
         const handlePrint = () => {
             const printContent = printRef.current;
@@ -370,7 +454,7 @@
                         
                         table { width: 100%; border-collapse: collapse; margin-bottom: 0; font-size: 10px; }
                         th, td { border: 1px solid #000; padding: 4px 6px; text-align: ${isRtl ? 'right' : 'left'}; }
-                        th { background-color: #e5e7eb !important; -webkit-print-color-adjust: exact; font-weight: bold; text-align: center; }
+                        th { background-color: lavender !important; -webkit-print-color-adjust: exact; font-weight: bold; text-align: center; color: #000; }
                         .text-center { text-align: center; }
                         .text-right { text-align: right; }
                         .text-left { text-align: left; }
@@ -384,9 +468,10 @@
                             margin-top: 40px;
                             text-align: center;
                         }
-                        .sig-box { display: flex; flex-direction: column; gap: 40px; }
-                        .sig-title { font-weight: bold; font-size: 11px; color: #333; }
-                        .sig-name { font-size: 11px; }
+                        .sig-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+                        .sig-title { font-weight: bold; font-size: 11px; color: #333; margin-bottom: 30px; }
+                        .sig-line { width: 80%; border-top: 1px dashed #666; margin-bottom: 5px; }
+                        .sig-name { font-size: 11px; font-weight: bold; }
                     </style>
                 </head>
                 <body>
@@ -421,45 +506,43 @@
                             <thead>
                                 <tr>
                                     <th style="width: 5%">${isRtl ? 'ردیف' : 'Row'}</th>
-                                    <th style="width: 15%">${isRtl ? 'کد حساب' : 'Code'}</th>
-                                    <th style="width: 25%">${isRtl ? 'نام حساب' : 'Account Name'}</th>
-                                    <th style="width: 20%">${isRtl ? 'شرح' : 'Description'}</th>
+                                    <th style="width: 12%">${isRtl ? 'کد حساب' : 'Code'}</th>
+                                    <th style="width: 20%">${isRtl ? 'نام حساب' : 'Account Name'}</th>
                                     <th style="width: 5%">${isRtl ? 'ارز' : 'Cur'}</th>
-                                    <th style="width: 15%">${isRtl ? 'مبلغ واریز' : 'Deposit'}</th>
-                                    <th style="width: 15%">${isRtl ? 'مبلغ برداشت' : 'Withdrawal'}</th>
-                                    ${printSettings.showCurrencies ? `<th>${isRtl ? 'واریز ارزی' : 'FC Deposit'}</th><th>${isRtl ? 'برداشت ارزی' : 'FC Withdrawal'}</th>` : ''}
+                                    <th style="width: 12%">${isRtl ? 'مبلغ واریز' : 'Deposit'}</th>
+                                    <th style="width: 12%">${isRtl ? 'مبلغ برداشت' : 'Withdrawal'}</th>
+                                    ${printSettings.showCurrencies ? `<th>${isRtl ? 'مبلغ (دلار)' : 'Amount (USD)'}</th><th>${isRtl ? 'مبلغ (ریال)' : 'Amount (IRR)'}</th>` : ''}
+                                    <th style="width: 25%">${isRtl ? 'شرح' : 'Description'}</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${itemsData.map((item, index) => {
-                                    const accName = isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en;
-                                    return `
+                                ${getPreparedItems().map((item) => `
                                     <tr>
-                                        <td class="text-center">${index + 1}</td>
-                                        <td class="text-center">${item.fm_coa_accounts?.code || '-'}</td>
-                                        <td class="text-${isRtl ? 'right' : 'left'}">${accName || '-'}</td>
-                                        <td class="text-${isRtl ? 'right' : 'left'}">${item.description || '-'}</td>
-                                        <td class="text-center">${item.currency || item.currency_code || '-'}</td>
-                                        <td class="text-right" dir="ltr">${item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-'}</td>
-                                        <td class="text-right" dir="ltr">${item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-'}</td>
+                                        <td class="text-center">${item.row_number}</td>
+                                        <td class="text-center">${item.account_code}</td>
+                                        <td class="text-${isRtl ? 'right' : 'left'}">${item.account_name}</td>
+                                        <td class="text-center">${item.currency}</td>
+                                        <td class="text-right" dir="ltr">${item.deposit_amount}</td>
+                                        <td class="text-right" dir="ltr">${item.withdrawal_amount}</td>
                                         ${printSettings.showCurrencies ? `
-                                            <td class="text-right" dir="ltr">${item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.currency_amount) : '-'}</td>
-                                            <td class="text-right" dir="ltr">${item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.currency_amount) : '-'}</td>
+                                            <td class="text-right" dir="ltr">${item.usd_amount}</td>
+                                            <td class="text-right" dir="ltr">${item.irr_amount}</td>
                                         ` : ''}
+                                        <td class="text-${isRtl ? 'right' : 'left'}">${item.description}</td>
                                     </tr>
-                                    `;
-                                }).join('')}
+                                `).join('')}
                             </tbody>
                             ${printSettings.showTotals ? `
                             <tfoot>
                                 <tr>
-                                    <td colspan="5" style="text-align: ${isRtl ? 'left' : 'right'}; padding-right: 10px; padding-left: 10px;">${isRtl ? 'جمع کل:' : 'Total:'}</td>
+                                    <td colspan="4" style="text-align: ${isRtl ? 'left' : 'right'}; padding-right: 10px; padding-left: 10px;">${isRtl ? 'جمع کل:' : 'Total:'}</td>
                                     <td class="text-right" dir="ltr">${formatNumberSafe(totals.debit)}</td>
                                     <td class="text-right" dir="ltr">${formatNumberSafe(totals.credit)}</td>
                                     ${printSettings.showCurrencies ? `
-                                        <td class="text-right" dir="ltr">${formatNumberSafe(totals.fcDebit)}</td>
-                                        <td class="text-right" dir="ltr">${formatNumberSafe(totals.fcCredit)}</td>
+                                        <td class="text-right" dir="ltr">${formatNumberSafe(totals.usdDebit)}</td>
+                                        <td class="text-right" dir="ltr">${formatNumberSafe(totals.irrDebit)}</td>
                                     ` : ''}
+                                    <td></td>
                                 </tr>
                             </tfoot>
                             ` : ''}
@@ -470,6 +553,7 @@
                                 ${activeSignaturesList.map(sig => `
                                     <div class="sig-box">
                                         <span class="sig-title">${sig.label}</span>
+                                        <div class="sig-line"></div>
                                         <span class="sig-name">${sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') : '---'}</span>
                                     </div>
                                 `).join('')}
@@ -536,29 +620,20 @@
                         label: isRtl ? 'جمع کل:' : 'Total:',
                         deposit: formatNumberSafe(totals.debit),
                         withdrawal: formatNumberSafe(totals.credit),
-                        fcDeposit: printSettings.showCurrencies ? formatNumberSafe(totals.fcDebit) : undefined,
-                        fcWithdrawal: printSettings.showCurrencies ? formatNumberSafe(totals.fcCredit) : undefined
+                        usdDebit: printSettings.showCurrencies ? formatNumberSafe(totals.usdDebit) : undefined,
+                        irrDebit: printSettings.showCurrencies ? formatNumberSafe(totals.irrDebit) : undefined
                     } : null,
-                    data: itemsData.map((item, index) => ({
-                        row_number: index + 1,
-                        account_code: item.fm_coa_accounts?.code || '-',
-                        account_name: isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en || '-',
-                        description: item.description,
-                        currency: item.currency || item.currency_code || '-',
-                        deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-',
-                        withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-',
-                        fc_deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.currency_amount) : '-',
-                        fc_withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.currency_amount) : '-'
-                    }))
+                    data: getPreparedItems()
                 }),
 
                 (printSettings.showSignatures && activeSignaturesList.length > 0) && React.createElement('div', { 
                     className: "grid mt-10 pt-4 px-4 text-center text-slate-800",
                     style: { gridTemplateColumns: `repeat(${activeSignaturesList.length}, minmax(0, 1fr))` }
                 },
-                    activeSignaturesList.map(sig => React.createElement(Flex, { key: sig.key, direction: "col", gap: "xl", align: "center" },
-                        React.createElement('span', { className: "text-xs font-bold text-slate-500" }, sig.label),
-                        React.createElement('span', { className: "text-sm font-medium" }, sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') : '---')
+                    activeSignaturesList.map(sig => React.createElement(Flex, { key: sig.key, direction: "col", gap: "sm", align: "center", justify: "end" },
+                        React.createElement('span', { className: "text-xs font-bold text-slate-500 mb-6" }, sig.label),
+                        React.createElement('div', { className: "w-3/4 border-t border-dashed border-slate-400 mb-1" }),
+                        React.createElement('span', { className: "text-sm font-bold" }, sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') : '---')
                     ))
                 )
             );
