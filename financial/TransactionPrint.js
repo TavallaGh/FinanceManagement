@@ -89,36 +89,48 @@
             if (!isOpen) return null;
             return React.createElement('div', { className: "fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" },
                 React.createElement('div', { className: `bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 ${width}` },
-                    React.createElement('div', { className: "p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80" },
+                    React.createElement('div', { className: "p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80 shrink-0" },
                         React.createElement('h2', { className: "text-lg font-bold text-slate-800 dark:text-slate-100" }, title),
                         React.createElement('button', { onClick: onClose, className: "text-slate-500 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" }, '✕')
                     ),
-                    React.createElement('div', { className: "p-0 flex-1 overflow-auto max-h-[90vh] bg-slate-100/50 dark:bg-slate-900 flex relative" }, children)
+                    React.createElement('div', { className: "p-0 flex-1 overflow-auto bg-slate-100/50 dark:bg-slate-900 flex relative" }, children)
                 )
             );
         };
     }
 
     let Drawer = safeGet('Drawer');
-    if (!Drawer) {
-        Drawer = ({ isOpen, onClose, title, children, footer, position = 'right', width = 'max-w-sm', language = 'fa' }) => {
-            if (!isOpen) return null;
+    if (!Drawer || !Drawer.supportsInline) {
+        Drawer = ({ isOpen, onClose, title, children, footer, position = 'right', width = 'w-[280px]', language = 'fa', variant = 'modal' }) => {
             const isRtl = language === 'fa';
             let physicalPosition = position;
             if (position === 'start') physicalPosition = isRtl ? 'right' : 'left';
             if (position === 'end') physicalPosition = isRtl ? 'left' : 'right';
             const isRight = physicalPosition === 'right';
-            
+
+            const innerContent = React.createElement(React.Fragment, null,
+                React.createElement('div', { className: "h-12 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between px-4 bg-slate-50/50 dark:bg-slate-900/50 shrink-0" },
+                    React.createElement('h3', { className: "font-black text-slate-700 dark:text-slate-200 text-[14px]" }, title),
+                    React.createElement('button', { onClick: onClose, className: "text-slate-400 hover:text-rose-500" }, '✕')
+                ),
+                React.createElement('div', { className: "flex-1 overflow-y-auto p-4 flex flex-col" }, children),
+                footer && React.createElement('div', { className: "p-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/50 shrink-0" }, footer)
+            );
+
+            if (variant === 'inline') {
+                const innerWidthClass = width.includes('max-w-') ? 'w-[320px]' : width;
+                return React.createElement('aside', { 
+                    className: `relative flex flex-col bg-white dark:bg-slate-800 border-slate-200/60 dark:border-slate-700/60 transition-all duration-300 ease-in-out shrink-0 overflow-hidden ${isOpen ? width : 'w-0 border-none opacity-0'} ${isRight ? 'border-l' : 'border-r'}`,
+                    dir: isRtl ? 'rtl' : 'ltr'
+                }, 
+                    React.createElement('div', { className: `absolute top-0 bottom-0 flex flex-col h-full ${isRight ? 'right-0' : 'left-0'} ${innerWidthClass} max-w-[100vw]` }, innerContent)
+                );
+            }
+
+            if (!isOpen) return null;
             return React.createElement('div', { className: "fixed inset-0 z-[99999] font-sans flex", dir: isRtl ? 'rtl' : 'ltr', style: { justifyContent: isRight ? 'flex-end' : 'flex-start' } },
                 React.createElement('div', { className: "absolute inset-0 bg-slate-900/60 backdrop-blur-[2px]", onClick: onClose }),
-                React.createElement('div', { className: `relative bg-white dark:bg-slate-800 h-full shadow-2xl flex flex-col w-full sm:${width} border-slate-200 dark:border-slate-700 ${isRight ? 'border-l' : 'border-r'}` },
-                    React.createElement('div', { className: "h-12 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between px-4 bg-slate-50/50 dark:bg-slate-900/50 shrink-0" },
-                        React.createElement('h3', { className: "font-black text-slate-700 dark:text-slate-200 text-[14px]" }, title),
-                        React.createElement('button', { onClick: onClose, className: "text-slate-400 hover:text-rose-500" }, '✕')
-                    ),
-                    React.createElement('div', { className: "flex-1 overflow-y-auto p-4 flex flex-col" }, children),
-                    footer && React.createElement('div', { className: "p-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/50 shrink-0" }, footer)
-                )
+                React.createElement('div', { className: `relative bg-white dark:bg-slate-800 h-full shadow-2xl flex flex-col w-full sm:${width} border-slate-200 dark:border-slate-700 ${isRight ? 'border-l' : 'border-r'}` }, innerContent)
             );
         };
     }
@@ -194,7 +206,7 @@
         const [deptsMap, setDeptsMap] = useState({});
         const [allAccounts, setAllAccounts] = useState([]);
         const [currencyRates, setCurrencyRates] = useState({});
-        const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+        const [isSettingsOpen, setIsSettingsOpen] = useState(true);
         
         const [printSettings, setPrintSettings] = useState({
             accountLevels: {
@@ -710,71 +722,75 @@
         return React.createElement(Modal, {
             isOpen: true,
             onClose: onClose,
-            width: "max-w-[1200px]",
+            width: "max-w-[1200px] max-h-[90vh]",
             title: isRtl ? 'چاپ سند حسابداری' : 'Print Voucher'
         },
-            React.createElement('div', { className: "w-full h-full flex flex-col relative", dir: isRtl ? 'rtl' : 'ltr' },
+            React.createElement('div', { className: "w-full h-[80vh] flex flex-col relative bg-slate-100/50 dark:bg-slate-900", dir: isRtl ? 'rtl' : 'ltr' },
                 
-                React.createElement(Flex, { className: "p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 shrink-0", justify: "between", align: "center" },
+                React.createElement(Flex, { className: "p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0 z-10 shadow-sm", justify: "between", align: "center" },
                     React.createElement(Button, { variant: "outline", icon: SafeSettingsIcon, onClick: () => setIsSettingsOpen(true) }, isRtl ? 'تنظیمات چاپ' : 'Print Settings'),
                     React.createElement(Button, { variant: "primary", icon: SafePrinterIcon, onClick: handlePrint, disabled: loading }, isRtl ? 'چاپ سند' : 'Print Document')
                 ),
 
-                React.createElement('div', { className: "flex-1 overflow-y-auto p-4 md:p-8 flex items-start justify-center w-full bg-slate-100/50 dark:bg-slate-900" },
-                    loading ? React.createElement(Flex, { justify: "center", align: "center", className: "h-full w-full" },
-                        React.createElement(Text, { variant: "h2", color: "secondary", className: "animate-pulse" }, isRtl ? 'در حال بارگذاری...' : 'Loading...')
-                    ) : renderPrintPreview()
-                ),
-
-                Drawer && React.createElement(Drawer, {
-                    isOpen: isSettingsOpen,
-                    onClose: () => setIsSettingsOpen(false),
-                    title: isRtl ? 'تنظیمات خروجی' : 'Output Settings',
-                    position: 'start',
-                    language: language,
-                    width: 'max-w-[260px]',
-                    footer: React.createElement(Button, { variant: "primary", fullWidth: true, icon: SafePrinterIcon, onClick: () => { setIsSettingsOpen(false); handlePrint(); }, disabled: loading },
-                        isRtl ? 'چاپ سند' : 'Print Document'
-                    )
-                },
-                    React.createElement(Flex, { direction: "col", gap: "md", className: "p-1" },
-                        React.createElement(Select, {
-                            label: isRtl ? 'تقویم' : 'Calendar',
-                            options: calendarOptions,
-                            value: printSettings.calendarType,
-                            onChange: (val) => handleSettingChange('calendarType', val),
-                            fullWidth: true
-                        }),
-                        
-                        React.createElement(Divider, { margin: "sm" }),
-                        
-                        React.createElement(Flex, { direction: "col", gap: "sm" },
-                            React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-400" }, isRtl ? 'سطح نمایش حساب' : 'Account Level'),
-                            React.createElement(Checkbox, { label: isRtl ? 'گروه حساب' : 'Account Group', checked: printSettings.accountLevels.group, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, group: val}) }),
-                            React.createElement(Checkbox, { label: isRtl ? 'حساب کل' : 'General Account', checked: printSettings.accountLevels.general, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, general: val}) }),
-                            React.createElement(Checkbox, { label: isRtl ? 'حساب معین' : 'Subsidiary Account', checked: printSettings.accountLevels.subsidiary, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, subsidiary: val}) })
-                        ),
-
-                        React.createElement(Divider, { margin: "sm" }),
-
-                        React.createElement(Flex, { direction: "col", gap: "sm" },
-                            React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-400" }, isRtl ? 'گزینه‌های نمایش' : 'Display Options'),
-                            React.createElement(Checkbox, { label: isRtl ? 'نمایش جمع کل' : 'Show Totals', checked: printSettings.showTotals, onChange: (val) => handleSettingChange('showTotals', val) }),
-                            React.createElement(Checkbox, { label: isRtl ? 'نمایش مبالغ ارزی' : 'Show Currencies', checked: printSettings.showCurrencies, onChange: (val) => handleSettingChange('showCurrencies', val) }),
-                            React.createElement(Checkbox, { label: isRtl ? 'نمایش وضعیت سند' : 'Show Status', checked: printSettings.showStatus, onChange: (val) => handleSettingChange('showStatus', val) }),
-                            React.createElement(Checkbox, { label: isRtl ? 'نمایش محل امضاها' : 'Show Signatures Section', checked: printSettings.showSignatures, onChange: (val) => handleSettingChange('showSignatures', val) })
-                        ),
-
-                        printSettings.showSignatures && React.createElement(Flex, { direction: "col", gap: "sm", className: "mt-2 p-3 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700" },
-                            React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-500" }, isRtl ? 'انتخاب امضاکنندگان (حداکثر ۴)' : 'Select Signatories (Max 4)'),
-                            signatureOptions.map(opt => React.createElement(Checkbox, { 
-                                key: opt.key, 
-                                label: opt.label, 
-                                checked: printSettings.signatures[opt.key], 
-                                onChange: (val) => handleSignatureToggle(opt.key, val),
-                                disabled: !printSettings.signatures[opt.key] && activeSignaturesList.length >= 4
-                            }))
+                React.createElement('div', { className: "flex-1 flex flex-row relative min-h-0 overflow-hidden" },
+                    
+                    Drawer && React.createElement(Drawer, {
+                        isOpen: isSettingsOpen,
+                        onClose: () => setIsSettingsOpen(false),
+                        title: isRtl ? 'تنظیمات خروجی' : 'Output Settings',
+                        position: 'start',
+                        language: language,
+                        width: 'w-[280px]',
+                        variant: 'inline',
+                        footer: React.createElement(Button, { variant: "primary", fullWidth: true, icon: SafePrinterIcon, onClick: handlePrint, disabled: loading },
+                            isRtl ? 'چاپ سند' : 'Print Document'
                         )
+                    },
+                        React.createElement(Flex, { direction: "col", gap: "md", className: "p-1" },
+                            React.createElement(Select, {
+                                label: isRtl ? 'تقویم' : 'Calendar',
+                                options: calendarOptions,
+                                value: printSettings.calendarType,
+                                onChange: (val) => handleSettingChange('calendarType', val),
+                                fullWidth: true
+                            }),
+                            
+                            React.createElement(Divider, { margin: "sm" }),
+                            
+                            React.createElement(Flex, { direction: "col", gap: "sm" },
+                                React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-400" }, isRtl ? 'سطح نمایش حساب' : 'Account Level'),
+                                React.createElement(Checkbox, { label: isRtl ? 'گروه حساب' : 'Account Group', checked: printSettings.accountLevels.group, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, group: val}) }),
+                                React.createElement(Checkbox, { label: isRtl ? 'حساب کل' : 'General Account', checked: printSettings.accountLevels.general, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, general: val}) }),
+                                React.createElement(Checkbox, { label: isRtl ? 'حساب معین' : 'Subsidiary Account', checked: printSettings.accountLevels.subsidiary, onChange: (val) => handleSettingChange('accountLevels', {...printSettings.accountLevels, subsidiary: val}) })
+                            ),
+
+                            React.createElement(Divider, { margin: "sm" }),
+
+                            React.createElement(Flex, { direction: "col", gap: "sm" },
+                                React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-400" }, isRtl ? 'گزینه‌های نمایش' : 'Display Options'),
+                                React.createElement(Checkbox, { label: isRtl ? 'نمایش جمع کل' : 'Show Totals', checked: printSettings.showTotals, onChange: (val) => handleSettingChange('showTotals', val) }),
+                                React.createElement(Checkbox, { label: isRtl ? 'نمایش مبالغ ارزی' : 'Show Currencies', checked: printSettings.showCurrencies, onChange: (val) => handleSettingChange('showCurrencies', val) }),
+                                React.createElement(Checkbox, { label: isRtl ? 'نمایش وضعیت سند' : 'Show Status', checked: printSettings.showStatus, onChange: (val) => handleSettingChange('showStatus', val) }),
+                                React.createElement(Checkbox, { label: isRtl ? 'نمایش محل امضاها' : 'Show Signatures Section', checked: printSettings.showSignatures, onChange: (val) => handleSettingChange('showSignatures', val) })
+                            ),
+
+                            printSettings.showSignatures && React.createElement(Flex, { direction: "col", gap: "sm", className: "mt-2 p-3 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700" },
+                                React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-500" }, isRtl ? 'انتخاب امضاکنندگان (حداکثر ۴)' : 'Select Signatories (Max 4)'),
+                                signatureOptions.map(opt => React.createElement(Checkbox, { 
+                                    key: opt.key, 
+                                    label: opt.label, 
+                                    checked: printSettings.signatures[opt.key], 
+                                    onChange: (val) => handleSignatureToggle(opt.key, val),
+                                    disabled: !printSettings.signatures[opt.key] && activeSignaturesList.length >= 4
+                                }))
+                            )
+                        )
+                    ),
+
+                    React.createElement('div', { className: "flex-1 overflow-y-auto p-4 md:p-8 flex items-start justify-center w-full" },
+                        loading ? React.createElement(Flex, { justify: "center", align: "center", className: "h-full w-full" },
+                            React.createElement(Text, { variant: "h2", color: "secondary", className: "animate-pulse" }, isRtl ? 'در حال بارگذاری...' : 'Loading...')
+                        ) : renderPrintPreview()
                     )
                 )
             )

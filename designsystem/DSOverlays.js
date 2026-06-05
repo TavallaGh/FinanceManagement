@@ -20,56 +20,80 @@
     headerActions,
     position = 'right', 
     width = 'max-w-sm',
-    language = 'fa'
+    language = 'fa',
+    variant = 'modal'
   }) => {
     const isRtl = language === 'fa';
 
     useEffect(() => {
-      const handleEsc = (e) => { if (e.key === 'Escape' && isOpen) onClose(); };
-      if (isOpen) document.addEventListener('keydown', handleEsc);
-      return () => document.removeEventListener('keydown', handleEsc);
-    }, [isOpen, onClose]);
+      if (variant === 'modal') {
+        const handleEsc = (e) => { if (e.key === 'Escape' && isOpen) onClose(); };
+        if (isOpen) document.addEventListener('keydown', handleEsc);
+        return () => document.removeEventListener('keydown', handleEsc);
+      }
+    }, [isOpen, onClose, variant]);
 
-    if (!isOpen) return null;
-
-    // Mapping 'start'/'end' logical positions to physical 'right'/'left' for backward compatibility
     let physicalPosition = position;
     if (position === 'start') physicalPosition = isRtl ? 'right' : 'left';
     if (position === 'end') physicalPosition = isRtl ? 'left' : 'right';
 
     const isRight = physicalPosition === 'right';
     const slideAnim = isRight ? 'animate-slide-in-right' : 'animate-slide-in-left';
-    const placementClasses = isRight ? 'right-0 border-l' : 'left-0 border-r';
+    const placementClasses = isRight ? 'border-l' : 'border-r';
+
+    const innerContent = (
+      <>
+        <div className="h-12 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between px-4 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+          <div className="flex items-center gap-2">
+              {typeof title === 'string' ? <h3 className="font-black text-slate-700 dark:text-slate-200 text-[14px] tracking-tight truncate">{title}</h3> : title}
+          </div>
+          <div className="flex items-center gap-1">
+              {headerActions}
+              <button onClick={onClose} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all active:scale-95">
+              <X size={16} strokeWidth={2.5} />
+              </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-white dark:bg-slate-800 flex flex-col min-h-0">
+          {children}
+        </div>
+        {footer && (
+          <div className="p-2 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+            {footer}
+          </div>
+        )}
+      </>
+    );
+
+    if (variant === 'inline') {
+      const innerWidthClass = width.includes('max-w-') ? 'w-[320px]' : width;
+      return (
+        <aside 
+          className={`relative flex flex-col bg-white dark:bg-slate-800 border-slate-200/60 dark:border-slate-700/60 transition-all duration-300 ease-in-out shrink-0 overflow-hidden ${isOpen ? width : 'w-0 border-none opacity-0'} ${placementClasses}`}
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
+          <div className={`absolute top-0 bottom-0 ${isRight ? 'right-0' : 'left-0'} flex flex-col h-full ${innerWidthClass} max-w-[100vw]`}>
+            {innerContent}
+          </div>
+        </aside>
+      );
+    }
+
+    if (!isOpen) return null;
 
     return (
       <div className="fixed inset-0 z-[150] font-sans" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="absolute inset-0 bg-slate-900/20 dark:bg-slate-900/60 backdrop-blur-[2px] animate-in fade-in duration-300" onClick={onClose} />
         <aside 
-          className={`absolute top-0 bottom-0 ${width} w-full bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl shadow-[0_0_60px_rgba(0,0,0,0.1)] dark:shadow-[0_0_60px_rgba(0,0,0,0.5)] border-slate-200/60 dark:border-slate-700/60 flex flex-col transition-all duration-300 ${placementClasses} ${slideAnim}`}
+          className={`absolute top-0 bottom-0 ${width} w-full bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl shadow-[0_0_60px_rgba(0,0,0,0.1)] dark:shadow-[0_0_60px_rgba(0,0,0,0.5)] border-slate-200/60 dark:border-slate-700/60 flex flex-col transition-all duration-300 ${isRight ? 'right-0' : 'left-0'} ${placementClasses} ${slideAnim}`}
         >
-          <div className="h-12 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between px-4 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
-            <div className="flex items-center gap-2">
-                {typeof title === 'string' ? <h3 className="font-black text-slate-700 dark:text-slate-200 text-[14px] tracking-tight truncate">{title}</h3> : title}
-            </div>
-            <div className="flex items-center gap-1">
-                {headerActions}
-                <button onClick={onClose} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all active:scale-95">
-                <X size={16} strokeWidth={2.5} />
-                </button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-white dark:bg-slate-800 flex flex-col min-h-0">
-            {children}
-          </div>
-          {footer && (
-            <div className="p-2 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
-              {footer}
-            </div>
-          )}
+          {innerContent}
         </aside>
       </div>
     );
   };
+
+  Drawer.supportsInline = true;
 
   const ContextMenu = ({ items = [], children, language = 'fa' }) => {
     const [isVisible, setIsVisible] = useState(false);
