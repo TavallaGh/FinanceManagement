@@ -293,17 +293,19 @@
                 });
                 
                 const mappedItems = (initialRecord.fm_transaction_items || []).map(item => {
-                    const isDep = item.transaction_action === 'DEPOSIT';
-                    const rawAmt = item.amount !== undefined && item.amount !== null ? item.amount : 0;
+                    const action = String(item.transaction_action || '').toUpperCase();
+                    const isDep = action === 'DEPOSIT';
+                    const rawAmt = item.amount != null ? parseFloat(item.amount) : 0;
+                    
                     return {
                         ...item,
                         _tempId: crypto.randomUUID(),
                         id: formMode === 'COPY' ? undefined : item.id,
                         transaction_id: formMode === 'COPY' ? undefined : item.transaction_id,
                         deposit_amount: isDep ? rawAmt : 0,
-                        withdrawal_amount: !isDep ? rawAmt : 0
+                        withdrawal_amount: action === 'WITHDRAWAL' ? rawAmt : (isDep ? 0 : rawAmt)
                     };
-                }).sort((a, b) => a.row_number - b.row_number);
+                }).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
                 
                 setItemsData(mappedItems);
                 setIsDirty(formMode === 'COPY');
@@ -369,7 +371,8 @@
             const wid = parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
             const cur = i.currency || 'IRR';
             const { toUsd } = getExchangeRates(cur);
-            const action = i.transaction_action || (dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL');
+            
+            const action = (i.transaction_action || '').toUpperCase() || (dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL');
             const amt = action === 'DEPOSIT' ? dep : wid;
             
             const aUsd = amt * toUsd;
@@ -491,10 +494,14 @@
                     const itemsPayload = itemsData.map((item, index) => {
                         const dep = parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0;
                         const wid = parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-                        const action = item.transaction_action || (dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL');
+                        
+                        let action = (item.transaction_action || '').toUpperCase();
+                        if (!action) {
+                            action = dep > 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+                        }
+                        
                         const originalAmount = action === 'DEPOSIT' ? dep : wid;
                         const cur = item.currency || 'IRR';
-                        const { toUsd, usdToIrr } = getExchangeRates(cur);
                         
                         return {
                             transaction_id: txId,
@@ -506,10 +513,6 @@
                             income_type_id: item.income_type_id || null,
                             currency: cur,
                             amount: originalAmount,
-                            exchange_rate_to_usd: toUsd,
-                            exchange_rate_usd_to_irr: usdToIrr,
-                            amount_usd: originalAmount * toUsd,
-                            amount_irr: (originalAmount * toUsd) * usdToIrr,
                             description: item.description || null
                         };
                     });
@@ -518,15 +521,17 @@
                     if (itemsError) throw itemsError;
 
                     const mappedItems = newItems.map(item => {
-                        const isDep = item.transaction_action === 'DEPOSIT';
-                        const rawAmt = item.amount !== undefined && item.amount !== null ? item.amount : 0;
+                        const action = String(item.transaction_action || '').toUpperCase();
+                        const isDep = action === 'DEPOSIT';
+                        const rawAmt = item.amount != null ? parseFloat(item.amount) : 0;
                         return {
                             ...item,
                             _tempId: crypto.randomUUID(),
                             deposit_amount: isDep ? rawAmt : 0,
-                            withdrawal_amount: !isDep ? rawAmt : 0
+                            withdrawal_amount: action === 'WITHDRAWAL' ? rawAmt : (isDep ? 0 : rawAmt)
                         };
-                    }).sort((a, b) => a.row_number - b.row_number);
+                    }).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
+                    
                     setItemsData(mappedItems);
                 }
             }
@@ -541,7 +546,7 @@
                 showToast(t('سند با موفقیت ثبت شد.', 'Transaction saved successfully.'));
             }
         } catch (error) {
-            showToast(t('خطا در عملیات.', 'Operation failed.'), 'error');
+            showToast(t('خطا در عملیات. لطفاً مجدداً تلاش کنید.', 'Operation failed. Please try again.'), 'error');
         } finally {
             setIsLoading(false);
         }
