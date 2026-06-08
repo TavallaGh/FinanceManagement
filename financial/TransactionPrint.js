@@ -148,7 +148,7 @@
         )
     ));
 
-    const SimplePrintTable = ({ columns, rows, totals, language }) => {
+    const SimplePrintTable = ({ columns, rows, totals, language, showGroupTotals }) => {
         const isRtl = language === 'fa';
         return React.createElement('div', { className: "w-full overflow-hidden border border-slate-300 mt-4 rounded shadow-sm" },
             React.createElement('table', { className: `w-full text-[11px] text-slate-900 border-collapse ${isRtl ? 'text-right' : 'text-left'}` },
@@ -165,11 +165,27 @@
                                           'bg-slate-50 border-slate-200';
                             const indent = r.level === 'group' ? '' : r.level === 'general' ? (isRtl ? 'pr-4' : 'pl-4') : (isRtl ? 'pr-8' : 'pl-8');
                             const levelName = r.level === 'group' ? (isRtl ? 'گروه' : 'Group') : r.level === 'general' ? (isRtl ? 'کل' : 'General') : (isRtl ? 'معین' : 'Subsidiary');
-                            return React.createElement('tr', { key: `hdr-${i}`, className: `${bgCls} border-b` },
-                                React.createElement('td', { colSpan: columns.length, className: `px-3 py-2 font-bold text-slate-800 ${indent}` }, 
-                                    `${levelName}: ${r.data.code} - ${isRtl ? r.data.title_fa : (r.data.title_en || r.data.title_fa)}`
-                                )
-                            );
+                            
+                            const usdColIndex = columns.findIndex(c => c.field === 'usd_amount');
+                            const irrColIndex = columns.findIndex(c => c.field === 'irr_amount');
+
+                            if (showGroupTotals && usdColIndex !== -1 && irrColIndex !== -1) {
+                                const beforeUsdCount = usdColIndex;
+                                return React.createElement('tr', { key: `hdr-${i}`, className: `${bgCls} border-b font-bold` },
+                                    React.createElement('td', { colSpan: beforeUsdCount, className: `px-3 py-2 text-slate-800 ${indent}` }, 
+                                        `${levelName}: ${r.data.code} - ${isRtl ? r.data.title_fa : (r.data.title_en || r.data.title_fa)}`
+                                    ),
+                                    React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-200 font-bold", dir: "ltr" }, formatNumberSafe(r.usdSum)),
+                                    React.createElement('td', { className: "px-2 py-2 text-right border-x border-slate-200 font-bold", dir: "ltr" }, formatNumberSafe(r.irrSum)),
+                                    React.createElement('td', { colSpan: columns.length - irrColIndex - 1, className: "border-x border-slate-200" })
+                                );
+                            } else {
+                                return React.createElement('tr', { key: `hdr-${i}`, className: `${bgCls} border-b` },
+                                    React.createElement('td', { colSpan: columns.length, className: `px-3 py-2 font-bold text-slate-800 ${indent}` }, 
+                                        `${levelName}: ${r.data.code} - ${isRtl ? r.data.title_fa : (r.data.title_en || r.data.title_fa)}`
+                                    )
+                                );
+                            }
                         } else {
                             const item = r.data;
                             return React.createElement('tr', { key: `itm-${i}`, className: "border-b border-slate-200 last:border-b-0 hover:bg-slate-50" },
@@ -217,6 +233,7 @@
             calendarType: 'jalali',
             showTotals: true,
             showCurrencies: true,
+            showGroupTotals: true,
             showStatus: true,
             showSignatures: true,
             signatures: {
@@ -413,13 +430,40 @@
                 const subChanged = generalChanged || (itemSubsidiaryId !== currentSubsidiaryId);
 
                 if (printSettings.accountLevels.group && item._group && groupChanged) {
-                    rows.push({ type: 'header', level: 'group', data: item._group });
+                    let usdSum = 0, irrSum = 0;
+                    if (printSettings.showCurrencies && printSettings.showGroupTotals) {
+                        augmentedItems.forEach(x => {
+                            if (x._group && x._group.id === itemGroupId) {
+                                usdSum += parseFloat(x.amount_usd || 0);
+                                irrSum += parseFloat(x.amount_irr || 0);
+                            }
+                        });
+                    }
+                    rows.push({ type: 'header', level: 'group', data: item._group, usdSum, irrSum });
                 }
                 if (printSettings.accountLevels.general && item._general && generalChanged) {
-                    rows.push({ type: 'header', level: 'general', data: item._general });
+                    let usdSum = 0, irrSum = 0;
+                    if (printSettings.showCurrencies && printSettings.showGroupTotals) {
+                        augmentedItems.forEach(x => {
+                            if (x._general && x._general.id === itemGeneralId) {
+                                usdSum += parseFloat(x.amount_usd || 0);
+                                irrSum += parseFloat(x.amount_irr || 0);
+                            }
+                        });
+                    }
+                    rows.push({ type: 'header', level: 'general', data: item._general, usdSum, irrSum });
                 }
                 if (printSettings.accountLevels.subsidiary && item._subsidiary && subChanged) {
-                    rows.push({ type: 'header', level: 'subsidiary', data: item._subsidiary });
+                    let usdSum = 0, irrSum = 0;
+                    if (printSettings.showCurrencies && printSettings.showGroupTotals) {
+                        augmentedItems.forEach(x => {
+                            if (x._subsidiary && x._subsidiary.id === itemSubsidiaryId) {
+                                usdSum += parseFloat(x.amount_usd || 0);
+                                irrSum += parseFloat(x.amount_irr || 0);
+                            }
+                        });
+                    }
+                    rows.push({ type: 'header', level: 'subsidiary', data: item._subsidiary, usdSum, irrSum });
                 }
 
                 currentGroupId = itemGroupId;
@@ -459,6 +503,32 @@
 
             const rows = getPreparedRows();
             const cols = getColumns();
+
+            const usdColIdx = cols.findIndex(c => c.field === 'usd_amount');
+            const irrColIdx = cols.findIndex(c => c.field === 'irr_amount');
+
+            const tableRowsHTML = rows.map(r => {
+                if (r.type === 'header') {
+                    const cls = r.level === 'group' ? 'hdr-group' : r.level === 'general' ? 'hdr-general' : 'hdr-sub';
+                    const levelName = r.level === 'group' ? (isRtl ? 'گروه' : 'Group') : r.level === 'general' ? (isRtl ? 'کل' : 'General') : (isRtl ? 'معین' : 'Subsidiary');
+                    
+                    if (printSettings.showCurrencies && printSettings.showGroupTotals && usdColIdx !== -1 && irrColIdx !== -1) {
+                        return `
+                            <tr class="${cls}" style="font-weight: bold;">
+                                <td colspan="${usdColIdx}">${levelName}: ${r.data.code} - ${isRtl ? r.data.title_fa : (r.data.title_en || r.data.title_fa)}</td>
+                                <td class="text-right" dir="ltr">${formatNumberSafe(r.usdSum)}</td>
+                                <td class="text-right" dir="ltr">${formatNumberSafe(r.irrSum)}</td>
+                                <td colspan="${cols.length - irrColIdx - 1}"></td>
+                            </tr>
+                        `;
+                    } else {
+                        return `<tr class="${cls}"><td colspan="${cols.length}">${levelName}: ${r.data.code} - ${isRtl ? r.data.title_fa : (r.data.title_en || r.data.title_fa)}</td></tr>`;
+                    }
+                } else {
+                    const item = r.data;
+                    return `<tr>${cols.map(c => `<td class="${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}" ${c.align === 'right' ? 'dir="ltr"' : ''}>${item[c.field] || '-'}</td>`).join('')}</tr>`;
+                }
+            }).join('');
 
             const printHTML = `
                 <!DOCTYPE html>
@@ -564,16 +634,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                ${rows.map(r => {
-                                    if (r.type === 'header') {
-                                        const cls = r.level === 'group' ? 'hdr-group' : r.level === 'general' ? 'hdr-general' : 'hdr-sub';
-                                        const levelName = r.level === 'group' ? (isRtl ? 'گروه' : 'Group') : r.level === 'general' ? (isRtl ? 'کل' : 'General') : (isRtl ? 'معین' : 'Subsidiary');
-                                        return `<tr class="${cls}"><td colspan="${cols.length}">${levelName}: ${r.data.code} - ${isRtl ? r.data.title_fa : (r.data.title_en || r.data.title_fa)}</td></tr>`;
-                                    } else {
-                                        const item = r.data;
-                                        return `<tr>${cols.map(c => `<td class="${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}" ${c.align === 'right' ? 'dir="ltr"' : ''}>${item[c.field] || '-'}</td>`).join('')}</tr>`;
-                                    }
-                                }).join('')}
+                                ${tableRowsHTML}
                             </tbody>
                             ${printSettings.showTotals ? `
                             <tfoot>
@@ -660,6 +721,7 @@
                 React.createElement(SimplePrintTable, {
                     columns: getColumns(),
                     language: language,
+                    showGroupTotals: printSettings.showGroupTotals,
                     totals: printSettings.showTotals ? {
                         label: isRtl ? 'جمع کل:' : 'Total:',
                         deposit: formatNumberSafe(totals.debit),
@@ -734,6 +796,7 @@
                                 React.createElement(Text, { variant: "caption", weight: "bold", className: "mb-1 text-slate-400" }, isRtl ? 'گزینه‌های نمایش' : 'Display Options'),
                                 React.createElement(Checkbox, { label: isRtl ? 'نمایش جمع کل' : 'Show Totals', checked: printSettings.showTotals, onChange: (val) => handleSettingChange('showTotals', val) }),
                                 React.createElement(Checkbox, { label: isRtl ? 'نمایش مبالغ ارزی' : 'Show Currencies', checked: printSettings.showCurrencies, onChange: (val) => handleSettingChange('showCurrencies', val) }),
+                                printSettings.showCurrencies && React.createElement(Checkbox, { label: isRtl ? 'نمایش مجموع سطوح گروهبندی' : 'Show Totals for Group Levels', checked: printSettings.showGroupTotals, onChange: (val) => handleSettingChange('showGroupTotals', val) }),
                                 React.createElement(Checkbox, { label: isRtl ? 'نمایش وضعیت سند' : 'Show Status', checked: printSettings.showStatus, onChange: (val) => handleSettingChange('showStatus', val) }),
                                 React.createElement(Checkbox, { label: isRtl ? 'نمایش محل امضاها' : 'Show Signatures Section', checked: printSettings.showSignatures, onChange: (val) => handleSettingChange('showSignatures', val) })
                             ),
