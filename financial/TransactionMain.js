@@ -573,7 +573,8 @@
                     selectable: true,
                     actions: gridActions,
                     bulkActions: bulkActions,
-                    isLoading: isLoading
+                    isLoading: isLoading,
+                    actionWidth: '220px'
                 })
             )
         ),
