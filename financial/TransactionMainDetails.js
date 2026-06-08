@@ -487,6 +487,11 @@
                         const wid = parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0;
                         const cur = item.currency || 'IRR';
                         
+                        const { toUsd, usdToIrr } = getExchangeRates(cur);
+                        const val = dep > 0 ? dep : wid;
+                        const amtUsd = val * toUsd;
+                        const amtIrr = amtUsd * usdToIrr;
+                        
                         return {
                             transaction_id: txId,
                             row_number: index + 1,
@@ -498,6 +503,10 @@
                             currency: cur,
                             deposit_amount: dep,
                             withdrawal_amount: wid,
+                            exchange_rate_to_usd: toUsd,
+                            exchange_rate_usd_to_irr: usdToIrr,
+                            amount_usd: amtUsd,
+                            amount_irr: amtIrr,
                             description: item.description || null
                         };
                     });

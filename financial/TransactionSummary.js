@@ -41,8 +41,21 @@
     
     const mappedItems = rawItems.map(item => {
         const isDep = item.transaction_action === 'DEPOSIT';
-        const usd = parseFloat(item.amount_usd || 0);
-        const irr = parseFloat(item.amount_irr || 0);
+        
+        let usd = parseFloat(item.amount_usd || 0);
+        let irr = parseFloat(item.amount_irr || 0);
+
+        if (usd === 0 || irr === 0) {
+            const rawDep = parseFloat(item.deposit_amount || 0);
+            const rawWid = parseFloat(item.withdrawal_amount || 0);
+            const val = rawDep > 0 ? rawDep : rawWid;
+            const exUsd = parseFloat(item.exchange_rate_to_usd || 1);
+            const exIrr = parseFloat(item.exchange_rate_usd_to_irr || 1);
+            usd = val * exUsd;
+            irr = usd * exIrr;
+            item.amount_usd = usd;
+            item.amount_irr = irr;
+        }
         
         if (isDep) {
             depUsd += usd;
@@ -54,8 +67,8 @@
 
         return {
             ...item,
-            deposit_amount: isDep ? item.amount : 0,
-            withdrawal_amount: !isDep ? item.amount : 0
+            deposit_amount: item.deposit_amount || 0,
+            withdrawal_amount: item.withdrawal_amount || 0
         };
     });
     
