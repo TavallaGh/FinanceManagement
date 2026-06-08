@@ -95,7 +95,7 @@
       }
     };
 
-    const openLogModal = async (entityType, recordId) => {
+    const openLogModal = useCallback(async (entityType, recordId) => {
       setIsLogModalOpen(true); setIsLogsLoading(true);
       try {
         if (!supabase) throw new Error("Supabase is not initialized");
@@ -107,7 +107,7 @@
       } finally {
         setIsLogsLoading(false);
       }
-    };
+    }, [supabase, showToast]);
 
     const fetchCurrencies = useCallback(async () => {
       setIsLoading(true);
@@ -159,7 +159,7 @@
       }
     };
 
-    const handleBulkAction = async (actionType, selectedIds) => {
+    const handleBulkAction = useCallback(async (actionType, selectedIds) => {
       if (!selectedIds || !selectedIds.length) return;
       try {
         const nowStr = new Date().toISOString();
@@ -182,7 +182,7 @@
       } catch (err) {
         showToast(t('خطا در اجرای عملیات گروهی', 'Error executing bulk action'), 'error');
       }
-    };
+    }, [supabase, currencies, currentUser, showToast, fetchCurrencies]);
 
     const executeDelete = async () => {
       try {
@@ -235,7 +235,7 @@
 
     const handleOpenEdit = useCallback((row) => { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); }, []);
     const handleOpenDelete = useCallback((row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), []);
-    const handleOpenLog = useCallback((row) => openLogModal('fm_currencies', row.id), []);
+    const handleOpenLog = useCallback((row) => openLogModal('fm_currencies', row.id), [openLogModal]);
     const handleOpenAdd = useCallback(() => { setSelectedCurrency({ code: '', title: '', symbol: '', is_active: true, fetch_type: 'manual', decimal_places: 0, targets: [] }); setIsCurrencyModalOpen(true); }, []);
     const handleRowDoubleClick = useCallback((row) => { if (access.canEdit || access.canView) { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); } }, [access.canEdit, access.canView]);
 
@@ -251,7 +251,7 @@
       { id: 'setAuto', label: t('دریافت اتوماتیک', 'Set Auto'), icon: RefreshCw, onClick: (ids) => handleBulkAction('setAuto', ids), variant: 'outline', className: 'text-blue-600 dark:text-blue-400', requiredAccess: 'edit' },
       { id: 'setManual', label: t('دریافت دستی', 'Set Manual'), icon: Lock, onClick: (ids) => handleBulkAction('setManual', ids), variant: 'outline', className: 'text-amber-600 dark:text-amber-400', requiredAccess: 'edit' },
       { id: 'delete', label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }), variant: 'danger-outline', className: '!text-red-500 dark:!text-red-400 !border-red-500 dark:!border-red-800 hover:!bg-red-50 dark:hover:!bg-red-900/30' },
-    ], [isRtl, handleBulkAction]);
+    ], [isRtl, handleBulkAction, t]);
 
     const filteredCurrencies = useMemo(() => {
       let result = [...currencies];

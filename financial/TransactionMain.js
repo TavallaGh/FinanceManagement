@@ -48,6 +48,7 @@
   const Paperclip = safeIcon(LucideIcons, 'Paperclip');
   const DollarSign = safeIcon(LucideIcons, 'DollarSign');
   const Printer = safeIcon(LucideIcons, 'Printer');
+  const RefreshCw = safeIcon(LucideIcons, 'RefreshCw');
 
   const formatNumber = (num) => {
       if (!num && num !== 0) return '0';
@@ -282,6 +283,77 @@
         }
     };
 
+    const resolveRates = (ratesMap, currency) => {
+        let toUsd = 1;
+        if (currency !== 'USD') {
+            const direct = ratesMap[`${currency}_USD`];
+            if (direct) {
+                toUsd = parseFloat(direct);
+            } else {
+                const inverse = ratesMap[`USD_${currency}`];
+                if (inverse) toUsd = 1 / parseFloat(inverse);
+            }
+        }
+        let usdToIrr = parseFloat(ratesMap['USD_IRR'] || 1);
+        if (!ratesMap['USD_IRR'] && ratesMap['IRR_USD']) {
+            usdToIrr = 1 / parseFloat(ratesMap['IRR_USD']);
+        }
+        return { toUsd, usdToIrr };
+    };
+
+    const handleBulkUpdateRates = async (ids) => {
+        setIsLoading(true);
+        try {
+            const selectedTxs = transactions.filter(tx => ids.includes(tx.id));
+
+            // Collect unique dates and fetch rates per date
+            const uniqueDates = [...new Set(selectedTxs.map(tx => tx.document_date).filter(Boolean))];
+            const ratesByDate = {};
+            for (const date of uniqueDates) {
+                const formattedDate = date.replace(/\//g, '-');
+                const { data } = await supabase.from('fm_currency_rates')
+                    .select('base_currency, target_currency, rate, rate_date')
+                    .lte('rate_date', formattedDate)
+                    .order('rate_date', { ascending: false });
+                const latestRates = {};
+                (data || []).forEach(r => {
+                    const key = `${r.base_currency}_${r.target_currency}`;
+                    if (!latestRates[key]) latestRates[key] = r.rate;
+                });
+                ratesByDate[date] = latestRates;
+            }
+
+            let updatedCount = 0;
+            for (const tx of selectedTxs) {
+                const ratesMap = ratesByDate[tx.document_date] || {};
+                for (const item of (tx.fm_transaction_items || [])) {
+                    const cur = item.currency || 'IRR';
+                    const { toUsd, usdToIrr } = resolveRates(ratesMap, cur);
+                    const dep = parseFloat(item.deposit_amount || 0);
+                    const wid = parseFloat(item.withdrawal_amount || 0);
+                    const val = dep > 0 ? dep : wid;
+                    const amtUsd = val * toUsd;
+                    const amtIrr = amtUsd * usdToIrr;
+                    const { error } = await supabase.from('fm_transaction_items').update({
+                        exchange_rate_to_usd: toUsd,
+                        exchange_rate_usd_to_irr: usdToIrr,
+                        amount_usd: amtUsd,
+                        amount_irr: amtIrr
+                    }).eq('id', item.id);
+                    if (!error) updatedCount++;
+                }
+            }
+
+            showToast(t(`${updatedCount} قلم تراکنش با آخرین نرخ‌های ارز بروز شد.`, `${updatedCount} items updated with latest exchange rates.`));
+            await logAction('bulk_update_rates', 'BULK', `بروزرسانی نرخ ارز ${ids.length} سند (${updatedCount} قلم)`);
+            fetchData();
+        } catch (error) {
+            showToast(t('خطا در بروزرسانی نرخ ارزها.', 'Error updating exchange rates.'), 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const loadAttachments = async (recordId) => {
         try {
             const { data } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
@@ -446,6 +518,7 @@
     const bulkActions = [
         { label: t('تغییر به موقت', 'Set Temporary'), icon: FileText, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids) },
         { label: t('تغییر به یادداشت', 'Set Draft'), icon: Edit, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('DRAFT', ids) },
+        { label: t('بروزرسانی نرخ ارز', 'Update Exchange Rates'), icon: RefreshCw, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkUpdateRates(ids), className: 'text-indigo-600 dark:text-indigo-400' },
         { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) }
     ];
 
