@@ -115,15 +115,20 @@
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
 
-    const [currentUserId, setCurrentUserId]   = useState(null);
+    const windowCurrentUserObj = window.NavigationSystem?.currentUser || {};
+    const windowCurrentUserId = windowCurrentUserObj.id || null;
+    const windowCurrentUserName = windowCurrentUserObj.name || windowCurrentUserObj.full_name || windowCurrentUserObj.username || 'مدیر سیستم';
+    const windowCurrentUserUsername = windowCurrentUserObj.username || 'admin';
+
+    const [currentUserId, setCurrentUserId]   = useState(windowCurrentUserId);
     const [activeTab, setActiveTab]           = useState('personal');
     const [isLoading, setIsLoading]           = useState(false);
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
     const [toast, setToast]                   = useState({ isVisible: false, message: '', type: 'success' });
 
     const [profileInfo, setProfileInfo] = useState({
-      fullName:   t('در حال بارگذاری...', 'Loading...'),
-      username:   t('در حال بارگذاری...', 'Loading...'),
+      fullName:   windowCurrentUserName,
+      username:   windowCurrentUserUsername,
       partyRoles: [],
       department: '---',
       avatarUrl:  null,
@@ -151,45 +156,70 @@
       if (!supabase) return;
       const init = async () => {
         try {
-          const { data: authData, error: authErr } = await supabase.auth.getUser();
-          if (authErr || !authData?.user?.id) {
-            setProfileInfo(prev => ({ ...prev, fullName: t('کاربر یافت نشد', 'User not found'), username: '---' }));
-            return;
+          const { data: allUsers, error: usersErr } = await supabase
+            .from('sec_users')
+            .select('id, username, email, full_name, avatar_url, party_id');
+
+          if (usersErr) throw usersErr;
+
+          let safeMyUserId = windowCurrentUserId;
+          if (!safeMyUserId || safeMyUserId === '00000000-0000-0000-0000-000000000000') {
+              const matchedUser = (allUsers || []).find(u => u.username === windowCurrentUserUsername || u.full_name === windowCurrentUserName);
+              if (matchedUser) safeMyUserId = matchedUser.id;
           }
-          const userId = authData.user.id;
-          setCurrentUserId(userId);
-          await Promise.all([fetchUserData(userId), fetchPreferences(userId), fetchCostTypes()]);
+          
+          if (!safeMyUserId) {
+            const { data: authData } = await supabase.auth.getUser();
+            if (authData?.user?.id) {
+              safeMyUserId = authData.user.id;
+            }
+          }
+
+          setCurrentUserId(safeMyUserId);
+
+          if (safeMyUserId) {
+            await Promise.all([
+              fetchUserData(safeMyUserId, allUsers), 
+              fetchPreferences(safeMyUserId), 
+              fetchCostTypes()
+            ]);
+          } else {
+            setProfileInfo(prev => ({ ...prev, fullName: t('کاربر یافت نشد', 'User not found'), username: '---' }));
+          }
         } catch (err) {
           console.error('Auth init error:', err);
           setProfileInfo(prev => ({ ...prev, fullName: t('خطای دسترسی', 'Access error'), username: '---' }));
         }
       };
       init();
-    }, []);
+    }, [windowCurrentUserId, windowCurrentUserUsername, windowCurrentUserName]);
 
     // ── Fetch user profile ──────────────────────────────────────────────────────
-    const fetchUserData = async (userId) => {
+    const fetchUserData = async (userId, preloadedUsers) => {
       if (!supabase || !userId) return;
       try {
-        // 1. Resolve sec_users by auth ID
-        const { data: userData, error: userErr } = await supabase
-          .from('sec_users')
-          .select('id, username, email, full_name, avatar_url, party_id')
-          .eq('id', userId)
-          .maybeSingle();
+        let userData = (preloadedUsers || []).find(u => u.id === userId);
+        
+        if (!userData) {
+          const { data, error } = await supabase
+            .from('sec_users')
+            .select('id, username, email, full_name, avatar_url, party_id')
+            .eq('id', userId)
+            .maybeSingle();
+          if (error) throw error;
+          userData = data;
+        }
 
-        if (userErr) throw userErr;
         if (!userData) throw new Error('sec_users record not found');
 
         const partyId  = userData.party_id;
-        const username = userData.username || userData.email || '---';
-        let   fullName = userData.full_name || username;
+        const username = userData.username || userData.email || windowCurrentUserUsername || '---';
+        let   fullName = userData.full_name || windowCurrentUserName || username;
         let   partyRoles = [];
         let   department = '---';
 
         if (partyId) {
-          // 2. Parallel: party details + active org assignment
-          const [partyRes, orgRes] = await Promise.all([
+          const [partyRes, personnelRes, nodesRes] = await Promise.all([
             supabase
               .from('parties')
               .select('first_name, last_name, company_name, party_type, roles')
@@ -197,14 +227,17 @@
               .maybeSingle(),
             supabase
               .from('fm_org_chart_personnel')
-              .select('node_id, from_date, to_date')
-              .eq('person_id', partyId),
+              .select('node_id')
+              .eq('person_id', partyId)
+              .maybeSingle(),
+            supabase
+              .from('fm_org_chart_nodes')
+              .select('id, title, is_active')
           ]);
 
-          // Resolve display name
           if (!partyRes.error && partyRes.data) {
             const p = partyRes.data;
-            if (p.party_type === 'legal') {
+            if (p.party_type === 'legal' || p.party_type === 'COMPANY') {
               fullName = p.company_name || fullName;
             } else {
               const combined = `${p.first_name || ''} ${p.last_name || ''}`.trim();
@@ -217,23 +250,10 @@
             }
           }
 
-          // Resolve active department
-          const orgRows = (!orgRes.error && orgRes.data?.length > 0) ? orgRes.data : null;
-          if (orgRows) {
-            const today = new Date().toISOString().split('T')[0];
-            const active = orgRows.find(row => {
-              const from = row.from_date?.substring(0, 10).replace(/\//g, '-') ?? '1000-01-01';
-              const to   = row.to_date?.substring(0, 10).replace(/\//g, '-')   ?? '9999-12-31';
-              return today >= from && today <= to;
-            }) ?? orgRows[0];
-
-            if (active?.node_id) {
-              const { data: nodeData } = await supabase
-                .from('fm_org_chart_nodes')
-                .select('title, is_active')
-                .eq('id', active.node_id)
-                .maybeSingle();
-              if (nodeData?.is_active) department = nodeData.title;
+          if (personnelRes.data && personnelRes.data.node_id) {
+            const matchedNode = (nodesRes.data || []).find(n => n.id === personnelRes.data.node_id);
+            if (matchedNode && matchedNode.is_active !== false) {
+              department = matchedNode.title;
             }
           }
         }
@@ -482,6 +502,7 @@
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <ReadOnlyField label={t('نام کامل', 'Full Name')} value={profileInfo.fullName} />
                     <ReadOnlyField label={t('نام کاربری', 'Username')} value={profileInfo.username} ltr />
+                    <ReadOnlyField label={t('دپارتمان / واحد سازمانی', 'Department')} value={profileInfo.department} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="flex flex-col gap-1">
@@ -642,4 +663,3 @@
 
   window.UserProfile = UserProfile;
 })();
-
