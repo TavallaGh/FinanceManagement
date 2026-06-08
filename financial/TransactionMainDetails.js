@@ -491,6 +491,7 @@
                             transaction_id: txId,
                             row_number: index + 1,
                             account_id: (item.account_id && String(item.account_id).trim() !== '') ? item.account_id : null,
+                            transaction_action: item.transaction_action || 'DEPOSIT',
                             transaction_group: (item.transaction_group && String(item.transaction_group).trim() !== '') ? item.transaction_group : null,
                             cost_type_id: (item.cost_type_id && String(item.cost_type_id).trim() !== '') ? item.cost_type_id : null,
                             income_type_id: (item.income_type_id && String(item.income_type_id).trim() !== '') ? item.income_type_id : null,
