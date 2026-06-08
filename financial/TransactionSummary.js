@@ -1,7 +1,7 @@
 /* Filename: financial/TransactionSummary.js */
 (() => {
   const React = window.React;
-  const { useState, useCallback } = React;
+  const { useState, useEffect, useCallback, useMemo } = React;
 
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
@@ -31,46 +31,93 @@
   const TransactionSummary = ({ isOpen, onClose, record, lookups, language = 'fa', formCode = 'TRANSACTIONS' }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
+    const supabase = window.supabase;
 
     const [showGrid, setShowGrid] = useState(false);
+    const [currencyRates, setCurrencyRates] = useState({});
 
-    if (!isOpen || !record) return null;
+    useEffect(() => {
+        if (isOpen && record?.document_date && supabase) {
+            const fetchRates = async () => {
+                try {
+                    const formattedDate = record.document_date.replace(/\//g, '-');
+                    const { data } = await supabase.from('fm_currency_rates')
+                        .select('base_currency, target_currency, rate, rate_date')
+                        .lte('rate_date', formattedDate)
+                        .order('rate_date', { ascending: false });
+                    
+                    const latestRates = {};
+                    (data || []).forEach(r => {
+                        const key = `${r.base_currency}_${r.target_currency}`;
+                        if (!latestRates[key]) latestRates[key] = r.rate;
+                    });
+                    setCurrencyRates(latestRates);
+                } catch (e) {}
+            };
+            fetchRates();
+        }
+    }, [isOpen, record?.document_date, supabase]);
 
-    const rawItems = record.fm_transaction_items || [];
-    let depUsd = 0, widUsd = 0, depIrr = 0, widIrr = 0;
-    
-    const mappedItems = rawItems.map(item => {
-        const isDep = item.transaction_action === 'DEPOSIT';
+    const getExchangeRates = useCallback((currency) => {
+        let toUsd = 1;
+        if (currency !== 'USD') {
+            const direct = currencyRates[`${currency}_USD`];
+            if (direct) {
+                toUsd = direct;
+            } else {
+                const inverse = currencyRates[`USD_${currency}`];
+                if (inverse) toUsd = 1 / inverse;
+            }
+        }
         
-        let usd = parseFloat(item.amount_usd || 0);
-        let irr = parseFloat(item.amount_irr || 0);
+        // USD to IRR is generally stored as USD_IRR
+        let usdToIrr = currencyRates[`USD_IRR`] || 1;
+        if (!currencyRates[`USD_IRR`] && currencyRates[`IRR_USD`]) {
+             usdToIrr = 1 / currencyRates[`IRR_USD`];
+        }
+        
+        return { toUsd, usdToIrr };
+    }, [currencyRates]);
 
-        if (usd === 0 || irr === 0) {
+    const { mappedItems, depUsd, widUsd, depIrr, widIrr } = useMemo(() => {
+        const rawItems = record?.fm_transaction_items || [];
+        let dUsd = 0, wUsd = 0, dIrr = 0, wIrr = 0;
+        
+        const mItems = rawItems.map(item => {
+            const isDep = item.transaction_action === 'DEPOSIT';
+            const cur = item.currency || 'IRR';
+            const { toUsd, usdToIrr } = getExchangeRates(cur);
+
             const rawDep = parseFloat(item.deposit_amount || 0);
             const rawWid = parseFloat(item.withdrawal_amount || 0);
             const val = rawDep > 0 ? rawDep : rawWid;
-            const exUsd = parseFloat(item.exchange_rate_to_usd || 1);
-            const exIrr = parseFloat(item.exchange_rate_usd_to_irr || 1);
-            usd = val * exUsd;
-            irr = usd * exIrr;
-            item.amount_usd = usd;
-            item.amount_irr = irr;
-        }
-        
-        if (isDep) {
-            depUsd += usd;
-            depIrr += irr;
-        } else {
-            widUsd += usd;
-            widIrr += irr;
-        }
 
-        return {
-            ...item,
-            deposit_amount: item.deposit_amount || 0,
-            withdrawal_amount: item.withdrawal_amount || 0
-        };
-    });
+            let usd = val * toUsd;
+            let irr = usd * usdToIrr;
+
+            if (isDep) {
+                dUsd += usd;
+                dIrr += irr;
+            } else {
+                wUsd += usd;
+                wIrr += irr;
+            }
+
+            return {
+                ...item,
+                deposit_amount: rawDep,
+                withdrawal_amount: rawWid,
+                exchange_rate_to_usd: toUsd,
+                exchange_rate_usd_to_irr: usdToIrr,
+                amount_usd: usd,
+                amount_irr: irr
+            };
+        });
+
+        return { mappedItems: mItems, depUsd: dUsd, widUsd: wUsd, depIrr: dIrr, widIrr: wIrr };
+    }, [record, getExchangeRates]);
+
+    if (!isOpen || !record) return null;
     
     const diffUsd = Math.abs(depUsd - widUsd);
     const isBalancedUsd = diffUsd < 0.01;
@@ -96,7 +143,7 @@
         { field: 'deposit_amount', header_fa: 'مبلغ واریز', header_en: 'Deposit', width: '110px', render: val => <span dir="ltr" className="text-emerald-600 dark:text-emerald-400 font-bold">{formatNumber(val)}</span> },
         { field: 'withdrawal_amount', header_fa: 'مبلغ برداشت', header_en: 'Withdrawal', width: '110px', render: val => <span dir="ltr" className="text-orange-600 dark:text-orange-400 font-bold">{formatNumber(val)}</span> },
         { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '60px', render: val => <Badge size="sm" variant="slate">{val}</Badge> },
-        { field: 'exchange_rate_to_usd', header_fa: 'نرخ دلار', header_en: 'USD Rate', width: '80px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
+        { field: 'exchange_rate_to_usd', header_fa: 'نرخ به دلار', header_en: 'USD Rate', width: '80px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
         { field: 'amount_usd', header_fa: 'مبلغ به دلار', header_en: 'USD Amount', width: '110px', render: val => <span dir="ltr" className="font-bold text-slate-800 dark:text-slate-200">{formatNumber(val)}</span> },
         { field: 'exchange_rate_usd_to_irr', header_fa: 'نرخ دلار به ریال', header_en: 'USD to IRR Rate', width: '110px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
         { field: 'amount_irr', header_fa: 'مبلغ به ریال', header_en: 'IRR Amount', width: '120px', render: val => <span dir="ltr" className="font-bold text-slate-800 dark:text-slate-200">{formatNumber(val)}</span> },
