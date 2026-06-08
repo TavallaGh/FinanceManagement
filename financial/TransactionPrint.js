@@ -441,26 +441,26 @@
             }).sort((a, b) => a._sortCode.localeCompare(b._sortCode));
 
             const rows = [];
-            let currentGroup = null;
-            let currentGeneral = null;
-            let currentSubsidiary = null;
+            let currentGroupId = null;
+            let currentGeneralId = null;
+            let currentSubsidiaryId = null;
 
             augmentedItems.forEach((item, index) => {
-                const groupChanged = item._group?.id !== currentGroup?.id;
-                const generalChanged = groupChanged || item._general?.id !== currentGeneral?.id;
-                const subChanged = generalChanged || item._subsidiary?.id !== currentSubsidiary?.id;
+                const groupChanged = item._group ? item._group.id !== currentGroupId : false;
+                const generalChanged = groupChanged || (item._general ? item._general.id !== currentGeneralId : false);
+                const subChanged = generalChanged || (item._subsidiary ? item._subsidiary.id !== currentSubsidiaryId : false);
 
-                if (printSettings.accountLevels.group && item._group && groupChanged) {
+                if (printSettings.accountLevels.group && item._group && (currentGroupId === null || groupChanged)) {
                     rows.push({ type: 'header', level: 'group', data: item._group });
-                    currentGroup = item._group;
+                    currentGroupId = item._group.id;
                 }
-                if (printSettings.accountLevels.general && item._general && generalChanged) {
+                if (printSettings.accountLevels.general && item._general && (currentGeneralId === null || generalChanged)) {
                     rows.push({ type: 'header', level: 'general', data: item._general });
-                    currentGeneral = item._general;
+                    currentGeneralId = item._general.id;
                 }
-                if (printSettings.accountLevels.subsidiary && item._subsidiary && subChanged) {
+                if (printSettings.accountLevels.subsidiary && item._subsidiary && (currentSubsidiaryId === null || subChanged)) {
                     rows.push({ type: 'header', level: 'subsidiary', data: item._subsidiary });
-                    currentSubsidiary = item._subsidiary;
+                    currentSubsidiaryId = item._subsidiary.id;
                 }
 
                 const accName = isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en;
@@ -732,7 +732,7 @@
                     React.createElement(Button, { variant: "primary", icon: SafePrinterIcon, onClick: handlePrint, disabled: loading }, isRtl ? 'چاپ سند' : 'Print Document')
                 ),
 
-                React.createElement('div', { className: "flex-1 flex flex-row relative min-h-0 overflow-hidden" },
+                React.createElement('div', { className: "xs:flex-1 flex flex-row relative min-h-0 overflow-hidden" },
                     
                     Drawer && React.createElement(Drawer, {
                         isOpen: isSettingsOpen,
