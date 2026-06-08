@@ -219,7 +219,7 @@
         let   department = '---';
 
         if (partyId) {
-          const [partyRes, personnelRes] = await Promise.all([
+          const [partyRes, personnelRes, nodesRes] = await Promise.all([
             supabase
               .from('parties')
               .select('first_name, last_name, company_name, party_type, roles')
@@ -229,8 +229,10 @@
               .from('fm_org_chart_personnel')
               .select('node_id')
               .eq('person_id', partyId)
-              .limit(1)
-              .maybeSingle()
+              .maybeSingle(),
+            supabase
+              .from('fm_org_chart_nodes')
+              .select('id, title, is_active')
           ]);
 
           if (!partyRes.error && partyRes.data) {
@@ -248,15 +250,10 @@
             }
           }
 
-          if (!personnelRes.error && personnelRes.data && personnelRes.data.node_id) {
-            const { data: nodeData } = await supabase
-              .from('fm_org_chart_nodes')
-              .select('title')
-              .eq('id', personnelRes.data.node_id)
-              .eq('is_active', true)
-              .maybeSingle();
-            if (nodeData) {
-              department = nodeData.title;
+          if (personnelRes.data && personnelRes.data.node_id) {
+            const matchedNode = (nodesRes.data || []).find(n => n.id === personnelRes.data.node_id);
+            if (matchedNode && matchedNode.is_active !== false) {
+              department = matchedNode.title;
             }
           }
         }
