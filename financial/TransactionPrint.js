@@ -20,6 +20,7 @@
         const strVal = String(val).replace(/,/g, '');
         if (strVal.trim() === '' || isNaN(Number(strVal))) return '0';
         const parsed = parseFloat(strVal);
+        if (parsed === 0) return '0';
         const parts = parsed.toFixed(2).split('.');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         return parts[1] === '00' ? parts[0] : parts.join('.');
@@ -205,7 +206,6 @@
         const [usersMap, setUsersMap] = useState({});
         const [deptsMap, setDeptsMap] = useState({});
         const [allAccounts, setAllAccounts] = useState([]);
-        const [currencyRates, setCurrencyRates] = useState({});
         const [isSettingsOpen, setIsSettingsOpen] = useState(true);
         
         const [printSettings, setPrintSettings] = useState({
@@ -249,48 +249,6 @@
                 fetchDependencies();
             }
         }, [transactionId]);
-
-        useEffect(() => {
-            if (headerData?.document_date && supabase) {
-                const fetchRates = async () => {
-                    try {
-                        const formattedDate = headerData.document_date.replace(/\//g, '-');
-                        const { data } = await supabase.from('fm_currency_rates')
-                            .select('base_currency, target_currency, rate, rate_date')
-                            .lte('rate_date', formattedDate)
-                            .order('rate_date', { ascending: false });
-                        
-                        const latestRates = {};
-                        (data || []).forEach(r => {
-                            const key = `${r.base_currency}_${r.target_currency}`;
-                            if (!latestRates[key]) latestRates[key] = r.rate;
-                        });
-                        setCurrencyRates(latestRates);
-                    } catch (e) {}
-                };
-                fetchRates();
-            }
-        }, [headerData?.document_date, supabase]);
-
-        const getExchangeRates = useCallback((currency) => {
-            let toUsd = 1;
-            if (currency !== 'USD') {
-                const direct = currencyRates[`${currency}_USD`];
-                if (direct) {
-                    toUsd = direct;
-                } else {
-                    const inverse = currencyRates[`USD_${currency}`];
-                    if (inverse) toUsd = 1 / inverse;
-                }
-            }
-            
-            let usdToIrr = currencyRates[`USD_IRR`] || 1;
-            if (!currencyRates[`USD_IRR`] && currencyRates[`IRR_USD`]) {
-                 usdToIrr = 1 / currencyRates[`IRR_USD`];
-            }
-            
-            return { toUsd, usdToIrr };
-        }, [currencyRates]);
 
         const fetchDependencies = async () => {
             try {
@@ -377,20 +335,20 @@
             let debit = 0, credit = 0, usdDebit = 0, usdCredit = 0, irrDebit = 0, irrCredit = 0;
             
             itemsData.forEach(item => {
-                const amt = parseFloat(item.amount || 0);
-                const cur = item.currency || item.currency_code || 'IRR';
-                const { toUsd, usdToIrr } = getExchangeRates(cur);
-                const usdVal = amt * toUsd;
-                const irrVal = usdVal * usdToIrr;
+                const dep = parseFloat(item.deposit_amount || 0);
+                const wtd = parseFloat(item.withdrawal_amount || 0);
+                const usd = parseFloat(item.amount_usd || 0);
+                const irr = parseFloat(item.amount_irr || 0);
 
-                if (item.transaction_action === 'DEPOSIT') {
-                    debit += amt;
-                    usdDebit += usdVal;
-                    irrDebit += irrVal;
-                } else {
-                    credit += amt;
-                    usdCredit += usdVal;
-                    irrCredit += irrVal;
+                debit += dep;
+                credit += wtd;
+
+                if (dep > 0) {
+                    usdDebit += usd;
+                    irrDebit += irr;
+                } else if (wtd > 0) {
+                    usdCredit += usd;
+                    irrCredit += irr;
                 }
             });
 
@@ -470,10 +428,11 @@
 
                 const accName = isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en;
                 const cur = item.currency || item.currency_code || 'IRR';
-                const amt = parseFloat(item.amount || 0);
-                const { toUsd, usdToIrr } = getExchangeRates(cur);
-                const usdVal = amt * toUsd;
-                const irrVal = usdVal * usdToIrr;
+                
+                const depositAmt = parseFloat(item.deposit_amount || 0);
+                const withdrawAmt = parseFloat(item.withdrawal_amount || 0);
+                const usdVal = parseFloat(item.amount_usd || 0);
+                const irrVal = parseFloat(item.amount_irr || 0);
 
                 rows.push({
                     type: 'item',
@@ -482,10 +441,10 @@
                         account_code: item.fm_coa_accounts?.code || '-',
                         account_name: accName || '-',
                         currency: cur,
-                        deposit_amount: item.transaction_action === 'DEPOSIT' ? formatNumberSafe(item.amount) : '-',
-                        withdrawal_amount: item.transaction_action === 'WITHDRAWAL' ? formatNumberSafe(item.amount) : '-',
-                        usd_amount: formatNumberSafe(usdVal),
-                        irr_amount: formatNumberSafe(irrVal),
+                        deposit_amount: depositAmt > 0 ? formatNumberSafe(depositAmt) : '-',
+                        withdrawal_amount: withdrawAmt > 0 ? formatNumberSafe(withdrawAmt) : '-',
+                        usd_amount: usdVal > 0 ? formatNumberSafe(usdVal) : '-',
+                        irr_amount: irrVal > 0 ? formatNumberSafe(irrVal) : '-',
                         description: item.description || '-'
                     }
                 });
