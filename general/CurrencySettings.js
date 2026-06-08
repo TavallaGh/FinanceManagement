@@ -206,12 +206,12 @@
       }
     };
 
-    const tabs = [
+    const tabs = useMemo(() => [
       { id: 'list', label: t('فهرست ارزها', 'Currency List'), icon: Globe },
       { id: 'rates', label: t('سوابق نرخ ارزها', 'Exchange Rate History'), icon: History },
-    ];
+    ], [isRtl]);
 
-    const currencyColumns = [
+    const currencyColumns = useMemo(() => [
       { field: 'code', header_fa: 'کد ارز', header_en: 'Code', width: '90px', render: (v) => <span className="font-black text-slate-800 dark:text-slate-200">{v}</span> },
       { field: 'title', header_fa: 'عنوان', header_en: 'Title', width: '180px' },
       { field: 'symbol', header_fa: 'نماد', header_en: 'Symbol', width: '70px' },
@@ -231,15 +231,27 @@
       },
       { field: 'decimal_places', header_fa: 'اعشار', header_en: 'Decimals', width: '70px', render: (v) => <span className="text-slate-500 dark:text-slate-400 font-sans">{v}</span> },
       { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', type: 'toggle', width: '90px' },
-    ];
+    ], [isRtl]);
 
-    const currencyBulkActions = [
+    const handleOpenEdit = useCallback((row) => { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); }, []);
+    const handleOpenDelete = useCallback((row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), []);
+    const handleOpenLog = useCallback((row) => openLogModal('fm_currencies', row.id), []);
+    const handleOpenAdd = useCallback(() => { setSelectedCurrency({ code: '', title: '', symbol: '', is_active: true, fetch_type: 'manual', decimal_places: 0, targets: [] }); setIsCurrencyModalOpen(true); }, []);
+    const handleRowDoubleClick = useCallback((row) => { if (access.canEdit || access.canView) { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); } }, [access.canEdit, access.canView]);
+
+    const gridActions = useMemo(() => [
+      { id: 'view_log', icon: History, tooltip: t('مشاهده لاگ سیستم', 'View System Log'), onClick: handleOpenLog, className: 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300' },
+      { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: handleOpenEdit, className: 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400' },
+      { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: handleOpenDelete, className: 'text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400' }
+    ], [isRtl, handleOpenLog, handleOpenEdit, handleOpenDelete]);
+
+    const currencyBulkActions = useMemo(() => [
       { id: 'activate', label: t('فعال‌سازی', 'Activate'), icon: Check, onClick: (ids) => handleBulkAction('activate', ids), variant: 'outline', className: 'text-emerald-600 dark:text-emerald-400', requiredAccess: 'edit' },
       { id: 'deactivate', label: t('غیرفعال‌سازی', 'Deactivate'), icon: X, onClick: (ids) => handleBulkAction('deactivate', ids), variant: 'outline', className: 'text-slate-600 dark:text-slate-400', requiredAccess: 'edit' },
       { id: 'setAuto', label: t('دریافت اتوماتیک', 'Set Auto'), icon: RefreshCw, onClick: (ids) => handleBulkAction('setAuto', ids), variant: 'outline', className: 'text-blue-600 dark:text-blue-400', requiredAccess: 'edit' },
       { id: 'setManual', label: t('دریافت دستی', 'Set Manual'), icon: Lock, onClick: (ids) => handleBulkAction('setManual', ids), variant: 'outline', className: 'text-amber-600 dark:text-amber-400', requiredAccess: 'edit' },
       { id: 'delete', label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }), variant: 'danger-outline', className: '!text-red-500 dark:!text-red-400 !border-red-500 dark:!border-red-800 hover:!bg-red-50 dark:hover:!bg-red-900/30' },
-    ];
+    ], [isRtl, handleBulkAction]);
 
     const filteredCurrencies = useMemo(() => {
       let result = [...currencies];
@@ -272,15 +284,11 @@
                 <DataGrid 
                   data={filteredCurrencies} columns={currencyColumns} language={language} formCode={formCode}
                   gridState={currenciesGridState} onGridStateChange={setCurrenciesGridState}
-                  actions={[
-                    { id: 'view_log', icon: History, tooltip: t('مشاهده لاگ سیستم', 'View System Log'), onClick: (row) => openLogModal('fm_currencies', row.id), className: 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300' },
-                    { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); }, className: 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400' },
-                    { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400' }
-                  ]}
+                  actions={gridActions}
                   selectable={true}
-                  onRowDoubleClick={(row) => { if(access.canEdit || access.canView) { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); } }}
+                  onRowDoubleClick={handleRowDoubleClick}
                   bulkActions={currencyBulkActions}
-                  onAdd={() => { setSelectedCurrency({ code: '', title: '', symbol: '', is_active: true, fetch_type: 'manual', decimal_places: 0, targets: [] }); setIsCurrencyModalOpen(true); }}
+                  onAdd={handleOpenAdd}
                 />
               </div>
             </>
