@@ -42,6 +42,7 @@
     const [isLoading, setIsLoading] = useState(false);
     
     const [currencies, setCurrencies] = useState([]);
+    const [selectedIds, setSelectedIds] = useState([]);
     const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
     const [selectedCurrency, setSelectedCurrency] = useState(null);
     const [currencyFilters, setCurrencyFilters] = useState({});
@@ -178,6 +179,7 @@
            await logAction('fm_currencies', id, 'update', `عملیات گروهی: ${actionDesc}`, oldRecord, { ...oldRecord, ...updatePayload });
         }
         showToast(t('عملیات گروهی با موفقیت انجام شد', 'Bulk action successful'));
+        setSelectedIds([]);
         fetchCurrencies();
       } catch (err) {
         showToast(t('خطا در اجرای عملیات گروهی', 'Error executing bulk action'), 'error');
@@ -197,6 +199,7 @@
           if (error) throw error;
           for (const oldRec of oldRecords) await logAction('fm_currencies', oldRec.id, 'delete', `حذف گروهی ارز`, oldRec, null);
         }
+        setSelectedIds([]);
         fetchCurrencies();
         showToast(t('عملیات حذف با موفقیت انجام شد', 'Deletion successful'));
         setDeleteConfirm({ isOpen: false, type: null, data: null });
@@ -286,6 +289,8 @@
                   gridState={currenciesGridState} onGridStateChange={setCurrenciesGridState}
                   actions={gridActions}
                   selectable={true}
+                  selectedIds={selectedIds}
+                  onSelectChange={setSelectedIds}
                   onRowDoubleClick={handleRowDoubleClick}
                   bulkActions={currencyBulkActions}
                   onAdd={handleOpenAdd}
