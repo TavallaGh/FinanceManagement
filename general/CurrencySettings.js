@@ -55,7 +55,7 @@
     const [rateFilters, setRateFilters] = useState({ fromDate: todayStr, toDate: todayStr });
     const [ratesGridState, setRatesGridState] = useState(null);
 
-    const viewConfig = {
+    const viewConfig = useMemo(() => ({
       pageId: 'currency_settings_main',
       currentState: () => ({ activeTab, currencyFilters, currenciesGridState, rateFilters, ratesGridState }),
       onApplyState: (state) => {
@@ -73,7 +73,7 @@
           setRatesGridState(null);
         }
       }
-    };
+    }), [activeTab, currencyFilters, currenciesGridState, rateFilters, ratesGridState, todayStr]);
 
     const supabase = window.supabase;
     const currentUser = window.NavigationSystem?.currentUser?.name || 'مدیر سیستم';
