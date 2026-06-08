@@ -104,11 +104,11 @@
         if (error) throw error;
         setRecordLogs(data || []);
       } catch (err) {
-        showToast(t('خطا در دریافت تاریخچه تغییرات', 'Error fetching logs'), 'error');
+        showToast(isRtl ? 'خطا در دریافت تاریخچه تغییرات' : 'Error fetching logs', 'error');
       } finally {
         setIsLogsLoading(false);
       }
-    }, [supabase, showToast]);
+    }, [supabase, showToast, isRtl]);
 
     const fetchCurrencies = useCallback(async () => {
       setIsLoading(true);
@@ -118,11 +118,11 @@
         if (error) throw error;
         setCurrencies(data || []);
       } catch (err) {
-        showToast(t('خطا در دریافت اطلاعات ارزها', 'Error fetching currencies'), 'error');
+        showToast(isRtl ? 'خطا در دریافت اطلاعات ارزها' : 'Error fetching currencies', 'error');
       } finally {
         setIsLoading(false);
       }
-    }, [supabase, showToast, t]);
+    }, [supabase, showToast, isRtl]);
 
     useEffect(() => { fetchCurrencies(); }, [fetchCurrencies]);
 
@@ -160,31 +160,31 @@
       }
     };
 
-    const handleBulkAction = useCallback(async (actionType, selectedIds) => {
-      if (!selectedIds || !selectedIds.length) return;
+    const handleBulkAction = useCallback(async (actionType, targetIds) => {
+      if (!targetIds || !targetIds.length) return;
       try {
         const nowStr = new Date().toISOString();
         let updatePayload = { updated_by: currentUser, updated_at: nowStr };
         let actionDesc = '';
-        if (actionType === 'activate') { updatePayload.is_active = true; actionDesc = 'فعال‌سازی ارز'; }
-        if (actionType === 'deactivate') { updatePayload.is_active = false; actionDesc = 'غیرفعال‌سازی ارز'; }
-        if (actionType === 'setAuto') { updatePayload.fetch_type = 'auto'; actionDesc = 'تغییر به دریافت اتوماتیک'; }
-        if (actionType === 'setManual') { updatePayload.fetch_type = 'manual'; actionDesc = 'تغییر به دریافت دستی'; }
+        if (actionType === 'activate') { updatePayload.is_active = true; actionDesc = isRtl ? 'فعال‌سازی ارز' : 'Activate currency'; }
+        if (actionType === 'deactivate') { updatePayload.is_active = false; actionDesc = isRtl ? 'غیرفعال‌سازی ارز' : 'Deactivate currency'; }
+        if (actionType === 'setAuto') { updatePayload.fetch_type = 'auto'; actionDesc = isRtl ? 'تغییر به دریافت اتوماتیک' : 'Set to auto fetch'; }
+        if (actionType === 'setManual') { updatePayload.fetch_type = 'manual'; actionDesc = isRtl ? 'تغییر به دریافت دستی' : 'Set to manual fetch'; }
 
-        const { error } = await supabase.from('fm_currencies').update(updatePayload).in('id', selectedIds);
+        const { error } = await supabase.from('fm_currencies').update(updatePayload).in('id', targetIds);
         if (error) throw error;
         
-        for (const id of selectedIds) {
+        for (const id of targetIds) {
            const oldRecord = currencies.find(c => c.id === id);
            await logAction('fm_currencies', id, 'update', `عملیات گروهی: ${actionDesc}`, oldRecord, { ...oldRecord, ...updatePayload });
         }
-        showToast(t('عملیات گروهی با موفقیت انجام شد', 'Bulk action successful'));
+        showToast(isRtl ? 'عملیات گروهی با موفقیت انجام شد' : 'Bulk action successful');
         setSelectedIds([]);
         fetchCurrencies();
       } catch (err) {
-        showToast(t('خطا در اجرای عملیات گروهی', 'Error executing bulk action'), 'error');
+        showToast(isRtl ? 'خطا در اجرای عملیات گروهی' : 'Error executing bulk action', 'error');
       }
-    }, [supabase, currencies, currentUser, showToast, fetchCurrencies]);
+    }, [supabase, currencies, currentUser, showToast, fetchCurrencies, isRtl]);
 
     const executeDelete = async () => {
       try {
@@ -223,14 +223,14 @@
         render: (val) => (
           <div className="flex gap-1 flex-wrap">
             {Array.isArray(val) && val.map(c => <Badge key={c} variant="indigo" size="sm" className="px-1.5 py-0 text-[10px]">{c}</Badge>)}
-            {(!val || val.length === 0) && <span className="text-slate-300 dark:text-slate-500 text-[10px]">{t('بدون وابستگی', 'No targets')}</span>}
+            {(!val || val.length === 0) && <span className="text-slate-300 dark:text-slate-500 text-[10px]">{isRtl ? 'بدون وابستگی' : 'No targets'}</span>}
           </div>
         )
       },
       { 
         field: 'fetch_type', header_fa: 'نوع دریافت', header_en: 'Fetch Type', width: '110px', type: 'select',
-        options: [{value: 'auto', label: t('اتوماتیک', 'Auto')}, {value: 'manual', label: t('دستی', 'Manual')}],
-        render: (v) => <Badge variant={v === 'auto' ? 'emerald' : 'slate'} className="text-[10px]">{v === 'auto' ? t('اتوماتیک', 'Auto') : t('دستی', 'Manual')}</Badge>
+        options: [{value: 'auto', label: isRtl ? 'اتوماتیک' : 'Auto'}, {value: 'manual', label: isRtl ? 'دستی' : 'Manual'}],
+        render: (v) => <Badge variant={v === 'auto' ? 'emerald' : 'slate'} className="text-[10px]">{v === 'auto' ? (isRtl ? 'اتوماتیک' : 'Auto') : (isRtl ? 'دستی' : 'Manual')}</Badge>
       },
       { field: 'decimal_places', header_fa: 'اعشار', header_en: 'Decimals', width: '70px', render: (v) => <span className="text-slate-500 dark:text-slate-400 font-sans">{v}</span> },
       { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', type: 'toggle', width: '90px' },
@@ -243,18 +243,18 @@
     const handleRowDoubleClick = useCallback((row) => { if (access.canEdit || access.canView) { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); } }, [access.canEdit, access.canView]);
 
     const gridActions = useMemo(() => [
-      { id: 'view_log', icon: History, tooltip: t('مشاهده لاگ سیستم', 'View System Log'), onClick: handleOpenLog, className: 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300' },
-      { id: 'update', icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: handleOpenEdit, className: 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400' },
-      { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: handleOpenDelete, className: 'text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400' }
+      { id: 'view_log', icon: History, tooltip: isRtl ? 'مشاهده لاگ سیستم' : 'View System Log', onClick: handleOpenLog, className: 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300' },
+      { id: 'update', icon: Edit, tooltip: isRtl ? 'ویرایش' : 'Edit', onClick: handleOpenEdit, className: 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400' },
+      { id: 'delete', icon: Trash2, tooltip: isRtl ? 'حذف' : 'Delete', onClick: handleOpenDelete, className: 'text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400' }
     ], [isRtl, handleOpenLog, handleOpenEdit, handleOpenDelete]);
 
     const currencyBulkActions = useMemo(() => [
-      { id: 'activate', label: t('فعال‌سازی', 'Activate'), icon: Check, onClick: (ids) => handleBulkAction('activate', ids), variant: 'outline', className: 'text-emerald-600 dark:text-emerald-400', requiredAccess: 'edit' },
-      { id: 'deactivate', label: t('غیرفعال‌سازی', 'Deactivate'), icon: X, onClick: (ids) => handleBulkAction('deactivate', ids), variant: 'outline', className: 'text-slate-600 dark:text-slate-400', requiredAccess: 'edit' },
-      { id: 'setAuto', label: t('دریافت اتوماتیک', 'Set Auto'), icon: RefreshCw, onClick: (ids) => handleBulkAction('setAuto', ids), variant: 'outline', className: 'text-blue-600 dark:text-blue-400', requiredAccess: 'edit' },
-      { id: 'setManual', label: t('دریافت دستی', 'Set Manual'), icon: Lock, onClick: (ids) => handleBulkAction('setManual', ids), variant: 'outline', className: 'text-amber-600 dark:text-amber-400', requiredAccess: 'edit' },
-      { id: 'delete', label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }), variant: 'danger-outline', className: '!text-red-500 dark:!text-red-400 !border-red-500 dark:!border-red-800 hover:!bg-red-50 dark:hover:!bg-red-900/30' },
-    ], [isRtl, handleBulkAction, t]);
+      { id: 'activate', label: isRtl ? 'فعال‌سازی' : 'Activate', icon: Check, onClick: (ids) => handleBulkAction('activate', ids), variant: 'outline', className: 'text-emerald-600 dark:text-emerald-400', requiredAccess: 'edit' },
+      { id: 'deactivate', label: isRtl ? 'غیرفعال‌سازی' : 'Deactivate', icon: X, onClick: (ids) => handleBulkAction('deactivate', ids), variant: 'outline', className: 'text-slate-600 dark:text-slate-400', requiredAccess: 'edit' },
+      { id: 'setAuto', label: isRtl ? 'دریافت اتوماتیک' : 'Set Auto', icon: RefreshCw, onClick: (ids) => handleBulkAction('setAuto', ids), variant: 'outline', className: 'text-blue-600 dark:text-blue-400', requiredAccess: 'edit' },
+      { id: 'setManual', label: isRtl ? 'دریافت دستی' : 'Set Manual', icon: Lock, onClick: (ids) => handleBulkAction('setManual', ids), variant: 'outline', className: 'text-amber-600 dark:text-amber-400', requiredAccess: 'edit' },
+      { id: 'delete', label: isRtl ? 'حذف گروهی' : 'Delete Selected', icon: Trash2, onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }), variant: 'danger-outline', className: '!text-red-500 dark:!text-red-400 !border-red-500 dark:!border-red-800 hover:!bg-red-50 dark:hover:!bg-red-900/30' },
+    ], [isRtl, handleBulkAction]);
 
     const filteredCurrencies = useMemo(() => {
       let result = [...currencies];
