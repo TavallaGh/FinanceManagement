@@ -227,7 +227,7 @@
       orange: "bg-orange-100/50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
       emerald: "bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
     };
-    return <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[12px] font-black tracking-wide ${variants[variant] || variants.gray} ${className}`}>{children}</span>;
+    return <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[12px] tracking-wide ${variants[variant] || variants.gray} ${className}`}>{children}</span>;
   };
 
   const PageHeader = ({ title, icon: Icon, breadcrumbs = [], language = 'fa', actions, viewConfig }) => {
