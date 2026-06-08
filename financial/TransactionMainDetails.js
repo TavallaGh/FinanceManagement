@@ -137,17 +137,25 @@
 
             (usersRes.data || []).forEach(u => {
                 uMap[u.id] = `${u.full_name || u.username || ''}`.trim();
-                if (u.id === currentUserId && u.party_id) {
-                    const personnelRecord = (personnelRes.data || []).find(p => p.person_id === u.party_id);
-                    if (personnelRecord) {
-                        const nodeRecord = (nodesRes.data || []).find(n => n.id === personnelRecord.node_id);
-                        if (nodeRecord) {
-                            myDeptId = nodeRecord.id;
-                            myDeptTitle = nodeRecord.title;
-                        }
+            });
+
+            let safeMyUserId = currentUserId;
+            if (!safeMyUserId || safeMyUserId === '00000000-0000-0000-0000-000000000000') {
+                const matchedMe = (usersRes.data || []).find(u => u.username === currentUserUsername || u.full_name === currentUserName);
+                if (matchedMe) safeMyUserId = matchedMe.id;
+            }
+
+            const activeUserObj = (usersRes.data || []).find(u => u.id === safeMyUserId);
+            if (activeUserObj && activeUserObj.party_id) {
+                const personnelRecord = (personnelRes.data || []).find(p => p.person_id === activeUserObj.party_id);
+                if (personnelRecord) {
+                    const nodeRecord = (nodesRes.data || []).find(n => n.id === personnelRecord.node_id);
+                    if (nodeRecord) {
+                        myDeptId = nodeRecord.id;
+                        myDeptTitle = nodeRecord.title;
                     }
                 }
-            });
+            }
 
             const activeCharts = chartRes.data || [];
             const activeChartIds = new Set(activeCharts.map(c => c.id));
@@ -184,6 +192,11 @@
             const costLeafs = buildPathsAndFilterLeafs(costRes.data || []);
             const incomeLeafs = buildPathsAndFilterLeafs(incRes.data || []);
 
+            const nodesMap = {};
+            (nodesRes.data || []).forEach(n => {
+                nodesMap[n.id] = n.title;
+            });
+
             const newLookups = {
                 accounts: allAccounts,
                 leafAccounts: leafAccs,
@@ -193,7 +206,8 @@
                 usersList: usersRes.data || [],
                 currentUserDeptId: myDeptId,
                 currentUserDeptTitle: myDeptTitle,
-                currencies: currRes.data || []
+                currencies: currRes.data || [],
+                departmentsMap: nodesMap
             };
 
             setLookups(newLookups);
@@ -202,7 +216,7 @@
             showToast(t('خطا در دریافت اطلاعات پایه', 'Error fetching dependencies'), 'error');
             return null;
         }
-    }, [supabase, showToast, t, currentUserId]);
+    }, [supabase, showToast, t, currentUserId, currentUserName, currentUserUsername]);
 
     const generateFallbackCode = () => {
         return `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -277,7 +291,9 @@
                 }
                 
                 const parsedDate = formMode === 'COPY' ? todayStr : (initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr);
-                
+                const finalDeptId = formMode === 'COPY' ? newLookups.currentUserDeptId : initialRecord.department_id;
+                const finalDeptTitle = formMode === 'COPY' ? newLookups.currentUserDeptTitle : (newLookups.departmentsMap[initialRecord.department_id] || initialRecord.department_id || '');
+
                 setHeaderData({
                     ...initialRecord,
                     id: formMode === 'COPY' ? undefined : initialRecord.id,
@@ -287,8 +303,8 @@
                     daily_number: formMode === 'COPY' ? '' : initialRecord.daily_number,
                     document_date: parsedDate,
                     registered_at: formMode === 'COPY' ? new Date().toISOString() : initialRecord.registered_at,
-                    department_id: formMode === 'COPY' ? newLookups.currentUserDeptId : initialRecord.department_id,
-                    department_title: formMode === 'COPY' ? newLookups.currentUserDeptTitle : '',
+                    department_id: finalDeptId,
+                    department_title: finalDeptTitle,
                     registrar_id: formMode === 'COPY' ? safeFinalRegistrar : initialRecord.registrar_id
                 });
                 
