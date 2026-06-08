@@ -105,8 +105,10 @@
     const [gridState, setGridState] = useState(null);
     const [filters, setFilters] = useState({});
     const [usersMap, setUsersMap] = useState({});
+    const [deptsMap, setDeptsMap] = useState({});
     const [lookups, setLookups] = useState({ accounts: [], costTypes: [], incomeTypes: [] });
     const [resolvedUserId, setResolvedUserId] = useState(currentUserId);
+    const [userDepartmentId, setUserDepartmentId] = useState(null);
     
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [formMode, setFormMode] = useState('CREATE');
@@ -136,32 +138,58 @@
       } catch (err) {}
     }, [supabase, currentUserName]);
 
-    const fetchUsers = useCallback(async () => {
+    const fetchUsersAndResolveDepartment = useCallback(async () => {
         try {
-            const { data } = await supabase.from('sec_users').select('id, full_name, username');
+            const { data: userData } = await supabase.from('sec_users').select('id, full_name, username, party_id');
             const uMap = {};
-            (data || []).forEach(u => {
+            (userData || []).forEach(u => {
                 uMap[u.id] = `${u.full_name || u.username || ''}`.trim();
             });
             setUsersMap(uMap);
 
             let myId = currentUserId;
+            let targetUsername = currentUserObj.username || 'admin';
+
             if (!myId || myId === '00000000-0000-0000-0000-000000000000') {
-                const me = (data || []).find(u => u.username === (currentUserObj.username || 'admin') || u.full_name === currentUserName);
-                if (me) myId = me.id;
+                const me = (userData || []).find(u => u.username === targetUsername || u.full_name === currentUserName);
+                if (me) {
+                    myId = me.id;
+                }
             }
             setResolvedUserId(myId);
-        } catch (error) {}
+
+            const activeUserRecord = (userData || []).find(u => u.id === myId || u.username === targetUsername);
+            if (activeUserRecord && activeUserRecord.party_id) {
+                const { data: personnelData } = await supabase
+                    .from('fm_org_chart_personnel')
+                    .select('node_id')
+                    .eq('person_id', activeUserRecord.party_id)
+                    .maybeSingle();
+                
+                if (personnelData && personnelData.node_id) {
+                    setUserDepartmentId(personnelData.node_id);
+                }
+            }
+        } catch (error) {
+            console.error("Error in fetching user department relation:", error);
+        }
     }, [supabase, currentUserId, currentUserObj.username, currentUserName]);
 
     const fetchLookups = useCallback(async () => {
         try {
-            const [accRes, chartRes, costRes, incRes] = await Promise.all([
+            const [accRes, chartRes, costRes, incRes, deptNodesRes] = await Promise.all([
                 supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
-                supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true)
+                supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+                supabase.from('fm_org_chart_nodes').select('id, title')
             ]);
+
+            const dMap = {};
+            (deptNodesRes.data || []).forEach(d => {
+                dMap[d.id] = d.title;
+            });
+            setDeptsMap(dMap);
 
             const activeCharts = chartRes.data || [];
             const activeChartIds = new Set(activeCharts.map(c => c.id));
@@ -229,15 +257,26 @@
 
     useEffect(() => {
         if (access.canView) {
-            fetchUsers();
+            fetchUsersAndResolveDepartment();
             fetchLookups();
             fetchData();
         }
-    }, [fetchUsers, fetchLookups, fetchData, access.canView]);
+    }, [fetchUsersAndResolveDepartment, fetchLookups, fetchData, access.canView]);
 
     const handleOpenForm = (mode, record = null) => {
         setFormMode(mode);
-        setCurrentRecord(record);
+        if (mode === 'CREATE') {
+            setCurrentRecord({
+                department_id: userDepartmentId,
+                registrar_id: resolvedUserId,
+                document_date: new Date().toISOString().split('T')[0],
+                status: 'DRAFT',
+                transaction_type: 'GENERAL',
+                fm_transaction_items: []
+            });
+        } else {
+            setCurrentRecord(record);
+        }
         setIsFormModalOpen(true);
     };
 
@@ -306,7 +345,6 @@
         try {
             const selectedTxs = transactions.filter(tx => ids.includes(tx.id));
 
-            // Collect unique dates and fetch rates per date
             const uniqueDates = [...new Set(selectedTxs.map(tx => tx.document_date).filter(Boolean))];
             const ratesByDate = {};
             for (const date of uniqueDates) {
@@ -461,8 +499,11 @@
             if (!val || val === '00000000-0000-0000-0000-000000000000') return React.createElement('span', { className: "text-[12px] text-slate-500" }, t('سیستمی', 'System'));
             return React.createElement('span', { className: "text-[12px] truncate font-medium text-slate-700 dark:text-slate-300 block" }, usersMap[val] || val);
         }},
+        { field: 'department_id', header_fa: 'دپارتمان', header_en: 'Department', width: '120px', render: (val) => {
+            return React.createElement('span', { className: "text-[12px] truncate font-medium text-slate-600 dark:text-slate-400 block" }, deptsMap[val] || val || '-');
+        }},
         { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: 'auto', render: (val) => React.createElement('span', { className: "text-[12px] truncate block max-w-xs", title: val }, val || '-') }
-    ], [usersMap, t]);
+    ], [usersMap, deptsMap, t]);
 
     const accountLovColumns = [
         { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '120px' },
@@ -574,12 +615,12 @@
                     actions: gridActions,
                     bulkActions: bulkActions,
                     isLoading: isLoading,
-                    actionWidth: '220px'
+                    actionWidth: '260px'
                 })
             )
         ),
 
-        React.createElement(DetailsModal, {
+        isFormModalOpen && React.createElement(DetailsModal, {
             isOpen: isFormModalOpen,
             onClose: () => setIsFormModalOpen(false),
             onSuccess: handleModalSuccess,
