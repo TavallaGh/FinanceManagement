@@ -446,22 +446,27 @@
             let currentSubsidiaryId = null;
 
             augmentedItems.forEach((item, index) => {
-                const groupChanged = item._group ? item._group.id !== currentGroupId : false;
-                const generalChanged = groupChanged || (item._general ? item._general.id !== currentGeneralId : false);
-                const subChanged = generalChanged || (item._subsidiary ? item._subsidiary.id !== currentSubsidiaryId : false);
+                const itemGroupId = item._group ? item._group.id : null;
+                const itemGeneralId = item._general ? item._general.id : null;
+                const itemSubsidiaryId = item._subsidiary ? item._subsidiary.id : null;
 
-                if (printSettings.accountLevels.group && item._group && (currentGroupId === null || groupChanged)) {
+                const groupChanged = itemGroupId !== currentGroupId;
+                const generalChanged = groupChanged || (itemGeneralId !== currentGeneralId);
+                const subChanged = generalChanged || (itemSubsidiaryId !== currentSubsidiaryId);
+
+                if (printSettings.accountLevels.group && item._group && groupChanged) {
                     rows.push({ type: 'header', level: 'group', data: item._group });
-                    currentGroupId = item._group.id;
                 }
-                if (printSettings.accountLevels.general && item._general && (currentGeneralId === null || generalChanged)) {
+                if (printSettings.accountLevels.general && item._general && generalChanged) {
                     rows.push({ type: 'header', level: 'general', data: item._general });
-                    currentGeneralId = item._general.id;
                 }
-                if (printSettings.accountLevels.subsidiary && item._subsidiary && (currentSubsidiaryId === null || subChanged)) {
+                if (printSettings.accountLevels.subsidiary && item._subsidiary && subChanged) {
                     rows.push({ type: 'header', level: 'subsidiary', data: item._subsidiary });
-                    currentSubsidiaryId = item._subsidiary.id;
                 }
+
+                currentGroupId = itemGroupId;
+                currentGeneralId = itemGeneralId;
+                currentSubsidiaryId = itemSubsidiaryId;
 
                 const accName = isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en;
                 const cur = item.currency || item.currency_code || 'IRR';
