@@ -116,9 +116,11 @@
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
 
     const windowCurrentUserObj = window.NavigationSystem?.currentUser || {};
-    const windowCurrentUserId = windowCurrentUserObj.id || null;
-    const windowCurrentUserName = windowCurrentUserObj.name || windowCurrentUserObj.full_name || windowCurrentUserObj.username || 'مدیر سیستم';
-    const windowCurrentUserUsername = windowCurrentUserObj.username || 'admin';
+    // Session واقعی از sessionStorage خوانده می‌شود (توسط app.js پس از لاگین ذخیره می‌شود)
+    const storedSession = (() => { try { return JSON.parse(sessionStorage.getItem('fm_user_session') || '{}'); } catch(_) { return {}; } })();
+    const windowCurrentUserId = storedSession.id || windowCurrentUserObj.id || null;
+    const windowCurrentUserUsername = storedSession.username || windowCurrentUserObj.username || '';
+    const windowCurrentUserName = windowCurrentUserObj.name || windowCurrentUserObj.full_name || windowCurrentUserUsername || '';
 
     const [currentUserId, setCurrentUserId]   = useState(windowCurrentUserId);
     const [activeTab, setActiveTab]           = useState('personal');
@@ -127,11 +129,12 @@
     const [toast, setToast]                   = useState({ isVisible: false, message: '', type: 'success' });
 
     const [profileInfo, setProfileInfo] = useState({
-      fullName:   windowCurrentUserName,
-      username:   windowCurrentUserUsername,
-      partyRoles: [],
-      department: '---',
-      avatarUrl:  null,
+      fullName:    windowCurrentUserName || windowCurrentUserUsername || '...',
+      username:    windowCurrentUserUsername || '...',
+      partyRoles:  [],
+      accessRoles: [],
+      department:  '---',
+      avatarUrl:   null,
     });
 
     const [preferences, setPreferences] = useState({
@@ -167,14 +170,14 @@
           console.warn('sec_users fetch exception:', e);
         }
 
-        // Step 2: resolve userId
+        // Step 2: resolve userId — اولویت با sessionStorage است (id مستقیم، نیازی به match name نیست)
         let safeMyUserId = windowCurrentUserId;
+        // فقط اگر id از session نداشتیم، سعی می‌کنیم با username match کنیم (نه full_name)
         if (!safeMyUserId || safeMyUserId === '00000000-0000-0000-0000-000000000000') {
-          const matchedUser = allUsers.find(u =>
-            u.username === windowCurrentUserUsername ||
-            u.full_name === windowCurrentUserName
-          );
-          if (matchedUser) safeMyUserId = matchedUser.id;
+          if (windowCurrentUserUsername) {
+            const matchedUser = allUsers.find(u => u.username === windowCurrentUserUsername);
+            if (matchedUser) safeMyUserId = matchedUser.id;
+          }
         }
 
         if (!safeMyUserId) {
@@ -226,14 +229,15 @@
         console.log('[UserProfile] userData:', userData);
 
         const partyId  = userData.party_id;
-        const username = userData.username || '---';
+        const username = userData.username || windowCurrentUserUsername || '---';
         // full_name از DB اولویت دارد؛ اگر خالی بود از first_name + last_name در parties استفاده می‌شود
         let   fullName = userData.full_name || '';
         let   partyRoles = [];
+        let   accessRoles = [];
         let   department = '---';
 
         if (partyId) {
-          const [partyRes, personnelRes] = await Promise.all([
+        const [partyRes, personnelRes, userRolesRes] = await Promise.all([
             supabase
               .from('parties')
               .select('first_name, last_name, company_name, party_type, roles')
@@ -244,6 +248,10 @@
               .select('node_id')
               .eq('person_id', partyId)
               .maybeSingle(),
+            supabase
+              .from('sec_user_roles')
+              .select('role_id, sec_roles(id, title)')
+              .eq('user_id', userId),
           ]);
 
           if (partyRes.error) console.warn('parties fetch warning:', partyRes.error.message);
@@ -277,14 +285,34 @@
               department = nodeRes.data.title;
             }
           }
+
+          if (!userRolesRes.error && userRolesRes.data) {
+            accessRoles = userRolesRes.data
+              .map(r => r.sec_roles?.title)
+              .filter(Boolean);
+          } else if (userRolesRes.error) {
+            console.warn('sec_user_roles fetch warning:', userRolesRes.error.message);
+          }
+        } else {
+          // اگر party_id نداشت، فقط نقش‌های دسترسی رو بگیر
+          const userRolesRes = await supabase
+            .from('sec_user_roles')
+            .select('role_id, sec_roles(id, title)')
+            .eq('user_id', userId);
+          if (!userRolesRes.error && userRolesRes.data) {
+            accessRoles = userRolesRes.data
+              .map(r => r.sec_roles?.title)
+              .filter(Boolean);
+          }
         }
 
         console.log('[UserProfile] resolved — fullName:', fullName, '| username:', username, '| department:', department);
 
         setProfileInfo({
-          fullName:   fullName || username || t('بدون نام', 'No name'),
+          fullName:    fullName || username || t('بدون نام', 'No name'),
           username,
           partyRoles,
+          accessRoles,
           department,
           avatarUrl: userData.avatar_url ?? null,
         });
@@ -533,6 +561,21 @@
                           ? profileInfo.partyRoles.map((role, idx) => (
                               <span key={idx} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded">
                                 {formatRole(role)}
+                              </span>
+                            ))
+                          : <span className="text-[11px] text-slate-400 px-1">{t('ندارد', 'None')}</span>
+                        }
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        <Shield size={12} /> {t('نقش‌های دسترسی', 'Access Roles')}
+                      </label>
+                      <div className="min-h-[36px] p-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded flex flex-wrap gap-1 items-center">
+                        {profileInfo.accessRoles.length > 0
+                          ? profileInfo.accessRoles.map((role, idx) => (
+                              <span key={idx} className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold rounded">
+                                {role}
                               </span>
                             ))
                           : <span className="text-[11px] text-slate-400 px-1">{t('ندارد', 'None')}</span>
