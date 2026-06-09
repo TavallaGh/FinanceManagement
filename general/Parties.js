@@ -40,6 +40,7 @@
       mobile: '',
       phone: '',
       email: '',
+      latinTitle: '',
       addresses: [],
       roles: [],
       isActive: true
@@ -88,6 +89,7 @@
           mobile: item.mobile,
           phone: item.phone,
           email: item.email,
+          latinTitle: item.latin_title || '',
           addresses: item.addresses || [],
           roles: item.roles || [],
           isActive: item.is_active ?? true
@@ -119,6 +121,7 @@
           mobile: formData.mobile,
           phone: formData.phone,
           email: formData.email,
+          latin_title: formData.latinTitle,
           addresses: formData.addresses || [],
           roles: formData.roles || [],
           is_active: formData.isActive,
@@ -186,6 +189,7 @@
         mobile: '',
         phone: '',
         email: '',
+        latinTitle: '',
         addresses: [],
         roles: [],
         isActive: true 
@@ -244,6 +248,7 @@
         width: '250px',
         render: (val, row) => row.partyType === 'legal' ? <span className="font-bold text-slate-800 dark:text-slate-100">{row.companyName}</span> : <span className="font-bold text-slate-800 dark:text-slate-100">{`${row.firstName || ''} ${row.lastName || ''}`.trim()}</span>
       },
+      { field: 'latinTitle', header_fa: 'عنوان لاتین', header_en: 'Latin Title', width: '150px' },
       { 
         field: 'partyType', 
         header_fa: 'نوع', 
@@ -382,6 +387,7 @@
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('شماره موبایل', 'Mobile')} value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('تلفن ثابت', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('پست الکترونیک', 'Email')} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
+                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('عنوان لاتین', 'Latin Title')} value={formData.latinTitle} onChange={e => setFormData({...formData, latinTitle: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
               </div>
             </div>
 
@@ -400,7 +406,7 @@
                       <CheckboxField size="sm" wrapperClassName="!m-0" label={t('صرافی', 'Exchange')} checked={formData.roles.includes('exchange')} onChange={() => toggleRole('exchange')} isRtl={isRtl} formCode={FORM_CODE} />
                       
                       {formData.partyType === 'real' && (
-                        <div className="w-full flex flex-wrap gap-x-6 gap-y-3 mt-1 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                        <div className="w-full flex flex-wrap gap-x-6 gap-y-3">
                           <CheckboxField size="sm" wrapperClassName="!m-0" label={t('کارمند', 'Employee')} checked={formData.roles.includes('employee')} onChange={() => toggleRole('employee')} isRtl={isRtl} formCode={FORM_CODE} />
                           <CheckboxField size="sm" wrapperClassName="!m-0" label={t('کاربر سیستم', 'System User')} checked={formData.roles.includes('system_user')} onChange={() => toggleRole('system_user')} isRtl={isRtl} formCode={FORM_CODE} />
                         </div>
