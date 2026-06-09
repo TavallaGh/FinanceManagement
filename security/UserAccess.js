@@ -52,8 +52,6 @@
     const [activeSourceId, setActiveSourceId] = useState(null);
     const [gridSelectedIds, setGridSelectedIds] = useState([]);
 
-    const [isAddFormModalOpen, setIsAddFormModalOpen] = useState(false);
-
     useEffect(() => {
       if (isOpen && user) {
         fetchData();
@@ -64,7 +62,6 @@
         setDirectPerms({});
         setDeletedPermIds([]);
         setGridSelectedIds([]);
-        setIsAddFormModalOpen(false);
         setHasChanges(false);
       }
     }, [isOpen, user]);
@@ -233,6 +230,8 @@
           const deletes = [...deletedPermIds];
 
           Object.entries(directPerms).forEach(([menuId, data]) => {
+              if (menuId.startsWith('temp_')) return;
+
               const hasActions = data.actions && data.actions.length > 0;
               const hasScopes = data.scopes && Object.keys(data.scopes).some(k => data.scopes[k]?.length > 0);
 
@@ -286,19 +285,33 @@
         setHasChanges(true);
     };
 
-    const handleAddDirectForm = (form) => {
-        if (directPerms[form.id]) {
+    const handleInlineAddRow = () => {
+        const tempId = `temp_${Date.now()}`;
+        setDirectPerms(prev => ({
+            ...prev,
+            [tempId]: { id: null, actions: [], scopes: {} }
+        }));
+        setSelectedMenuId(tempId);
+        setActiveSourceId('direct');
+        setHasChanges(true);
+    };
+
+    const handleInlineSelectForm = (tempId, targetMenuId) => {
+        if (!targetMenuId) return;
+        if (directPerms[targetMenuId]) {
             alert(t('این فرم قبلاً در لیست دسترسی‌های مستقیم وجود دارد.', 'This form is already in direct permissions list.'));
             return;
         }
 
-        setDirectPerms(prev => ({
-            ...prev,
-            [form.id]: { id: null, actions: [], scopes: {} }
-        }));
-        
-        setSelectedMenuId(form.id);
-        setGridSelectedIds([form.id]);
+        setDirectPerms(prev => {
+            const next = { ...prev };
+            const oldData = next[tempId] || { id: null, actions: [], scopes: {} };
+            delete next[tempId];
+            next[targetMenuId] = oldData;
+            return next;
+        });
+
+        setSelectedMenuId(targetMenuId);
         setActiveSourceId('direct');
         setHasChanges(true);
     };
@@ -360,6 +373,11 @@
     };
 
     const handleUpdateDirectPermission = (formId, type, key, value) => {
+        if (formId.startsWith('temp_')) {
+            alert(t('لطفاً ابتدا فرم مورد نظر را انتخاب کنید.', 'Please select a form first.'));
+            return;
+        }
+
         setDirectPerms(prev => {
             const current = prev[formId] || { id: null, actions: [], scopes: {} };
             let updatedActions = [...current.actions];
@@ -399,32 +417,59 @@
         header_fa: 'مسیر و نام فرم', 
         header_en: 'Form Path & Name', 
         width: '350px',
-        render: (val, row) => (
-            <div className="flex flex-col py-0.5 w-full">
-                <span className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{row.name}</span>
-                <span className="text-[10px] text-slate-400 font-sans truncate">{row.path}</span>
-            </div>
-        )
+        render: (val, row) => {
+            if (row.id.toString().startsWith('temp_')) {
+                return (
+                    <div className="w-full py-1">
+                        <SelectField
+                            size="sm"
+                            placeholder={t('انتخاب فرم...', 'Select Form...')}
+                            options={allSystemForms.filter(f => !directPerms[f.id]).map(f => ({ value: f.id, label: f.fullPath }))}
+                            value=""
+                            onChange={(e) => handleInlineSelectForm(row.id, e.target.value)}
+                            isRtl={isRtl}
+                        />
+                    </div>
+                );
+            }
+            return (
+                <div className="flex flex-col py-0.5 w-full">
+                    <span className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{row.name}</span>
+                    <span className="text-[10px] text-slate-400 font-sans truncate">{row.path}</span>
+                </div>
+            );
+        }
       },
       { 
         field: 'source', 
         header_fa: 'نوع دسترسی', 
         header_en: 'Access Type', 
         width: '250px',
-        render: (val, row) => (
-          <div className="flex items-center w-full min-h-[24px]">
-             <div className="flex flex-wrap gap-1 flex-1 items-center">
-                 {row.breakdown.map((s, idx) => {
-                    const isDirect = s.type === 'direct';
-                    return (
-                        <Badge key={idx} variant={isDirect ? 'blue' : 'gray'} className="flex items-center gap-1">
-                           {isDirect ? <Zap size={10}/> : <Shield size={10}/>} {s.label}
-                        </Badge>
-                    )
-                 })}
-             </div>
-          </div>
-        )
+        render: (val, row) => {
+          if (row.id.toString().startsWith('temp_')) {
+              return (
+                  <div className="flex items-center min-h-[24px]">
+                      <Badge variant="blue" className="flex items-center gap-1">
+                          <Zap size={10}/> {t('مستقیم (جدید)', 'Direct (New)')}
+                      </Badge>
+                  </div>
+              );
+          }
+          return (
+            <div className="flex items-center w-full min-h-[24px]">
+               <div className="flex flex-wrap gap-1 flex-1 items-center">
+                   {row.breakdown.map((s, idx) => {
+                      const isDirect = s.type === 'direct';
+                      return (
+                          <Badge key={idx} variant={isDirect ? 'blue' : 'gray'} className="flex items-center gap-1">
+                             {isDirect ? <Zap size={10}/> : <Shield size={10}/>} {s.label}
+                          </Badge>
+                      )
+                   })}
+               </div>
+            </div>
+          )
+        }
       }
     ];
 
@@ -496,13 +541,13 @@
                                             setActiveSourceId(row.breakdown[0].sourceId);
                                         }
                                     } else {
-                                        setActiveSourceId(null);
+                                        setActiveSourceId('direct');
                                     }
                                 }}
-                                onAdd={() => setIsAddFormModalOpen(true)}
+                                onAdd={handleInlineAddRow}
                                 onRowDoubleClick={(row) => {
                                     setSelectedMenuId(row.id);
-                                    if (row.breakdown.length > 0) setActiveSourceId(row.breakdown[0].sourceId);
+                                    if (row.breakdown && row.breakdown.length > 0) setActiveSourceId(row.breakdown[0].sourceId);
                                 }}
                                 actions={[
                                     { 
@@ -510,14 +555,14 @@
                                         tooltip: t('مشاهده جزئیات', 'View Details'), 
                                         onClick: (row) => {
                                             setSelectedMenuId(row.id);
-                                            if (row.breakdown.length > 0) setActiveSourceId(row.breakdown[0].sourceId);
+                                            if (row.breakdown && row.breakdown.length > 0) setActiveSourceId(row.breakdown[0].sourceId);
                                         },
                                         className: 'text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-slate-800 dark:hover:bg-slate-700 p-1.5 rounded transition-colors'
                                     },
                                     {
                                         icon: Trash2,
                                         tooltip: t('حذف دسترسی مستقیم', 'Delete Direct Access'),
-                                        hidden: (row) => !row.breakdown.some(b => b.type === 'direct'),
+                                        hidden: (row) => !directPerms[row.id],
                                         onClick: (row) => handleDeleteDirect(row.id),
                                         className: 'text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors'
                                     }
@@ -534,7 +579,7 @@
                         </div>
                     </div>
 
-                    {currentDetailRow && (
+                    {currentDetailRow && !selectedMenuId.toString().startsWith('temp_') && (
                         <div className="w-full md:w-5/12 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 flex flex-col overflow-hidden animate-in slide-in-from-right-5 duration-200 relative z-10 shadow-sm">
                             <div className="absolute top-3 left-3">
                                 <button onClick={() => setSelectedMenuId(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors">
@@ -548,7 +593,7 @@
                             </div>
 
                             <div className="flex-1 flex flex-col overflow-hidden">
-                                {currentDetailRow.breakdown.length > 1 && (
+                                {currentDetailRow.breakdown && currentDetailRow.breakdown.length > 1 && (
                                     <div className="px-4 pt-4 border-b border-slate-100 dark:border-slate-800">
                                         <Tabs 
                                             tabs={currentDetailRow.breakdown.map(s => ({ 
@@ -671,23 +716,6 @@
                     </div>
                 </div>
             </div>
-            <Modal isOpen={isAddFormModalOpen} onClose={() => setIsAddFormModalOpen(false)} title={t('افزودن دسترسی مستقیم', 'Add Direct Access')} width="max-w-md" language={language}>
-                <div className="p-4 flex flex-col gap-4 min-h-[250px]">
-                    <SelectField
-                        label={t('جستجو و انتخاب فرم', 'Search and select form')}
-                        options={allSystemForms.filter(f => !directPerms[f.id]).map(f => ({ value: f.id, label: f.fullPath }))}
-                        value=""
-                        onChange={(e) => {
-                            const f = allSystemForms.find(x => x.id === e.target.value);
-                            if(f) {
-                                handleAddDirectForm(f);
-                                setIsAddFormModalOpen(false);
-                            }
-                        }}
-                        isRtl={isRtl}
-                    />
-                </div>
-            </Modal>
         </Modal>
     );
   };
