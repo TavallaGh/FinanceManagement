@@ -114,12 +114,13 @@
                 const scopes = typeof p.data_scopes === 'string' ? JSON.parse(p.data_scopes || '{}') : (p.data_scopes || {});
                 
                 if (p.role_id) {
-                    if (!rPerms[p.role_id]) rPerms[p.role_id] = [];
-                    rPerms[p.role_id].push({ menu_id: p.menu_id, actions, scopes });
+                    const rId = String(p.role_id);
+                    if (!rPerms[rId]) rPerms[rId] = [];
+                    rPerms[rId].push({ menu_id: p.menu_id, actions, scopes });
                 }
                 
                 if (p.user_id && p.user_id === user.id) {
-                    dPerms[p.menu_id] = { id: p.id, actions, scopes };
+                    dPerms[String(p.menu_id)] = { id: p.id, actions, scopes };
                 }
             });
         }
@@ -143,10 +144,10 @@
 
     const getMenuFullPath = useCallback((menuId) => {
         const pathParts = [];
-        let current = menusData.find(m => m.id === menuId);
+        let current = menusData.find(m => String(m.id) === String(menuId));
         while (current) {
             pathParts.unshift(getMenuLabel(current));
-            current = menusData.find(m => m.id === current.parent_id);
+            current = menusData.find(m => String(m.id) === String(current.parent_id));
         }
         return pathParts.join(' / ');
     }, [menusData, getMenuLabel]);
@@ -166,16 +167,17 @@
         const map = new Map();
 
         assignedRoles.forEach(roleId => {
-            const rolePerms = globalRolePerms[roleId] || [];
-            const roleInfo = allRoles.find(r => r.id === roleId);
+            const rolePerms = globalRolePerms[String(roleId)] || [];
+            const roleInfo = allRoles.find(r => String(r.id) === String(roleId));
             
             rolePerms.forEach(p => {
-                const formInfo = allSystemForms.find(f => f.id === p.menu_id);
+                const formInfo = allSystemForms.find(f => String(f.id) === String(p.menu_id));
                 if (!formInfo) return; 
-                if (!map.has(p.menu_id)) {
-                    map.set(p.menu_id, { id: p.menu_id, path: formInfo.fullPath, name: formInfo.label, breakdown: [] });
+                const stringId = String(p.menu_id);
+                if (!map.has(stringId)) {
+                    map.set(stringId, { id: formInfo.id, path: formInfo.fullPath, name: formInfo.label, breakdown: [] });
                 }
-                map.get(p.menu_id).breakdown.push({ 
+                map.get(stringId).breakdown.push({ 
                     sourceId: `role_${roleId}`, 
                     type: 'role', 
                     label: `${t('نقش:', 'Role:')} ${roleInfo?.title || roleId}`, 
@@ -186,17 +188,35 @@
         });
 
         Object.entries(directPerms).forEach(([menuId, p]) => {
-            const formInfo = allSystemForms.find(f => f.id === menuId);
-            if (!formInfo) return;
-            if (!map.has(menuId)) {
-                map.set(menuId, { id: menuId, path: formInfo.fullPath, name: formInfo.label, breakdown: [] });
+            if (menuId.startsWith('temp_')) {
+                map.set(menuId, {
+                    id: menuId,
+                    name: t('(فرم جدید)', '(New Form)'),
+                    path: t('لطفاً فرم را انتخاب کنید...', 'Please select a form...'),
+                    breakdown: [{
+                        sourceId: 'direct',
+                        type: 'direct',
+                        label: t('مستقیم (جدید)', 'Direct (New)'),
+                        actions: p.actions || [],
+                        scopes: p.scopes || {}
+                    }]
+                });
+                return;
             }
-            const existing = map.get(menuId).breakdown.find(b => b.type === 'direct');
+
+            const formInfo = allSystemForms.find(f => String(f.id) === String(menuId));
+            if (!formInfo) return;
+            
+            const stringId = String(formInfo.id);
+            if (!map.has(stringId)) {
+                map.set(stringId, { id: formInfo.id, path: formInfo.fullPath, name: formInfo.label, breakdown: [] });
+            }
+            const existing = map.get(stringId).breakdown.find(b => b.type === 'direct');
             if (existing) {
                 existing.actions = p.actions || []; 
                 existing.scopes = p.scopes || {};
             } else {
-                map.get(menuId).breakdown.push({ 
+                map.get(stringId).breakdown.push({ 
                     sourceId: 'direct', 
                     type: 'direct', 
                     label: t('مستقیم', 'Direct'), 
@@ -211,7 +231,7 @@
 
     const currentDetailRow = useMemo(() => {
         if (!selectedMenuId) return null;
-        return effectivePermissions.find(r => r.id === selectedMenuId) || null;
+        return effectivePermissions.find(r => String(r.id) === String(selectedMenuId)) || null;
     }, [selectedMenuId, effectivePermissions]);
 
     const handleSavePermissions = async () => {
@@ -235,10 +255,13 @@
               const hasActions = data.actions && data.actions.length > 0;
               const hasScopes = data.scopes && Object.keys(data.scopes).some(k => data.scopes[k]?.length > 0);
 
+              const systemForm = allSystemForms.find(f => String(f.id) === String(menuId));
+              const dbMenuId = systemForm ? systemForm.id : menuId;
+
               if (hasActions || hasScopes) {
                   const payload = { 
                       user_id: user.id, 
-                      menu_id: menuId, 
+                      menu_id: dbMenuId, 
                       actions: data.actions || [], 
                       data_scopes: data.scopes || {} 
                   };
@@ -298,7 +321,8 @@
 
     const handleInlineSelectForm = (tempId, targetMenuId) => {
         if (!targetMenuId) return;
-        if (directPerms[targetMenuId]) {
+        const stringTargetId = String(targetMenuId);
+        if (directPerms[stringTargetId]) {
             alert(t('این فرم قبلاً در لیست دسترسی‌های مستقیم وجود دارد.', 'This form is already in direct permissions list.'));
             return;
         }
@@ -307,32 +331,36 @@
             const next = { ...prev };
             const oldData = next[tempId] || { id: null, actions: [], scopes: {} };
             delete next[tempId];
-            next[targetMenuId] = oldData;
+            next[stringTargetId] = oldData;
             return next;
         });
 
-        setSelectedMenuId(targetMenuId);
+        const systemForm = allSystemForms.find(f => String(f.id) === stringTargetId);
+        const finalId = systemForm ? systemForm.id : targetMenuId;
+
+        setSelectedMenuId(finalId);
         setActiveSourceId('direct');
         setHasChanges(true);
     };
 
     const handleDeleteDirect = (menuId) => {
-        const perm = directPerms[menuId];
+        const stringMenuId = String(menuId);
+        const perm = directPerms[stringMenuId];
         if (perm && perm.id) {
             setDeletedPermIds(prev => [...prev, perm.id]);
         }
         
         setDirectPerms(prev => {
             const next = { ...prev };
-            delete next[menuId];
+            delete next[stringMenuId];
             return next;
         });
 
-        setGridSelectedIds(prev => prev.filter(id => id !== menuId));
+        setGridSelectedIds(prev => prev.filter(id => String(id) !== stringMenuId));
 
-        if (selectedMenuId === menuId) {
+        if (String(selectedMenuId) === stringMenuId) {
             if (activeSourceId === 'direct') {
-                const current = effectivePermissions.find(r => r.id === menuId);
+                const current = effectivePermissions.find(r => String(r.id) === stringMenuId);
                 const roleSources = current?.breakdown.filter(b => b.type === 'role') || [];
                 if (roleSources.length > 0) {
                     setActiveSourceId(roleSources[0].sourceId);
@@ -347,7 +375,9 @@
 
     const handleBulkDeleteDirect = (menuIds) => {
         const idsToDelete = [];
-        menuIds.forEach(id => {
+        const stringMenuIds = menuIds.map(id => String(id));
+
+        stringMenuIds.forEach(id => {
             if (directPerms[id] && directPerms[id].id) {
                 idsToDelete.push(directPerms[id].id);
             }
@@ -359,13 +389,13 @@
 
         setDirectPerms(prev => {
             const next = { ...prev };
-            menuIds.forEach(id => delete next[id]);
+            stringMenuIds.forEach(id => delete next[id]);
             return next;
         });
 
-        setGridSelectedIds(prev => prev.filter(id => !menuIds.includes(id)));
+        setGridSelectedIds(prev => prev.filter(id => !stringMenuIds.includes(String(id))));
 
-        if (menuIds.includes(selectedMenuId) && activeSourceId === 'direct') {
+        if (stringMenuIds.includes(String(selectedMenuId)) && activeSourceId === 'direct') {
             setSelectedMenuId(null);
             setActiveSourceId(null);
         }
@@ -373,13 +403,14 @@
     };
 
     const handleUpdateDirectPermission = (formId, type, key, value) => {
-        if (formId.startsWith('temp_')) {
+        const stringFormId = String(formId);
+        if (stringFormId.startsWith('temp_')) {
             alert(t('لطفاً ابتدا فرم مورد نظر را انتخاب کنید.', 'Please select a form first.'));
             return;
         }
 
         setDirectPerms(prev => {
-            const current = prev[formId] || { id: null, actions: [], scopes: {} };
+            const current = prev[stringFormId] || { id: null, actions: [], scopes: {} };
             let updatedActions = [...current.actions];
             let updatedScopes = { ...current.scopes };
 
@@ -401,7 +432,7 @@
 
             return {
                 ...prev,
-                [formId]: {
+                [stringFormId]: {
                     ...current,
                     actions: updatedActions,
                     scopes: updatedScopes
@@ -424,7 +455,7 @@
                         <SelectField
                             size="sm"
                             placeholder={t('انتخاب فرم...', 'Select Form...')}
-                            options={allSystemForms.filter(f => !directPerms[f.id]).map(f => ({ value: f.id, label: f.fullPath }))}
+                            options={allSystemForms.filter(f => !directPerms[String(f.id)]).map(f => ({ value: f.id, label: f.fullPath }))}
                             value=""
                             onChange={(e) => handleInlineSelectForm(row.id, e.target.value)}
                             isRtl={isRtl}
@@ -475,7 +506,7 @@
 
     if (!isOpen) return null;
 
-    const activeMenuInfo = currentDetailRow ? allSystemForms.find(f => f.id === currentDetailRow.id) : null;
+    const activeMenuInfo = currentDetailRow ? allSystemForms.find(f => String(f.id) === String(currentDetailRow.id)) : null;
     const availActions = activeMenuInfo ? activeMenuInfo.available_actions : [];
     const availScopes = activeMenuInfo ? activeMenuInfo.available_scopes : [];
     const activeSource = currentDetailRow ? currentDetailRow.breakdown.find(b => b.sourceId === activeSourceId) : null;
@@ -495,7 +526,7 @@
                         </span>
                         <div className="flex gap-1 flex-wrap items-center">
                             {assignedRoles.map(rId => {
-                                const role = allRoles.find(r => r.id === rId);
+                                const role = allRoles.find(r => String(r.id) === String(rId));
                                 return (
                                     <div key={rId} className="flex items-center gap-1 bg-white dark:bg-slate-700 border border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-[11px] font-bold shadow-sm">
                                         {role?.title || rId}
@@ -562,7 +593,7 @@
                                     {
                                         icon: Trash2,
                                         tooltip: t('حذف دسترسی مستقیم', 'Delete Direct Access'),
-                                        hidden: (row) => !directPerms[row.id],
+                                        hidden: (row) => !directPerms[String(row.id)],
                                         onClick: (row) => handleDeleteDirect(row.id),
                                         className: 'text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors'
                                     }
