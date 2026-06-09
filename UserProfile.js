@@ -588,46 +588,46 @@
 
               {/* Tab: Basic Preferences */}
               {activeTab === 'preferences' && (
-                <div className="flex flex-col gap-8 max-w-2xl">
+                <div className="flex flex-col gap-6 max-w-xl">
 
                   {/* ── Theme ── */}
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-700">
-                      <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
-                        <Sun size={13} className="text-amber-500" />
-                      </div>
-                      <span className="text-[12px] font-black text-slate-700 dark:text-slate-200">{t('تم رنگی', 'Color Theme')}</span>
-                      <span className="ms-auto text-[10px] text-slate-400 dark:text-slate-500">{t('ظاهر رابط کاربری', 'UI appearance')}</span>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Sun size={12} className="text-amber-500" />
+                      <span className="text-[11px] font-black text-slate-600 dark:text-slate-300">{t('تم رنگی', 'Color Theme')}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2">
                       {[
-                        { value: 'light',  fa: 'روشن',   en: 'Light',  Icon: Sun,     descFa: 'پس‌زمینه سفید روشن',    descEn: 'Bright white background'  },
-                        { value: 'dark',   fa: 'تاریک',  en: 'Dark',   Icon: Moon,    descFa: 'پس‌زمینه تیره و آرام',    descEn: 'Dark comfortable theme'   },
-                        { value: 'system', fa: 'خودکار', en: 'System', Icon: Monitor, descFa: 'براساس تنظیمات سیستم',  descEn: 'Follow OS preference'     },
-                      ].map(({ value: v, fa, en, Icon, descFa, descEn }) => {
+                        { value: 'light',  fa: 'روشن',   en: 'Light',  Icon: Sun     },
+                        { value: 'dark',   fa: 'تاریک',  en: 'Dark',   Icon: Moon    },
+                        { value: 'system', fa: 'خودکار', en: 'System', Icon: Monitor },
+                      ].map(({ value: v, fa, en, Icon }) => {
                         const sel = preferences.theme === v;
                         return (
                           <button key={v} type="button"
-                            onClick={() => setPreferences(p => ({ ...p, theme: v }))}
-                            className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 text-center outline-none transition-all duration-150 ${
+                            onClick={() => {
+                              setPreferences(p => ({ ...p, theme: v }));
+                              if (v === 'system') {
+                                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                                window.DSCore?.setGlobalTheme?.(isDark ? 'dark' : 'light');
+                              } else {
+                                window.DSCore?.setGlobalTheme?.(v);
+                              }
+                            }}
+                            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 outline-none transition-all duration-150 ${
                               sel
-                                ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 shadow-md'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm'
+                                ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-indigo-300 dark:hover:border-indigo-700'
                             }`}>
-                            {sel && (
-                              <span className="absolute top-2 end-2 w-4 h-4 rounded-full bg-indigo-500 dark:bg-indigo-400 flex items-center justify-center text-white text-[9px] font-black leading-none">✓</span>
-                            )}
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-                              sel ? 'bg-indigo-500 dark:bg-indigo-400 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500'
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              sel ? 'bg-indigo-500 dark:bg-indigo-400 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
                             }`}>
-                              <Icon size={22} strokeWidth={sel ? 2.5 : 1.5} />
+                              <Icon size={14} strokeWidth={sel ? 2.5 : 1.5} />
                             </div>
-                            <span className={`text-[12px] font-black ${sel ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                            <span className={`text-[11px] font-bold ${sel ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'}`}>
                               {isRtl ? fa : en}
                             </span>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
-                              {isRtl ? descFa : descEn}
-                            </span>
+                            {sel && <span className="ms-auto text-indigo-500 text-[10px] font-black">✓</span>}
                           </button>
                         );
                       })}
@@ -635,36 +635,34 @@
                   </div>
 
                   {/* ── Language ── */}
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-700">
-                      <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-                        <Globe size={13} className="text-blue-500" />
-                      </div>
-                      <span className="text-[12px] font-black text-slate-700 dark:text-slate-200">{t('زبان سیستم', 'System Language')}</span>
-                      <span className="ms-auto text-[10px] text-slate-400 dark:text-slate-500">{t('زبان پیش‌فرض رابط کاربری', 'Default UI language')}</span>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Globe size={12} className="text-blue-500" />
+                      <span className="text-[11px] font-black text-slate-600 dark:text-slate-300">{t('زبان سیستم', 'System Language')}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
-                        { value: 'fa', label: 'فارسی',   sublabel: 'Persian (Farsi)', flag: '🇮🇷', dir: 'rtl' },
-                        { value: 'en', label: 'English', sublabel: 'انگلیسی',         flag: '🇬🇧', dir: 'ltr' },
-                      ].map(({ value: v, label, sublabel, flag, dir }) => {
+                        { value: 'fa', label: 'فارسی',   sublabel: 'Persian', flag: '🇮🇷' },
+                        { value: 'en', label: 'English', sublabel: 'انگلیسی',   flag: '🇬🇧' },
+                      ].map(({ value: v, label, sublabel, flag }) => {
                         const sel = preferences.language === v;
                         return (
                           <button key={v} type="button"
-                            onClick={() => setPreferences(p => ({ ...p, language: v }))}
-                            className={`relative flex items-center gap-3 p-4 rounded-xl border-2 outline-none transition-all duration-150 ${
+                            onClick={() => {
+                              setPreferences(p => ({ ...p, language: v }));
+                              window.DSCore?.setGlobalLanguage?.(v);
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border-2 outline-none transition-all duration-150 ${
                               sel
-                                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm'
+                                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-blue-300 dark:hover:border-blue-700'
                             }`}>
-                            {sel && (
-                              <span className="absolute top-2 end-2 w-4 h-4 rounded-full bg-blue-500 dark:bg-blue-400 flex items-center justify-center text-white text-[9px] font-black leading-none">✓</span>
-                            )}
-                            <span className="text-3xl select-none leading-none">{flag}</span>
-                            <div className="flex flex-col items-start" dir={dir}>
-                              <span className={`text-[13px] font-black ${sel ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`}>{label}</span>
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500">{sublabel}</span>
+                            <span className="text-xl select-none leading-none">{flag}</span>
+                            <div className="flex flex-col items-start">
+                              <span className={`text-[11px] font-bold ${sel ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`}>{label}</span>
+                              <span className="text-[9px] text-slate-400">{sublabel}</span>
                             </div>
+                            {sel && <span className="ms-auto text-blue-500 text-[10px] font-black">✓</span>}
                           </button>
                         );
                       })}
@@ -672,43 +670,38 @@
                   </div>
 
                   {/* ── Calendar ── */}
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-700">
-                      <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
-                        <Calendar size={13} className="text-emerald-500" />
-                      </div>
-                      <span className="text-[12px] font-black text-slate-700 dark:text-slate-200">{t('نوع تقویم', 'Calendar Type')}</span>
-                      <span className="ms-auto text-[10px] text-slate-400 dark:text-slate-500">{t('تقویم پیش‌فرض نمایش تاریخ', 'Default date display')}</span>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Calendar size={12} className="text-emerald-500" />
+                      <span className="text-[11px] font-black text-slate-600 dark:text-slate-300">{t('نوع تقویم', 'Calendar Type')}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
-                        { value: 'jalali',    fa: 'شمسی (جلالی)',  en: 'Jalali',    abbrFa: 'ج',  abbrEn: 'Ja', descFa: 'تقویم هجری شمسی',           descEn: 'Solar Hijri Calendar'       },
-                        { value: 'gregorian', fa: 'میلادی',         en: 'Gregorian', abbrFa: 'م',  abbrEn: 'Gr', descFa: 'تقویم میلادی بین‌المللی',    descEn: 'International Gregorian'    },
-                      ].map(({ value: v, fa, en, abbrFa, abbrEn, descFa, descEn }) => {
+                        { value: 'jalali',    fa: 'شمسی (جلالی)', en: 'Jalali',    abbrFa: 'ج', abbrEn: 'Ja' },
+                        { value: 'gregorian', fa: 'میلادی',        en: 'Gregorian', abbrFa: 'م', abbrEn: 'Gr' },
+                      ].map(({ value: v, fa, en, abbrFa, abbrEn }) => {
                         const sel = preferences.calendarType === v;
                         return (
                           <button key={v} type="button"
-                            onClick={() => setPreferences(p => ({ ...p, calendarType: v }))}
-                            className={`relative flex items-center gap-3 p-4 rounded-xl border-2 outline-none transition-all duration-150 ${
+                            onClick={() => {
+                              setPreferences(p => ({ ...p, calendarType: v }));
+                              window.DSCore?.setGlobalCalendarMode?.(v);
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border-2 outline-none transition-all duration-150 ${
                               sel
-                                ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 shadow-md'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-sm'
+                                ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-emerald-300 dark:hover:border-emerald-700'
                             }`}>
-                            {sel && (
-                              <span className="absolute top-2 end-2 w-4 h-4 rounded-full bg-emerald-500 dark:bg-emerald-400 flex items-center justify-center text-white text-[9px] font-black leading-none">✓</span>
-                            )}
-                            <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all shrink-0 ${
-                              sel ? 'bg-emerald-500 dark:bg-emerald-400 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500'
+                            <div className={`w-9 h-9 rounded-lg flex flex-col items-center justify-center shrink-0 ${
+                              sel ? 'bg-emerald-500 dark:bg-emerald-400 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
                             }`}>
-                              <Calendar size={16} strokeWidth={1.5} />
-                              <span className="text-[9px] font-black leading-none">{isRtl ? abbrFa : abbrEn}</span>
+                              <Calendar size={12} strokeWidth={1.5} />
+                              <span className="text-[8px] font-black leading-none mt-0.5">{isRtl ? abbrFa : abbrEn}</span>
                             </div>
-                            <div className="flex flex-col items-start">
-                              <span className={`text-[13px] font-black ${sel ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                                {isRtl ? fa : en}
-                              </span>
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500">{isRtl ? descFa : descEn}</span>
-                            </div>
+                            <span className={`text-[11px] font-bold ${sel ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-400'}`}>
+                              {isRtl ? fa : en}
+                            </span>
+                            {sel && <span className="ms-auto text-emerald-500 text-[10px] font-black">✓</span>}
                           </button>
                         );
                       })}

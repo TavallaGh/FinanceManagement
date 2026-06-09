@@ -44,6 +44,23 @@
     return theme;
   };
 
+  const getGlobalLanguage = () => window.localStorage.getItem('fm_language') || 'fa';
+
+  const setGlobalLanguage = (lang) => {
+    window.localStorage.setItem('fm_language', lang);
+    window.dispatchEvent(new CustomEvent('fm_language_change', { detail: lang }));
+  };
+
+  const useLanguage = (initialLang) => {
+    const [lang, setLang] = useState(initialLang || getGlobalLanguage());
+    useEffect(() => {
+      const handler = (e) => setLang(e.detail);
+      window.addEventListener('fm_language_change', handler);
+      return () => window.removeEventListener('fm_language_change', handler);
+    }, []);
+    return [lang, setLang];
+  };
+
   const j2g = (jy, jm, jd) => {
     let gy = (jy <= 979) ? 621 : 1600;
     jy -= (jy <= 979) ? 0 : 979;
@@ -768,6 +785,7 @@
   Object.assign(window.DSCore, {
     getGlobalCalendarMode, setGlobalCalendarMode, useCalendarMode, formatGlobalDate, j2g, g2j,
     getGlobalTheme, setGlobalTheme, useTheme,
+    getGlobalLanguage, setGlobalLanguage, useLanguage,
     useSecureDataScope, applyDataScope, useSecureAccess,
     Button, Card, Badge, PageHeader, Tabs, Skeleton, EmptyState, StatCard, 
     Timeline, Avatar, DropdownMenu, ProgressBar, Stepper, Spinner

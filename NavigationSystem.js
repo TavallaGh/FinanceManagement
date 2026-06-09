@@ -42,7 +42,9 @@
     
     const { hasAccess, isFullAccess } = window.SecurityManager ? window.SecurityManager.useSecurity() : { hasAccess: () => true, isFullAccess: true };
 
-    const [currentLanguage, setCurrentLanguage] = useState(initialLanguage);
+    const [currentLanguage, setCurrentLanguage] = window.DSCore?.useLanguage
+      ? window.DSCore.useLanguage(initialLanguage)
+      : useState(initialLanguage);
     const isRtl = currentLanguage === 'fa';
     
     const t = (fa, en) => isRtl ? fa : en;
