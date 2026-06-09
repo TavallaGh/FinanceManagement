@@ -292,7 +292,7 @@
           partyRoles,
           accessRoles,
           department,
-          avatarUrl: userData.avatar_url ?? null,
+          avatarUrl: null,
         });
       } catch (err) {
         console.error('fetchUserData error:', err);
@@ -306,7 +306,7 @@
       try {
         const { data, error } = await supabase
           .from('fm_user_preferences')
-          .select('theme, language, calendar_type, default_cost_type_id')
+          .select('theme, language, calendar_type, default_cost_type_id, photo_url')
           .eq('user_id', userId)
           .maybeSingle();
         if (!error && data) {
@@ -316,6 +316,17 @@
             calendarType:      data.calendar_type     ?? 'jalali',
             defaultCostTypeId: data.default_cost_type_id ?? '',
           });
+          if (data.photo_url) {
+            setProfileInfo(prev => ({ ...prev, avatarUrl: data.photo_url }));
+            try {
+              const stored = JSON.parse(sessionStorage.getItem('fm_user_session') || '{}');
+              if (!stored.photo_url) {
+                stored.photo_url = data.photo_url;
+                sessionStorage.setItem('fm_user_session', JSON.stringify(stored));
+                window.dispatchEvent(new CustomEvent('fm_avatar_change', { detail: data.photo_url }));
+              }
+            } catch (_) {}
+          }
         }
       } catch (_) {}
     };
@@ -346,28 +357,41 @@
       setIsUploadingAvatar(true);
       try {
         const ext      = file.name.split('.').pop().toLowerCase();
-        const fileName = `${currentUserId}-${Date.now()}.${ext}`;
-        const filePath = `avatars/${fileName}`;
+        const fileName = `avatar_${currentUserId}.${ext}`;
+        const filePath = `user-avatars/${fileName}`;
+        const BUCKET   = 'attachments';
+
+        // حذف فایل قبلی اگر وجود داشت
+        await supabase.storage.from(BUCKET).remove([filePath]);
 
         const { error: uploadErr } = await supabase.storage
-          .from('avatars')
-          .upload(filePath, file, { upsert: false, contentType: file.type });
+          .from(BUCKET)
+          .upload(filePath, file, { upsert: true, contentType: file.type });
         if (uploadErr) throw uploadErr;
 
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
         const publicUrl = urlData?.publicUrl;
         if (!publicUrl) throw new Error(t('خطا در دریافت آدرس عکس.', 'Could not retrieve public URL.'));
 
         const { error: updateErr } = await supabase
-          .from('sec_users')
-          .update({ avatar_url: publicUrl })
-          .eq('id', currentUserId);
+          .from('fm_user_preferences')
+          .upsert(
+            { user_id: currentUserId, photo_url: publicUrl },
+            { onConflict: 'user_id' }
+          );
         if (updateErr) throw updateErr;
+
+        // آپدیت در session و اطلاع به NavigationSystem
+        try {
+          const stored = JSON.parse(sessionStorage.getItem('fm_user_session') || '{}');
+          stored.photo_url = publicUrl;
+          sessionStorage.setItem('fm_user_session', JSON.stringify(stored));
+          window.dispatchEvent(new CustomEvent('fm_avatar_change', { detail: publicUrl }));
+        } catch (_) {}
 
         setProfileInfo(prev => ({ ...prev, avatarUrl: publicUrl }));
         showToast(t('تصویر پروفایل بروزرسانی شد.', 'Profile picture updated successfully.'));
       } catch (err) {
-        console.error('Avatar upload error:', err);
         showToast(err.message || t('خطا در بارگذاری تصویر.', 'Error uploading image.'), 'error');
       } finally {
         setIsUploadingAvatar(false);
