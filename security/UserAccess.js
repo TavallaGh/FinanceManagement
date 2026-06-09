@@ -51,6 +51,7 @@
     const [selectedMenuId, setSelectedMenuId] = useState(null);
     const [activeSourceId, setActiveSourceId] = useState(null);
     const [gridSelectedIds, setGridSelectedIds] = useState([]);
+    const [isDetailPanelVisible, setIsDetailPanelVisible] = useState(false);
 
     useEffect(() => {
       if (isOpen && user) {
@@ -62,6 +63,7 @@
         setDirectPerms({});
         setDeletedPermIds([]);
         setGridSelectedIds([]);
+        setIsDetailPanelVisible(false);
         setHasChanges(false);
       }
     }, [isOpen, user]);
@@ -316,6 +318,7 @@
         }));
         setSelectedMenuId(tempId);
         setActiveSourceId('direct');
+        setIsDetailPanelVisible(false);
         setHasChanges(true);
     };
 
@@ -340,6 +343,7 @@
 
         setSelectedMenuId(finalId);
         setActiveSourceId('direct');
+        setIsDetailPanelVisible(false);
         setHasChanges(true);
     };
 
@@ -367,6 +371,7 @@
                 } else {
                     setSelectedMenuId(null);
                     setActiveSourceId(null);
+                    setIsDetailPanelVisible(false);
                 }
             }
         }
@@ -398,6 +403,7 @@
         if (stringMenuIds.includes(String(selectedMenuId)) && activeSourceId === 'direct') {
             setSelectedMenuId(null);
             setActiveSourceId(null);
+            setIsDetailPanelVisible(false);
         }
         setHasChanges(true);
     };
@@ -554,7 +560,7 @@
 
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-5 gap-5">
                     
-                    <div className={`flex flex-col bg-white dark:bg-slate-900 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm ${currentDetailRow ? 'w-full md:w-7/12' : 'w-full'}`}>
+                    <div className={`flex flex-col bg-white dark:bg-slate-900 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm ${(currentDetailRow && !String(selectedMenuId).startsWith('temp_') && isDetailPanelVisible) ? 'w-full md:w-7/12' : 'w-full'}`}>
                         <div className="flex-1 min-h-0 relative">
                             <DataGrid 
                                 data={effectivePermissions}
@@ -571,22 +577,27 @@
                                         if (!activeSourceId || !row.breakdown.find(b => b.sourceId === activeSourceId)) {
                                             setActiveSourceId(row.breakdown[0].sourceId);
                                         }
+                                        if (!row.id.toString().startsWith('temp_')) setIsDetailPanelVisible(true);
                                     } else {
                                         setActiveSourceId('direct');
+                                        if (!row.id.toString().startsWith('temp_')) setIsDetailPanelVisible(true);
                                     }
                                 }}
                                 onAdd={handleInlineAddRow}
                                 onRowDoubleClick={(row) => {
                                     setSelectedMenuId(row.id);
                                     if (row.breakdown && row.breakdown.length > 0) setActiveSourceId(row.breakdown[0].sourceId);
+                                    if (!row.id.toString().startsWith('temp_')) setIsDetailPanelVisible(true);
                                 }}
                                 actions={[
                                     { 
                                         icon: Eye, 
                                         tooltip: t('مشاهده جزئیات', 'View Details'), 
+                                        hidden: (row) => row.id.toString().startsWith('temp_'),
                                         onClick: (row) => {
                                             setSelectedMenuId(row.id);
                                             if (row.breakdown && row.breakdown.length > 0) setActiveSourceId(row.breakdown[0].sourceId);
+                                            setIsDetailPanelVisible(true);
                                         },
                                         className: 'text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-slate-800 dark:hover:bg-slate-700 p-1.5 rounded transition-colors'
                                     },
@@ -610,10 +621,10 @@
                         </div>
                     </div>
 
-                    {currentDetailRow && !selectedMenuId.toString().startsWith('temp_') && (
+                    {currentDetailRow && !selectedMenuId.toString().startsWith('temp_') && isDetailPanelVisible && (
                         <div className="w-full md:w-5/12 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 flex flex-col overflow-hidden animate-in slide-in-from-right-5 duration-200 relative z-10 shadow-sm">
                             <div className="absolute top-3 left-3">
-                                <button onClick={() => setSelectedMenuId(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors">
+                                <button onClick={() => { setSelectedMenuId(null); setIsDetailPanelVisible(false); }} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors">
                                     <X size={14}/>
                                 </button>
                             </div>
