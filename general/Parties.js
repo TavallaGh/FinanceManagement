@@ -5,8 +5,10 @@
   
   const { 
     Button, PageHeader, Modal, DataGrid, 
-    TextField, ToggleField, Badge, CheckboxField, RadioGroup, EmptyState, toast
+    TextField, ToggleField, Badge, CheckboxField, RadioGroup, EmptyState
   } = window.DesignSystem || {};
+
+  const { Toast } = window.DSFeedback || window.DesignSystem || {};
   
   const { 
     Users, User, Building, Edit, Trash2, Save, 
@@ -48,6 +50,17 @@
     const [newAddress, setNewAddress] = useState('');
 
     const [gridState, setGridState] = useState(null);
+
+    // Toast State Management
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'info' });
+
+    const showToast = (msgFa, msgEn, type = 'error') => {
+      const msg = isRtl ? msgFa : msgEn;
+      setToast({ isVisible: true, message: msg, type });
+      setTimeout(() => {
+        setToast(prev => ({ ...prev, isVisible: false }));
+      }, 5000);
+    };
 
     const viewConfig = {
       pageId: FORM_CODE,
@@ -98,26 +111,16 @@
         setData(mappedData);
       } catch (err) {
         console.error('Fetch Error:', err);
-        if (toast?.error) toast.error(t('خطا در دریافت اطلاعات.', 'Error fetching data.'));
+        showToast('خطا در دریافت اطلاعات.', 'Error fetching data.', 'error');
       } finally {
         setIsLoading(false);
       }
     };
 
     const handleSave = async () => {
-      // Helper function for showing error via Toast
-      const showError = (msgFa, msgEn) => {
-        const msg = isRtl ? msgFa : msgEn;
-        if (toast?.error) {
-          toast.error(msg);
-        } else if (typeof toast === 'function') {
-          toast(msg, 'error');
-        }
-      };
-
       // 1. Validate Required Fields
       if (!formData.code || !formData.latinTitle || (formData.partyType === 'real' && !formData.lastName) || (formData.partyType === 'legal' && !formData.companyName)) {
-         showError('لطفا تمام فیلدهای اجباری (کد، عنوان لاتین، نام/عنوان) را وارد کنید.', 'Please fill all required fields including code, latin title and name.');
+         showToast('لطفا تمام فیلدهای اجباری (کد، عنوان لاتین، نام/عنوان) را وارد کنید.', 'Please fill all required fields including code, latin title and name.', 'warning');
          return;
       }
 
@@ -132,13 +135,13 @@
       // 3. Prevent Duplicates
       const isCodeDuplicate = data.some(item => item.code === formData.code && item.id !== currentRecord?.id);
       if (isCodeDuplicate) {
-         showError('کد وارد شده در سیستم تکراری است.', 'The entered code already exists.');
+         showToast('کد وارد شده در سیستم تکراری است.', 'The entered code already exists.', 'error');
          return;
       }
 
       const isLatinTitleDuplicate = data.some(item => item.latinTitle?.toLowerCase() === formData.latinTitle?.toLowerCase() && item.id !== currentRecord?.id);
       if (isLatinTitleDuplicate) {
-         showError('عنوان لاتین وارد شده در سیستم تکراری است.', 'The entered Latin title already exists.');
+         showToast('عنوان لاتین وارد شده در سیستم تکراری است.', 'The entered Latin title already exists.', 'error');
          return;
       }
 
@@ -148,7 +151,7 @@
          return itemUniqueName === newUniqueName;
       });
       if (isNameDuplicate) {
-         showError('شخص یا شرکتی با این نام پیش از این در سیستم ثبت شده است (نام یکتا تکراری).', 'A party with this exact name already exists.');
+         showToast('شخص یا شرکتی با این نام پیش از این در سیستم ثبت شده است (نام یکتا تکراری).', 'A party with this exact name already exists.', 'error');
          return;
       }
 
@@ -178,15 +181,13 @@
 
         if (error) throw error;
         
-        if (toast?.success) {
-           toast.success(t('اطلاعات با موفقیت ذخیره شد.', 'Data saved successfully.'));
-        }
+        showToast('اطلاعات با موفقیت ذخیره شد.', 'Data saved successfully.', 'success');
         
         setIsModalOpen(false);
         fetchData();
       } catch (err) {
         console.error('Save Error:', err);
-        if (toast?.error) toast.error(t('خطا در ذخیره اطلاعات.', 'Error saving data.'));
+        showToast('خطا در ذخیره اطلاعات.', 'Error saving data.', 'error');
       } finally {
         setIsLoading(false);
       }
@@ -201,10 +202,10 @@
         
         if (error) throw error;
         setData(prev => prev.map(item => item.id === row.id ? { ...item, isActive: newValue } : item));
-        if (toast?.success) toast.success(t('وضعیت با موفقیت تغییر کرد.', 'Status changed successfully.'));
+        showToast('وضعیت با موفقیت تغییر کرد.', 'Status changed successfully.', 'success');
       } catch (err) {
         console.error("Toggle Error:", err);
-        if (toast?.error) toast.error(t('خطا در تغییر وضعیت.', 'Error changing status.'));
+        showToast('خطا در تغییر وضعیت.', 'Error changing status.', 'error');
       }
     };
 
@@ -219,13 +220,13 @@
           if (error) throw error;
         }
         
-        if (toast?.success) toast.success(t('حذف با موفقیت انجام شد.', 'Deleted successfully.'));
+        showToast('حذف با موفقیت انجام شد.', 'Deleted successfully.', 'success');
         setSelectedIds([]);
         setDeleteConfirm({ isOpen: false, type: null, data: null });
         fetchData();
       } catch (err) {
         console.error("Delete error:", err);
-        if (toast?.error) toast.error(t('خطا در حذف اطلاعات.', 'Error deleting data.'));
+        showToast('خطا در حذف اطلاعات. ممکن است این رکورد در جای دیگری استفاده شده باشد.', 'Error deleting data. It might be in use.', 'error');
       } finally {
         setIsLoading(false);
       }
@@ -536,6 +537,16 @@
             }
           />
         </Modal>
+
+        {/* Global Toast Renderer */}
+        {Toast && (
+          <Toast 
+            isVisible={toast.isVisible} 
+            message={toast.message} 
+            type={toast.type} 
+            onClose={() => setToast({ ...toast, isVisible: false })} 
+          />
+        )}
       </div>
     );
   };
