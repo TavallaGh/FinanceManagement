@@ -160,7 +160,7 @@
         try {
           const { data, error } = await supabase
             .from('sec_users')
-            .select('id, username, email, full_name, avatar_url, party_id');
+            .select('id, username, email, full_name, party_id');
           if (error) console.warn('sec_users fetch warning:', error.message, error.code);
           else allUsers = data || [];
         } catch (e) {
@@ -211,7 +211,7 @@
         if (!userData) {
           const { data, error } = await supabase
             .from('sec_users')
-            .select('id, username, email, full_name, avatar_url, party_id')
+            .select('id, username, email, full_name, party_id')
             .eq('id', userId)
             .maybeSingle();
           if (error) { console.warn('sec_users single fetch warning:', error.message); }
