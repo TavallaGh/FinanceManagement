@@ -76,16 +76,21 @@
     const theme = window.DSCore?.useTheme ? window.DSCore.useTheme() : 'light';
 
     const sessionString = sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}';
-    let sessionUser = { id: '00000000-0000-0000-0000-000000000000', username: 'US' };
+    let sessionUser = { id: '00000000-0000-0000-0000-000000000000', username: 'US', photo_url: null };
     try {
         const parsed = JSON.parse(sessionString);
         if (parsed && parsed.id) {
             sessionUser = parsed;
         }
-    } catch (e) {
-        console.error("Error parsing session data", e);
-    }
+    } catch (e) {}
     const CURRENT_USER_ID = sessionUser.id;
+
+    const [avatarUrl, setAvatarUrl] = useState(sessionUser.photo_url || null);
+    useEffect(() => {
+      const handler = (e) => setAvatarUrl(e.detail);
+      window.addEventListener('fm_avatar_change', handler);
+      return () => window.removeEventListener('fm_avatar_change', handler);
+    }, []);
     const RECENTS_STORAGE_KEY = `sys_recents_${CURRENT_USER_ID}`;
 
     useEffect(() => {
@@ -552,8 +557,11 @@
           ))}
           <div className="mt-auto flex flex-col items-center gap-5">
             <button onClick={handleLogoutClick} title={t('خروج از سیستم', 'Logout')} className="text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"><LogOut size={18} /></button>
-            <div onClick={handleProfileClick} title={t('پروفایل کاربری', 'User Profile')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-slate-600 dark:text-slate-300 font-black text-[12px] cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors uppercase">
-              {sessionUser.username ? sessionUser.username.substring(0, 2) : 'US'}
+            <div onClick={handleProfileClick} title={t('پروفایل کاربری', 'User Profile')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-slate-600 dark:text-slate-300 font-black text-[12px] cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors uppercase overflow-hidden">
+              {avatarUrl
+                ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                : (sessionUser.username ? sessionUser.username.substring(0, 2) : 'US')
+              }
             </div>
           </div>
         </nav>
