@@ -615,7 +615,7 @@
                     actions: gridActions,
                     bulkActions: bulkActions,
                     isLoading: isLoading,
-                    actionWidth: '260px'
+                    actionWidth: '200px'
                 })
             )
         ),
