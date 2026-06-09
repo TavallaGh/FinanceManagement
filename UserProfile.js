@@ -213,13 +213,14 @@
         if (!userData) throw new Error('sec_users record not found');
 
         const partyId  = userData.party_id;
-        const username = userData.username || userData.email || windowCurrentUserUsername || '---';
-        let   fullName = userData.full_name || windowCurrentUserName || username;
+        const username = userData.username || '---';
+        // full_name از DB اولویت دارد؛ اگر خالی بود از first_name + last_name در parties استفاده می‌شود
+        let   fullName = userData.full_name || '';
         let   partyRoles = [];
         let   department = '---';
 
         if (partyId) {
-          const [partyRes, personnelRes, nodesRes] = await Promise.all([
+          const [partyRes, personnelRes] = await Promise.all([
             supabase
               .from('parties')
               .select('first_name, last_name, company_name, party_type, roles')
@@ -230,18 +231,17 @@
               .select('node_id')
               .eq('person_id', partyId)
               .maybeSingle(),
-            supabase
-              .from('fm_org_chart_nodes')
-              .select('id, title, is_active')
           ]);
 
           if (!partyRes.error && partyRes.data) {
             const p = partyRes.data;
-            if (p.party_type === 'legal' || p.party_type === 'COMPANY') {
-              fullName = p.company_name || fullName;
-            } else {
-              const combined = `${p.first_name || ''} ${p.last_name || ''}`.trim();
-              fullName = combined || fullName;
+            // فقط اگر full_name خالی باشد از parties استفاده می‌کنیم
+            if (!fullName) {
+              if (p.party_type === 'legal' || p.party_type === 'COMPANY') {
+                fullName = p.company_name || '';
+              } else {
+                fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+              }
             }
             if (Array.isArray(p.roles)) {
               partyRoles = p.roles;
@@ -250,10 +250,15 @@
             }
           }
 
-          if (personnelRes.data && personnelRes.data.node_id) {
-            const matchedNode = (nodesRes.data || []).find(n => n.id === personnelRes.data.node_id);
-            if (matchedNode && matchedNode.is_active !== false) {
-              department = matchedNode.title;
+          // کوئری مستقیم بر اساس node_id بدون fetch همه نودها
+          if (!personnelRes.error && personnelRes.data?.node_id) {
+            const nodeRes = await supabase
+              .from('fm_org_chart_nodes')
+              .select('title')
+              .eq('id', personnelRes.data.node_id)
+              .maybeSingle();
+            if (!nodeRes.error && nodeRes.data?.title) {
+              department = nodeRes.data.title;
             }
           }
         }
