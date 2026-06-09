@@ -5,7 +5,7 @@
   
   const { 
     Button, PageHeader, Modal, DataGrid, 
-    TextField, ToggleField, Badge, CheckboxField, RadioGroup, EmptyState
+    TextField, ToggleField, Badge, CheckboxField, RadioGroup, EmptyState, toast
   } = window.DesignSystem || {};
   
   const { 
@@ -98,25 +98,20 @@
         setData(mappedData);
       } catch (err) {
         console.error('Fetch Error:', err);
+        if (toast?.error) toast.error(t('خطا در دریافت اطلاعات.', 'Error fetching data.'));
       } finally {
         setIsLoading(false);
       }
     };
 
     const handleSave = async () => {
-      // Helper function for showing error via Toast or Alert
+      // Helper function for showing error via Toast
       const showError = (msgFa, msgEn) => {
         const msg = isRtl ? msgFa : msgEn;
-        if (window.DesignSystem && window.DesignSystem.toast) {
-          if (typeof window.DesignSystem.toast === 'function') {
-            window.DesignSystem.toast(msg, 'error');
-          } else if (typeof window.DesignSystem.toast.error === 'function') {
-            window.DesignSystem.toast.error(msg);
-          } else {
-            alert(msg);
-          }
-        } else {
-          alert(msg);
+        if (toast?.error) {
+          toast.error(msg);
+        } else if (typeof toast === 'function') {
+          toast(msg, 'error');
         }
       };
 
@@ -182,10 +177,16 @@
           : await supabase.from('parties').insert([payload]);
 
         if (error) throw error;
+        
+        if (toast?.success) {
+           toast.success(t('اطلاعات با موفقیت ذخیره شد.', 'Data saved successfully.'));
+        }
+        
         setIsModalOpen(false);
         fetchData();
       } catch (err) {
         console.error('Save Error:', err);
+        if (toast?.error) toast.error(t('خطا در ذخیره اطلاعات.', 'Error saving data.'));
       } finally {
         setIsLoading(false);
       }
@@ -200,8 +201,10 @@
         
         if (error) throw error;
         setData(prev => prev.map(item => item.id === row.id ? { ...item, isActive: newValue } : item));
+        if (toast?.success) toast.success(t('وضعیت با موفقیت تغییر کرد.', 'Status changed successfully.'));
       } catch (err) {
         console.error("Toggle Error:", err);
+        if (toast?.error) toast.error(t('خطا در تغییر وضعیت.', 'Error changing status.'));
       }
     };
 
@@ -216,11 +219,13 @@
           if (error) throw error;
         }
         
+        if (toast?.success) toast.success(t('حذف با موفقیت انجام شد.', 'Deleted successfully.'));
         setSelectedIds([]);
         setDeleteConfirm({ isOpen: false, type: null, data: null });
         fetchData();
       } catch (err) {
         console.error("Delete error:", err);
+        if (toast?.error) toast.error(t('خطا در حذف اطلاعات.', 'Error deleting data.'));
       } finally {
         setIsLoading(false);
       }
