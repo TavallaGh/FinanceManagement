@@ -155,41 +155,49 @@
     useEffect(() => {
       if (!supabase) return;
       const init = async () => {
+        // Step 1: try to fetch users list (non-fatal)
+        let allUsers = [];
         try {
-          const { data: allUsers, error: usersErr } = await supabase
+          const { data, error } = await supabase
             .from('sec_users')
             .select('id, username, email, full_name, avatar_url, party_id');
-
-          if (usersErr) throw usersErr;
-
-          let safeMyUserId = windowCurrentUserId;
-          if (!safeMyUserId || safeMyUserId === '00000000-0000-0000-0000-000000000000') {
-              const matchedUser = (allUsers || []).find(u => u.username === windowCurrentUserUsername || u.full_name === windowCurrentUserName);
-              if (matchedUser) safeMyUserId = matchedUser.id;
-          }
-          
-          if (!safeMyUserId) {
-            const { data: authData } = await supabase.auth.getUser();
-            if (authData?.user?.id) {
-              safeMyUserId = authData.user.id;
-            }
-          }
-
-          setCurrentUserId(safeMyUserId);
-
-          if (safeMyUserId) {
-            await Promise.all([
-              fetchUserData(safeMyUserId, allUsers), 
-              fetchPreferences(safeMyUserId), 
-              fetchCostTypes()
-            ]);
-          } else {
-            setProfileInfo(prev => ({ ...prev, fullName: t('کاربر یافت نشد', 'User not found'), username: '---' }));
-          }
-        } catch (err) {
-          console.error('Auth init error:', err);
-          setProfileInfo(prev => ({ ...prev, fullName: t('خطای دسترسی', 'Access error'), username: '---' }));
+          if (error) console.warn('sec_users fetch warning:', error.message, error.code);
+          else allUsers = data || [];
+        } catch (e) {
+          console.warn('sec_users fetch exception:', e);
         }
+
+        // Step 2: resolve userId
+        let safeMyUserId = windowCurrentUserId;
+        if (!safeMyUserId || safeMyUserId === '00000000-0000-0000-0000-000000000000') {
+          const matchedUser = allUsers.find(u =>
+            u.username === windowCurrentUserUsername ||
+            u.full_name === windowCurrentUserName
+          );
+          if (matchedUser) safeMyUserId = matchedUser.id;
+        }
+
+        if (!safeMyUserId) {
+          try {
+            const { data: authData } = await supabase.auth.getUser();
+            if (authData?.user?.id) safeMyUserId = authData.user.id;
+          } catch (e) {
+            console.warn('auth.getUser exception:', e);
+          }
+        }
+
+        console.log('[UserProfile] resolved userId:', safeMyUserId, '| navUser:', windowCurrentUserObj);
+        setCurrentUserId(safeMyUserId);
+
+        // Step 3: fetch profile details (non-fatal — keep NavigationSystem data on failure)
+        const tasks = [fetchCostTypes()];
+        if (safeMyUserId) {
+          tasks.push(fetchUserData(safeMyUserId, allUsers));
+          tasks.push(fetchPreferences(safeMyUserId));
+        } else {
+          console.warn('[UserProfile] userId not resolved — showing NavigationSystem data only');
+        }
+        await Promise.allSettled(tasks);
       };
       init();
     }, [windowCurrentUserId, windowCurrentUserUsername, windowCurrentUserName]);
@@ -206,11 +214,16 @@
             .select('id, username, email, full_name, avatar_url, party_id')
             .eq('id', userId)
             .maybeSingle();
-          if (error) throw error;
+          if (error) { console.warn('sec_users single fetch warning:', error.message); }
           userData = data;
         }
 
-        if (!userData) throw new Error('sec_users record not found');
+        if (!userData) {
+          console.warn('[UserProfile] no userData found for userId:', userId, '— keeping NavigationSystem data');
+          return;
+        }
+
+        console.log('[UserProfile] userData:', userData);
 
         const partyId  = userData.party_id;
         const username = userData.username || '---';
@@ -233,6 +246,7 @@
               .maybeSingle(),
           ]);
 
+          if (partyRes.error) console.warn('parties fetch warning:', partyRes.error.message);
           if (!partyRes.error && partyRes.data) {
             const p = partyRes.data;
             // فقط اگر full_name خالی باشد از parties استفاده می‌کنیم
@@ -250,6 +264,7 @@
             }
           }
 
+          if (personnelRes.error) console.warn('org_chart_personnel fetch warning:', personnelRes.error.message);
           // کوئری مستقیم بر اساس node_id بدون fetch همه نودها
           if (!personnelRes.error && personnelRes.data?.node_id) {
             const nodeRes = await supabase
@@ -257,11 +272,14 @@
               .select('title')
               .eq('id', personnelRes.data.node_id)
               .maybeSingle();
+            if (nodeRes.error) console.warn('org_chart_nodes fetch warning:', nodeRes.error.message);
             if (!nodeRes.error && nodeRes.data?.title) {
               department = nodeRes.data.title;
             }
           }
         }
+
+        console.log('[UserProfile] resolved — fullName:', fullName, '| username:', username, '| department:', department);
 
         setProfileInfo({
           fullName:   fullName || username || t('بدون نام', 'No name'),
@@ -272,11 +290,7 @@
         });
       } catch (err) {
         console.error('fetchUserData error:', err);
-        setProfileInfo(prev => ({
-          ...prev,
-          fullName: t('خطا در دریافت اطلاعات', 'Error loading profile'),
-          username: '---',
-        }));
+        // Don't overwrite profileInfo — keep what's already shown (NavigationSystem data)
       }
     };
 
