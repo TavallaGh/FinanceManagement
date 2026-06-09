@@ -104,7 +104,56 @@
     };
 
     const handleSave = async () => {
-      if (!formData.code || (formData.partyType === 'real' && !formData.lastName) || (formData.partyType === 'legal' && !formData.companyName)) {
+      // Helper function for showing error via Toast or Alert
+      const showError = (msgFa, msgEn) => {
+        const msg = isRtl ? msgFa : msgEn;
+        if (window.DesignSystem && window.DesignSystem.toast) {
+          if (typeof window.DesignSystem.toast === 'function') {
+            window.DesignSystem.toast(msg, 'error');
+          } else if (typeof window.DesignSystem.toast.error === 'function') {
+            window.DesignSystem.toast.error(msg);
+          } else {
+            alert(msg);
+          }
+        } else {
+          alert(msg);
+        }
+      };
+
+      // 1. Validate Required Fields
+      if (!formData.code || !formData.latinTitle || (formData.partyType === 'real' && !formData.lastName) || (formData.partyType === 'legal' && !formData.companyName)) {
+         showError('لطفا تمام فیلدهای اجباری (کد، عنوان لاتین، نام/عنوان) را وارد کنید.', 'Please fill all required fields including code, latin title and name.');
+         return;
+      }
+
+      // 2. Generate Normalized Unique Name
+      const normalizePersian = (str) => str.replace(/ي/g, 'ی').replace(/ك/g, 'ک');
+      const getUniqueName = (type, fName, lName, cName) => {
+        const rawStr = type === 'real' ? `${fName || ''}${lName || ''}` : `${cName || ''}`;
+        return normalizePersian(rawStr).replace(/[^a-zA-Zآابپتثجچحخدذرزژسشصضطظعغفقکگلمنوهیئءؤإأ]/g, '').toLowerCase();
+      };
+      const newUniqueName = getUniqueName(formData.partyType, formData.firstName, formData.lastName, formData.companyName);
+
+      // 3. Prevent Duplicates
+      const isCodeDuplicate = data.some(item => item.code === formData.code && item.id !== currentRecord?.id);
+      if (isCodeDuplicate) {
+         showError('کد وارد شده در سیستم تکراری است.', 'The entered code already exists.');
+         return;
+      }
+
+      const isLatinTitleDuplicate = data.some(item => item.latinTitle?.toLowerCase() === formData.latinTitle?.toLowerCase() && item.id !== currentRecord?.id);
+      if (isLatinTitleDuplicate) {
+         showError('عنوان لاتین وارد شده در سیستم تکراری است.', 'The entered Latin title already exists.');
+         return;
+      }
+
+      const isNameDuplicate = data.some(item => {
+         if (item.id === currentRecord?.id) return false;
+         const itemUniqueName = getUniqueName(item.partyType, item.firstName, item.lastName, item.companyName);
+         return itemUniqueName === newUniqueName;
+      });
+      if (isNameDuplicate) {
+         showError('شخص یا شرکتی با این نام پیش از این در سیستم ثبت شده است (نام یکتا تکراری).', 'A party with this exact name already exists.');
          return;
       }
 
@@ -387,7 +436,7 @@
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('شماره موبایل', 'Mobile')} value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('تلفن ثابت', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
                 <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('پست الکترونیک', 'Email')} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
-                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('عنوان لاتین', 'Latin Title')} value={formData.latinTitle} onChange={e => setFormData({...formData, latinTitle: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
+                <TextField size="sm" wrapperClassName="sm:col-span-3 !m-0" label={t('عنوان لاتین', 'Latin Title')} value={formData.latinTitle} onChange={e => setFormData({...formData, latinTitle: e.target.value})} isRtl={isRtl} dir="ltr" required formCode={FORM_CODE} />
               </div>
             </div>
 
