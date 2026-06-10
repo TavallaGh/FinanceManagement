@@ -134,7 +134,7 @@
       console.log('[Notif] action:', action, '| formComponent:', formComponent);
       console.log('[Notif] window.__navigateToForm exists?', !!window.__navigateToForm);
 
-      if (action === 'open_record') {
+      if (action === 'open_record' || action === 'open_comments') {
         const dispatchFilter = () => {
           console.log('[Notif] dispatching filterToRecord', payload.entity_type, payload.entity_id);
           window.dispatchEvent(new CustomEvent('filterToRecord', {
