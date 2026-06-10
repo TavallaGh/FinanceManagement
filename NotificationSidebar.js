@@ -22,7 +22,12 @@
 
     const calendarMode = DSCore.useCalendarMode ? DSCore.useCalendarMode() : 'jalali';
 
-    const MOCK_USER_ID = '00000000-0000-0000-0000-000000000000';
+    const CURRENT_USER_ID = (() => {
+      try {
+        const s = sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}';
+        return JSON.parse(s).id || null;
+      } catch(e) { return null; }
+    })();
 
     const isRtl = language === 'fa';
     const [notifications, setNotifications] = useState([]);
@@ -63,7 +68,7 @@
           const { data, error } = await supabase
             .from('system_notifications')
             .select('*')
-            .eq('user_id', MOCK_USER_ID)
+            .eq('user_id', CURRENT_USER_ID)
             .order('created_at', { ascending: false });
 
           if (error) throw error;
@@ -85,7 +90,7 @@
           event: '*',
           schema: 'public',
           table: 'system_notifications',
-          filter: `user_id=eq.${MOCK_USER_ID}`
+          filter: `user_id=eq.${CURRENT_USER_ID}`
         }, (payload) => {
           if (payload.eventType === 'INSERT') {
             setNotifications(prev => [payload.new, ...prev]);
@@ -126,7 +131,7 @@
         const { error } = await supabase
           .from('system_notifications')
           .update({ is_read: true })
-          .eq('user_id', MOCK_USER_ID)
+          .eq('user_id', CURRENT_USER_ID)
           .eq('is_read', false);
         if (error) throw error;
       } catch (err) {
@@ -164,7 +169,7 @@
           setNotifications([]);
           setPage(1);
           try {
-            const { error } = await supabase.from('system_notifications').delete().eq('user_id', MOCK_USER_ID);
+            const { error } = await supabase.from('system_notifications').delete().eq('user_id', CURRENT_USER_ID);
             if (error) throw error;
             showToast(t('تمام اعلان‌ها با موفقیت حذف شدند.', 'All notifications deleted successfully.'), 'success');
           } catch (err) {
