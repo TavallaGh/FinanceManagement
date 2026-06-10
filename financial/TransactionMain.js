@@ -572,7 +572,7 @@
         { 
             id: 'comment',
             icon: MessageSquare,
-            tooltip: t('هامش‌ها', 'Comments'),
+            tooltip: t('کامنت‌ها', 'Comments'),
             onClick: (row) => setCommentModalState({ isOpen: true, record: row }),
             className: (row) => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600'
         },

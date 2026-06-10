@@ -272,7 +272,7 @@
               onGridStateChange={setGridState}
               hideImport={true}
               actions={[
-                { icon: MessageSquare, tooltip: t('هامش / کامنت', 'Comments'), onClick: (row) => handleOpenComment(row), className: (row) => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600' },
+                { icon: MessageSquare, tooltip: t('کامنت / کامنت', 'Comments'), onClick: (row) => handleOpenComment(row), className: (row) => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600' },
                 { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
                 { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600' }
               ]}

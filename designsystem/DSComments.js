@@ -146,7 +146,7 @@
         if (error) throw error;
         setComments(data || []);
       } catch (err) {
-        showToast(t('خطا در دریافت هامش‌ها', 'Error fetching comments'), 'error');
+        showToast(t('خطا در دریافت کامنت‌ها', 'Error fetching comments'), 'error');
       } finally {
         setIsLoading(false);
       }
@@ -240,9 +240,9 @@
             if (mentionIds.length > 0) {
                 const notifs = mentionedUsers.map(u => ({
                     user_id: u.id,
-                    title: t('هامش جدید', 'New Mention'),
+                    title: t('کامنت جدید', 'New Mention'),
                     message: t(
-                        `شما در یک هامش روی فرم ${eformTitle || etype}، ${etitle}، منشن شده‌اید.`,
+                        `شما در یک کامنت روی فرم ${eformTitle || etype}، ${etitle}، منشن شده‌اید.`,
                         `You were mentioned in a comment on form ${eformTitle || etype}: ${etitle}.`
                     ),
                     type: 'info',
@@ -259,25 +259,25 @@
 
             setNewComment('');
             setShowMentions(false);
-            showToast(t('هامش با موفقیت ثبت شد', 'Comment added successfully'));
+            showToast(t('کامنت با موفقیت ثبت شد', 'Comment added successfully'));
             fetchComments();
         } catch (error) {
             console.error(error);
-            showToast(t('خطا در ثبت هامش', 'Error saving comment'), 'error');
+            showToast(t('خطا در ثبت کامنت', 'Error saving comment'), 'error');
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const deleteComment = async (id) => {
-        if (!window.confirm(t('آیا از حذف این هامش اطمینان دارید؟', 'Are you sure you want to delete this comment?'))) return;
+        if (!window.confirm(t('آیا از حذف این کامنت اطمینان دارید؟', 'Are you sure you want to delete this comment?'))) return;
         try {
             const { error } = await supabase.from('sys_comments').delete().eq('id', id);
             if (error) throw error;
             setComments(prev => prev.filter(c => c.id !== id));
-            showToast(t('هامش حذف شد', 'Comment deleted'));
+            showToast(t('کامنت حذف شد', 'Comment deleted'));
         } catch (err) {
-            showToast(t('خطا در حذف هامش', 'Error deleting comment'), 'error');
+            showToast(t('خطا در حذف کامنت', 'Error deleting comment'), 'error');
         }
     };
 
@@ -289,9 +289,9 @@
             setComments(prev => prev.map(c => c.id === id ? { ...c, content: editingContent } : c));
             setEditingCommentId(null);
             setEditingContent('');
-            showToast(t('هامش ویرایش شد', 'Comment updated'));
+            showToast(t('کامنت ویرایش شد', 'Comment updated'));
         } catch (err) {
-            showToast(t('خطا در ویرایش هامش', 'Error updating comment'), 'error');
+            showToast(t('خطا در ویرایش کامنت', 'Error updating comment'), 'error');
         }
     };
 
@@ -333,7 +333,7 @@
     return React.createElement(Modal, {
         isOpen: isOpen,
         onClose: onClose,
-        title: t('هامش‌ها', 'Comments'),
+        title: t('کامنت‌ها', 'Comments'),
         language: language,
         width: "max-w-xl"
     },
@@ -350,7 +350,7 @@
                 ),
                 React.createElement('div', { className: "mr-auto shrink-0" },
                     React.createElement('span', { className: "text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400" },
-                        `${comments.length} ${t('هامش', 'comment')}${!isRtl && comments.length !== 1 ? 's' : ''}`
+                        `${comments.length} ${t('کامنت', 'comment')}${!isRtl && comments.length !== 1 ? 's' : ''}`
                     )
                 )
             ),
@@ -362,7 +362,7 @@
                 ) : comments.length === 0 ? (
                     React.createElement('div', { className: "flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 py-10" },
                         React.createElement(MessageSquare, { size: 28, className: "opacity-30" }),
-                        React.createElement('span', { className: "text-[11px]" }, t('هنوز هامشی ثبت نشده است.', 'No comments yet.'))
+                        React.createElement('span', { className: "text-[11px]" }, t('هنوز کامنتی ثبت نشده است.', 'No comments yet.'))
                     )
                 ) : (
                     comments.map(comment => {
@@ -448,7 +448,7 @@
                     value: newComment,
                     onChange: handleTextChange,
                     onKeyDown: (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit(); },
-                    placeholder: t('هامش بنویسید... (@ برای منشن، Ctrl+Enter برای ارسال)', 'Write a comment... (@ to mention, Ctrl+Enter to send)'),
+                    placeholder: t('کامنت بنویسید... (@ برای منشن، Ctrl+Enter برای ارسال)', 'Write a comment... (@ to mention, Ctrl+Enter to send)'),
                     className: "w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-[12px] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none",
                     style: { minHeight: '60px', maxHeight: '120px' },
                     dir: isRtl ? 'rtl' : 'ltr'
