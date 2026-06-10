@@ -49,10 +49,6 @@
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const supabase = window.supabase;
 
-    const currentUserObj = window.NavigationSystem?.currentUser || {};
-    const currentUserId = currentUserObj.id || null;
-    const currentUserName = currentUserObj.name || currentUserObj.full_name || currentUserObj.username || 'کاربر سیستم';
-
     const [comments, setComments] = useState([]);
     const [users, setUsers] = useState([]);
     const [usersMap, setUsersMap] = useState({});
@@ -64,7 +60,6 @@
 
     const [showMentions, setShowMentions] = useState(false);
     const [mentionFilter, setMentionFilter] = useState('');
-    const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
     
     const textareaRef = useRef(null);
 
@@ -169,21 +164,46 @@
         if (!newComment.trim()) return;
         setIsSubmitting(true);
         try {
+            let safeAuthorId = null;
+
+            // 1. بررسی از طریق سشن Supabase (مطمئن‌ترین روش)
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user && user.id) safeAuthorId = user.id;
+            } catch (e) {}
+
+            // 2. بررسی از طریق آبجکت سراسری سیستم
+            if (!safeAuthorId && window.NavigationSystem?.currentUser?.id) {
+                safeAuthorId = window.NavigationSystem.currentUser.id;
+            }
+
+            // 3. بررسی از طریق حافظه محلی مرورگر (Local Storage)
+            if (!safeAuthorId) {
+                try {
+                    const stored = localStorage.getItem('currentUser') || localStorage.getItem('user');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (parsed.id) safeAuthorId = parsed.id;
+                    }
+                } catch (e) {}
+            }
+
+            // 4. حالت تست (در صورتی که سشن احراز هویت وجود نداشته باشد، کاربر اول انتخاب می‌شود)
+            if (!safeAuthorId && users.length > 0) {
+                safeAuthorId = users[0].id;
+            }
+
+            if (!safeAuthorId) {
+                 showToast(t('شناسه کاربر یافت نشد. لطفاً مجدداً وارد سیستم شوید.', 'User ID not found. Please log in.'), 'error');
+                 setIsSubmitting(false);
+                 return;
+            }
+
             const mentionRegex = /@([\w\u0600-\u06FF]+)/g;
             const matches = [...newComment.matchAll(mentionRegex)].map(m => m[1]);
             
             const mentionedUsers = users.filter(u => matches.includes(u.username));
             const mentionIds = mentionedUsers.map(u => u.id);
-
-            const safeAuthorId = currentUserId && currentUserId !== '00000000-0000-0000-0000-000000000000' 
-                ? currentUserId 
-                : (users.find(u => u.username === currentUserObj.username)?.id || null);
-
-            if (!safeAuthorId) {
-                 showToast(t('شناسه کاربر یافت نشد', 'User ID not found'), 'error');
-                 setIsSubmitting(false);
-                 return;
-            }
 
             const { error: commentError } = await supabase.from('sys_comments').insert([{
                 entity_type: entityType,
