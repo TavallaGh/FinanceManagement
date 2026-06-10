@@ -160,6 +160,18 @@
       localStorage.setItem(RECENTS_STORAGE_KEY, JSON.stringify(newRecents));
     };
 
+    // expose a global helper so NotificationSidebar can navigate without timing issues
+    useEffect(() => {
+      window.__navigateToForm = (formComponent) => {
+        if (!menuData.length) return false;
+        const item = menuData.find(m => m.component_path &&
+          (m.component_path === formComponent || m.component_path.endsWith('/' + formComponent)));
+        if (item) { handleFormClick(item); return true; }
+        return false;
+      };
+      return () => { delete window.__navigateToForm; };
+    }, [menuData]);
+
     useEffect(() => {
       const handler = (e) => {
         const { formComponent } = e.detail || {};

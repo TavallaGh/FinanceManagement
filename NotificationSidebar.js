@@ -107,14 +107,28 @@
       };
     }, [supabase]);
 
+    // mapping from entity_type to form component name
+    const ENTITY_FORM_MAP = {
+      'ORGANIZATION_INFO': 'OrganizationInfo',
+      'PARTIES': 'Parties',
+      'CHART_OF_ACCOUNTS': 'ChartOfAccountsMain',
+      'TRANSACTION_MAIN': 'TransactionMain',
+      'BROKER_CONTRACT': 'BrokerContract',
+      'BROKER_MANAGEMENT': 'BrokerManagement',
+    };
+
     const handleNotificationClick = async (notif) => {
       const payload = notif.action_payload;
-      if (!payload || !payload.action) return;
+      if (!payload || (!payload.entity_type && !payload.action)) return;
 
       await markAsRead(notif.id);
       onClose();
 
-      if (payload.action === 'open_record') {
+      // normalise: support both old payloads (no action) and new ones
+      const action = payload.action || 'open_record';
+      const formComponent = payload.form_component || ENTITY_FORM_MAP[payload.entity_type] || null;
+
+      if (action === 'open_record') {
         const dispatchFilter = () => {
           window.dispatchEvent(new CustomEvent('filterToRecord', {
             detail: {
@@ -124,11 +138,17 @@
           }));
         };
 
-        if (payload.form_component) {
-          window.dispatchEvent(new CustomEvent('navigateToForm', {
-            detail: { formComponent: payload.form_component }
-          }));
-          setTimeout(dispatchFilter, 400);
+        if (formComponent) {
+          // try global helper first (instant, no timing issues)
+          if (window.__navigateToForm) {
+            window.__navigateToForm(formComponent);
+            setTimeout(dispatchFilter, 300);
+          } else {
+            window.dispatchEvent(new CustomEvent('navigateToForm', {
+              detail: { formComponent }
+            }));
+            setTimeout(dispatchFilter, 500);
+          }
         } else {
           dispatchFilter();
         }
@@ -288,7 +308,7 @@
                         timestamp={notif.created_at}
                         onRead={markAsRead}
                         onDelete={deleteOne}
-                        onClick={notif.action_payload?.action ? () => handleNotificationClick(notif) : undefined}
+                        onClick={notif.action_payload?.entity_type || notif.action_payload?.action ? () => handleNotificationClick(notif) : undefined}
                         formatTime={formatTime}
                         language={language}
                     />
