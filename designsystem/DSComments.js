@@ -70,6 +70,10 @@
     const [editingContent, setEditingContent] = useState('');
     
     const textareaRef = useRef(null);
+    const entityRef = useRef({ entityId, entityTitle, entityType, formComponent });
+
+    // keep ref in sync with latest props on every render
+    entityRef.current = { entityId, entityTitle, entityType, formComponent };
 
     const currentUserId = (() => {
       try {
@@ -205,6 +209,8 @@
     const handleSubmit = async () => {
         if (!newComment.trim()) return;
         setIsSubmitting(true);
+        // read from ref to always get the latest entity props, avoiding stale closures
+        const { entityId: eid, entityTitle: etitle, entityType: etype, formComponent: eform } = entityRef.current;
         try {
             const safeAuthorId = currentUserId;
 
@@ -221,8 +227,8 @@
             const mentionIds = mentionedUsers.map(u => u.id);
 
             const { error: commentError } = await supabase.from('sys_comments').insert([{
-                entity_type: entityType,
-                entity_id: String(entityId),
+                entity_type: etype,
+                entity_id: String(eid),
                 author_id: safeAuthorId,
                 content: newComment,
                 mentions: mentionIds
@@ -234,14 +240,14 @@
                 const notifs = mentionedUsers.map(u => ({
                     user_id: u.id,
                     title: t('هامش جدید', 'New Mention'),
-                    message: t(`شما در یک هامش روی ${entityTitle} منشن شده‌اید.`, `You were mentioned on ${entityTitle}.`),
+                    message: t(`شما در یک هامش روی ${etitle} منشن شده‌اید.`, `You were mentioned on ${etitle}.`),
                     type: 'info',
                     action_payload: {
-                        action: 'open_comments',
-                        form_component: formComponent,
-                        entity_type: entityType,
-                        entity_id: String(entityId),
-                        entity_title: entityTitle
+                        action: 'open_record',
+                        form_component: eform,
+                        entity_type: etype,
+                        entity_id: String(eid),
+                        entity_title: etitle
                     }
                 }));
                 await supabase.from('system_notifications').insert(notifs);
