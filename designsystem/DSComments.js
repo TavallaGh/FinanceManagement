@@ -312,11 +312,14 @@
         }
     };
 
-    const renderCommentContent = (content) => {
+    const renderCommentContent = (content, isOwn) => {
         const parts = content.split(/(@[\w\u0600-\u06FF]+)/g);
         return parts.map((part, i) => {
             if (part.startsWith('@')) {
-                return React.createElement('span', { key: i, className: "font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1 py-0.5 rounded mx-0.5" }, part);
+                const cls = isOwn
+                    ? "font-bold text-yellow-300"
+                    : "font-bold text-indigo-600 dark:text-indigo-400";
+                return React.createElement('span', { key: i, className: cls }, part);
             }
             return React.createElement('span', { key: i, style: { whiteSpace: 'pre-wrap' } }, part);
         });
@@ -350,7 +353,7 @@
             ),
 
             // Messages list
-            React.createElement('div', { className: "flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3 custom-scrollbar" },
+            React.createElement('div', { className: "flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4 custom-scrollbar" },
                 isLoading ? (
                     React.createElement('div', { className: "flex-1 flex items-center justify-center text-slate-400 py-10" }, t('در حال بارگذاری...', 'Loading...'))
                 ) : comments.length === 0 ? (
@@ -361,17 +364,17 @@
                 ) : (
                     comments.map(comment => {
                         const isOwn = comment.author_id === currentUserId;
-                        return React.createElement('div', { key: comment.id, className: `flex flex-col gap-0.5 ${isOwn ? (isRtl ? 'items-start' : 'items-end') : (isRtl ? 'items-end' : 'items-start')}` },
-                            // author + time row
-                            React.createElement('div', { className: `flex items-center gap-1.5 ${isOwn ? (isRtl ? 'flex-row' : 'flex-row-reverse') : 'flex-row'}` },
-                                React.createElement('div', { className: `w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0 ${isOwn ? 'bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}` },
-                                    (usersMap[comment.author_id] || '?').charAt(0)
+                        const authorName = isOwn ? t('شما', 'You') : (usersMap[comment.author_id] || t('نامشخص', 'Unknown'));
+                        // all bubbles aligned to the reading direction start (RTL=right, LTR=left)
+                        return React.createElement('div', { key: comment.id, className: "flex flex-col gap-1" },
+                            // meta row: avatar + name + date + actions
+                            React.createElement('div', { className: "flex items-center gap-1.5" },
+                                React.createElement('div', { className: `w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shrink-0 ${isOwn ? 'bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300'}` },
+                                    authorName.charAt(0)
                                 ),
-                                React.createElement('span', { className: "text-[10px] font-bold text-slate-600 dark:text-slate-400" },
-                                    isOwn ? t('شما', 'You') : (usersMap[comment.author_id] || t('نامشخص', 'Unknown'))
-                                ),
-                                React.createElement('span', { className: "text-[9px] text-slate-400 dark:text-slate-500", dir: "ltr" }, formatDate(comment.created_at)),
-                                canEditComment(comment) && React.createElement('div', { className: "flex items-center gap-0.5" },
+                                React.createElement('span', { className: `text-[11px] font-black ${isOwn ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}` }, authorName),
+                                React.createElement('span', { className: "text-[10px] text-slate-400 dark:text-slate-500 font-medium", dir: "ltr" }, formatDate(comment.created_at)),
+                                canEditComment(comment) && React.createElement(React.Fragment, null,
                                     React.createElement('button', {
                                         onClick: () => { setEditingCommentId(comment.id); setEditingContent(comment.content); },
                                         className: "p-0.5 rounded text-slate-300 hover:text-indigo-500 transition-colors",
@@ -386,7 +389,7 @@
                             ),
                             // bubble
                             editingCommentId === comment.id
-                                ? React.createElement('div', { className: "w-full flex flex-col gap-2" },
+                                ? React.createElement('div', { className: "flex flex-col gap-2" },
                                     React.createElement('textarea', {
                                         value: editingContent,
                                         onChange: e => setEditingContent(e.target.value),
@@ -405,13 +408,13 @@
                                     )
                                   )
                                 : React.createElement('div', {
-                                    className: `max-w-[85%] px-3 py-2 rounded-xl text-[12px] leading-relaxed shadow-sm ${
+                                    className: `inline-block max-w-[88%] px-3 py-2 rounded-xl text-[12px] leading-relaxed shadow-sm ${
                                         isOwn
-                                            ? 'bg-indigo-600 dark:bg-indigo-500 text-white rounded-tr-sm'
-                                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-sm'
+                                            ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
+                                            : 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
                                     }`
                                   },
-                                    renderCommentContent(comment.content)
+                                    renderCommentContent(comment.content, isOwn)
                                   )
                         );
                     })
