@@ -111,14 +111,16 @@
       const payload = notif.action_payload;
       if (!payload || !payload.action) return;
 
-      // mark as read first
       await markAsRead(notif.id);
       onClose();
 
-      if (payload.action === 'open_comments') {
-        const dispatch = () => {
-          window.dispatchEvent(new CustomEvent('openCommentModal', {
-            detail: { entity_type: payload.entity_type, entity_id: payload.entity_id }
+      if (payload.action === 'open_record') {
+        const dispatchFilter = () => {
+          window.dispatchEvent(new CustomEvent('filterToRecord', {
+            detail: {
+              entity_type: payload.entity_type,
+              entity_id: payload.entity_id
+            }
           }));
         };
 
@@ -126,10 +128,9 @@
           window.dispatchEvent(new CustomEvent('navigateToForm', {
             detail: { formComponent: payload.form_component }
           }));
-          // wait for form to mount before opening modal
-          setTimeout(dispatch, 400);
+          setTimeout(dispatchFilter, 400);
         } else {
-          dispatch();
+          dispatchFilter();
         }
       }
     };

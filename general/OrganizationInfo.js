@@ -32,6 +32,7 @@
     
     const [commentModalOpen, setCommentModalOpen] = useState(false);
     const [selectedEntityForComment, setSelectedEntityForComment] = useState({ id: '', title: '' });
+    const [filteredRecordId, setFilteredRecordId] = useState(null);
 
     const [formData, setFormData] = useState({
       code: '', 
@@ -83,6 +84,16 @@
           window.removeEventListener('openCommentModal', handleOpenCommentNotification);
       };
     }, [data, t]);
+
+    useEffect(() => {
+      const handleFilterToRecord = (e) => {
+          if (e.detail && e.detail.entity_type === 'ORGANIZATION_INFO') {
+              setFilteredRecordId(String(e.detail.entity_id));
+          }
+      };
+      window.addEventListener('filterToRecord', handleFilterToRecord);
+      return () => window.removeEventListener('filterToRecord', handleFilterToRecord);
+    }, []);
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -231,9 +242,22 @@
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-4 animate-in fade-in duration-300">
+          {filteredRecordId && (
+            <div className="mb-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg flex items-center justify-between text-[11px]">
+              <span className="text-amber-700 dark:text-amber-300 font-bold">
+                {t('نمایش فیلتر شده از طریق اعلان', 'Filtered view from notification')}
+              </span>
+              <button
+                onClick={() => setFilteredRecordId(null)}
+                className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 underline font-bold"
+              >
+                {t('نمایش همه رکوردها', 'Show all records')}
+              </button>
+            </div>
+          )}
           <div className="flex-1 min-h-0">
             <DataGrid 
-              data={data}
+              data={filteredRecordId ? data.filter(r => String(r.id) === filteredRecordId) : data}
               columns={columns} 
               language={language}
               selectable={true}

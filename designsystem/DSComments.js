@@ -238,10 +238,10 @@
                     type: 'info',
                     action_payload: {
                         action: 'open_comments',
+                        form_component: formComponent,
                         entity_type: entityType,
                         entity_id: String(entityId),
-                        entity_title: entityTitle,
-                        form_component: formComponent
+                        entity_title: entityTitle
                     }
                 }));
                 await supabase.from('system_notifications').insert(notifs);

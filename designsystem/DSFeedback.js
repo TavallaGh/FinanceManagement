@@ -23,7 +23,8 @@
     ArrowRight = FallbackIcon,
     ChevronDown = FallbackIcon,
     Box = FallbackIcon,
-    Check = FallbackIcon
+    Check = FallbackIcon,
+    ExternalLink = FallbackIcon
   } = LucideIcons;
   
   const { Button } = window.DSCore || window.DesignSystem || {};
@@ -469,8 +470,6 @@
       </div>
     );
   };
-
-  const ExternalLink = safeIcon(LucideIcons, 'ExternalLink');
 
   const NotificationCard = ({
     id,
