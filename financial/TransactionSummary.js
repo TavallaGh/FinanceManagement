@@ -119,6 +119,8 @@
 
     if (!isOpen || !record) return null;
     
+    const isTransfer = record.transaction_type === 'TRANSFER';
+
     const diffUsd = Math.abs(depUsd - widUsd);
     const isBalancedUsd = diffUsd < 0.01;
 
@@ -172,14 +174,16 @@
                                 <span className="text-slate-500 dark:text-slate-400">{t('جمع برداشت:', 'Total Withdrawal:')}</span>
                                 <span className="font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(widUsd)}</span>
                             </div>
-                            <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-2 mt-1">
-                                <span className="text-slate-500 dark:text-slate-400">{t('وضعیت تراز:', 'Balance Status:')}</span>
-                                {isBalancedUsd ? (
-                                    <Badge variant="emerald" size="sm">{t('تراز', 'Balanced')}</Badge>
-                                ) : (
-                                    <Badge variant="orange" size="sm">{t('ناتراز', 'Unbalanced')}</Badge>
-                                )}
-                            </div>
+                            {isTransfer && (
+                                <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-2 mt-1">
+                                    <span className="text-slate-500 dark:text-slate-400">{t('وضعیت تراز:', 'Balance Status:')}</span>
+                                    {isBalancedUsd ? (
+                                        <Badge variant="emerald" size="sm">{t('تراز', 'Balanced')}</Badge>
+                                    ) : (
+                                        <Badge variant="orange" size="sm">{t('ناتراز', 'Unbalanced')}</Badge>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </Card>
 
@@ -198,14 +202,16 @@
                                 <span className="text-slate-500 dark:text-slate-400">{t('جمع برداشت:', 'Total Withdrawal:')}</span>
                                 <span className="font-bold text-orange-600 dark:text-orange-400" dir="ltr">{formatNumber(widIrr)}</span>
                             </div>
-                            <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-2 mt-1">
-                                <span className="text-slate-500 dark:text-slate-400">{t('وضعیت تراز:', 'Balance Status:')}</span>
-                                {isBalancedIrr ? (
-                                    <Badge variant="emerald" size="sm">{t('تراز', 'Balanced')}</Badge>
-                                ) : (
-                                    <Badge variant="orange" size="sm">{t('ناتراز', 'Unbalanced')}</Badge>
-                                )}
-                            </div>
+                            {isTransfer && (
+                                <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700 pt-2 mt-1">
+                                    <span className="text-slate-500 dark:text-slate-400">{t('وضعیت تراز:', 'Balance Status:')}</span>
+                                    {isBalancedIrr ? (
+                                        <Badge variant="emerald" size="sm">{t('تراز', 'Balanced')}</Badge>
+                                    ) : (
+                                        <Badge variant="orange" size="sm">{t('ناتراز', 'Unbalanced')}</Badge>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </Card>
 
