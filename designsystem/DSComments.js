@@ -48,6 +48,7 @@
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const supabase = window.supabase;
+    const calendarMode = Core.useCalendarMode ? Core.useCalendarMode() : (isRtl ? 'jalali' : 'gregorian');
 
     const [comments, setComments] = useState([]);
     const [users, setUsers] = useState([]);
@@ -71,12 +72,18 @@
     const fetchUsers = useCallback(async () => {
       if (!supabase) return;
       try {
-        const { data } = await supabase.from('sec_users').select('id, username, full_name').eq('is_active', true);
+        const { data } = await supabase
+          .from('sec_users')
+          .select('id, username, parties!party_id(first_name, last_name)')
+          .eq('is_active', true);
         if (data) {
           setUsers(data);
           const uMap = {};
           data.forEach(u => {
-            uMap[u.id] = u.full_name || u.username;
+            const fullName = u.parties
+              ? `${u.parties.first_name || ''} ${u.parties.last_name || ''}`.trim()
+              : '';
+            uMap[u.id] = fullName || u.username;
           });
           setUsersMap(uMap);
         }
@@ -154,10 +161,13 @@
 
     const filteredUsers = useMemo(() => {
         if (!mentionFilter) return users;
-        return users.filter(u => 
-            (u.username && u.username.toLowerCase().includes(mentionFilter)) || 
-            (u.full_name && u.full_name.toLowerCase().includes(mentionFilter))
-        );
+        return users.filter(u => {
+            const fullName = u.parties
+              ? `${u.parties.first_name || ''} ${u.parties.last_name || ''}`.trim().toLowerCase()
+              : '';
+            return (u.username && u.username.toLowerCase().includes(mentionFilter)) ||
+                   fullName.includes(mentionFilter);
+        });
     }, [users, mentionFilter]);
 
     const handleSubmit = async () => {
@@ -220,7 +230,7 @@
                     user_id: u.id,
                     title: t('هامش جدید', 'New Mention'),
                     message: t(`شما در یک هامش روی ${entityTitle} منشن شده‌اید.`, `You were mentioned on ${entityTitle}.`),
-                    type: 'mention',
+                    type: 'info',
                     action_payload: { entity_type: entityType, entity_id: entityId }
                 }));
                 await supabase.from('system_notifications').insert(notifs);
@@ -242,13 +252,17 @@
         if (!dateString) return '';
         try {
             const d = new Date(dateString);
-            if (isRtl) {
+            if (calendarMode === 'jalali') {
                 return new Intl.DateTimeFormat('fa-IR', { 
                     year: 'numeric', month: '2-digit', day: '2-digit', 
-                    hour: '2-digit', minute: '2-digit' 
+                    hour: '2-digit', minute: '2-digit',
+                    calendar: 'persian'
                 }).format(d);
             }
-            return d.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' });
+            return new Intl.DateTimeFormat('en-US', { 
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            }).format(d);
         } catch (e) {
             return dateString;
         }
@@ -327,7 +341,7 @@
                             },
                                 React.createElement(AtSign, { size: 14, className: "text-slate-400" }),
                                 React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-200" }, u.username),
-                                React.createElement('span', { className: "text-slate-500 dark:text-slate-400 text-[10px]" }, u.full_name)
+                                React.createElement('span', { className: "text-slate-500 dark:text-slate-400 text-[10px]" }, u.parties ? `${u.parties.first_name || ''} ${u.parties.last_name || ''}`.trim() : '')
                             )
                         ))
                     )
