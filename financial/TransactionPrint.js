@@ -610,12 +610,17 @@
                             
                             <div class="header-col header-center">
                                 <h1 class="title">${isRtl ? 'سند حسابداری' : 'Accounting Voucher'}</h1>
-                                ${printSettings.showStatus ? `<span class="badge">${headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') : (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')}</span>` : ''}
+                                ${printSettings.showStatus ? `<span class="badge">${
+                            headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') :
+                            headerData.status === 'FINAL' ? (isRtl ? 'بررسی شده' : 'Final') :
+                            (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')
+                        }</span>` : ''}
                             </div>
                             
                             <div class="header-col header-end">
                                 <div class="info-line"><span class="info-label">${isRtl ? 'ثبت کننده:' : 'Prepared By:'}</span><span class="info-val">${usersMap[headerData.registrar_id] || headerData.registrar_id || '---'}</span></div>
-                                <div class="info-line"><span class="info-label">${isRtl ? 'تایید کننده:' : 'Approved By:'}</span><span class="info-val">---</span></div>
+                                <div class="info-line"><span class="info-label">${isRtl ? 'بررسی کننده:' : 'Reviewed By:'}</span><span class="info-val">${headerData.reviewed_by_name || (headerData.reviewed_by ? (usersMap[headerData.reviewed_by] || headerData.reviewed_by) : '---')}</span></div>
+                                <div class="info-line"><span class="info-label">${isRtl ? 'تایید کننده:' : 'Approved By:'}</span><span class="info-val">${headerData.approved_by_name || (headerData.approved_by ? (usersMap[headerData.approved_by] || headerData.approved_by) : '---')}</span></div>
                                 <div class="info-line"><span class="info-label">${isRtl ? 'دپارتمان:' : 'Department:'}</span><span class="info-val">${deptsMap[headerData.department_id] || '---'}</span></div>
                             </div>
                         </div>
@@ -658,7 +663,12 @@
                                     <div class="sig-box">
                                         <span class="sig-title">${sig.label}</span>
                                         <div class="sig-line"></div>
-                                        <span class="sig-name">${sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') : '---'}</span>
+                                        <span class="sig-name">${
+                                            sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') :
+                                            sig.key === 'checker' ? (headerData.reviewed_by_name || (headerData.reviewed_by ? (usersMap[headerData.reviewed_by] || headerData.reviewed_by) : '---')) :
+                                            sig.key === 'approver' ? (headerData.approved_by_name || (headerData.approved_by ? (usersMap[headerData.approved_by] || headerData.approved_by) : '---')) :
+                                            '---'
+                                        }</span>
                                     </div>
                                 `).join('')}
                             </div>
@@ -701,14 +711,17 @@
                     
                     React.createElement(Flex, { direction: "col", gap: "xs", align: "center", justify: "center", className: "flex-1" },
                         React.createElement(Text, { variant: "h2", className: "tracking-tight text-center" }, isRtl ? 'سند حسابداری' : 'Accounting Voucher'),
-                        printSettings.showStatus && React.createElement(Badge, { variant: headerData.status === 'APPROVED' ? 'success' : 'warning', className: "mt-1 border-slate-800 bg-transparent text-slate-800" },
-                            headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') : (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')
+                        printSettings.showStatus && React.createElement(Badge, { variant: headerData.status === 'APPROVED' ? 'success' : headerData.status === 'FINAL' ? 'primary' : 'warning', className: "mt-1 border-slate-800 bg-transparent text-slate-800" },
+                            headerData.status === 'APPROVED' ? (isRtl ? 'تایید شده' : 'Approved') :
+                            headerData.status === 'FINAL' ? (isRtl ? 'بررسی شده' : 'Final') :
+                            (isRtl ? 'یادداشت / موقت' : 'Draft / Temp')
                         )
                     ),
 
                     React.createElement(Flex, { direction: "col", gap: "xs", align: "end", className: "flex-1 text-left" },
                         React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'ثبت کننده:' : 'Prepared By:'), React.createElement(Text, { weight: "bold" }, usersMap[headerData.registrar_id] || headerData.registrar_id || '---')),
-                        React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'تایید کننده:' : 'Approved By:'), React.createElement(Text, { weight: "bold" }, '---')),
+                        React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'بررسی کننده:' : 'Reviewed By:'), React.createElement(Text, { weight: "bold" }, headerData.reviewed_by_name || (headerData.reviewed_by ? (usersMap[headerData.reviewed_by] || headerData.reviewed_by) : '---'))),
+                        React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'تایید کننده:' : 'Approved By:'), React.createElement(Text, { weight: "bold" }, headerData.approved_by_name || (headerData.approved_by ? (usersMap[headerData.approved_by] || headerData.approved_by) : '---'))),
                         React.createElement(Flex, { align: "center", gap: "xs", justify: isRtl ? "end" : "start", className: "w-full" }, React.createElement(Text, { variant: "caption", className: "whitespace-nowrap" }, isRtl ? 'دپارتمان:' : 'Department:'), React.createElement(Text, { weight: "bold" }, deptsMap[headerData.department_id] || '---'))
                     )
                 ),
@@ -739,7 +752,12 @@
                     activeSignaturesList.map(sig => React.createElement(Flex, { key: sig.key, direction: "col", gap: "sm", align: "center", justify: "end" },
                         React.createElement('span', { className: "text-xs font-bold text-slate-500 mb-6" }, sig.label),
                         React.createElement('div', { className: "w-3/4 border-t border-dashed border-slate-400 mb-1" }),
-                        React.createElement('span', { className: "text-sm font-bold" }, sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') : '---')
+                        React.createElement('span', { className: "text-sm font-bold" }, 
+                            sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') :
+                            sig.key === 'checker' ? (headerData.reviewed_by_name || (headerData.reviewed_by ? (usersMap[headerData.reviewed_by] || headerData.reviewed_by) : '---')) :
+                            sig.key === 'approver' ? (headerData.approved_by_name || (headerData.approved_by ? (usersMap[headerData.approved_by] || headerData.approved_by) : '---')) :
+                            '---'
+                        )
                     ))
                 )
             );

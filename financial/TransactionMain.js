@@ -104,8 +104,21 @@
     const STATUS_OPTIONS = [
         { value: 'DRAFT', label: t('یادداشت', 'Draft') },
         { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
+        { value: 'FINAL', label: t('بررسی شده', 'Final') },
         { value: 'APPROVED', label: t('تایید شده', 'Approved') }
     ];
+
+    // ترتیب مجاز تغییر وضعیت
+    const STATUS_ORDER = ['DRAFT', 'TEMPORARY', 'FINAL', 'APPROVED'];
+    const canTransitionTo = (from, to) => {
+        if (from === 'APPROVED') return false; // وضعیت تایید شده قابل تغییر نیست
+        if (to === 'DRAFT' && from === 'TEMPORARY') return true; // برگشت از موقت به یادداشت
+        if (to === 'TEMPORARY' && from === 'FINAL') return true; // برگشت از بررسی شده به موقت
+        // پیشرفت رو به جلو در ترتیب مجاز
+        const fromIdx = STATUS_ORDER.indexOf(from);
+        const toIdx = STATUS_ORDER.indexOf(to);
+        return toIdx === fromIdx + 1;
+    };
 
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [isLoading, setIsLoading] = useState(false);
@@ -340,10 +353,45 @@
     const handleBulkStatusChange = async (newStatus, ids) => {
         setIsLoading(true);
         try {
-            const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', ids);
+            // فیلتر رکوردهایی که تغییر وضعیت برایشان مجاز است
+            const eligible = transactions.filter(tx => ids.includes(tx.id) && canTransitionTo(tx.status, newStatus));
+            const skipped = ids.length - eligible.length;
+
+            if (eligible.length === 0) {
+                showToast(t('هیچ‌کدام از رکوردهای انتخابی امکان تغییر به این وضعیت را ندارند.', 'None of the selected records can transition to this status.'), 'warning');
+                setIsLoading(false);
+                return;
+            }
+
+            const eligibleIds = eligible.map(tx => tx.id);
+            const now = new Date().toISOString();
+
+            // آماده‌سازی پیلود بر اساس وضعیت جدید
+            let updatePayload = { status: newStatus };
+            if (newStatus === 'FINAL') {
+                updatePayload.reviewed_by = currentUserId || null;
+                updatePayload.reviewed_at = now;
+                updatePayload.reviewed_by_name = currentUserName;
+            } else if (newStatus === 'APPROVED') {
+                updatePayload.approved_by = currentUserId || null;
+                updatePayload.approved_at = now;
+                updatePayload.approved_by_name = currentUserName;
+            } else if (newStatus === 'TEMPORARY') {
+                // برگشت از بررسی شده به موقت - پاک کردن اطلاعات بررسی
+                updatePayload.reviewed_by = null;
+                updatePayload.reviewed_at = null;
+                updatePayload.reviewed_by_name = null;
+            }
+
+            const { error } = await supabase.from('fm_transactions').update(updatePayload).in('id', eligibleIds);
             if (error) throw error;
-            showToast(t('وضعیت با موفقیت تغییر کرد.', 'Status updated.'));
-            await logAction('bulk_status_update', 'BULK_UPDATE', `تغییر وضعیت ${ids.length} سند به ${newStatus}`);
+
+            const statusLabels = { DRAFT: 'یادداشت', TEMPORARY: 'موقت', FINAL: 'بررسی شده', APPROVED: 'تایید شده' };
+            const msg = skipped > 0
+                ? t(`وضعیت ${eligible.length} سند تغییر کرد. ${skipped} سند به دلیل ترتیب وضعیت قابل تغییر نبود.`, `${eligible.length} records updated. ${skipped} skipped due to invalid transition.`)
+                : t('وضعیت با موفقیت تغییر کرد.', 'Status updated.');
+            showToast(msg, skipped > 0 ? 'warning' : 'success');
+            await logAction('bulk_status_update', 'BULK_UPDATE', `تغییر وضعیت ${eligible.length} سند به ${statusLabels[newStatus] || newStatus} توسط ${currentUserName}`);
             fetchData();
         } catch (error) {
             showToast(t('خطا در تغییر وضعیت.', 'Error updating status.'), 'error');
@@ -373,7 +421,13 @@
     const handleBulkUpdateRates = async (ids) => {
         setIsLoading(true);
         try {
-            const selectedTxs = transactions.filter(tx => ids.includes(tx.id));
+            // فقط تراکنش‌های یادداشت یا موقت قابل بروزرسانی نرخ هستند
+            const selectedTxs = transactions.filter(tx => ids.includes(tx.id) && (tx.status === 'DRAFT' || tx.status === 'TEMPORARY'));
+            if (selectedTxs.length === 0) {
+                showToast(t('تراکنش‌های بررسی شده یا تایید شده امکان بروزرسانی نرخ ارز را ندارند.', 'Reviewed or Approved transactions cannot have exchange rates updated.'), 'warning');
+                setIsLoading(false);
+                return;
+            }
 
             const uniqueDates = [...new Set(selectedTxs.map(tx => tx.document_date).filter(Boolean))];
             const ratesByDate = {};
@@ -413,7 +467,7 @@
             }
 
             showToast(t(`${updatedCount} قلم تراکنش با آخرین نرخ‌های ارز بروز شد.`, `${updatedCount} items updated with latest exchange rates.`));
-            await logAction('bulk_update_rates', 'BULK', `بروزرسانی نرخ ارز ${ids.length} سند (${updatedCount} قلم)`);
+            await logAction('bulk_update_rates', 'BULK', `بروزرسانی نرخ ارز ${selectedTxs.length} سند (${updatedCount} قلم) توسط ${currentUserName}`);
             fetchData();
         } catch (error) {
             showToast(t('خطا در بروزرسانی نرخ ارزها.', 'Error updating exchange rates.'), 'error');
@@ -520,9 +574,9 @@
         { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
         { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '90px', type: 'date' },
         { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '100px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
-        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '90px', render: (val) => {
+        { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '95px', render: (val) => {
             const s = STATUS_OPTIONS.find(x => x.value === val);
-            const colors = { DRAFT: 'slate', TEMPORARY: 'orange', APPROVED: 'emerald' };
+            const colors = { DRAFT: 'slate', TEMPORARY: 'orange', FINAL: 'blue', APPROVED: 'emerald' };
             return React.createElement(Badge, { variant: colors[val] || 'gray', size: "sm" }, s ? s.label : val);
         }},
         { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '110px', render: (val) => {
@@ -593,9 +647,16 @@
         { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
     ];
 
+    const CheckCircle = safeIcon(LucideIcons, 'CheckCircle');
+    const CheckSquare = safeIcon(LucideIcons, 'CheckSquare');
+    const RotateCcw = safeIcon(LucideIcons, 'RotateCcw');
+
     const bulkActions = [
         { label: t('تغییر به موقت', 'Set Temporary'), icon: FileText, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids) },
         { label: t('تغییر به یادداشت', 'Set Draft'), icon: Edit, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('DRAFT', ids) },
+        { label: t('تبدیل به بررسی شده', 'Set Final'), icon: CheckSquare, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('FINAL', ids), className: 'text-blue-600 dark:text-blue-400' },
+        { label: t('تبدیل به تایید شده', 'Set Approved'), icon: CheckCircle, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('APPROVED', ids), className: 'text-emerald-600 dark:text-emerald-400' },
+        { label: t('برگشت به موقت', 'Revert to Temporary'), icon: RotateCcw, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids), className: 'text-orange-500 dark:text-orange-400' },
         { label: t('بروزرسانی نرخ ارز', 'Update Exchange Rates'), icon: RefreshCw, variant: 'outline', requiredAccess: 'edit', onClick: (ids) => handleBulkUpdateRates(ids), className: 'text-indigo-600 dark:text-indigo-400' },
         { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) }
     ];
@@ -618,7 +679,7 @@
     const TransactionSummaryModal = safeComp(window, 'TransactionSummary');
     const { CommentModal } = window.DSComments || {};
     
-    const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
+    const isAttachReadOnly = attachModal.record && (attachModal.record.status === 'FINAL' || attachModal.record.status === 'APPROVED');
 
     return React.createElement('div', { className: "p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900", dir: isRtl ? 'rtl' : 'ltr' },
         React.createElement(PageHeader, {

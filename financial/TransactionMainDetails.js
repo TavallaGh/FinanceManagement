@@ -57,9 +57,20 @@
     const STATUS_OPTIONS = [
         { value: 'DRAFT', label: t('یادداشت', 'Draft') },
         { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
-        { value: 'APPROVED', label: t('تایید شده', 'Approved') },
-        { value: 'FINAL', label: t('قطعی شده', 'Final') }
+        { value: 'FINAL', label: t('بررسی شده', 'Final') },
+        { value: 'APPROVED', label: t('تایید شده', 'Approved') }
     ];
+
+    // ترتیب مجاز تغییر وضعیت
+    const STATUS_ORDER = ['DRAFT', 'TEMPORARY', 'FINAL', 'APPROVED'];
+    const canTransitionTo = (from, to) => {
+        if (from === 'APPROVED') return false;
+        if (to === 'DRAFT' && from === 'TEMPORARY') return true;
+        if (to === 'TEMPORARY' && from === 'FINAL') return true;
+        const fromIdx = STATUS_ORDER.indexOf(from);
+        const toIdx = STATUS_ORDER.indexOf(to);
+        return toIdx === fromIdx + 1;
+    };
 
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [isLoading, setIsLoading] = useState(false);
@@ -92,11 +103,12 @@
     const isReadOnly = useMemo(() => {
         if (formMode === 'CREATE' || formMode === 'COPY') return false;
         if (!headerData.status) return false;
-        return headerData.status !== 'DRAFT' && headerData.status !== 'TEMPORARY';
+        // وضعیت بررسی شده (FINAL) یا تایید شده (APPROVED) قابل ویرایش نیست
+        return headerData.status === 'FINAL' || headerData.status === 'APPROVED';
     }, [headerData.status, formMode]);
 
     const isAttachReadOnly = useMemo(() => {
-        return attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
+        return attachModal.record && (attachModal.record.status === 'FINAL' || attachModal.record.status === 'APPROVED');
     }, [attachModal.record]);
 
     const showToast = useCallback((message, type = 'success') => {
@@ -443,6 +455,13 @@
     const handleSaveTransaction = async (overrideStatus) => {
         const statusToSave = typeof overrideStatus === 'string' ? overrideStatus : headerData.status;
 
+        // بررسی تغییر وضعیت - ترتیب وضعیت باید رعایت شود
+        if (typeof overrideStatus === 'string' && overrideStatus !== headerData.status) {
+            if (!canTransitionTo(headerData.status, overrideStatus)) {
+                return showToast(t('تغییر وضعیت به دلیل رعایت نشدن ترتیب امکانپذیر نیست.', 'Status transition is not allowed.'), 'warning');
+            }
+        }
+
         if (document.getElementById('grid-inline-edit-marker')) {
             return showToast(t('لطفاً ابتدا با زدن دکمه Enter یا دکمه تایید تغییرات سطر باز را در اقلام ذخیره کنید.', 'Please save inline edits first.'), 'warning');
         }
@@ -458,6 +477,7 @@
             let txId = headerData.id;
             const validDeptId = (headerData.department_id && String(headerData.department_id).trim() !== '') ? headerData.department_id : null;
 
+            const now = new Date().toISOString();
             const txPayload = {
                 document_code: headerData.document_code,
                 document_date: headerData.document_date.replace(/\//g, '-'),
@@ -467,6 +487,22 @@
                 status: statusToSave || 'DRAFT',
                 description: headerData.description || ''
             };
+
+            // ثبت اطلاعات بررسی‌کننده / تاییدکننده
+            if (statusToSave === 'FINAL' && headerData.status !== 'FINAL') {
+                txPayload.reviewed_by = currentUserId || null;
+                txPayload.reviewed_at = now;
+                txPayload.reviewed_by_name = currentUserName;
+            } else if (statusToSave === 'APPROVED' && headerData.status !== 'APPROVED') {
+                txPayload.approved_by = currentUserId || null;
+                txPayload.approved_at = now;
+                txPayload.approved_by_name = currentUserName;
+            } else if (statusToSave === 'TEMPORARY' && headerData.status === 'FINAL') {
+                // برگشت از بررسی شده به موقت - پاک کردن اطلاعات بررسی
+                txPayload.reviewed_by = null;
+                txPayload.reviewed_at = null;
+                txPayload.reviewed_by_name = null;
+            }
 
             if (!txId) {
                 const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
@@ -488,9 +524,10 @@
                 if (error) throw error;
                 
                 if (statusToSave !== headerData.status) {
-                    await logAction('status_update', txId, `تغییر وضعیت تراکنش به: ${statusToSave}`);
+                    const statusLabels = { DRAFT: 'یادداشت', TEMPORARY: 'موقت', FINAL: 'بررسی شده', APPROVED: 'تایید شده' };
+                    await logAction('status_update', txId, `تغییر وضعیت از ${statusLabels[headerData.status] || headerData.status} به ${statusLabels[statusToSave] || statusToSave} - توسط ${currentUserName}`);
                 } else if (isDirty) {
-                    await logAction('update_transaction', txId, `ویرایش تراکنش: ${headerData.document_code}`);
+                    await logAction('update_transaction', txId, `ویرایش تراکنش: ${headerData.document_code} - توسط ${currentUserName}`);
                 }
             }
 
@@ -529,6 +566,7 @@
 
                     const { data: newItems, error: itemsError } = await supabase.from('fm_transaction_items').insert(itemsPayload).select();
                     if (itemsError) throw itemsError;
+                    await logAction('update_items', txId, `بروزرسانی ${itemsPayload.length} قلم سند ${headerData.document_code} - توسط ${currentUserName}`);
 
                     const mappedItems = newItems.map(item => {
                         return {
@@ -543,7 +581,14 @@
                 }
             }
 
-            setHeaderData(prev => ({ ...prev, status: statusToSave }));
+            setHeaderData(prev => ({ 
+                ...prev, 
+                status: statusToSave,
+                // بهروزرسانی مختصر برای نمایش در اینترفیس
+                ...(statusToSave === 'FINAL' && headerData.status !== 'FINAL' ? { reviewed_by: currentUserId, reviewed_at: new Date().toISOString(), reviewed_by_name: currentUserName } : {}),
+                ...(statusToSave === 'APPROVED' && headerData.status !== 'APPROVED' ? { approved_by: currentUserId, approved_at: new Date().toISOString(), approved_by_name: currentUserName } : {}),
+                ...(statusToSave === 'TEMPORARY' && headerData.status === 'FINAL' ? { reviewed_by: null, reviewed_at: null, reviewed_by_name: null } : {})
+            }));
             setIsDirty(false);
             setHasSaved(true);
             
@@ -561,6 +606,10 @@
 
     const handleFileUpload = async (files) => {
         if (!files || files.length === 0 || !attachModal.record) return;
+        // بلوک آپلود برای تراکنش‌های بررسی شده / تایید شده
+        if (attachModal.record.status === 'FINAL' || attachModal.record.status === 'APPROVED') {
+            return showToast(t('تراکنش‌های بررسی شده / تایید شده امکان افزودن پیوست ندارند.', 'Finalized/approved transactions cannot have attachments added.'), 'warning');
+        }
         const file = files[0];
 
         setIsUploading(true);
@@ -593,6 +642,7 @@
             if (error) throw error;
 
             showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
+            await logAction('upload_attachment', attachModal.record.id, `افزودن پیوست به تراکنش ${attachModal.record.document_code}: ${file.name} - توسط ${currentUserName}`);
             loadAttachments(attachModal.record.id);
         } catch (error) {
             showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
@@ -602,10 +652,15 @@
     };
 
     const handleDeleteAttachment = async (fileId) => {
+        // بلوک حذف برای تراکنش‌های بررسی شده / تایید شده
+        if (attachModal.record && (attachModal.record.status === 'FINAL' || attachModal.record.status === 'APPROVED')) {
+            return showToast(t('تراکنش‌های بررسی شده / تایید شده امکان حذف پیوست ندارند.', 'Finalized/approved transactions cannot have attachments deleted.'), 'warning');
+        }
         try {
             const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
             if (error) throw error;
             showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
+            await logAction('delete_attachment', attachModal.record.id, `حذف پیوست از تراکنش ${attachModal.record.document_code} - توسط ${currentUserName}`);
             loadAttachments(attachModal.record.id);
         } catch (error) {
             showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
@@ -627,26 +682,49 @@
     const headerCardTitle = (
         <div className="flex items-center gap-4 w-full">
             <span>{t('اطلاعات سربرگ', 'Header Data')}</span>
-            <Badge variant={(headerData.status || 'DRAFT') === 'APPROVED' ? 'emerald' : (headerData.status || 'DRAFT') === 'TEMPORARY' ? 'orange' : 'slate'} className="shadow-none">
+            <Badge variant={{ APPROVED: 'emerald', FINAL: 'blue', TEMPORARY: 'orange', DRAFT: 'slate' }[(headerData.status || 'DRAFT')] || 'slate'} className="shadow-none">
                 {STATUS_OPTIONS.find(x => x.value === (headerData.status || 'DRAFT'))?.label || t('یادداشت', 'Draft')}
             </Badge>
         </div>
     );
 
-    const headerCardAction = (!isReadOnly) ? (
+    const currentStatus = headerData.status || 'DRAFT';
+    const headerCardAction = (
         <div className="flex items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
-            {(headerData.status || 'DRAFT') === 'DRAFT' && access.canEdit && (
+            {/* وضعیت یادداشت -> موقت */}
+            {currentStatus === 'DRAFT' && access.canEdit && (
                 <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                     {t('تبدیل به موقت', 'Set Temporary')}
                 </Button>
             )}
-            {(headerData.status || 'DRAFT') === 'TEMPORARY' && access.canEdit && (
-                <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
-                    {t('برگشت به یادداشت', 'Revert to Draft')}
-                </Button>
+            {/* وضعیت موقت: برگشت به یادداشت یا تبدیل به بررسی شده */}
+            {currentStatus === 'TEMPORARY' && access.canEdit && (
+                <>
+                    <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
+                        {t('برگشت به یادداشت', 'Revert to Draft')}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('FINAL')} className="!text-blue-600 !border-blue-500 hover:!bg-blue-50 dark:hover:!bg-blue-900/30 !py-0.5 !h-6">
+                        {t('تبدیل به بررسی شده', 'Set Final')}
+                    </Button>
+                </>
+            )}
+            {/* وضعیت بررسی شده: برگشت به موقت یا تایید */}
+            {currentStatus === 'FINAL' && access.canEdit && (
+                <>
+                    <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
+                        {t('برگشت به موقت', 'Revert to Temporary')}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('APPROVED')} className="!text-emerald-600 !border-emerald-500 hover:!bg-emerald-50 dark:hover:!bg-emerald-900/30 !py-0.5 !h-6">
+                        {t('تایید سند', 'Approve')}
+                    </Button>
+                </>
+            )}
+            {/* وضعیت تایید شده: غیرقابل تغییر */}
+            {currentStatus === 'APPROVED' && (
+                <Badge variant="emerald" size="sm">{t('تایید نهایی - غیرقابل تغییر', 'Approved - Locked')}</Badge>
             )}
         </div>
-    ) : null;
+    );
 
     const itemsCardTitle = (
         <div className="flex items-center gap-4 w-full">
@@ -710,6 +788,20 @@
                             <div className="lg:col-span-3 sm:col-span-2 relative z-[70]">
                                 <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => { setHeaderData({...headerData, description: e.target.value}); setIsDirty(true); }} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
+
+                            {/* نمایش اطلاعات بررسی و تایید */}
+                            {(headerData.reviewed_by || headerData.reviewed_by_name) && (
+                                <>
+                                    <TextField size="sm" formCode={formCode} label={t('بررسی کننده', 'Reviewed By')} value={headerData.reviewed_by_name || lookups.usersMap[headerData.reviewed_by] || '-'} disabled isRtl={isRtl} />
+                                    <TextField size="sm" formCode={formCode} label={t('تاریخ بررسی', 'Reviewed At')} value={headerData.reviewed_at ? new Intl.DateTimeFormat(isRtl ? 'fa-IR' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.reviewed_at)) : '-'} disabled isRtl={isRtl} />
+                                </>
+                            )}
+                            {(headerData.approved_by || headerData.approved_by_name) && (
+                                <>
+                                    <TextField size="sm" formCode={formCode} label={t('تایید کننده', 'Approved By')} value={headerData.approved_by_name || lookups.usersMap[headerData.approved_by] || '-'} disabled isRtl={isRtl} />
+                                    <TextField size="sm" formCode={formCode} label={t('تاریخ تایید', 'Approved At')} value={headerData.approved_at ? new Intl.DateTimeFormat(isRtl ? 'fa-IR' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.approved_at)) : '-'} disabled isRtl={isRtl} />
+                                </>
+                            )}
                         </div>
                     </Card>
 
