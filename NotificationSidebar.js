@@ -119,47 +119,64 @@
 
     const handleNotificationClick = async (notif) => {
       const payload = notif.action_payload;
-      console.log('[Notif] clicked payload:', payload);
-      if (!payload || (!payload.entity_type && !payload.action)) {
-        console.log('[Notif] early return - no payload or missing fields');
-        return;
-      }
+      if (!payload || (!payload.entity_type && !payload.action)) return;
 
       await markAsRead(notif.id);
       onClose();
 
-      // normalise: support both old payloads (no action) and new ones
       const action = payload.action || 'open_record';
       const formComponent = payload.form_component || ENTITY_FORM_MAP[payload.entity_type] || null;
-      console.log('[Notif] action:', action, '| formComponent:', formComponent);
-      console.log('[Notif] window.__navigateToForm exists?', !!window.__navigateToForm);
 
       if (action === 'open_record' || action === 'open_comments') {
         const dispatchFilter = () => {
-          console.log('[Notif] dispatching filterToRecord', payload.entity_type, payload.entity_id);
           window.dispatchEvent(new CustomEvent('filterToRecord', {
-            detail: {
-              entity_type: payload.entity_type,
-              entity_id: payload.entity_id
-            }
+            detail: { entity_type: payload.entity_type, entity_id: payload.entity_id }
           }));
         };
 
         if (formComponent) {
           if (window.__navigateToForm) {
-            const result = window.__navigateToForm(formComponent);
-            console.log('[Notif] __navigateToForm result:', result);
+            window.__navigateToForm(formComponent);
             setTimeout(dispatchFilter, 300);
           } else {
-            console.log('[Notif] falling back to event');
-            window.dispatchEvent(new CustomEvent('navigateToForm', {
-              detail: { formComponent }
-            }));
+            window.dispatchEvent(new CustomEvent('navigateToForm', { detail: { formComponent } }));
             setTimeout(dispatchFilter, 500);
           }
         } else {
           dispatchFilter();
         }
+      }
+    };
+
+    const markAsUnread = async (id) => {
+      if (!id) return;
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+      try {
+        const { error } = await supabase
+          .from('system_notifications')
+          .update({ is_read: false })
+          .eq('id', id);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Error marking as unread in DB:', err);
+        showToast(t('خطا در ثبت وضعیت خوانده نشده.', 'Error marking as unread.'), 'error');
+      }
+    };
+
+    const markAllAsUnread = async () => {
+      const ids = notifications.filter(n => n.is_read).map(n => n.id);
+      if (ids.length === 0) return;
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: false })));
+      try {
+        const { error } = await supabase
+          .from('system_notifications')
+          .update({ is_read: false })
+          .eq('user_id', CURRENT_USER_ID)
+          .eq('is_read', true);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Error marking all as unread in DB:', err);
+        showToast(t('خطا در ثبت وضعیت خوانده نشده برای همه اعلان‌ها.', 'Error marking all as unread.'), 'error');
       }
     };
 
@@ -286,12 +303,20 @@
           <div className="flex flex-col h-full">
               {notifications.length > 0 && (
                 <div className="px-1 pb-2 mb-2 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between shrink-0">
-                  <Button
-                    size="sm" variant="ghost" icon={Check} onClick={markAllAsRead} disabled={unreadCount === 0}
-                    className="!text-indigo-600 dark:!text-indigo-400 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !px-2 !h-7 !text-[10px]"
-                  >
-                    {t('خواندن همه', 'Mark All Read')}
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm" variant="ghost" icon={Check} onClick={markAllAsRead} disabled={unreadCount === 0}
+                      className="!text-indigo-600 dark:!text-indigo-400 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !px-2 !h-7 !text-[10px]"
+                    >
+                      {t('خواندن همه', 'All Read')}
+                    </Button>
+                    <Button
+                      size="sm" variant="ghost" onClick={markAllAsUnread} disabled={unreadCount === notifications.length}
+                      className="!text-slate-500 dark:!text-slate-400 hover:!bg-slate-100 dark:hover:!bg-slate-700/50 !px-2 !h-7 !text-[10px]"
+                    >
+                      {t('نخوانده همه', 'All Unread')}
+                    </Button>
+                  </div>
                   <Button
                     size="sm" variant="danger-outline" icon={Trash2} onClick={deleteAll}
                     className="!px-2 !h-7 !text-[10px]"
@@ -315,6 +340,7 @@
                         isRead={notif.is_read}
                         timestamp={notif.created_at}
                         onRead={markAsRead}
+                        onUnread={markAsUnread}
                         onDelete={deleteOne}
                         onClick={notif.action_payload?.entity_type || notif.action_payload?.action ? () => handleNotificationClick(notif) : undefined}
                         formatTime={formatTime}

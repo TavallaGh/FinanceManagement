@@ -479,6 +479,7 @@
     isRead = false,
     timestamp,
     onRead,
+    onUnread,
     onDelete,
     onClick,
     formatTime = (t) => t,
@@ -526,15 +527,23 @@
             {!isRead && onRead && (
               <Button
                 size="sm" variant="ghost" icon={Check}
-                onClick={() => onRead(id)}
+                onClick={(e) => { e.stopPropagation(); onRead(id); }}
                 title={t('علامت‌گذاری خوانده شده', 'Mark as read')}
                 className="!text-slate-400 dark:!text-slate-500 hover:!text-indigo-600 dark:hover:!text-indigo-400 hover:!bg-indigo-50 dark:hover:!bg-indigo-900/30 !px-1 !h-6"
+              />
+            )}
+            {isRead && onUnread && (
+              <Button
+                size="sm" variant="ghost" icon={Clock}
+                onClick={(e) => { e.stopPropagation(); onUnread(id); }}
+                title={t('علامت‌گذاری خوانده نشده', 'Mark as unread')}
+                className="!text-slate-400 dark:!text-slate-500 hover:!text-amber-600 dark:hover:!text-amber-400 hover:!bg-amber-50 dark:hover:!bg-amber-900/30 !px-1 !h-6"
               />
             )}
             {onDelete && (
               <Button
                 size="sm" variant="ghost" icon={Trash2}
-                onClick={() => onDelete(id)}
+                onClick={(e) => { e.stopPropagation(); onDelete(id); }}
                 title={t('حذف اعلان', 'Delete')}
                 className="!text-slate-400 dark:!text-slate-500 hover:!text-red-500 dark:hover:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/30 !px-1 !h-6"
               />

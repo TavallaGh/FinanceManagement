@@ -239,22 +239,10 @@
           language={language}
           breadcrumbs={[{ label: t('تنظیمات پایه', 'Base Setup') }, { label: t('سازمان', 'Organization') }]}
           viewConfig={viewConfig}
+          notifFilter={filteredRecordId ? { isActive: true, onClear: () => setFilteredRecordId(null) } : null}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-4 animate-in fade-in duration-300">
-          {filteredRecordId && (
-            <div className="mb-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg flex items-center justify-between text-[11px]">
-              <span className="text-amber-700 dark:text-amber-300 font-bold">
-                {t('نمایش فیلتر شده از طریق اعلان', 'Filtered view from notification')}
-              </span>
-              <button
-                onClick={() => setFilteredRecordId(null)}
-                className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 underline font-bold"
-              >
-                {t('نمایش همه رکوردها', 'Show all records')}
-              </button>
-            </div>
-          )}
           <div className="flex-1 min-h-0">
             <DataGrid 
               data={filteredRecordId ? data.filter(r => String(r.id) === filteredRecordId) : data}

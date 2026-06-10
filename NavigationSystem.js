@@ -163,15 +163,10 @@
     // expose a global helper so NotificationSidebar can navigate without timing issues
     useEffect(() => {
       window.__navigateToForm = (formComponent) => {
-        console.log('[Nav] __navigateToForm called with:', formComponent);
-        console.log('[Nav] menuData length:', menuData.length);
         if (!menuData.length) return false;
         const item = menuData.find(m => m.component_path &&
           (m.component_path === formComponent || m.component_path.endsWith('/' + formComponent)));
-        console.log('[Nav] found item:', item);
         if (item) { handleFormClick(item); return true; }
-        // log all component_paths to help debug
-        console.log('[Nav] available component_paths:', menuData.filter(m=>m.component_path).map(m=>m.component_path));
         return false;
       };
       return () => { delete window.__navigateToForm; };
