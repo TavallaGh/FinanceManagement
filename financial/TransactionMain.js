@@ -63,8 +63,17 @@
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
 
     const supabase = window.supabase;
+
+    // read current user from session (same source used across the app)
+    const sessionUserId = (() => {
+      try {
+        const s = sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}';
+        return JSON.parse(s).id || null;
+      } catch(e) { return null; }
+    })();
+
     const currentUserObj = window.NavigationSystem?.currentUser || {};
-    const currentUserId = currentUserObj.id || null;
+    const currentUserId = sessionUserId || currentUserObj.id || null;
     const currentUserName = currentUserObj.name || currentUserObj.username || 'مدیر سیستم';
 
     const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
@@ -152,18 +161,11 @@
             });
             setUsersMap(uMap);
 
-            let myId = currentUserId;
-            let targetUsername = currentUserObj.username || 'admin';
-
-            if (!myId || myId === '00000000-0000-0000-0000-000000000000') {
-                const me = (userData || []).find(u => u.username === targetUsername || u.full_name === currentUserName);
-                if (me) {
-                    myId = me.id;
-                }
-            }
+            // use session-based ID directly — no username fallback that could match wrong user
+            const myId = currentUserId;
             setResolvedUserId(myId);
 
-            const activeUserRecord = (userData || []).find(u => u.id === myId || u.username === targetUsername);
+            const activeUserRecord = myId ? (userData || []).find(u => u.id === myId) : null;
             if (activeUserRecord && activeUserRecord.party_id) {
                 const { data: personnelData } = await supabase
                     .from('fm_org_chart_personnel')
