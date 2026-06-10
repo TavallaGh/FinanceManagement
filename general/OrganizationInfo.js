@@ -1,441 +1,375 @@
 /* Filename: general/OrganizationInfo.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useCallback, useMemo } = React;
+  const { useState, useEffect } = React;
+  
+  const { 
+    Button, PageHeader, Modal, DataGrid, 
+    TextField, ToggleField, Badge, EmptyState, Avatar
+  } = window.DesignSystem || window.DSCore || {};
+  
+  const { 
+    Building2, Plus, Edit, Trash2, MapPin, Upload, X, Save, 
+    AlertTriangle, Lock, MessageSquare
+  } = window.LucideIcons || {};
+  
+  const { CommentModal } = window.DSComments || {};
+  const supabase = window.supabase;
 
-  const FallbackComponent = () => null;
-  const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
-
-  const safeComp = (moduleObj, compName) => {
-      const comp = moduleObj && moduleObj[compName];
-      if (typeof comp === 'function' || (comp && typeof comp === 'object' && comp.$$typeof)) return comp;
-      if (comp && comp.default && (typeof comp.default === 'function' || comp.default.$$typeof)) return comp.default;
-      return FallbackComponent;
-  };
-
-  const safeIcon = (moduleObj, iconName) => {
-      const icon = moduleObj && moduleObj[iconName];
-      if (typeof icon === 'function' || (icon && typeof icon === 'object' && icon.$$typeof)) return icon;
-      if (icon && icon.default && (typeof icon.default === 'function' || icon.default.$$typeof)) return icon.default;
-      return FallbackIcon;
-  };
-
-  const DS = window.DesignSystem || {};
-  const Core = window.DSCore || DS || {};
-  const Button = safeComp(Core, 'Button');
-  const Badge = safeComp(Core, 'Badge');
-  const Card = safeComp(Core, 'Card');
-
-  const Forms = window.DSForms || DS || {};
-  const TextField = safeComp(Forms, 'TextField');
-  const SelectField = safeComp(Forms, 'SelectField');
-
-  const Grid = window.DSGrid || DS || {};
-  const DataGrid = safeComp(Grid, 'DataGrid');
-
-  const Feedback = window.DSFeedback || window.DSOverlays || DS || {};
-  const Modal = safeComp(Feedback, 'Modal');
-  const Toast = safeComp(Feedback, 'Toast');
-  const ConfirmDialog = safeComp(Feedback, 'ConfirmDialog');
-
-  const CommentsModule = window.DSComments || {};
-  const CommentModal = safeComp(CommentsModule, 'CommentModal');
-
-  const LucideIcons = window.LucideIcons || {};
-  const Plus = safeIcon(LucideIcons, 'Plus');
-  const Edit = safeIcon(LucideIcons, 'Edit');
-  const Trash2 = safeIcon(LucideIcons, 'Trash2');
-  const Globe = safeIcon(LucideIcons, 'Globe');
-  const Building = safeIcon(LucideIcons, 'Building');
-  const MessageSquare = safeIcon(LucideIcons, 'MessageSquare');
-
-  const formCode = "OrganizationInfo";
-
-  const OrganizationInfo = ({ language = 'fa' }) => {
+  const OrganizationInfo = ({ isAdmin, language = 'fa' }) => {
     const isRtl = language === 'fa';
-    const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
-    const supabase = window.supabase;
-
+    const t = (fa, en) => isRtl ? fa : en;
+    const FORM_CODE = 'organization_info_main';
+    
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [isSubmitLoading, setIsSubmitLoading] = useState(false);
+    
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [currentRecord, setCurrentRecord] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
+    
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
     
     const [commentModalOpen, setCommentModalOpen] = useState(false);
     const [selectedEntityForComment, setSelectedEntityForComment] = useState({ id: '', title: '' });
 
-    const [selectedRecordId, setSelectedRecordId] = useState(null);
-    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+    const [formData, setFormData] = useState({
+      code: '', 
+      name: '', 
+      regNo: '', 
+      phone: '', 
+      fax: '', 
+      logo: null, 
+      addresses: [], 
+      isActive: true
+    });
+    const [newAddress, setNewAddress] = useState('');
 
-    const initialFormState = useMemo(() => ({
-      name_fa: '',
-      name_en: '',
-      national_code: '',
-      registration_number: '',
-      economic_code: '',
-      postal_code: '',
-      address: '',
-      phone: '',
-      email: '',
-      website: '',
-      currency_code: 'IRR',
-      legal_type: 'PUBLIC_JOINT_STOCK'
-    }), []);
+    const [gridState, setGridState] = useState(null);
 
-    const [formData, setFormData] = useState(initialFormState);
+    const viewConfig = {
+      pageId: FORM_CODE,
+      currentState: () => ({ 
+        gridState
+      }),
+      onApplyState: (state) => {
+        if (state) {
+          if (state.gridState) setGridState(state.gridState);
+        } else {
+          setGridState(null);
+        }
+      }
+    };
 
-    const showToast = useCallback((message, type = 'success') => {
-      setToast({ isVisible: true, message, type });
-      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
+    useEffect(() => {
+      fetchData();
     }, []);
 
-    const fetchData = useCallback(async () => {
-      if (!supabase) return;
+    useEffect(() => {
+      const handleOpenCommentNotification = (e) => {
+          if (e.detail && e.detail.entity_type === 'ORGANIZATION_INFO') {
+              const targetRecord = data.find(item => String(item.id) === String(e.detail.entity_id));
+              const recordTitle = targetRecord ? targetRecord.name : String(e.detail.entity_id);
+              setSelectedEntityForComment({
+                  id: String(e.detail.entity_id),
+                  title: `${t('سازمان', 'Organization')}: ${recordTitle}`
+              });
+              setCommentModalOpen(true);
+          }
+      };
+
+      window.addEventListener('openCommentModal', handleOpenCommentNotification);
+      return () => {
+          window.removeEventListener('openCommentModal', handleOpenCommentNotification);
+      };
+    }, [data, t]);
+
+    const fetchData = async () => {
       setIsLoading(true);
       try {
-        const { data: resData, error } = await supabase
-          .from('gen_organizations')
+        const { data: orgs, error } = await supabase
+          .from('organization_info')
           .select('*')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setData(resData || []);
-      } catch (error) {
-        showToast(t('خطا در بارگذاری اطلاعات', 'Error loading data'), 'error');
+
+        const mappedData = (orgs || []).map(item => ({
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          regNo: item.reg_no,
+          phone: item.phone,
+          fax: item.fax,
+          logo: item.logo,
+          addresses: item.addresses || [],
+          isActive: item.is_active ?? true
+        }));
+        
+        setData(mappedData);
+      } catch (err) {
+        console.error('Fetch Error:', err);
       } finally {
         setIsLoading(false);
       }
-    }, [supabase, t, showToast]);
-
-    useEffect(() => {
-      fetchData();
-    }, [fetchData]);
-
-    useEffect(() => {
-        const handleOpenCommentNotification = (e) => {
-            if (e.detail && e.detail.entity_type === 'ORGANIZATION_INFO') {
-                const targetRecord = data.find(item => String(item.id) === String(e.detail.entity_id));
-                const recordTitle = targetRecord ? (isRtl ? targetRecord.name_fa : targetRecord.name_en) : String(e.detail.entity_id);
-                setSelectedEntityForComment({
-                    id: String(e.detail.entity_id),
-                    title: `${t('سازمان', 'Organization')}: ${recordTitle}`
-                });
-                setCommentModalOpen(true);
-            }
-        };
-
-        window.addEventListener('openCommentModal', handleOpenCommentNotification);
-        return () => {
-            window.removeEventListener('openCommentModal', handleOpenCommentNotification);
-        };
-    }, [data, isRtl, t]);
-
-    const handleOpenAddModal = () => {
-      setSelectedRecordId(null);
-      setFormData(initialFormState);
-      setIsModalOpen(true);
-    };
-
-    const handleOpenEdit = (record) => {
-      setSelectedRecordId(record.id);
-      setFormData({
-        name_fa: record.name_fa || '',
-        name_en: record.name_en || '',
-        national_code: record.national_code || '',
-        registration_number: record.registration_number || '',
-        economic_code: record.economic_code || '',
-        postal_code: record.postal_code || '',
-        address: record.address || '',
-        phone: record.phone || '',
-        email: record.email || '',
-        website: record.website || '',
-        currency_code: record.currency_code || 'IRR',
-        legal_type: record.legal_type || 'PUBLIC_JOINT_STOCK'
-      });
-      setIsModalOpen(true);
-    };
-
-    const handleOpenComment = (record) => {
-        const recordTitle = isRtl ? record.name_fa : record.name_en;
-        setSelectedEntityForComment({
-            id: String(record.id),
-            title: `${t('سازمان', 'Organization')}: ${recordTitle}`
-        });
-        setCommentModalOpen(true);
-    };
-
-    const handleOpenDelete = (id) => {
-      setSelectedRecordId(id);
-      setIsConfirmOpen(true);
-    };
-
-    const handleFormChange = (field, value) => {
-      setFormData(prev => ({ ...prev, [field]: value }));
     };
 
     const handleSave = async () => {
-      if (!formData.name_fa || !formData.name_en) {
-        showToast(t('لطفاً نام فارسی و انگلیسی را وارد کنید', 'Please enter both Persian and English names'), 'error');
-        return;
-      }
+      if (!formData.code || !formData.name) return;
 
-      setIsSubmitLoading(true);
+      setIsLoading(true);
       try {
-        if (selectedRecordId) {
-          const { error } = await supabase
-            .from('gen_organizations')
-            .update(formData)
-            .eq('id', selectedRecordId);
+        const payload = {
+          code: formData.code,
+          name: formData.name,
+          reg_no: formData.regNo,
+          phone: formData.phone,
+          fax: formData.fax,
+          logo: formData.logo,
+          addresses: formData.addresses || [],
+          is_active: formData.isActive
+        };
 
-          if (error) throw error;
-          showToast(t('اطلاعات سازمان با موفقیت ویرایش شد', 'Organization updated successfully'));
-        } else {
-          const { error } = await supabase
-            .from('gen_organizations')
-            .insert([formData]);
-
-          if (error) throw error;
-          showToast(t('سازمان جدید با موفقیت ثبت شد', 'Organization created successfully'));
-        }
-        setIsModalOpen(false);
-        fetchData();
-      } catch (error) {
-        showToast(t('خطا در ذخیره‌سازی اطلاعات', 'Error saving data'), 'error');
-      } finally {
-        setIsSubmitLoading(false);
-      }
-    };
-
-    const handleDelete = async () => {
-      try {
-        const { error } = await supabase
-          .from('gen_organizations')
-          .delete()
-          .eq('id', selectedRecordId);
+        const { error } = currentRecord?.id 
+          ? await supabase.from('organization_info').update(payload).eq('id', currentRecord.id)
+          : await supabase.from('organization_info').insert([payload]);
 
         if (error) throw error;
-        showToast(t('سازمان با موفقیت حذف شد', 'Organization deleted successfully'));
-        setIsConfirmOpen(false);
+        setIsModalOpen(false);
         fetchData();
-      } catch (error) {
-        showToast(t('خطا در حذف سازمان', 'Error deleting organization'), 'error');
+      } catch (err) {
+        console.error('Save Error:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    const legalTypeOptions = [
-      { value: 'PUBLIC_JOINT_STOCK', label: t('سهامی عام', 'Public Joint Stock') },
-      { value: 'PRIVATE_JOINT_STOCK', label: t('سهامی خاص', 'Private Joint Stock') },
-      { value: 'LIMITED_LIABILITY', label: t('با مسئولیت محدود', 'Limited Liability') },
-      { value: 'COOPERATIVE', label: t('تعاونی', 'Cooperative') },
-      { value: 'GOVERNMENTAL', label: t('دولتی', 'Governmental') }
-    ];
+    const handleToggleActive = async (row, newValue) => {
+      try {
+        const { error } = await supabase
+          .from('organization_info')
+          .update({ is_active: newValue })
+          .eq('id', row.id);
+        
+        if (error) throw error;
+        setData(prev => prev.map(item => item.id === row.id ? { ...item, isActive: newValue } : item));
+      } catch (err) {
+        console.error("Toggle Error:", err);
+      }
+    };
 
-    const currencyOptions = [
-      { value: 'IRR', label: t('ریال ایران', 'Iranian Rial') },
-      { value: 'USD', label: t('دلار آمریکا', 'US Dollar') },
-      { value: 'EUR', label: t('یورو', 'Euro') },
-      { value: 'AED', label: t('درهم امارات', 'UAE Dirham') }
-    ];
+    const executeDelete = async () => {
+      setIsLoading(true);
+      try {
+        if (deleteConfirm.type === 'single') {
+          const { error } = await supabase.from('organization_info').delete().eq('id', deleteConfirm.data.id);
+          if (error) throw error;
+        } else if (deleteConfirm.type === 'bulk') {
+          const { error } = await supabase.from('organization_info').delete().in('id', deleteConfirm.data);
+          if (error) throw error;
+        }
+        
+        setSelectedIds([]);
+        setDeleteConfirm({ isOpen: false, type: null, data: null });
+        fetchData();
+      } catch (err) {
+        console.error("Delete error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const handleOpenModal = (record = null) => {
+      setFormData(record ? { ...record } : { 
+        code: '', name: '', regNo: '', phone: '', fax: '', 
+        logo: null, addresses: [], isActive: true 
+      });
+      setCurrentRecord(record);
+      setNewAddress('');
+      setIsModalOpen(true);
+    };
+
+    const handleOpenComment = (row) => {
+      setSelectedEntityForComment({
+        id: String(row.id),
+        title: `${t('سازمان', 'Organization')}: ${row.name}`
+      });
+      setCommentModalOpen(true);
+    };
+
+    const handleSetDefaultAddress = (addrId) => {
+      setFormData(prev => ({
+        ...prev,
+        addresses: prev.addresses.map(a => ({ ...a, isDefault: a.id === addrId }))
+      }));
+    };
 
     const columns = [
-      {
-        key: 'name_fa',
-        title: t('نام فارسی', 'Persian Name'),
-        render: (val, row) => React.createElement('div', { className: 'flex items-center gap-2' },
-          React.createElement(Building, { size: 16, className: 'text-slate-400' }),
-          React.createElement('span', { className: 'font-bold text-slate-700 dark:text-slate-200' }, val)
-        )
-      },
-      { key: 'name_en', title: t('نام انگلیسی', 'English Name') },
-      { key: 'national_code', title: t('شناسه ملی', 'National Code') },
-      { key: 'registration_number', title: t('شماره ثبت', 'Registration No') },
-      {
-        key: 'legal_type',
-        title: t('نوع حقوقی', 'Legal Type'),
-        render: (val) => {
-          const opt = legalTypeOptions.find(o => o.value === val);
-          return React.createElement(Badge, { variant: 'info' }, opt ? opt.label : val);
-        }
-      },
-      {
-        key: 'currency_code',
-        title: t('ارز پایه', 'Base Currency'),
-        render: (val) => React.createElement(Badge, { variant: 'warning' }, val)
-      },
-      {
-        key: 'actions',
-        title: t('عملیات', 'Actions'),
-        align: 'center',
-        render: (_, row) => React.createElement('div', { className: 'flex items-center justify-center gap-1' },
-          React.createElement(Button, {
-            variant: 'ghost',
-            className: '!p-1 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30',
-            icon: MessageSquare,
-            onClick: () => handleOpenComment(row),
-            title: t('هامش / کامنت', 'Comments / Annotations')
-          }),
-          React.createElement(Button, {
-            variant: 'ghost',
-            className: '!p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30',
-            icon: Edit,
-            onClick: () => handleOpenEdit(row)
-          }),
-          React.createElement(Button, {
-            variant: 'ghost',
-            className: '!p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30',
-            icon: Trash2,
-            onClick: () => handleOpenDelete(row)
-          })
-        )
+      { field: 'code', header_fa: 'کد', header_en: 'Code', width: '100px' },
+      { field: 'name', header_fa: 'نام سازمان', header_en: 'Name', width: '250px' },
+      { field: 'regNo', header_fa: 'شماره ثبت', header_en: 'Reg No', width: '120px' },
+      { field: 'phone', header_fa: 'تلفن', header_en: 'Phone', width: '120px' },
+      { 
+        field: 'isActive', 
+        header_fa: 'وضعیت', 
+        header_en: 'Status', 
+        width: '100px', 
+        type: 'toggle',
+        onToggle: (row, val) => handleToggleActive(row, val)
       }
     ];
 
-    return React.createElement('div', { className: 'flex flex-col gap-4 p-4 font-sans text-[12px] h-full overflow-y-auto custom-scrollbar' },
-      React.createElement('div', { className: 'flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm' },
-        React.createElement('div', { className: 'flex items-center gap-3' },
-          React.createElement('div', { className: 'p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg' },
-            React.createElement(Building, { size: 24 })
-          ),
-          React.createElement('div', { className: 'flex flex-col gap-0.5' },
-            React.createElement('h1', { className: 'text-base font-black text-slate-800 dark:text-slate-100' }, t('اطلاعات سازمان', 'Organization Profile')),
-            React.createElement('p', { className: 'text-slate-400 text-[11px]' }, t('مدیریت مشخصات حقوقی، کدهای شناسایی و تنظیمات ساختاری سازمان', 'Manage corporate details, identification codes and configuration'))
-          )
-        ),
-        React.createElement(Button, {
-          variant: 'primary',
-          icon: Plus,
-          onClick: handleOpenAddModal
-        }, t('سازمان جدید', 'New Organization'))
-      ),
+    return (
+      <div className="flex flex-col h-full p-4 bg-[#f8fafc] dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
+        <PageHeader 
+          title={t('اطلاعات سازمان', 'Organization Info')} 
+          icon={Building2}
+          description={t('تنظیمات پایه و مدیریت ساختار شرکت', 'Base settings and company structure')}
+          language={language}
+          breadcrumbs={[{ label: t('تنظیمات پایه', 'Base Setup') }, { label: t('سازمان', 'Organization') }]}
+          viewConfig={viewConfig}
+        />
 
-      React.createElement(Card, { className: 'flex-1 min-h-[400px] overflow-hidden flex flex-col' },
-        React.createElement(DataGrid, {
-          data: data,
-          columns: columns,
-          isLoading: isLoading,
-          language: language,
-          formCode: formCode,
-          hideToolbar: false,
-          exportable: true,
-          importable: false
-        })
-      ),
+        <div className="flex-1 flex flex-col min-h-0 mt-4 animate-in fade-in duration-300">
+          <div className="flex-1 min-h-0">
+            <DataGrid 
+              data={data}
+              columns={columns} 
+              language={language}
+              selectable={true}
+              selectedIds={selectedIds}
+              onSelectChange={setSelectedIds}
+              isLoading={isLoading}
+              onAdd={() => handleOpenModal()}
+              onRowDoubleClick={(row) => handleOpenModal(row)}
+              gridState={gridState}
+              onGridStateChange={setGridState}
+              hideImport={true}
+              actions={[
+                { icon: MessageSquare, tooltip: t('هامش / کامنت', 'Comments'), onClick: (row) => handleOpenComment(row), className: 'text-slate-400 hover:text-blue-600' },
+                { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
+                { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600' }
+              ]}
+              bulkActions={[
+                { label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) }
+              ]}
+            />
+          </div>
+        </div>
 
-      React.createElement(Modal, {
-        isOpen: isModalOpen,
-        onClose: () => setIsModalOpen(false),
-        title: selectedRecordId ? t('ویرایش سازمان', 'Edit Organization') : t('ثبت سازمان جدید', 'New Organization'),
-        language: language,
-        width: 'max-w-3xl'
-      },
-        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 p-2' },
-          React.createElement(TextField, {
-            label: t('نام فارسی', 'Persian Name'),
-            value: formData.name_fa,
-            onChange: (val) => handleFormChange('name_fa', val),
-            required: true,
-            dir: 'rtl'
-          }),
-          React.createElement(TextField, {
-            label: t('نام انگلیسی', 'English Name'),
-            value: formData.name_en,
-            onChange: (val) => handleFormChange('name_en', val),
-            required: true,
-            dir: 'ltr'
-          }),
-          React.createElement(TextField, {
-            label: t('شناسه ملی', 'National Code'),
-            value: formData.national_code,
-            onChange: (val) => handleFormChange('national_code', val)
-          }),
-          React.createElement(TextField, {
-            label: t('شماره ثبت', 'Registration Number'),
-            value: formData.registration_number,
-            onChange: (val) => handleFormChange('registration_number', val)
-          }),
-          React.createElement(TextField, {
-            label: t('کد اقتصادی', 'Economic Code'),
-            value: formData.economic_code,
-            onChange: (val) => handleFormChange('economic_code', val)
-          }),
-          React.createElement(TextField, {
-            label: t('کد پستی', 'Postal Code'),
-            value: formData.postal_code,
-            onChange: (val) => handleFormChange('postal_code', val)
-          }),
-          React.createElement(SelectField, {
-            label: t('نوع شخصیت حقوقی', 'Legal Type'),
-            value: formData.legal_type,
-            onChange: (val) => handleFormChange('legal_type', val),
-            options: legalTypeOptions
-          }),
-          React.createElement(SelectField, {
-            label: t('ارز اصلی سیستم', 'Base Currency'),
-            value: formData.currency_code,
-            onChange: (val) => handleFormChange('currency_code', val),
-            options: currencyOptions
-          }),
-          React.createElement(TextField, {
-            label: t('تلفن تماس', 'Phone Number'),
-            value: formData.phone,
-            onChange: (val) => handleFormChange('phone', val)
-          }),
-          React.createElement(TextField, {
-            label: t('پست الکترونیک', 'Email Address'),
-            value: formData.email,
-            onChange: (val) => handleFormChange('email', val),
-            dir: 'ltr'
-          }),
-          React.createElement('div', { className: 'md:col-span-2' },
-            React.createElement(TextField, {
-              label: t('وب‌سایت', 'Website URL'),
-              value: formData.website,
-              onChange: (val) => handleFormChange('website', val),
-              dir: 'ltr',
-              icon: Globe
-            })
-          ),
-          React.createElement('div', { className: 'md:col-span-2' },
-            React.createElement(TextField, {
-              label: t('آدرس دفتر مرکزی', 'Headquarters Address'),
-              value: formData.address,
-              onChange: (val) => handleFormChange('address', val),
-              multiline: true,
-              rows: 2
-            })
-          )
-        ),
-        React.createElement('div', { className: 'flex justify-end gap-2 mt-6 border-t border-slate-100 dark:border-slate-700/50 pt-4' },
-          React.createElement(Button, { variant: 'outline', onClick: () => setIsModalOpen(false) }, t('انصراف', 'Cancel')),
-          React.createElement(Button, { variant: 'primary', onClick: handleSave, isLoading: isSubmitLoading }, t('ذخیره تغییرات', 'Save Changes'))
-        )
-      ),
+        <Modal 
+          isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} 
+          title={currentRecord ? t('ویرایش سازمان', 'Edit Org') : t('تعریف سازمان جدید', 'New Org')}
+          width="max-w-xl"
+          language={language}
+        >
+          <div className="p-4 flex flex-col gap-4">
+            <div className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+               <Avatar src={formData.logo} name={formData.name || 'Org'} size="lg" />
+               <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                     <Button variant="outline" size="sm" icon={Upload} onClick={() => document.getElementById('logo-upload-input').click()}>
+                        {t('انتخاب لوگو', 'Select Logo')}
+                     </Button>
+                     {formData.logo && (
+                        <Button variant="danger-outline" size="sm" icon={Trash2} onClick={() => setFormData({...formData, logo: null})}>
+                           {t('حذف لوگو', 'Remove Logo')}
+                        </Button>
+                     )}
+                  </div>
+                  <input id="logo-upload-input" type="file" className="hidden" accept="image/*" onChange={(e) => {
+                     const reader = new FileReader();
+                     reader.onload = () => setFormData({...formData, logo: reader.result});
+                     if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+                  }} />
+               </div>
+            </div>
 
-      React.createElement(ConfirmDialog, {
-        isOpen: isConfirmOpen,
-        onClose: () => setIsConfirmOpen(false),
-        onConfirm: handleDelete,
-        title: t('حذف سازمان', 'Delete Organization'),
-        message: t('آیا از حذف این سازمان اطمینان دارید؟ این عملیات غیرقابل بازگشت است.', 'Are you sure you want to delete this organization? This action cannot be undone.'),
-        type: 'danger'
-      }),
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <TextField size="sm" label={t('کد سازمان', 'Code')} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} required dir="ltr" formCode={FORM_CODE} />
+              <TextField size="sm" label={t('نام سازمان', 'Name')} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} isRtl={isRtl} required formCode={FORM_CODE} />
+              <TextField size="sm" label={t('شماره ثبت', 'Reg No')} value={formData.regNo} onChange={e => setFormData({...formData, regNo: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
+              <div className="flex items-center mt-6">
+                <ToggleField size="sm" label={t('فعال', 'Active')} checked={formData.isActive} onChange={v => setFormData({...formData, isActive: v})} isRtl={isRtl} formCode={FORM_CODE} />
+              </div>
+              <TextField size="sm" label={t('تلفن', 'Phone')} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
+              <TextField size="sm" label={t('فکس', 'Fax')} value={formData.fax} onChange={e => setFormData({...formData, fax: e.target.value})} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
+            </div>
 
-      React.createElement(CommentModal, {
-        isOpen: commentModalOpen,
-        onClose: () => setCommentModalOpen(false),
-        entityType: "ORGANIZATION_INFO",
-        entityId: selectedEntityForComment.id,
-        entityTitle: selectedEntityForComment.title,
-        language: language
-      }),
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 mt-2">
+               <label className="text-[12px] font-bold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-1.5"><MapPin size={14} className="text-indigo-500"/> {t('مدیریت آدرس‌ها', 'Manage Addresses')}</label>
+               <div className="flex gap-2 mb-3">
+                 <div className="flex-1">
+                   <TextField size="sm" placeholder={t('آدرس جدید را وارد کنید...', 'New address...')} value={newAddress} onChange={e => setNewAddress(e.target.value)} isRtl={isRtl} wrapperClassName="m-0" formCode={FORM_CODE} />
+                 </div>
+                 <Button variant="secondary" size="sm" icon={Plus} onClick={() => {
+                   if(!newAddress.trim()) return;
+                   setFormData({...formData, addresses: [...formData.addresses, { id: Date.now(), text: newAddress.trim(), isDefault: formData.addresses.length === 0 }]});
+                   setNewAddress('');
+                 }}>{t('افزودن', 'Add')}</Button>
+               </div>
+               
+               <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                 {formData.addresses.map(a => (
+                   <div key={a.id} className={`flex justify-between items-center p-2 rounded-md border text-[12px] group shadow-sm transition-all ${a.isDefault ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`}>
+                     <div className="flex items-center gap-2 flex-1 min-w-0">
+                       <span className="text-slate-700 dark:text-slate-300 leading-relaxed truncate">{a.text}</span>
+                     </div>
+                     <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                       {a.isDefault ? (
+                         <Badge variant="indigo" className="!py-0.5">{t('پیش‌فرض', 'Default')}</Badge>
+                       ) : (
+                         <Button variant="ghost" size="sm" className="!h-6 !text-[10px] !px-2 text-slate-400 hover:text-indigo-600" onClick={() => handleSetDefaultAddress(a.id)}>
+                           {t('انتخاب پیش‌فرض', 'Set Default')}
+                         </Button>
+                       )}
+                       <Button variant="ghost" size="sm" className="!h-6 !w-6 !p-0 text-slate-300 hover:text-red-500" icon={Trash2} onClick={() => setFormData({...formData, addresses: formData.addresses.filter(x => x.id !== a.id)})} title={t('حذف', 'Delete')} />
+                     </div>
+                   </div>
+                 ))}
+                 {formData.addresses.length === 0 && (
+                   <div className="text-center py-4 border border-dashed border-slate-200 dark:border-slate-700 rounded-md">
+                      <span className="text-[10px] text-slate-400">{t('هیچ آدرسی ثبت نشده است.', 'No addresses found.')}</span>
+                   </div>
+                 )}
+               </div>
+            </div>
 
-      React.createElement(Toast, {
-        isVisible: toast.isVisible,
-        message: toast.message,
-        type: toast.type,
-        onClose: () => setToast(prev => ({ ...prev, isVisible: false }))
-      })
+            <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+              <Button variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
+              <Button variant="primary" size="sm" icon={Save} onClick={handleSave} isLoading={isLoading}>{t('ذخیره تغییرات', 'Save Changes')}</Button>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
+            description={deleteConfirm.type === 'bulk' 
+              ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
+              : t(`آیا از حذف سازمان ${deleteConfirm.data?.name} اطمینان دارید؟`, `Delete ${deleteConfirm.data?.name}?`)
+            }
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button variant="danger" size="sm" onClick={executeDelete} isLoading={isLoading} className="flex-1">{t('تایید حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
+        </Modal>
+
+        {CommentModal && (
+          <CommentModal 
+            isOpen={commentModalOpen}
+            onClose={() => setCommentModalOpen(false)}
+            entityType="ORGANIZATION_INFO"
+            entityId={selectedEntityForComment.id}
+            entityTitle={selectedEntityForComment.title}
+            language={language}
+          />
+        )}
+      </div>
     );
   };
 
