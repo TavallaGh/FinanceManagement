@@ -58,7 +58,7 @@
       return parts[1] === '00' ? parts[0] : parts.join('.');
   };
 
-  const TransactionMain = ({ language = 'fa', formCode = 'TRANSACTIONS' }) => {
+  const TransactionMain = ({ language = 'fa', formCode = 'FIN_TRANSACTION_MAIN' }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
 
@@ -751,6 +751,6 @@
     );
   };
 
-  TransactionMain.formCode = 'TRANSACTIONS';
+  TransactionMain.formCode = 'FIN_TRANSACTION_MAIN';
   window.TransactionMain = TransactionMain;
 })();
