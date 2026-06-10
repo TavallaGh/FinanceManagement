@@ -117,6 +117,7 @@
     
     const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
     const [commentedIds, setCommentedIds] = useState(new Set());
+    const [filteredRecordId, setFilteredRecordId] = useState(null);
     
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
     const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
@@ -283,15 +284,12 @@
     useEffect(() => {
         const handleFilterToRecord = (e) => {
             if (e.detail && e.detail.entity_type === 'TRANSACTION_MAIN') {
-                const targetRecord = transactions.find(r => String(r.id) === String(e.detail.entity_id));
-                if (targetRecord) {
-                    setCommentModalState({ isOpen: true, record: targetRecord });
-                }
+                setFilteredRecordId(String(e.detail.entity_id));
             }
         };
         window.addEventListener('filterToRecord', handleFilterToRecord);
         return () => window.removeEventListener('filterToRecord', handleFilterToRecord);
-    }, [transactions]);
+    }, []);
 
     const handleOpenForm = (mode, record = null) => {
         setFormMode(mode);
@@ -627,7 +625,8 @@
             language: language,
             description: t('ثبت و پیگیری اسناد مالی چندسطری ارزی', 'Manage multi-currency financial documents'),
             breadcrumbs: [{ label: t('مدیریت مالی', 'Financial Setup') }, { label: t('تراکنش‌ها', 'Transactions') }],
-            viewConfig: viewConfig
+            viewConfig: viewConfig,
+            notifFilter: filteredRecordId ? { isActive: true, onClear: () => setFilteredRecordId(null) } : null
         }),
 
         React.createElement('div', { className: "flex-1 min-h-0 flex flex-col gap-2 mt-4 overflow-hidden" },
@@ -641,7 +640,7 @@
             }),
             React.createElement('div', { className: "flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden" },
                 React.createElement(DataGrid, {
-                    data: filteredTransactions,
+                    data: filteredRecordId ? filteredTransactions.filter(r => String(r.id) === filteredRecordId) : filteredTransactions,
                     columns: columns,
                     language: language,
                     formCode: formCode,

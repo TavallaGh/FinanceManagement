@@ -71,10 +71,10 @@
     const [editingContent, setEditingContent] = useState('');
     
     const textareaRef = useRef(null);
-    const entityRef = useRef({ entityId, entityTitle, entityType, formComponent });
+    const entityRef = useRef({ entityId, entityTitle, entityType, formComponent, formTitle });
 
     // keep ref in sync with latest props on every render
-    entityRef.current = { entityId, entityTitle, entityType, formComponent };
+    entityRef.current = { entityId, entityTitle, entityType, formComponent, formTitle };
 
     const currentUserId = (() => {
       try {
@@ -211,7 +211,7 @@
         if (!newComment.trim()) return;
         setIsSubmitting(true);
         // read from ref to always get the latest entity props, avoiding stale closures
-        const { entityId: eid, entityTitle: etitle, entityType: etype, formComponent: eform } = entityRef.current;
+        const { entityId: eid, entityTitle: etitle, entityType: etype, formComponent: eform, formTitle: eformTitle } = entityRef.current;
         try {
             const safeAuthorId = currentUserId;
 
@@ -241,7 +241,10 @@
                 const notifs = mentionedUsers.map(u => ({
                     user_id: u.id,
                     title: t('هامش جدید', 'New Mention'),
-                    message: t(`شما در یک هامش روی ${etitle} منشن شده‌اید.`, `You were mentioned on ${etitle}.`),
+                    message: t(
+                        `شما در یک هامش روی فرم ${eformTitle || etype}، ${etitle}، منشن شده‌اید.`,
+                        `You were mentioned in a comment on form ${eformTitle || etype}: ${etitle}.`
+                    ),
                     type: 'info',
                     action_payload: {
                         action: 'open_record',
