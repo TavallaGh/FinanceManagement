@@ -40,6 +40,7 @@
   const Trash2 = safeIcon(LucideIcons, 'Trash2');
   const X = safeIcon(LucideIcons, 'X');
   const Check = safeIcon(LucideIcons, 'Check');
+  const CornerUpLeft = safeIcon(LucideIcons, 'CornerUpLeft');
 
   const CommentModal = ({ 
     isOpen, 
@@ -69,6 +70,7 @@
     const [mentionFilter, setMentionFilter] = useState('');
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [editingContent, setEditingContent] = useState('');
+    const [replyingTo, setReplyingTo] = useState(null); // { username, authorName }
     
     const textareaRef = useRef(null);
     const entityRef = useRef({ entityId, entityTitle, entityType, formComponent, formTitle });
@@ -161,9 +163,29 @@
       }
     }, [isOpen, fetchUsers, fetchComments]);
 
+    const handleReply = (comment) => {
+        // find the username of the comment author
+        const authorUser = users.find(u => u.id === comment.author_id);
+        if (!authorUser) return;
+        const mention = `@${authorUser.username} `;
+        setReplyingTo({ username: authorUser.username, authorName: usersMap[comment.author_id] || authorUser.username });
+        setNewComment(mention);
+        setShowMentions(false);
+        setTimeout(() => {
+            if (textareaRef.current) {
+                textareaRef.current.focus();
+                textareaRef.current.setSelectionRange(mention.length, mention.length);
+            }
+        }, 50);
+    };
+
     const handleTextChange = (e) => {
       const val = e.target.value;
       setNewComment(val);
+      // clear replyingTo if user removes the mention
+      if (replyingTo && !val.startsWith(`@${replyingTo.username}`)) {
+        setReplyingTo(null);
+      }
 
       const cursorPosition = e.target.selectionStart;
       const textBeforeCursor = val.slice(0, cursorPosition);
@@ -259,6 +281,7 @@
 
             setNewComment('');
             setShowMentions(false);
+            setReplyingTo(null);
             showToast(t('کامنت با موفقیت ثبت شد', 'Comment added successfully'));
             fetchComments();
         } catch (error) {
@@ -377,6 +400,12 @@
                                 ),
                                 React.createElement('span', { className: `text-[11px] font-black ${isOwn ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}` }, authorName),
                                 React.createElement('span', { className: "text-[10px] text-slate-400 dark:text-slate-500 font-medium", dir: "ltr" }, formatDate(comment.created_at)),
+                                // reply button — available on all comments
+                                !isOwn && React.createElement('button', {
+                                    onClick: () => handleReply(comment),
+                                    className: "p-0.5 rounded text-slate-300 hover:text-indigo-500 transition-colors",
+                                    title: t('پاسخ', 'Reply')
+                                }, React.createElement(CornerUpLeft, { size: 11 })),
                                 canEditComment(comment) && React.createElement(React.Fragment, null,
                                     React.createElement('button', {
                                         onClick: () => { setEditingCommentId(comment.id); setEditingContent(comment.content); },
@@ -426,6 +455,16 @@
 
             // Input area
             React.createElement('div', { className: "shrink-0 px-4 py-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 relative" },
+                replyingTo && React.createElement('div', { className: "flex items-center gap-1.5 mb-2 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40 rounded-lg text-[11px]" },
+                    React.createElement(CornerUpLeft, { size: 11, className: "text-indigo-500 shrink-0" }),
+                    React.createElement('span', { className: "text-indigo-700 dark:text-indigo-300 font-bold flex-1" },
+                        `${t('پاسخ به', 'Replying to')} ${replyingTo.authorName}`
+                    ),
+                    React.createElement('button', {
+                        onClick: () => { setReplyingTo(null); setNewComment(''); },
+                        className: "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                    }, React.createElement(X, { size: 11 }))
+                ),
                 showMentions && React.createElement('div', { className: "absolute bottom-full left-4 right-4 mb-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-40 overflow-y-auto z-50 p-1" },
                     filteredUsers.length === 0 ? (
                         React.createElement('div', { className: "p-2 text-center text-slate-500 text-[11px]" }, t('کاربری یافت نشد', 'No users found'))
