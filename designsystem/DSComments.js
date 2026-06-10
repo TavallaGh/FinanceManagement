@@ -1,7 +1,7 @@
 /* Filename: designsystem/DSComments.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useCallback, useRef } = React;
+  const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
   const FallbackComponent = () => null;
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
