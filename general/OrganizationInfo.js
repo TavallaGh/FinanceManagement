@@ -33,6 +33,7 @@
     const [commentModalOpen, setCommentModalOpen] = useState(false);
     const [selectedEntityForComment, setSelectedEntityForComment] = useState({ id: '', title: '' });
     const [filteredRecordId, setFilteredRecordId] = useState(null);
+    const [commentedIds, setCommentedIds] = useState(new Set());
 
     const [formData, setFormData] = useState({
       code: '', 
@@ -73,7 +74,7 @@
               const recordTitle = targetRecord ? targetRecord.name : String(e.detail.entity_id);
               setSelectedEntityForComment({
                   id: String(e.detail.entity_id),
-                  title: `${t('سازمان', 'Organization')}: ${recordTitle}`
+                  title: recordTitle
               });
               setCommentModalOpen(true);
           }
@@ -118,6 +119,19 @@
         }));
         
         setData(mappedData);
+
+        // fetch which records have at least one comment
+        if (mappedData.length > 0) {
+          const ids = mappedData.map(r => String(r.id));
+          const { data: commentRows } = await supabase
+            .from('sys_comments')
+            .select('entity_id')
+            .eq('entity_type', 'ORGANIZATION_INFO')
+            .in('entity_id', ids);
+          if (commentRows) {
+            setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
+          }
+        }
       } catch (err) {
         console.error('Fetch Error:', err);
       } finally {
@@ -203,7 +217,7 @@
     const handleOpenComment = (row) => {
       setSelectedEntityForComment({
         id: String(row.id),
-        title: `${t('سازمان', 'Organization')}: ${row.name}`
+        title: row.name
       });
       setCommentModalOpen(true);
     };
@@ -258,7 +272,7 @@
               onGridStateChange={setGridState}
               hideImport={true}
               actions={[
-                { icon: MessageSquare, tooltip: t('هامش / کامنت', 'Comments'), onClick: (row) => handleOpenComment(row), className: 'text-slate-400 hover:text-blue-600' },
+                { icon: MessageSquare, tooltip: t('هامش / کامنت', 'Comments'), onClick: (row) => handleOpenComment(row), className: (row) => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600' },
                 { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
                 { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600' }
               ]}
@@ -374,10 +388,11 @@
         {CommentModal && (
           <CommentModal 
             isOpen={commentModalOpen}
-            onClose={() => setCommentModalOpen(false)}
+            onClose={() => { setCommentModalOpen(false); fetchData(); }}
             entityType="ORGANIZATION_INFO"
             entityId={selectedEntityForComment.id}
             entityTitle={selectedEntityForComment.title}
+            formTitle={t('اطلاعات سازمان', 'Organization Info')}
             formComponent="OrganizationInfo"
             language={language}
           />

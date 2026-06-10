@@ -46,7 +46,8 @@
     onClose, 
     entityType, 
     entityId, 
-    entityTitle, 
+    entityTitle,
+    formTitle = null,
     formComponent = null,
     language = 'fa' 
   }) => {
@@ -326,122 +327,138 @@
     return React.createElement(Modal, {
         isOpen: isOpen,
         onClose: onClose,
-        title: t('هامش‌ها و پیگیری‌ها', 'Comments & Annotations'),
+        title: t('هامش‌ها', 'Comments'),
         language: language,
-        width: "max-w-2xl"
+        width: "max-w-xl"
     },
-        React.createElement('div', { className: "flex flex-col h-[75vh] bg-slate-50/50 dark:bg-slate-900/50 font-sans text-[12px] relative" },
-            
-            React.createElement('div', { className: "shrink-0 p-3 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800/50 flex flex-col gap-1" },
-                React.createElement('span', { className: "text-slate-500 dark:text-slate-400 text-[11px]" }, t('در حال بررسی رکورد:', 'Reviewing record:')),
-                React.createElement('div', { className: "flex items-center gap-2" },
-                    React.createElement(MessageSquare, { size: 16, className: "text-indigo-600 dark:text-indigo-400" }),
-                    React.createElement('span', { className: "font-bold text-indigo-900 dark:text-indigo-200 text-sm" }, entityTitle || entityId)
+        React.createElement('div', { className: "flex flex-col bg-white dark:bg-slate-900 font-sans text-[12px] relative", style: { height: '70vh' } },
+
+            // Header: form name + record title
+            React.createElement('div', { className: "shrink-0 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2" },
+                React.createElement('div', { className: "w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center shrink-0" },
+                    React.createElement(MessageSquare, { size: 14, className: "text-indigo-600 dark:text-indigo-400" })
+                ),
+                React.createElement('div', { className: "flex flex-col min-w-0" },
+                    formTitle && React.createElement('span', { className: "text-[10px] font-bold text-indigo-600 dark:text-indigo-400 leading-none mb-0.5" }, formTitle),
+                    React.createElement('span', { className: "text-[12px] font-bold text-slate-700 dark:text-slate-200 truncate" }, entityTitle || entityId)
+                ),
+                React.createElement('div', { className: "mr-auto shrink-0" },
+                    React.createElement('span', { className: "text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400" },
+                        `${comments.length} ${t('هامش', 'comment')}${!isRtl && comments.length !== 1 ? 's' : ''}`
+                    )
                 )
             ),
 
-            React.createElement('div', { className: "flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar" },
+            // Messages list
+            React.createElement('div', { className: "flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3 custom-scrollbar" },
                 isLoading ? (
-                    React.createElement('div', { className: "flex-1 flex items-center justify-center text-slate-400" }, t('در حال بارگذاری...', 'Loading...'))
+                    React.createElement('div', { className: "flex-1 flex items-center justify-center text-slate-400 py-10" }, t('در حال بارگذاری...', 'Loading...'))
                 ) : comments.length === 0 ? (
-                    React.createElement('div', { className: "flex-1 flex flex-col items-center justify-center text-slate-400 gap-2" },
-                        React.createElement(MessageSquare, { size: 32, className: "opacity-50" }),
-                        React.createElement('span', null, t('هیچ هامشی برای این رکورد ثبت نشده است.', 'No comments found for this record.'))
+                    React.createElement('div', { className: "flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 py-10" },
+                        React.createElement(MessageSquare, { size: 28, className: "opacity-30" }),
+                        React.createElement('span', { className: "text-[11px]" }, t('هنوز هامشی ثبت نشده است.', 'No comments yet.'))
                     )
                 ) : (
-                    comments.map(comment => (
-                        React.createElement('div', { key: comment.id, className: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 shadow-sm flex flex-col gap-2" },
-                            React.createElement('div', { className: "flex justify-between items-center border-b border-slate-100 dark:border-slate-700/50 pb-2 mb-1" },
-                                React.createElement('div', { className: "flex items-center gap-2" },
-                                    React.createElement('div', { className: "w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-[10px]" },
-                                        (usersMap[comment.author_id] || '?').charAt(0)
-                                    ),
-                                    React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-200" }, usersMap[comment.author_id] || t('کاربر نامشخص', 'Unknown User'))
+                    comments.map(comment => {
+                        const isOwn = comment.author_id === currentUserId;
+                        return React.createElement('div', { key: comment.id, className: `flex flex-col gap-0.5 ${isOwn ? (isRtl ? 'items-start' : 'items-end') : (isRtl ? 'items-end' : 'items-start')}` },
+                            // author + time row
+                            React.createElement('div', { className: `flex items-center gap-1.5 ${isOwn ? (isRtl ? 'flex-row' : 'flex-row-reverse') : 'flex-row'}` },
+                                React.createElement('div', { className: `w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0 ${isOwn ? 'bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}` },
+                                    (usersMap[comment.author_id] || '?').charAt(0)
                                 ),
-                                React.createElement('div', { className: "flex items-center gap-2" },
-                                    React.createElement('div', { className: "flex items-center gap-1 text-slate-400 dark:text-slate-500 text-[10px]" },
-                                        React.createElement(Clock, { size: 12 }),
-                                        React.createElement('span', { dir: "ltr" }, formatDate(comment.created_at))
-                                    ),
-                                    canEditComment(comment) && React.createElement('div', { className: "flex items-center gap-1" },
-                                        React.createElement('button', {
-                                            onClick: () => { setEditingCommentId(comment.id); setEditingContent(comment.content); },
-                                            className: "p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 transition-colors",
-                                            title: t('ویرایش', 'Edit')
-                                        }, React.createElement(Pencil, { size: 12 })),
-                                        React.createElement('button', {
-                                            onClick: () => deleteComment(comment.id),
-                                            className: "p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-red-600 transition-colors",
-                                            title: t('حذف', 'Delete')
-                                        }, React.createElement(Trash2, { size: 12 }))
-                                    )
+                                React.createElement('span', { className: "text-[10px] font-bold text-slate-600 dark:text-slate-400" },
+                                    isOwn ? t('شما', 'You') : (usersMap[comment.author_id] || t('نامشخص', 'Unknown'))
+                                ),
+                                React.createElement('span', { className: "text-[9px] text-slate-400 dark:text-slate-500", dir: "ltr" }, formatDate(comment.created_at)),
+                                canEditComment(comment) && React.createElement('div', { className: "flex items-center gap-0.5" },
+                                    React.createElement('button', {
+                                        onClick: () => { setEditingCommentId(comment.id); setEditingContent(comment.content); },
+                                        className: "p-0.5 rounded text-slate-300 hover:text-indigo-500 transition-colors",
+                                        title: t('ویرایش', 'Edit')
+                                    }, React.createElement(Pencil, { size: 11 })),
+                                    React.createElement('button', {
+                                        onClick: () => deleteComment(comment.id),
+                                        className: "p-0.5 rounded text-slate-300 hover:text-red-500 transition-colors",
+                                        title: t('حذف', 'Delete')
+                                    }, React.createElement(Trash2, { size: 11 }))
                                 )
                             ),
+                            // bubble
                             editingCommentId === comment.id
-                                ? React.createElement('div', { className: "flex flex-col gap-2" },
+                                ? React.createElement('div', { className: "w-full flex flex-col gap-2" },
                                     React.createElement('textarea', {
                                         value: editingContent,
                                         onChange: e => setEditingContent(e.target.value),
-                                        className: "w-full bg-slate-50 dark:bg-slate-900 border border-indigo-300 dark:border-indigo-600 rounded-lg p-2 text-[12px] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[60px]",
+                                        className: "w-full bg-slate-50 dark:bg-slate-800 border border-indigo-300 dark:border-indigo-600 rounded-lg p-2 text-[12px] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[56px]",
                                         dir: isRtl ? 'rtl' : 'ltr'
                                     }),
                                     React.createElement('div', { className: "flex gap-2 justify-end" },
                                         React.createElement('button', {
                                             onClick: () => { setEditingCommentId(null); setEditingContent(''); },
-                                            className: "flex items-center gap-1 px-2 py-1 rounded text-[11px] text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                                        }, React.createElement(X, { size: 12 }), t('انصراف', 'Cancel')),
+                                            className: "flex items-center gap-1 px-2 py-1 rounded text-[11px] text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
+                                        }, React.createElement(X, { size: 11 }), t('انصراف', 'Cancel')),
                                         React.createElement('button', {
                                             onClick: () => updateComment(comment.id),
                                             className: "flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-                                        }, React.createElement(Check, { size: 12 }), t('ذخیره', 'Save'))
+                                        }, React.createElement(Check, { size: 11 }), t('ذخیره', 'Save'))
                                     )
                                   )
-                                : React.createElement('div', { className: "text-slate-700 dark:text-slate-300 leading-relaxed" },
+                                : React.createElement('div', {
+                                    className: `max-w-[85%] px-3 py-2 rounded-xl text-[12px] leading-relaxed shadow-sm ${
+                                        isOwn
+                                            ? 'bg-indigo-600 dark:bg-indigo-500 text-white rounded-tr-sm'
+                                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-sm'
+                                    }`
+                                  },
                                     renderCommentContent(comment.content)
                                   )
-                        )
-                    ))
+                        );
+                    })
                 )
             ),
 
-            React.createElement('div', { className: "shrink-0 p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 relative" },
-                showMentions && React.createElement('div', { className: "absolute bottom-full left-4 right-4 mb-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto z-50 p-1" },
+            // Input area
+            React.createElement('div', { className: "shrink-0 px-4 py-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 relative" },
+                showMentions && React.createElement('div', { className: "absolute bottom-full left-4 right-4 mb-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-40 overflow-y-auto z-50 p-1" },
                     filteredUsers.length === 0 ? (
-                        React.createElement('div', { className: "p-2 text-center text-slate-500" }, t('کاربری یافت نشد', 'No users found'))
+                        React.createElement('div', { className: "p-2 text-center text-slate-500 text-[11px]" }, t('کاربری یافت نشد', 'No users found'))
                     ) : (
                         filteredUsers.map(u => (
                             React.createElement('div', { 
                                 key: u.id, 
                                 onClick: () => insertMention(u),
-                                className: "flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer rounded transition-colors" 
+                                className: "flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer rounded transition-colors" 
                             },
-                                React.createElement(AtSign, { size: 14, className: "text-slate-400" }),
-                                React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-200" }, u.username),
-                                React.createElement('span', { className: "text-slate-500 dark:text-slate-400 text-[10px]" }, u.displayName !== u.username ? u.displayName : '')
+                                React.createElement(AtSign, { size: 12, className: "text-slate-400 shrink-0" }),
+                                React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-200 text-[11px]" }, u.username),
+                                u.displayName !== u.username && React.createElement('span', { className: "text-slate-400 dark:text-slate-500 text-[10px]" }, u.displayName)
                             )
                         ))
                     )
                 ),
-                
-                React.createElement('div', { className: "flex gap-2 items-end relative" },
-                    React.createElement('div', { className: "flex-1 flex flex-col gap-1 relative" },
-                        React.createElement('textarea', {
-                            ref: textareaRef,
-                            value: newComment,
-                            onChange: handleTextChange,
-                            placeholder: t('هامش جدید را بنویسید... (برای منشن کردن از @ استفاده کنید)', 'Write a comment... (use @ to mention)'),
-                            className: "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-[12px] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[80px]",
-                            dir: isRtl ? 'rtl' : 'ltr'
-                        })
+                React.createElement('textarea', {
+                    ref: textareaRef,
+                    value: newComment,
+                    onChange: handleTextChange,
+                    onKeyDown: (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit(); },
+                    placeholder: t('هامش بنویسید... (@ برای منشن، Ctrl+Enter برای ارسال)', 'Write a comment... (@ to mention, Ctrl+Enter to send)'),
+                    className: "w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-[12px] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none",
+                    style: { minHeight: '60px', maxHeight: '120px' },
+                    dir: isRtl ? 'rtl' : 'ltr'
+                }),
+                React.createElement('div', { className: "flex items-center justify-between mt-2" },
+                    React.createElement('span', { className: "text-[10px] text-slate-400 dark:text-slate-500" },
+                        t('@ برای منشن کردن', '@ to mention')
                     ),
                     React.createElement(Button, { 
-                        variant: "primary", 
-                        className: "!h-[80px] !px-4", 
+                        variant: "primary",
+                        size: "sm",
                         icon: Send, 
                         onClick: handleSubmit,
                         disabled: !newComment.trim() || isSubmitting,
                         isLoading: isSubmitting
-                    }, t('ثبت', 'Send'))
+                    }, t('ارسال', 'Send'))
                 )
             ),
 
