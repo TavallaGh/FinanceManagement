@@ -37,7 +37,14 @@
 
     const supabase = window.supabase;
     const currentUserObj = window.NavigationSystem?.currentUser || {};
-    const currentUserId = currentUserObj.id || null;
+    // fallback به session storage - همان روشی که در TransactionMain.js استفاده می‌شود
+    const sessionUserId = (() => {
+      try {
+        const s = sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}';
+        return JSON.parse(s).id || null;
+      } catch(e) { return null; }
+    })();
+    const currentUserId = sessionUserId || currentUserObj.id || null;
     const currentUserName = currentUserObj.name || currentUserObj.full_name || 'مدیر سیستم';
     const currentUserUsername = currentUserObj.username || 'admin';
 
@@ -479,16 +486,29 @@
 
             const now = new Date().toISOString();
 
+            // آیدی مطمئن کاربر جاری - با fallback به usersList
+            const actorId = (() => {
+                if (currentUserId && currentUserId !== '00000000-0000-0000-0000-000000000000') return currentUserId;
+                const matched = (lookups.usersList || []).find(u =>
+                    u.username === currentUserUsername || u.full_name === currentUserName
+                );
+                return matched ? matched.id : null;
+            })();
+            // نام کاربر را از usersMap می‌گیریم تا دقیقاً با مقدار sec_users یکسان باشد
+            const actorName = (actorId && lookups.usersMap && lookups.usersMap[actorId])
+                ? lookups.usersMap[actorId]
+                : currentUserName;
+
             // فیلدهای metadata بررسی/تایید - جداگانه ارسال می‌شوند تا در صورت نبود ستون‌ها، عملیات اصلی fail نشود
             const metaPayload = {};
             if (statusToSave === 'FINAL' && headerData.status !== 'FINAL') {
-                metaPayload.reviewed_by = currentUserId || null;
+                metaPayload.reviewed_by = actorId;
                 metaPayload.reviewed_at = now;
-                metaPayload.reviewed_by_name = currentUserName;
+                metaPayload.reviewed_by_name = actorName;
             } else if (statusToSave === 'APPROVED' && headerData.status !== 'APPROVED') {
-                metaPayload.approved_by = currentUserId || null;
+                metaPayload.approved_by = actorId;
                 metaPayload.approved_at = now;
-                metaPayload.approved_by_name = currentUserName;
+                metaPayload.approved_by_name = actorName;
             } else if (statusToSave === 'TEMPORARY' && headerData.status === 'FINAL') {
                 metaPayload.reviewed_by = null;
                 metaPayload.reviewed_at = null;
@@ -594,8 +614,8 @@
                 ...prev, 
                 status: statusToSave,
                 // بهروزرسانی مختصر برای نمایش در اینترفیس
-                ...(statusToSave === 'FINAL' && headerData.status !== 'FINAL' ? { reviewed_by: currentUserId, reviewed_at: new Date().toISOString(), reviewed_by_name: currentUserName } : {}),
-                ...(statusToSave === 'APPROVED' && headerData.status !== 'APPROVED' ? { approved_by: currentUserId, approved_at: new Date().toISOString(), approved_by_name: currentUserName } : {}),
+                ...(statusToSave === 'FINAL' && headerData.status !== 'FINAL' ? { reviewed_by: actorId, reviewed_at: new Date().toISOString(), reviewed_by_name: actorName } : {}),
+                ...(statusToSave === 'APPROVED' && headerData.status !== 'APPROVED' ? { approved_by: actorId, approved_at: new Date().toISOString(), approved_by_name: actorName } : {}),
                 ...(statusToSave === 'TEMPORARY' && headerData.status === 'FINAL' ? { reviewed_by: null, reviewed_at: null, reviewed_by_name: null } : {})
             }));
             setIsDirty(false);

@@ -665,8 +665,14 @@
                                         <div class="sig-line"></div>
                                         <span class="sig-name">${
                                             sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') :
-                                            sig.key === 'checker' ? (headerData.reviewed_by_name || (headerData.reviewed_by ? (usersMap[headerData.reviewed_by] || headerData.reviewed_by) : '---')) :
-                                            sig.key === 'approver' ? (headerData.approved_by_name || (headerData.approved_by ? (usersMap[headerData.approved_by] || headerData.approved_by) : '---')) :
+                                            sig.key === 'checker' ? (
+                                                (headerData.reviewed_by && usersMap[headerData.reviewed_by]) ||
+                                                headerData.reviewed_by_name || '---'
+                                            ) :
+                                            sig.key === 'approver' ? (
+                                                (headerData.approved_by && usersMap[headerData.approved_by]) ||
+                                                headerData.approved_by_name || '---'
+                                            ) :
                                             '---'
                                         }</span>
                                     </div>
@@ -754,8 +760,14 @@
                         React.createElement('div', { className: "w-3/4 border-t border-dashed border-slate-400 mb-1" }),
                         React.createElement('span', { className: "text-sm font-bold" }, 
                             sig.key === 'preparer' ? (usersMap[headerData.registrar_id] || headerData.registrar_id || '---') :
-                            sig.key === 'checker' ? (headerData.reviewed_by_name || (headerData.reviewed_by ? (usersMap[headerData.reviewed_by] || headerData.reviewed_by) : '---')) :
-                            sig.key === 'approver' ? (headerData.approved_by_name || (headerData.approved_by ? (usersMap[headerData.approved_by] || headerData.approved_by) : '---')) :
+                            sig.key === 'checker' ? (
+                                (headerData.reviewed_by && usersMap[headerData.reviewed_by]) ||
+                                headerData.reviewed_by_name || '---'
+                            ) :
+                            sig.key === 'approver' ? (
+                                (headerData.approved_by && usersMap[headerData.approved_by]) ||
+                                headerData.approved_by_name || '---'
+                            ) :
                             '---'
                         )
                     ))

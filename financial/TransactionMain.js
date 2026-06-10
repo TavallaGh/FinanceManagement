@@ -371,15 +371,18 @@
             if (error) throw error;
 
             // آپدیت جداگانه فیلدهای metadata بررسی/تایید (graceful - در صورت نبود ستون‌ها fail نمی‌شود)
+            // نام مطمئن كاربر از usersMap
+            const actorName = (currentUserId && usersMap[currentUserId]) ? usersMap[currentUserId] : currentUserName;
+
             const metaPayload = {};
             if (newStatus === 'FINAL') {
                 metaPayload.reviewed_by = currentUserId || null;
                 metaPayload.reviewed_at = now;
-                metaPayload.reviewed_by_name = currentUserName;
+                metaPayload.reviewed_by_name = actorName;
             } else if (newStatus === 'APPROVED') {
                 metaPayload.approved_by = currentUserId || null;
                 metaPayload.approved_at = now;
-                metaPayload.approved_by_name = currentUserName;
+                metaPayload.approved_by_name = actorName;
             } else if (newStatus === 'TEMPORARY') {
                 metaPayload.reviewed_by = null;
                 metaPayload.reviewed_at = null;
