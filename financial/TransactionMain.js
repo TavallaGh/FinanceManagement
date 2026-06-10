@@ -328,17 +328,43 @@
         fetchData();
     };
 
+    const isLocked = (tx) => tx.status === 'FINAL' || tx.status === 'APPROVED';
+
     const executeDelete = async () => {
         setIsLoading(true);
         try {
             if (deleteConfirm.type === 'single') {
+                // جلوگیری از حذف سندهای بررسی شده / تایید شده
+                if (isLocked(deleteConfirm.data)) {
+                    showToast(t('سندهای بررسی شده یا تایید شده قابل حذف نیستند.', 'Reviewed or approved documents cannot be deleted.'), 'warning');
+                    setDeleteConfirm({ isOpen: false, type: null, data: null });
+                    setIsLoading(false);
+                    return;
+                }
                 const { error } = await supabase.from('fm_transactions').delete().eq('id', deleteConfirm.data.id);
                 if (error) throw error;
                 await logAction('delete_transaction', deleteConfirm.data.id, `حذف تراکنش: ${deleteConfirm.data.document_code}`);
             } else if (deleteConfirm.type === 'bulk') {
-                const { error } = await supabase.from('fm_transactions').delete().in('id', deleteConfirm.data);
+                // فیلتر کردن سندهای قابل حذف
+                const deletable = transactions.filter(tx => deleteConfirm.data.includes(tx.id) && !isLocked(tx));
+                const skipped = deleteConfirm.data.length - deletable.length;
+                if (deletable.length === 0) {
+                    showToast(t('هیچ‌کدام از سندهای انتخابی قابل حذف نیستند. سندهای بررسی شده یا تایید شده قابل حذف نمی‌باشند.', 'None of the selected documents can be deleted.'), 'warning');
+                    setDeleteConfirm({ isOpen: false, type: null, data: null });
+                    setIsLoading(false);
+                    return;
+                }
+                const deletableIds = deletable.map(tx => tx.id);
+                const { error } = await supabase.from('fm_transactions').delete().in('id', deletableIds);
                 if (error) throw error;
-                await logAction('bulk_delete_transactions', 'BULK_DELETE', `حذف گروهی ${deleteConfirm.data.length} تراکنش`);
+                await logAction('bulk_delete_transactions', 'BULK_DELETE', `حذف گروهی ${deletableIds.length} تراکنش${skipped > 0 ? ` (${skipped} سند قفل شده نادیده گرفته شد)` : ''}`);
+                if (skipped > 0) {
+                    showToast(t(`${deletableIds.length} سند حذف شد. ${skipped} سند بررسی/تایید شده نادیده گرفته شد.`, `${deletableIds.length} deleted. ${skipped} locked documents were skipped.`), 'warning');
+                    fetchData();
+                    setDeleteConfirm({ isOpen: false, type: null, data: null });
+                    setIsLoading(false);
+                    return;
+                }
             }
             showToast(t('عملیات با موفقیت انجام شد.', 'Operation successful.'));
             fetchData();
@@ -652,8 +678,8 @@
         { id: 'summary', icon: DollarSign, tooltip: t('خلاصه ارزی', 'Currency Summary'), onClick: (row) => openSummary(row), className: 'text-indigo-500 hover:text-indigo-600' },
         { id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: (row) => (attachmentCounts[row.id] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600') },
         { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
-        { id: 'update', icon: Edit, tooltip: t('مشاهده/ویرایش', 'View/Edit'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'view' },
-        { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), requiredAccess: 'delete', className: 'text-red-500 hover:text-red-600' }
+        { id: 'update', icon: Edit, tooltip: (row) => isLocked(row) ? t('مشاهده سند', 'View Document') : t('مشاهده/ویرایش', 'View/Edit'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'view' },
+        { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => { if (isLocked(row)) { showToast(t('سندهای بررسی شده یا تایید شده قابل حذف نیستند.', 'Locked documents cannot be deleted.'), 'warning'); return; } setDeleteConfirm({ isOpen: true, type: 'single', data: row }); }, requiredAccess: 'delete', className: (row) => isLocked(row) ? '!text-slate-300 dark:!text-slate-600 cursor-not-allowed' : 'text-red-500 hover:text-red-600' }
     ];
 
     const CheckCircle = safeIcon(LucideIcons, 'CheckCircle');
