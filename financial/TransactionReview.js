@@ -261,7 +261,7 @@
                 const { data: commentRows } = await supabase
                     .from('sys_comments')
                     .select('entity_id')
-                    .eq('entity_type', 'TRANSACTION_REVIEW')
+                    .eq('entity_type', 'TRANSACTION_MAIN')
                     .in('entity_id', txIds);
                 if (commentRows) {
                     setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
@@ -622,7 +622,7 @@
 
     return React.createElement('div', { className: "p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900", dir: isRtl ? 'rtl' : 'ltr' },
         React.createElement(PageHeader, {
-            title: t('مدیریت تراکنش‌ها', 'Transactions Management'),
+            title: t('بررسی تراکنش‌ها', 'Transactions Management'),
             icon: FileText,
             language: language,
             description: t('ثبت و پیگیری اسناد مالی چندسطری ارزی', 'Manage multi-currency financial documents'),

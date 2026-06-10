@@ -622,7 +622,7 @@
 
     return React.createElement('div', { className: "p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900", dir: isRtl ? 'rtl' : 'ltr' },
         React.createElement(PageHeader, {
-            title: t('مدیریت تراکنش‌ها', 'Transactions Management'),
+            title: t('ثبت و مدیریت تراکنش‌ها', 'Transactions Management'),
             icon: FileText,
             language: language,
             description: t('ثبت و پیگیری اسناد مالی چندسطری ارزی', 'Manage multi-currency financial documents'),
