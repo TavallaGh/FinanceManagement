@@ -160,6 +160,18 @@
       localStorage.setItem(RECENTS_STORAGE_KEY, JSON.stringify(newRecents));
     };
 
+    useEffect(() => {
+      const handler = (e) => {
+        const { formComponent } = e.detail || {};
+        if (!formComponent || !menuData.length) return;
+        const item = menuData.find(m => m.component_path &&
+          (m.component_path === formComponent || m.component_path.endsWith('/' + formComponent)));
+        if (item) handleFormClick(item);
+      };
+      window.addEventListener('navigateToForm', handler);
+      return () => window.removeEventListener('navigateToForm', handler);
+    }, [menuData]);
+
     const toggleCalendar = () => {
       const newMode = calendarMode === 'jalali' ? 'gregorian' : 'jalali';
       if (window.DSCore?.setGlobalCalendarMode) {

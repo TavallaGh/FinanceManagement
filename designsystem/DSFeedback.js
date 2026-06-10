@@ -470,6 +470,8 @@
     );
   };
 
+  const ExternalLink = safeIcon(LucideIcons, 'ExternalLink');
+
   const NotificationCard = ({
     id,
     title,
@@ -479,9 +481,11 @@
     timestamp,
     onRead,
     onDelete,
+    onClick,
     formatTime = (t) => t,
     language = 'fa'
   }) => {
+    const isActionable = typeof onClick === 'function';
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
 
@@ -499,11 +503,12 @@
 
     return (
       <div
-        className={`group relative border rounded-lg p-3 transition-all animate-in fade-in slide-in-from-bottom-2 ${
+        onClick={isActionable ? onClick : undefined}
+        className={`group relative border rounded-lg p-3 transition-all animate-in fade-in slide-in-from-bottom-2 ${isActionable ? 'cursor-pointer' : ''} ${
           isRead
             ? 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600'
             : 'bg-indigo-50/40 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/50 hover:border-indigo-200 dark:hover:border-indigo-700 hover:shadow-sm'
-        }`}
+        } ${isActionable && isRead ? 'hover:bg-slate-50 dark:hover:bg-slate-700/50' : ''} ${isActionable && !isRead ? 'hover:bg-indigo-50 dark:hover:bg-indigo-900/30' : ''}`}
       >
         <div className="flex gap-2">
           <div className={`mt-0.5 shrink-0 ${isRead ? 'opacity-50' : ''} ${typeColors[type] || typeColors.info}`}>
@@ -512,7 +517,10 @@
           <div className="flex-1 min-w-0">
             <h4 className={`text-[12px] font-bold mb-1 leading-tight ${isRead ? 'text-slate-600 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>{title}</h4>
             <p className={`text-[11px] leading-relaxed mb-1.5 line-clamp-2 ${isRead ? 'text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'}`}>{message}</p>
-            <div className="block mt-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-medium">{formatTime(timestamp)}</div>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{formatTime(timestamp)}</span>
+              {isActionable && <span className="text-[9px] text-indigo-500 dark:text-indigo-400 flex items-center gap-0.5"><ExternalLink size={10}/></span>}
+            </div>
           </div>
 
           <div className="flex flex-col gap-0.5 transition-all self-start shrink-0">

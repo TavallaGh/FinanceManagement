@@ -47,6 +47,7 @@
     entityType, 
     entityId, 
     entityTitle, 
+    formComponent = null,
     language = 'fa' 
   }) => {
     const isRtl = language === 'fa';
@@ -235,7 +236,13 @@
                     title: t('هامش جدید', 'New Mention'),
                     message: t(`شما در یک هامش روی ${entityTitle} منشن شده‌اید.`, `You were mentioned on ${entityTitle}.`),
                     type: 'info',
-                    action_payload: { entity_type: entityType, entity_id: entityId }
+                    action_payload: {
+                        action: 'open_comments',
+                        entity_type: entityType,
+                        entity_id: String(entityId),
+                        entity_title: entityTitle,
+                        form_component: formComponent
+                    }
                 }));
                 await supabase.from('system_notifications').insert(notifs);
             }

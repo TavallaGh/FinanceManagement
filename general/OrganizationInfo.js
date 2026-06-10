@@ -366,6 +366,7 @@
             entityType="ORGANIZATION_INFO"
             entityId={selectedEntityForComment.id}
             entityTitle={selectedEntityForComment.title}
+            formComponent="OrganizationInfo"
             language={language}
           />
         )}
