@@ -119,7 +119,11 @@
 
     const handleNotificationClick = async (notif) => {
       const payload = notif.action_payload;
-      if (!payload || (!payload.entity_type && !payload.action)) return;
+      console.log('[Notif] clicked payload:', payload);
+      if (!payload || (!payload.entity_type && !payload.action)) {
+        console.log('[Notif] early return - no payload or missing fields');
+        return;
+      }
 
       await markAsRead(notif.id);
       onClose();
@@ -127,9 +131,12 @@
       // normalise: support both old payloads (no action) and new ones
       const action = payload.action || 'open_record';
       const formComponent = payload.form_component || ENTITY_FORM_MAP[payload.entity_type] || null;
+      console.log('[Notif] action:', action, '| formComponent:', formComponent);
+      console.log('[Notif] window.__navigateToForm exists?', !!window.__navigateToForm);
 
       if (action === 'open_record') {
         const dispatchFilter = () => {
+          console.log('[Notif] dispatching filterToRecord', payload.entity_type, payload.entity_id);
           window.dispatchEvent(new CustomEvent('filterToRecord', {
             detail: {
               entity_type: payload.entity_type,
@@ -139,11 +146,12 @@
         };
 
         if (formComponent) {
-          // try global helper first (instant, no timing issues)
           if (window.__navigateToForm) {
-            window.__navigateToForm(formComponent);
+            const result = window.__navigateToForm(formComponent);
+            console.log('[Notif] __navigateToForm result:', result);
             setTimeout(dispatchFilter, 300);
           } else {
+            console.log('[Notif] falling back to event');
             window.dispatchEvent(new CustomEvent('navigateToForm', {
               detail: { formComponent }
             }));
