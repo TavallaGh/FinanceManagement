@@ -366,25 +366,31 @@
             const eligibleIds = eligible.map(tx => tx.id);
             const now = new Date().toISOString();
 
-            // آماده‌سازی پیلود بر اساس وضعیت جدید
-            let updatePayload = { status: newStatus };
-            if (newStatus === 'FINAL') {
-                updatePayload.reviewed_by = currentUserId || null;
-                updatePayload.reviewed_at = now;
-                updatePayload.reviewed_by_name = currentUserName;
-            } else if (newStatus === 'APPROVED') {
-                updatePayload.approved_by = currentUserId || null;
-                updatePayload.approved_at = now;
-                updatePayload.approved_by_name = currentUserName;
-            } else if (newStatus === 'TEMPORARY') {
-                // برگشت از بررسی شده به موقت - پاک کردن اطلاعات بررسی
-                updatePayload.reviewed_by = null;
-                updatePayload.reviewed_at = null;
-                updatePayload.reviewed_by_name = null;
-            }
-
-            const { error } = await supabase.from('fm_transactions').update(updatePayload).in('id', eligibleIds);
+            // آپدیت وضعیت (بدون فیلدهای metadata)
+            const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', eligibleIds);
             if (error) throw error;
+
+            // آپدیت جداگانه فیلدهای metadata بررسی/تایید (graceful - در صورت نبود ستون‌ها fail نمی‌شود)
+            const metaPayload = {};
+            if (newStatus === 'FINAL') {
+                metaPayload.reviewed_by = currentUserId || null;
+                metaPayload.reviewed_at = now;
+                metaPayload.reviewed_by_name = currentUserName;
+            } else if (newStatus === 'APPROVED') {
+                metaPayload.approved_by = currentUserId || null;
+                metaPayload.approved_at = now;
+                metaPayload.approved_by_name = currentUserName;
+            } else if (newStatus === 'TEMPORARY') {
+                metaPayload.reviewed_by = null;
+                metaPayload.reviewed_at = null;
+                metaPayload.reviewed_by_name = null;
+            }
+            if (Object.keys(metaPayload).length > 0) {
+                const { error: metaError } = await supabase.from('fm_transactions').update(metaPayload).in('id', eligibleIds);
+                if (metaError) {
+                    console.warn('متادیتای بررسی/تایید ذخیره نشد (ستون‌های DB ممکن است اضافه نشده باشند):', metaError.message);
+                }
+            }
 
             const statusLabels = { DRAFT: 'یادداشت', TEMPORARY: 'موقت', FINAL: 'بررسی شده', APPROVED: 'تایید شده' };
             const msg = skipped > 0

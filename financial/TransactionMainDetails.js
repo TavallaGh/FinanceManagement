@@ -478,6 +478,23 @@
             const validDeptId = (headerData.department_id && String(headerData.department_id).trim() !== '') ? headerData.department_id : null;
 
             const now = new Date().toISOString();
+
+            // فیلدهای metadata بررسی/تایید - جداگانه ارسال می‌شوند تا در صورت نبود ستون‌ها، عملیات اصلی fail نشود
+            const metaPayload = {};
+            if (statusToSave === 'FINAL' && headerData.status !== 'FINAL') {
+                metaPayload.reviewed_by = currentUserId || null;
+                metaPayload.reviewed_at = now;
+                metaPayload.reviewed_by_name = currentUserName;
+            } else if (statusToSave === 'APPROVED' && headerData.status !== 'APPROVED') {
+                metaPayload.approved_by = currentUserId || null;
+                metaPayload.approved_at = now;
+                metaPayload.approved_by_name = currentUserName;
+            } else if (statusToSave === 'TEMPORARY' && headerData.status === 'FINAL') {
+                metaPayload.reviewed_by = null;
+                metaPayload.reviewed_at = null;
+                metaPayload.reviewed_by_name = null;
+            }
+
             const txPayload = {
                 document_code: headerData.document_code,
                 document_date: headerData.document_date.replace(/\//g, '-'),
@@ -487,22 +504,6 @@
                 status: statusToSave || 'DRAFT',
                 description: headerData.description || ''
             };
-
-            // ثبت اطلاعات بررسی‌کننده / تاییدکننده
-            if (statusToSave === 'FINAL' && headerData.status !== 'FINAL') {
-                txPayload.reviewed_by = currentUserId || null;
-                txPayload.reviewed_at = now;
-                txPayload.reviewed_by_name = currentUserName;
-            } else if (statusToSave === 'APPROVED' && headerData.status !== 'APPROVED') {
-                txPayload.approved_by = currentUserId || null;
-                txPayload.approved_at = now;
-                txPayload.approved_by_name = currentUserName;
-            } else if (statusToSave === 'TEMPORARY' && headerData.status === 'FINAL') {
-                // برگشت از بررسی شده به موقت - پاک کردن اطلاعات بررسی
-                txPayload.reviewed_by = null;
-                txPayload.reviewed_at = null;
-                txPayload.reviewed_by_name = null;
-            }
 
             if (!txId) {
                 const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
@@ -522,7 +523,15 @@
             } else {
                 const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
                 if (error) throw error;
-                
+
+                // آپدیت جداگانه فیلدهای بررسی/تایید (در صورت نبود ستون در DB، عملیات اصلی مختل نمی‌شود)
+                if (Object.keys(metaPayload).length > 0) {
+                    const { error: metaError } = await supabase.from('fm_transactions').update(metaPayload).eq('id', txId);
+                    if (metaError) {
+                        console.warn('متادیتای بررسی/تایید ذخیره نشد (ستون‌های DB ممکن است اضافه نشده باشند):', metaError.message);
+                    }
+                }
+
                 if (statusToSave !== headerData.status) {
                     const statusLabels = { DRAFT: 'یادداشت', TEMPORARY: 'موقت', FINAL: 'بررسی شده', APPROVED: 'تایید شده' };
                     await logAction('status_update', txId, `تغییر وضعیت از ${statusLabels[headerData.status] || headerData.status} به ${statusLabels[statusToSave] || statusToSave} - توسط ${currentUserName}`);
