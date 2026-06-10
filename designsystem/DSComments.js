@@ -36,6 +36,10 @@
   const AtSign = safeIcon(LucideIcons, 'AtSign');
   const User = safeIcon(LucideIcons, 'User');
   const Clock = safeIcon(LucideIcons, 'Clock');
+  const Pencil = safeIcon(LucideIcons, 'Pencil');
+  const Trash2 = safeIcon(LucideIcons, 'Trash2');
+  const X = safeIcon(LucideIcons, 'X');
+  const Check = safeIcon(LucideIcons, 'Check');
 
   const CommentModal = ({ 
     isOpen, 
@@ -61,8 +65,23 @@
 
     const [showMentions, setShowMentions] = useState(false);
     const [mentionFilter, setMentionFilter] = useState('');
+    const [editingCommentId, setEditingCommentId] = useState(null);
+    const [editingContent, setEditingContent] = useState('');
     
     const textareaRef = useRef(null);
+
+    const currentUserId = (() => {
+      try {
+        const s = sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}';
+        const parsed = JSON.parse(s);
+        return parsed.id || null;
+      } catch(e) { return null; }
+    })();
+
+    const canEditComment = (comment) => {
+      if (!currentUserId || comment.author_id !== currentUserId) return false;
+      return (Date.now() - new Date(comment.created_at).getTime()) < 2 * 60 * 60 * 1000;
+    };
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -72,21 +91,36 @@
     const fetchUsers = useCallback(async () => {
       if (!supabase) return;
       try {
-        const { data } = await supabase
+        const { data: usersData, error: usersError } = await supabase
           .from('sec_users')
-          .select('id, username, parties!party_id(first_name, last_name)')
+          .select('id, username, party_id')
           .eq('is_active', true);
-        if (data) {
-          setUsers(data);
-          const uMap = {};
-          data.forEach(u => {
-            const fullName = u.parties
-              ? `${u.parties.first_name || ''} ${u.parties.last_name || ''}`.trim()
-              : '';
-            uMap[u.id] = fullName || u.username;
-          });
-          setUsersMap(uMap);
+        if (usersError || !usersData) return;
+
+        const partyIds = usersData.filter(u => u.party_id).map(u => u.party_id);
+        let partiesMap = {};
+        if (partyIds.length > 0) {
+          const { data: partiesData } = await supabase
+            .from('parties')
+            .select('id, first_name, last_name')
+            .in('id', partyIds);
+          if (partiesData) {
+            partiesData.forEach(p => { partiesMap[p.id] = p; });
+          }
         }
+
+        const enrichedUsers = usersData.map(u => {
+          const party = u.party_id ? partiesMap[u.party_id] : null;
+          const displayName = party
+            ? `${party.first_name || ''} ${party.last_name || ''}`.trim()
+            : '';
+          return { ...u, displayName: displayName || u.username };
+        });
+
+        setUsers(enrichedUsers);
+        const uMap = {};
+        enrichedUsers.forEach(u => { uMap[u.id] = u.displayName; });
+        setUsersMap(uMap);
       } catch (err) {
         console.error("Error fetching users for mentions", err);
       }
@@ -161,47 +195,17 @@
 
     const filteredUsers = useMemo(() => {
         if (!mentionFilter) return users;
-        return users.filter(u => {
-            const fullName = u.parties
-              ? `${u.parties.first_name || ''} ${u.parties.last_name || ''}`.trim().toLowerCase()
-              : '';
-            return (u.username && u.username.toLowerCase().includes(mentionFilter)) ||
-                   fullName.includes(mentionFilter);
-        });
+        return users.filter(u =>
+            (u.username && u.username.toLowerCase().includes(mentionFilter)) ||
+            (u.displayName && u.displayName.toLowerCase().includes(mentionFilter))
+        );
     }, [users, mentionFilter]);
 
     const handleSubmit = async () => {
         if (!newComment.trim()) return;
         setIsSubmitting(true);
         try {
-            let safeAuthorId = null;
-
-            // 1. بررسی از طریق سشن Supabase (مطمئن‌ترین روش)
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user && user.id) safeAuthorId = user.id;
-            } catch (e) {}
-
-            // 2. بررسی از طریق آبجکت سراسری سیستم
-            if (!safeAuthorId && window.NavigationSystem?.currentUser?.id) {
-                safeAuthorId = window.NavigationSystem.currentUser.id;
-            }
-
-            // 3. بررسی از طریق حافظه محلی مرورگر (Local Storage)
-            if (!safeAuthorId) {
-                try {
-                    const stored = localStorage.getItem('currentUser') || localStorage.getItem('user');
-                    if (stored) {
-                        const parsed = JSON.parse(stored);
-                        if (parsed.id) safeAuthorId = parsed.id;
-                    }
-                } catch (e) {}
-            }
-
-            // 4. حالت تست (در صورتی که سشن احراز هویت وجود نداشته باشد، کاربر اول انتخاب می‌شود)
-            if (!safeAuthorId && users.length > 0) {
-                safeAuthorId = users[0].id;
-            }
+            const safeAuthorId = currentUserId;
 
             if (!safeAuthorId) {
                  showToast(t('شناسه کاربر یافت نشد. لطفاً مجدداً وارد سیستم شوید.', 'User ID not found. Please log in.'), 'error');
@@ -245,6 +249,32 @@
             showToast(t('خطا در ثبت هامش', 'Error saving comment'), 'error');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const deleteComment = async (id) => {
+        if (!window.confirm(t('آیا از حذف این هامش اطمینان دارید؟', 'Are you sure you want to delete this comment?'))) return;
+        try {
+            const { error } = await supabase.from('sys_comments').delete().eq('id', id);
+            if (error) throw error;
+            setComments(prev => prev.filter(c => c.id !== id));
+            showToast(t('هامش حذف شد', 'Comment deleted'));
+        } catch (err) {
+            showToast(t('خطا در حذف هامش', 'Error deleting comment'), 'error');
+        }
+    };
+
+    const updateComment = async (id) => {
+        if (!editingContent.trim()) return;
+        try {
+            const { error } = await supabase.from('sys_comments').update({ content: editingContent }).eq('id', id);
+            if (error) throw error;
+            setComments(prev => prev.map(c => c.id === id ? { ...c, content: editingContent } : c));
+            setEditingCommentId(null);
+            setEditingContent('');
+            showToast(t('هامش ویرایش شد', 'Comment updated'));
+        } catch (err) {
+            showToast(t('خطا در ویرایش هامش', 'Error updating comment'), 'error');
         }
     };
 
@@ -315,14 +345,47 @@
                                     ),
                                     React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-200" }, usersMap[comment.author_id] || t('کاربر نامشخص', 'Unknown User'))
                                 ),
-                                React.createElement('div', { className: "flex items-center gap-1 text-slate-400 dark:text-slate-500 text-[10px]" },
-                                    React.createElement(Clock, { size: 12 }),
-                                    React.createElement('span', { dir: "ltr" }, formatDate(comment.created_at))
+                                React.createElement('div', { className: "flex items-center gap-2" },
+                                    React.createElement('div', { className: "flex items-center gap-1 text-slate-400 dark:text-slate-500 text-[10px]" },
+                                        React.createElement(Clock, { size: 12 }),
+                                        React.createElement('span', { dir: "ltr" }, formatDate(comment.created_at))
+                                    ),
+                                    canEditComment(comment) && React.createElement('div', { className: "flex items-center gap-1" },
+                                        React.createElement('button', {
+                                            onClick: () => { setEditingCommentId(comment.id); setEditingContent(comment.content); },
+                                            className: "p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 transition-colors",
+                                            title: t('ویرایش', 'Edit')
+                                        }, React.createElement(Pencil, { size: 12 })),
+                                        React.createElement('button', {
+                                            onClick: () => deleteComment(comment.id),
+                                            className: "p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-red-600 transition-colors",
+                                            title: t('حذف', 'Delete')
+                                        }, React.createElement(Trash2, { size: 12 }))
+                                    )
                                 )
                             ),
-                            React.createElement('div', { className: "text-slate-700 dark:text-slate-300 leading-relaxed" },
-                                renderCommentContent(comment.content)
-                            )
+                            editingCommentId === comment.id
+                                ? React.createElement('div', { className: "flex flex-col gap-2" },
+                                    React.createElement('textarea', {
+                                        value: editingContent,
+                                        onChange: e => setEditingContent(e.target.value),
+                                        className: "w-full bg-slate-50 dark:bg-slate-900 border border-indigo-300 dark:border-indigo-600 rounded-lg p-2 text-[12px] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[60px]",
+                                        dir: isRtl ? 'rtl' : 'ltr'
+                                    }),
+                                    React.createElement('div', { className: "flex gap-2 justify-end" },
+                                        React.createElement('button', {
+                                            onClick: () => { setEditingCommentId(null); setEditingContent(''); },
+                                            className: "flex items-center gap-1 px-2 py-1 rounded text-[11px] text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                        }, React.createElement(X, { size: 12 }), t('انصراف', 'Cancel')),
+                                        React.createElement('button', {
+                                            onClick: () => updateComment(comment.id),
+                                            className: "flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                                        }, React.createElement(Check, { size: 12 }), t('ذخیره', 'Save'))
+                                    )
+                                  )
+                                : React.createElement('div', { className: "text-slate-700 dark:text-slate-300 leading-relaxed" },
+                                    renderCommentContent(comment.content)
+                                  )
                         )
                     ))
                 )
@@ -341,7 +404,7 @@
                             },
                                 React.createElement(AtSign, { size: 14, className: "text-slate-400" }),
                                 React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-200" }, u.username),
-                                React.createElement('span', { className: "text-slate-500 dark:text-slate-400 text-[10px]" }, u.parties ? `${u.parties.first_name || ''} ${u.parties.last_name || ''}`.trim() : '')
+                                React.createElement('span', { className: "text-slate-500 dark:text-slate-400 text-[10px]" }, u.displayName !== u.username ? u.displayName : '')
                             )
                         ))
                     )
