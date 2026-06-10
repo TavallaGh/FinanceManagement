@@ -49,6 +49,7 @@
   const DollarSign = safeIcon(LucideIcons, 'DollarSign');
   const Printer = safeIcon(LucideIcons, 'Printer');
   const RefreshCw = safeIcon(LucideIcons, 'RefreshCw');
+  const MessageSquare = safeIcon(LucideIcons, 'MessageSquare');
 
   const formatNumber = (num) => {
       if (!num && num !== 0) return '0';
@@ -113,6 +114,9 @@
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [formMode, setFormMode] = useState('CREATE');
     const [currentRecord, setCurrentRecord] = useState(null);
+    
+    const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
+    const [commentedIds, setCommentedIds] = useState(new Set());
     
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
     const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
@@ -248,6 +252,19 @@
             });
             setAttachmentCounts(counts);
 
+            // fetch which transactions have at least one comment
+            if ((txData || []).length > 0) {
+                const txIds = txData.map(r => String(r.id));
+                const { data: commentRows } = await supabase
+                    .from('sys_comments')
+                    .select('entity_id')
+                    .eq('entity_type', 'TRANSACTION_MAIN')
+                    .in('entity_id', txIds);
+                if (commentRows) {
+                    setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
+                }
+            }
+
         } catch (error) {
             showToast(t('خطا در دریافت لیست تراکنش‌ها', 'Error fetching transactions'), 'error');
         } finally {
@@ -262,6 +279,19 @@
             fetchData();
         }
     }, [fetchUsersAndResolveDepartment, fetchLookups, fetchData, access.canView]);
+
+    useEffect(() => {
+        const handleFilterToRecord = (e) => {
+            if (e.detail && e.detail.entity_type === 'TRANSACTION_MAIN') {
+                const targetRecord = transactions.find(r => String(r.id) === String(e.detail.entity_id));
+                if (targetRecord) {
+                    setCommentModalState({ isOpen: true, record: targetRecord });
+                }
+            }
+        };
+        window.addEventListener('filterToRecord', handleFilterToRecord);
+        return () => window.removeEventListener('filterToRecord', handleFilterToRecord);
+    }, [transactions]);
 
     const handleOpenForm = (mode, record = null) => {
         setFormMode(mode);
@@ -542,6 +572,13 @@
 
     const gridActions = [
         { 
+            id: 'comment',
+            icon: MessageSquare,
+            tooltip: t('هامش‌ها', 'Comments'),
+            onClick: (row) => setCommentModalState({ isOpen: true, record: row }),
+            className: (row) => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600'
+        },
+        { 
             id: 'print', 
             icon: Printer, 
             tooltip: t('چاپ سند', 'Print Document'), 
@@ -579,6 +616,7 @@
 
     const DetailsModal = safeComp(window, 'TransactionMainDetails');
     const TransactionSummaryModal = safeComp(window, 'TransactionSummary');
+    const { CommentModal } = window.DSComments || {};
     
     const isAttachReadOnly = attachModal.record && attachModal.record.status !== 'DRAFT' && attachModal.record.status !== 'TEMPORARY';
 
@@ -615,7 +653,7 @@
                     actions: gridActions,
                     bulkActions: bulkActions,
                     isLoading: isLoading,
-                    actionWidth: '200px'
+                    actionWidth: '220px'
                 })
             )
         ),
@@ -690,6 +728,17 @@
         printModal.isOpen && window.TransactionPrint ? React.createElement(window.TransactionPrint, {
             transactionId: printModal.transactionId,
             onClose: () => setPrintModal({ isOpen: false, transactionId: null }),
+            language: language
+        }) : null,
+
+        CommentModal && commentModalState.isOpen ? React.createElement(CommentModal, {
+            isOpen: commentModalState.isOpen,
+            onClose: () => { setCommentModalState({ isOpen: false, record: null }); fetchData(); },
+            entityType: 'TRANSACTION_MAIN',
+            entityId: commentModalState.record ? String(commentModalState.record.id) : '',
+            entityTitle: commentModalState.record ? `${t('کد:', 'Code:')} ${commentModalState.record.document_code || '-'}  |  ${t('شرح:', 'Desc:')} ${commentModalState.record.description || '-'}` : '',
+            formTitle: t('ثبت تراکنش', 'Transaction'),
+            formComponent: 'TransactionMain',
             language: language
         }) : null,
 
