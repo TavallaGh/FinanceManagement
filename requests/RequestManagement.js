@@ -1,4 +1,4 @@
-/* Filename: requests/RequestManagement.js */
+/* Filename: workflow/RequestManagement.js */
 (() => {
   const React = window.React;
   const { useState, useEffect, useMemo, useCallback, useRef, useImperativeHandle } = React;
@@ -464,7 +464,7 @@
   // ════════════════════════════════════════════════════════════════════════════
   const RequestFormModal = ({
     isOpen, onClose, onSuccess, formMode = 'CREATE', initialRecord = null,
-    language = 'fa', formCode = 'WF_REQUEST_MANAGEMENT'
+    language = 'fa', formCode = 'REQ_REQUEST_MNGMT', showToast
   }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
@@ -947,7 +947,7 @@
   // ════════════════════════════════════════════════════════════════════════════
   // RequestManagement  –  the main list page
   // ════════════════════════════════════════════════════════════════════════════
-  const RequestManagement = ({ language = 'fa', formCode = 'WF_REQUEST_MANAGEMENT' }) => {
+  const RequestManagement = ({ language = 'fa', formCode = 'REQ_REQUEST_MNGMT' }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const supabase = window.supabase;
@@ -1115,7 +1115,7 @@
           icon={ClipboardList}
           description={t('ثبت، پیگیری و مدیریت درخواست‌های سازمانی', 'Manage and track organizational requests')}
           language={language}
-          breadcrumbs={[{ label: t('مدیریت درخواست ها', 'Requests') }, { label: t('درخواست‌ها', 'Requests') }]}
+          breadcrumbs={[{ label: t('گردش کار', 'Workflow') }, { label: t('درخواست‌ها', 'Requests') }]}
           viewConfig={viewConfig}
         />
 
