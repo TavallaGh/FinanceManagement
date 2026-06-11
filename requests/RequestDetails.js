@@ -1,7 +1,8 @@
 /* Filename: requests/RequestDetails.js */
+/* RequestFormModal – depends on RequestItemsGrid.js loaded before this file */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo, useCallback, useRef, useImperativeHandle } = React;
+  const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
   function FallbackComponent() { return null; }
   const FallbackIcon = ({ size = 16 }) =>
@@ -27,10 +28,6 @@
   const Badge       = safeComp(Core, 'Badge');
   const Card        = safeComp(Core, 'Card');
 
-  const DSGrid      = window.DSGrid || DS;
-  const DataGrid    = safeComp(DSGrid, 'DataGrid');
-  const LOVField    = safeComp(DSGrid, 'LOVField');
-
   const DSForms     = window.DSForms || DS;
   const TextField   = safeComp(DSForms, 'TextField');
   const SelectField = safeComp(DSForms, 'SelectField');
@@ -43,8 +40,6 @@
   // ── Icons ──────────────────────────────────────────────────────────────────
   const LucideIcons   = window.LucideIcons || {};
   const Save          = safeIcon(LucideIcons, 'Save');
-  const Trash2        = safeIcon(LucideIcons, 'Trash2');
-  const X             = safeIcon(LucideIcons, 'X');
   const Check         = safeIcon(LucideIcons, 'Check');
   const AlertTriangle = safeIcon(LucideIcons, 'AlertTriangle');
   const Send          = safeIcon(LucideIcons, 'Send');
@@ -55,7 +50,7 @@
   const PlayCircle    = safeIcon(LucideIcons, 'PlayCircle');
   const CheckSquare   = safeIcon(LucideIcons, 'CheckSquare');
 
-  // ── Shared constants (mirrored from RequestManagement.js) ─────────────────
+  // ── Shared constants ───────────────────────────────────────────────────────
   const REQUEST_TYPES = [
     { value: 'TRANSFER',   fa: 'انتقال',  en: 'Transfer'   },
     { value: 'CONVERSION', fa: 'تبدیل',   en: 'Conversion' },
@@ -74,9 +69,7 @@
     { value: 'CLOSED',      fa: 'بسته شده',     en: 'Closed',       color: 'gray'    },
   ];
 
-  const TYPES_WITH_GROUP = ['GENERAL', 'BUDGET'];
-  const lockedStatuses   = ['REGISTERED', 'REVIEWED', 'APPROVED', 'IN_PROGRESS', 'DONE', 'REJECTED', 'CLOSED'];
-
+  const lockedStatuses = ['REGISTERED', 'REVIEWED', 'APPROVED', 'IN_PROGRESS', 'DONE', 'REJECTED', 'CLOSED'];
   const getStatus = (v) => STATUS_LIST.find(s => s.value === v) || STATUS_LIST[0];
 
   const getSessionUserId = () => {
@@ -85,422 +78,6 @@
       return JSON.parse(s).id || null;
     } catch { return null; }
   };
-
-  const formatNumberSafe = (val, forDisplay = false) => {
-    if (val === null || val === undefined || val === '') return forDisplay ? '0' : '';
-    const s = String(val).replace(/,/g, '');
-    if (s.trim() === '' || isNaN(Number(s))) return forDisplay ? '0' : '';
-    const parts = s.split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return parts.join('.');
-  };
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // RequestItemsGrid  –  follows TransactionMainGrid.js DataGrid pattern exactly
-  // ════════════════════════════════════════════════════════════════════════════
-  const RequestItemsGrid = React.forwardRef(({
-    itemsData = [], onItemsChange, lookups = {}, requestType = 'GENERAL',
-    isReadOnly = false, language = 'fa', showToast, formCode = ''
-  }, ref) => {
-    const isRtl = language === 'fa';
-    const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
-    const [inlineItemEdit, setInlineItemEdit] = useState(null);
-    const showGroup = TYPES_WITH_GROUP.includes(requestType);
-
-    useImperativeHandle(ref, () => ({
-      cancelEdit: () => setInlineItemEdit(null),
-    }));
-
-    // ── local option lists (use t so labels honour language) ──────────────
-    const TX_ACTIONS = [
-      { value: 'DEPOSIT',    label: t('واریز',   'Deposit')    },
-      { value: 'WITHDRAWAL', label: t('برداشت',  'Withdrawal') },
-    ];
-    const TX_GROUPS = [
-      { value: 'COST',    label: t('هزینه',  'Cost')    },
-      { value: 'INCOME',  label: t('درآمد',  'Income')  },
-      { value: 'BALANCE', label: t('بالانس', 'Balance') },
-      { value: 'OTHER',   label: t('سایر',   'Other')   },
-    ];
-
-    // ── amount input handler ───────────────────────────────────────────────
-    const handleAmountChange = (e, field) => {
-      const raw = e.target.value.replace(/,/g, '');
-      if (raw === '' || !isNaN(raw))
-        setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, [field]: raw } }));
-    };
-
-    // ── add / edit / save / cancel / delete ────────────────────────────────
-    const handleAddItemClick = () => {
-      if (isReadOnly) return;
-      if (inlineItemEdit) return showToast(t('ابتدا با Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
-      setInlineItemEdit({
-        id: 'new',
-        data: {
-          row_number: itemsData.length + 1,
-          account_id: '', account_obj: null, currency: '',
-          transaction_action: 'DEPOSIT',
-          transaction_group: showGroup ? 'COST' : null,
-          cost_type_id: '', income_type_id: '',
-          deposit_amount: '0', withdrawal_amount: '0',
-          approved_amount: '0', remaining_amount: '0',
-          description: '',
-        },
-      });
-    };
-
-    const handleEditItemClick = (row) => {
-      if (isReadOnly || inlineItemEdit) return;
-      const accObj = (lookups.leafAccounts || []).find(a => String(a.id) === String(row.account_id)) || null;
-      setInlineItemEdit({
-        id: row._tempId || row.id,
-        data: {
-          ...row,
-          account_obj: accObj,
-          deposit_amount:    row.deposit_amount    != null ? String(row.deposit_amount)    : '0',
-          withdrawal_amount: row.withdrawal_amount != null ? String(row.withdrawal_amount) : '0',
-          approved_amount:   row.approved_amount   != null ? String(row.approved_amount)   : '0',
-          remaining_amount:  row.remaining_amount  != null ? String(row.remaining_amount)  : '0',
-        },
-      });
-    };
-
-    const handleSaveItemInline = () => {
-      if (!inlineItemEdit) return;
-      const form = inlineItemEdit.data;
-      const numDep = parseFloat(String(form.deposit_amount    || '0').replace(/,/g, '')) || 0;
-      const numWid = parseFloat(String(form.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-
-      if (numDep === 0 && numWid === 0)
-        return showToast(t('مبلغ واریز یا برداشت باید بزرگتر از صفر باشد.', 'Amount must be greater than zero.'), 'warning');
-
-      let newRowNum = parseInt(form.row_number, 10);
-      if (isNaN(newRowNum) || newRowNum < 1) newRowNum = itemsData.length + (inlineItemEdit.id === 'new' ? 1 : 0);
-
-      const dataToSave = {
-        ...form,
-        deposit_amount:    String(form.deposit_amount    || '0').replace(/,/g, ''),
-        withdrawal_amount: String(form.withdrawal_amount || '0').replace(/,/g, ''),
-      };
-      if (inlineItemEdit.id === 'new') dataToSave._tempId = crypto.randomUUID();
-
-      let otherItems = inlineItemEdit.id === 'new'
-        ? [...itemsData]
-        : itemsData.filter(i => i._tempId !== inlineItemEdit.id && i.id !== inlineItemEdit.id);
-
-      otherItems.sort((a, b) => a.row_number - b.row_number);
-      const idx = Math.min(Math.max(0, newRowNum - 1), otherItems.length);
-      otherItems.splice(idx, 0, dataToSave);
-
-      onItemsChange(otherItems.map((i, n) => ({ ...i, row_number: n + 1 })));
-      setInlineItemEdit(null);
-    };
-
-    const handleRemoveItem = (row) => {
-      if (isReadOnly) return;
-      const next = itemsData.filter(i => i._tempId !== row._tempId && i.id !== row.id);
-      onItemsChange(next.map((i, n) => ({ ...i, row_number: n + 1 })));
-    };
-
-    const handleBulkDeleteItems = (ids) => {
-      if (isReadOnly) return;
-      const next = itemsData.filter(i => !ids.includes(i.id) && !ids.includes(i._tempId));
-      onItemsChange(next.map((i, n) => ({ ...i, row_number: n + 1 })));
-      setInlineItemEdit(null);
-      showToast(t('اقلام انتخاب شده حذف شدند.', 'Selected items deleted.'));
-    };
-
-    const handleInlineKeyDown = (e) => {
-      if (e.key === 'Enter')  { e.preventDefault(); e.stopPropagation(); handleSaveItemInline(); }
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setInlineItemEdit(null); }
-    };
-
-    const isEditingRow = (row) =>
-      inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId);
-
-    // ── LOV column definitions ────────────────────────────────────────────
-    const accLovCols = [
-      { field: 'code',         header_fa: 'کد',      header_en: 'Code',  width: '90px'  },
-      { field: 'displayLabel', header_fa: 'عنوان',   header_en: 'Title', width: '200px',
-        render: (val, row) => (
-          <div className="flex flex-col">
-            <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-            {row.pathTitle && <span className="text-[10px] text-slate-500 truncate">{row.pathTitle}</span>}
-          </div>
-        )
-      },
-      { field: 'chart_name',   header_fa: 'ساختار',  header_en: 'Chart', width: '110px' },
-    ];
-
-    const typeLovCols = [
-      { field: 'code',         header_fa: 'کد',    header_en: 'Code',  width: '80px'  },
-      { field: 'displayLabel', header_fa: 'عنوان', header_en: 'Title', width: 'auto',
-        render: (val, row) => (
-          <div className="flex flex-col">
-            <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-            {row.pathTitle && <span className="text-[10px] text-slate-500 truncate">{row.pathTitle}</span>}
-          </div>
-        )
-      },
-    ];
-
-    // ── column definitions (same pattern as TransactionMainGrid) ──────────
-    const baseColumns = [
-      {
-        field: 'row_number', header_fa: '#', header_en: '#', width: '50px',
-        render: (val, row) => {
-          if (isEditingRow(row)) {
-            return (
-              <div id="grid-inline-edit-marker" onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}>
-                <TextField size="sm" type="number" min="1" dir="ltr"
-                  value={inlineItemEdit.data.row_number || ''}
-                  onChange={e => setInlineItemEdit(p => ({ ...p, data: { ...p.data, row_number: parseInt(e.target.value) || 1 } }))}
-                  isRtl={isRtl} wrapperClassName="m-0" />
-              </div>
-            );
-          }
-          return row._isNew
-            ? <span className="text-emerald-600 font-bold text-[12px]">*</span>
-            : <span className="text-[12px]">{val}</span>;
-        },
-      },
-      {
-        field: 'account_id', header_fa: 'حساب', header_en: 'Account', width: '200px',
-        render: (val, row) => {
-          if (isEditingRow(row)) {
-            return (
-              <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
-                <LOVField size="sm" formCode={formCode}
-                  data={lookups.leafAccounts || []} columns={accLovCols} dropdownWidth="min-w-[600px]"
-                  displayValue={
-                    inlineItemEdit.data.account_obj
-                      ? `${inlineItemEdit.data.account_obj.code ? inlineItemEdit.data.account_obj.code + ' - ' : ''}${inlineItemEdit.data.account_obj.displayLabel || ''}`
-                      : ''
-                  }
-                  onChange={r => {
-                    if (!r) {
-                      setInlineItemEdit(p => ({ ...p, data: { ...p.data, account_id: '', account_obj: null, currency: '' } }));
-                      return;
-                    }
-                    const curObj = (lookups.currencies || []).find(c => String(c.id) === String(r.currency_id));
-                    setInlineItemEdit(p => ({ ...p, data: { ...p.data, account_id: r.id, account_obj: r, currency: curObj ? curObj.code : '' } }));
-                  }}
-                  isRtl={isRtl} wrapperClassName="m-0"
-                />
-              </div>
-            );
-          }
-          const acc = (lookups.leafAccounts || []).find(a => String(a.id) === String(val));
-          return acc
-            ? <div className="flex flex-col"><span className="text-[12px] font-bold truncate">{acc.displayLabel}</span><span className="text-[10px] text-slate-400 font-mono">{acc.code}</span></div>
-            : <span className="text-[12px] text-slate-400">-</span>;
-        },
-      },
-      {
-        field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '65px',
-        render: (val, row) => {
-          if (isEditingRow(row)) {
-            return <div onClick={e => e.stopPropagation()}>
-              <TextField size="sm" value={inlineItemEdit.data.currency || ''} disabled isRtl={isRtl} dir="ltr" wrapperClassName="m-0" />
-            </div>;
-          }
-          return <span dir="ltr" className="text-[12px] font-mono">{val || '-'}</span>;
-        },
-      },
-      {
-        field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '90px',
-        render: (val, row) => {
-          if (isEditingRow(row)) {
-            return (
-              <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[90]">
-                <SelectField size="sm" formCode={formCode}
-                  options={TX_ACTIONS}
-                  value={inlineItemEdit.data.transaction_action || 'DEPOSIT'}
-                  onChange={e => {
-                    const action = e.target.value;
-                    setInlineItemEdit(p => ({
-                      ...p, data: {
-                        ...p.data, transaction_action: action,
-                        deposit_amount:    action === 'DEPOSIT'    ? p.data.deposit_amount    : '0',
-                        withdrawal_amount: action === 'WITHDRAWAL' ? p.data.withdrawal_amount : '0',
-                      }
-                    }));
-                  }}
-                  isRtl={isRtl} wrapperClassName="m-0" />
-              </div>
-            );
-          }
-          const isDeposit = val === 'DEPOSIT';
-          return <span className={`text-[12px] font-bold ${isDeposit ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-            {isRtl ? (isDeposit ? 'واریز' : 'برداشت') : (isDeposit ? 'Deposit' : 'Withdrawal')}
-          </span>;
-        },
-      },
-    ];
-
-    const groupColumns = [
-      {
-        field: 'transaction_group', header_fa: 'گروه', header_en: 'Group', width: '90px',
-        render: (val, row) => {
-          if (isEditingRow(row)) {
-            return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[80]">
-              <SelectField size="sm" formCode={formCode}
-                options={TX_GROUPS}
-                value={inlineItemEdit.data.transaction_group || 'COST'}
-                onChange={e => setInlineItemEdit(p => ({ ...p, data: { ...p.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: '' } }))}
-                isRtl={isRtl} wrapperClassName="m-0" />
-            </div>;
-          }
-          return <span className="text-[12px]">{TX_GROUPS.find(g => g.value === val)?.label || '-'}</span>;
-        },
-      },
-      {
-        field: 'sub_type', header_fa: 'نوع هزینه / درآمد', header_en: 'Cost / Income Type', width: '170px',
-        render: (_, row) => {
-          const group = isEditingRow(row) ? inlineItemEdit.data.transaction_group : row.transaction_group;
-          if (isEditingRow(row)) {
-            if (group === 'COST') {
-              return (
-                <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
-                  <LOVField size="sm" formCode={formCode}
-                    data={lookups.costTypes || []} columns={typeLovCols} dropdownWidth="min-w-[380px]"
-                    displayValue={(lookups.costTypes || []).find(c => String(c.id) === String(inlineItemEdit.data.cost_type_id))?.displayLabel || ''}
-                    onChange={r => setInlineItemEdit(p => ({ ...p, data: { ...p.data, cost_type_id: r ? r.id : '', income_type_id: '' } }))}
-                    isRtl={isRtl} wrapperClassName="m-0"
-                  />
-                </div>
-              );
-            }
-            if (group === 'INCOME') {
-              return (
-                <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[70]">
-                  <LOVField size="sm" formCode={formCode}
-                    data={lookups.incomeTypes || []} columns={typeLovCols} dropdownWidth="min-w-[380px]"
-                    displayValue={(lookups.incomeTypes || []).find(c => String(c.id) === String(inlineItemEdit.data.income_type_id))?.displayLabel || ''}
-                    onChange={r => setInlineItemEdit(p => ({ ...p, data: { ...p.data, income_type_id: r ? r.id : '', cost_type_id: '' } }))}
-                    isRtl={isRtl} wrapperClassName="m-0"
-                  />
-                </div>
-              );
-            }
-            return <div className="h-8 w-full bg-slate-100 dark:bg-slate-800 rounded opacity-40" />;
-          }
-          if (group === 'COST')   { const c = (lookups.costTypes   || []).find(x => String(x.id) === String(row.cost_type_id));   return <span className="text-[12px]">{c?.displayLabel || '-'}</span>; }
-          if (group === 'INCOME') { const c = (lookups.incomeTypes || []).find(x => String(x.id) === String(row.income_type_id)); return <span className="text-[12px]">{c?.displayLabel || '-'}</span>; }
-          return <span className="text-[12px]">-</span>;
-        },
-      },
-    ];
-
-    const amountColumns = [
-      {
-        field: 'deposit_amount', header_fa: 'واریز', header_en: 'Deposit', width: '110px',
-        render: (val, row) => {
-          const raw = row.deposit_amount !== undefined ? row.deposit_amount : val;
-          if (isEditingRow(row)) {
-            const disabled = inlineItemEdit.data.transaction_action !== 'DEPOSIT';
-            return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}>
-              <TextField size="sm" type="text" disabled={disabled}
-                value={formatNumberSafe(inlineItemEdit.data.deposit_amount)}
-                onChange={e => handleAmountChange(e, 'deposit_amount')}
-                isRtl={isRtl} dir="ltr" wrapperClassName="m-0" />
-            </div>;
-          }
-          return <span dir="ltr" className="block w-full text-right text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{formatNumberSafe(raw, true)}</span>;
-        },
-      },
-      {
-        field: 'withdrawal_amount', header_fa: 'برداشت', header_en: 'Withdrawal', width: '110px',
-        render: (val, row) => {
-          const raw = row.withdrawal_amount !== undefined ? row.withdrawal_amount : val;
-          if (isEditingRow(row)) {
-            const disabled = inlineItemEdit.data.transaction_action !== 'WITHDRAWAL';
-            return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}>
-              <TextField size="sm" type="text" disabled={disabled}
-                value={formatNumberSafe(inlineItemEdit.data.withdrawal_amount)}
-                onChange={e => handleAmountChange(e, 'withdrawal_amount')}
-                isRtl={isRtl} dir="ltr" wrapperClassName="m-0" />
-            </div>;
-          }
-          return <span dir="ltr" className="block w-full text-right text-[12px] font-medium text-rose-600 dark:text-rose-500">{formatNumberSafe(raw, true)}</span>;
-        },
-      },
-      {
-        field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto',
-        render: (val, row) => {
-          if (isEditingRow(row)) {
-            return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}>
-              <TextField size="sm"
-                value={inlineItemEdit.data.description || ''}
-                onChange={e => setInlineItemEdit(p => ({ ...p, data: { ...p.data, description: e.target.value } }))}
-                isRtl={isRtl} wrapperClassName="m-0" placeholder={t('Enter برای ثبت', 'Enter to save')} />
-            </div>;
-          }
-          return <span className="text-[12px] truncate">{val || '-'}</span>;
-        },
-      },
-    ];
-
-    const itemColumns = [
-      ...baseColumns,
-      ...(showGroup ? groupColumns : []),
-      ...amountColumns,
-    ];
-
-    const itemGridData = useMemo(() => {
-      const data = [...itemsData];
-      if (inlineItemEdit && inlineItemEdit.id === 'new')
-        data.unshift({ id: 'new', _isNew: true, ...inlineItemEdit.data });
-      return data;
-    }, [itemsData, inlineItemEdit]);
-
-    const rowActions = isReadOnly ? [] : [
-      {
-        icon: Save,
-        tooltip: t('ذخیره سطر', 'Save Row'),
-        className: 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/50',
-        hidden: (row) => !(inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
-        onClick: () => handleSaveItemInline(),
-      },
-      {
-        icon: X,
-        tooltip: t('انصراف', 'Cancel'),
-        className: 'text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/50',
-        hidden: (row) => !(inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
-        onClick: () => setInlineItemEdit(null),
-      },
-      {
-        icon: Trash2,
-        tooltip: t('حذف', 'Delete'),
-        className: 'text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/50',
-        hidden: (row) => !!(inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)),
-        onClick: (row) => handleRemoveItem(row),
-      },
-    ];
-
-    const itemBulkActions = isReadOnly ? [] : [
-      { label: t('حذف گروهی', 'Bulk Delete'), icon: Trash2, variant: 'danger-outline', onClick: handleBulkDeleteItems },
-    ];
-
-    return (
-      <DataGrid
-        data={itemGridData}
-        columns={itemColumns}
-        actionWidth="80px"
-        language={language}
-        onAdd={isReadOnly ? undefined : handleAddItemClick}
-        hideImport={true}
-        hideExport={true}
-        hideToolbar={true}
-        selectable={!isReadOnly}
-        bulkActions={itemBulkActions}
-        onRowDoubleClick={(row) => handleEditItemClick(row)}
-        actions={rowActions}
-        className="h-full border-0"
-        formCode={formCode}
-      />
-    );
-  });
 
   // ════════════════════════════════════════════════════════════════════════════
   // RequestFormModal
@@ -515,9 +92,12 @@
 
     const calendarMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : 'jalali';
 
-    const currentUserObj = window.NavigationSystem?.currentUser || {};
-    const currentUserId  = getSessionUserId() || currentUserObj.id || null;
+    const currentUserObj  = window.NavigationSystem?.currentUser || {};
+    const currentUserId   = getSessionUserId() || currentUserObj.id || null;
     const currentUserName = currentUserObj.name || currentUserObj.full_name || currentUserObj.username || '';
+
+    // RequestItemsGrid registered by RequestItemsGrid.js (loaded before this)
+    const RequestItemsGrid = safeComp(window, 'RequestItemsGrid');
 
     const secCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
     const access = useMemo(() => {
@@ -525,19 +105,19 @@
       return a || { canView: true, canCreate: true, canEdit: true, canDelete: true };
     }, [secCtx, formCode]);
 
-    const [toast, setToast]   = useState({ isVisible: false, message: '', type: 'success' });
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const showToast = useCallback((msg, type = 'success') => {
       setToast({ isVisible: true, message: msg, type });
       setTimeout(() => setToast(p => ({ ...p, isVisible: false })), 3500);
     }, []);
 
-    const [isLoading, setIsLoading] = useState(false);
-    const [isDirty,   setIsDirty]   = useState(false);
-    const [hasSaved,  setHasSaved]  = useState(false);
+    const [isLoading,   setIsLoading]   = useState(false);
+    const [isDirty,     setIsDirty]     = useState(false);
+    const [hasSaved,    setHasSaved]    = useState(false);
     const [copyWarning, setCopyWarning] = useState(null);
-    const [header,    setHeader]    = useState({});
-    const [items,     setItems]     = useState([]);
-    const [lookups,   setLookups]   = useState({
+    const [header,      setHeader]      = useState({});
+    const [items,       setItems]       = useState([]);
+    const [lookups,     setLookups]     = useState({
       leafAccounts: [], allAccounts: [], costTypes: [], incomeTypes: [],
       currencies: [], usersMap: {}, usersList: [], partiesMap: {},
       nodesMap: {}, currentUserDeptId: null, currentUserDeptTitle: '',
@@ -548,7 +128,7 @@
     const initialized = useRef(false);
 
     const isReadOnly = useMemo(
-      () => formMode !== 'CREATE' && lockedStatuses.includes(header.status || ''),
+      () => formMode !== 'CREATE' && formMode !== 'COPY' && lockedStatuses.includes(header.status || ''),
       [formMode, header.status]
     );
 
@@ -646,7 +226,6 @@
       fetchDeps().then(async (lk) => {
         if (!lk) return;
 
-        // generate a new code for both CREATE and COPY
         const needNewCode = formMode === 'CREATE' || formMode === 'COPY';
         let code = '';
         if (needNewCode) {
@@ -663,17 +242,17 @@
 
         if (formMode === 'CREATE') {
           setHeader({
-            request_code:     code,
-            registrar_id:     currentUserId,
+            request_code:      code,
+            registrar_id:      currentUserId,
             requester_party_id: lk.currentUserPartyId,
             requester_display: lk.currentUserPartyName || lk.usersMap[currentUserId] || currentUserName,
-            department_id:    lk.currentUserDeptId,
-            department_title: lk.currentUserDeptTitle,
-            created_at:       new Date().toISOString(),
-            need_date:        '',
-            request_type:     'GENERAL',
-            description:      '',
-            status:           'DRAFT',
+            department_id:     lk.currentUserDeptId,
+            department_title:  lk.currentUserDeptTitle,
+            created_at:        new Date().toISOString(),
+            need_date:         '',
+            request_type:      'GENERAL',
+            description:       '',
+            status:            'DRAFT',
           });
           setItems([]);
           setIsDirty(false);
@@ -686,24 +265,23 @@
           ));
           setHeader({
             ...initialRecord,
-            id:                undefined,       // new record
-            request_code:      code,
-            status:            'DRAFT',
-            registrar_id:      currentUserId,
+            id:                 undefined,
+            request_code:       code,
+            status:             'DRAFT',
+            registrar_id:       currentUserId,
             requester_party_id: lk.currentUserPartyId,
             requester_display:  lk.currentUserPartyName || lk.usersMap[currentUserId] || currentUserName,
-            department_id:     lk.currentUserDeptId,
-            department_title:  lk.currentUserDeptTitle,
-            created_at:        new Date().toISOString(),
-            need_date:         '',
-            // clear reviewer/approver metadata
+            department_id:      lk.currentUserDeptId,
+            department_title:   lk.currentUserDeptTitle,
+            created_at:         new Date().toISOString(),
+            need_date:          '',
             reviewer_id: null, reviewer_name: null, reviewed_at: null,
             approver_id: null, approver_name: null, approved_at: null,
           });
           const mapped = (initialRecord.req_request_items || []).map(item => ({
             ...item,
             _tempId:           crypto.randomUUID(),
-            id:                undefined,       // new items
+            id:                undefined,
             request_id:        undefined,
             deposit_amount:    item.deposit_amount    != null ? parseFloat(item.deposit_amount)    : 0,
             withdrawal_amount: item.withdrawal_amount != null ? parseFloat(item.withdrawal_amount) : 0,
@@ -711,7 +289,7 @@
             remaining_amount:  0,
           })).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
           setItems(mapped);
-          setIsDirty(true);   // dirty so save always persists items
+          setIsDirty(true);
           setHasSaved(false);
 
         } else if (formMode === 'EDIT' && initialRecord) {
@@ -742,7 +320,7 @@
       setIsDirty(true);
     }, []);
 
-    // ── save / status transitions ────────────────────────────────────────
+    // ── save ─────────────────────────────────────────────────────────────
     const handleSave = async (overrideStatus) => {
       const statusToSave = typeof overrideStatus === 'string' ? overrideStatus : header.status;
 
@@ -754,7 +332,7 @@
 
       setIsLoading(true);
       try {
-        const now      = new Date().toISOString();
+        const now       = new Date().toISOString();
         const actorId   = currentUserId;
         const actorName = actorId ? (lookups.usersMap[actorId] || currentUserName) : currentUserName;
 
@@ -767,14 +345,14 @@
           Object.assign(metaPayload, { reviewer_id: null, reviewed_at: null, reviewer_name: null });
 
         const payload = {
-          request_code:      header.request_code,
-          registrar_id:      header.registrar_id || currentUserId || null,
+          request_code:       header.request_code,
+          registrar_id:       header.registrar_id || currentUserId || null,
           requester_party_id: header.requester_party_id || null,
-          department_id:     header.department_id || null,
-          need_date:         header.need_date || null,
-          request_type:      header.request_type || 'GENERAL',
-          description:       header.description || '',
-          status:            statusToSave,
+          department_id:      header.department_id || null,
+          need_date:          header.need_date || null,
+          request_type:       header.request_type || 'GENERAL',
+          description:        header.description || '',
+          status:             statusToSave,
           ...metaPayload,
         };
 
@@ -793,25 +371,24 @@
           if (error) throw error;
         }
 
-        // persist items when dirty or it's a new record
         if (isDirty || !header.id) {
           await supabase.from('req_request_items').delete().eq('request_id', reqId);
           if (items.length > 0) {
             const parse = v => parseFloat(String(v || '0').replace(/,/g, '')) || 0;
             const itemsPayload = items.map((item, idx) => ({
-              request_id:        reqId,
-              row_number:        idx + 1,
-              account_id:        item.account_id        || null,
-              currency:          item.currency          || null,
+              request_id:         reqId,
+              row_number:         idx + 1,
+              account_id:         item.account_id         || null,
+              currency:           item.currency           || null,
               transaction_action: item.transaction_action || 'DEPOSIT',
-              transaction_group: item.transaction_group || null,
-              cost_type_id:      item.cost_type_id      || null,
-              income_type_id:    item.income_type_id    || null,
-              deposit_amount:    parse(item.deposit_amount),
-              withdrawal_amount: parse(item.withdrawal_amount),
-              approved_amount:   parse(item.approved_amount),
-              remaining_amount:  parse(item.remaining_amount),
-              description:       item.description || null,
+              transaction_group:  item.transaction_group  || null,
+              cost_type_id:       item.cost_type_id       || null,
+              income_type_id:     item.income_type_id     || null,
+              deposit_amount:     parse(item.deposit_amount),
+              withdrawal_amount:  parse(item.withdrawal_amount),
+              approved_amount:    parse(item.approved_amount),
+              remaining_amount:   parse(item.remaining_amount),
+              description:        item.description || null,
             }));
             const { data: savedItems, error: iErr } = await supabase.from('req_request_items').insert(itemsPayload).select();
             if (iErr) throw iErr;
@@ -935,7 +512,6 @@
         <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
           <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
 
-            {/* Copy warning banner */}
             {copyWarning && (
               <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-center gap-2 shrink-0 animate-in slide-in-from-top-2">
                 <AlertTriangle size={16} className="shrink-0" />
@@ -943,7 +519,6 @@
               </div>
             )}
 
-            {/* Header Card */}
             <Card title={headerCardTitle} action={statusActions}
               isCollapsible={true} noPadding={true}
               className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 relative z-20"
@@ -1005,7 +580,6 @@
               </div>
             </Card>
 
-            {/* Items Card */}
             <Card title={t('اقلام درخواست', 'Request Items')}
               isCollapsible={true} noPadding={true}
               className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[320px] relative z-10"
@@ -1028,7 +602,6 @@
 
           </div>
 
-          {/* Footer */}
           <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
             <Button variant="outline" size="sm" onClick={handleClose}>{t('بستن', 'Close')}</Button>
             {!isReadOnly && access.canEdit && (
