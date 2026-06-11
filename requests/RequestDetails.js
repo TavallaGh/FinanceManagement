@@ -558,12 +558,6 @@
                   )}
                 </div>
 
-                <div className="lg:col-span-3 relative z-[70]">
-                  <TextField size="sm" label={t('شرح درخواست', 'Description')}
-                    value={header.description || ''} onChange={e => updateHeader('description', e.target.value)}
-                    isRtl={isRtl} disabled={isReadOnly} required />
-                </div>
-
                 {(header.reviewer_id || header.reviewer_name) && (<>
                   <TextField size="sm" label={t('بررسی کننده', 'Reviewed By')}
                     value={header.reviewer_name || lookups.usersMap[header.reviewer_id] || '-'} disabled isRtl={isRtl} />
@@ -577,6 +571,12 @@
                   <TextField size="sm" label={t('تاریخ تایید', 'Approved At')}
                     value={fmtDT(header.approved_at)} disabled isRtl={isRtl} />
                 </>)}
+
+                <div className="lg:col-span-5 md:col-span-2 relative z-[70]">
+                  <TextField size="sm" label={t('شرح درخواست', 'Description')}
+                    value={header.description || ''} onChange={e => updateHeader('description', e.target.value)}
+                    isRtl={isRtl} disabled={isReadOnly} required />
+                </div>
               </div>
             </Card>
 
