@@ -464,7 +464,7 @@
   // ════════════════════════════════════════════════════════════════════════════
   const RequestFormModal = ({
     isOpen, onClose, onSuccess, formMode = 'CREATE', initialRecord = null,
-    language = 'fa', formCode = 'REQ_REQUEST_MNGMT', showToast
+    language = 'fa', formCode = 'REQ_REQUEST_MNGMT'
   }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
