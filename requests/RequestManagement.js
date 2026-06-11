@@ -36,11 +36,13 @@
   const Modal      = safeComp(DSFeedback, 'Modal');
   const Toast      = safeComp(DSFeedback, 'Toast');
 
-  const LucideIcons   = window.LucideIcons || {};
-  const ClipboardList = safeIcon(LucideIcons, 'ClipboardList');
-  const Edit          = safeIcon(LucideIcons, 'Edit');
-  const Trash2        = safeIcon(LucideIcons, 'Trash2');
-  const AlertTriangle = safeIcon(LucideIcons, 'AlertTriangle');
+  const LucideIcons    = window.LucideIcons || {};
+  const ClipboardList  = safeIcon(LucideIcons, 'ClipboardList');
+  const Edit           = safeIcon(LucideIcons, 'Edit');
+  const Trash2         = safeIcon(LucideIcons, 'Trash2');
+  const AlertTriangle  = safeIcon(LucideIcons, 'AlertTriangle');
+  const MessageSquare  = safeIcon(LucideIcons, 'MessageSquare');
+  const Copy           = safeIcon(LucideIcons, 'Copy');
 
   const REQUEST_TYPES = [
     { value: 'TRANSFER',   fa: 'انتقال',  en: 'Transfer'   },
@@ -97,8 +99,10 @@
     const [filters,     setFilters]     = useState({});
     const [gridState,   setGridState]   = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
-    const [formModal,   setFormModal]   = useState({ isOpen: false, mode: 'CREATE', record: null });
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
+    const [formModal,        setFormModal]        = useState({ isOpen: false, mode: 'CREATE', record: null });
+    const [deleteConfirm,    setDeleteConfirm]    = useState({ isOpen: false, type: null, data: null });
+    const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
+    const [commentedIds,     setCommentedIds]     = useState(new Set());
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
 
     const showToast = useCallback((msg, type = 'success') => {
@@ -136,6 +140,17 @@
           r.status !== 'DRAFT' || String(r.registrar_id) === String(currentUserId)
         );
         setRequests(visible);
+
+        // fetch which requests have at least one comment
+        if (visible.length > 0) {
+          const reqIds = visible.map(r => String(r.id));
+          const { data: commentRows } = await supabase
+            .from('sys_comments')
+            .select('entity_id')
+            .eq('entity_type', 'REQUEST_MANAGEMENT')
+            .in('entity_id', reqIds);
+          if (commentRows) setCommentedIds(new Set(commentRows.map(c => c.entity_id)));
+        }
       } catch {
         showToast(t('خطا در دریافت درخواست‌ها', 'Error loading requests'), 'error');
       } finally {
@@ -262,6 +277,19 @@
               onRowDoubleClick={row => setFormModal({ isOpen: true, mode: 'EDIT', record: row })}
               actions={[
                 {
+                  icon: MessageSquare,
+                  tooltip: t('کامنت‌ها', 'Comments'),
+                  onClick: row => setCommentModalState({ isOpen: true, record: row }),
+                  className: row => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600',
+                },
+                {
+                  icon: Copy,
+                  tooltip: t('کپی درخواست', 'Copy Request'),
+                  onClick: row => setFormModal({ isOpen: true, mode: 'COPY', record: row }),
+                  requiredAccess: 'create',
+                  className: 'text-emerald-600 hover:text-emerald-700',
+                },
+                {
                   icon: Edit, tooltip: t('مشاهده / ویرایش', 'View / Edit'),
                   onClick: row => setFormModal({ isOpen: true, mode: 'EDIT', record: row }),
                   className: 'text-slate-400 hover:text-indigo-600',
@@ -315,6 +343,19 @@
             }
           />
         </Modal>
+
+        {(() => { const { CommentModal } = window.DSComments || {}; return CommentModal && commentModalState.isOpen ? (
+          <CommentModal
+            isOpen={commentModalState.isOpen}
+            onClose={() => { setCommentModalState({ isOpen: false, record: null }); fetchData(); }}
+            entityType="REQUEST_MANAGEMENT"
+            entityId={commentModalState.record ? String(commentModalState.record.id) : ''}
+            entityTitle={commentModalState.record ? `${t('کد:', 'Code:')} ${commentModalState.record.request_code || '-'}  |  ${t('شرح:', 'Desc:')} ${commentModalState.record.description || '-'}` : ''}
+            formTitle={t('مدیریت درخواست‌ها', 'Request Management')}
+            formComponent="RequestManagement"
+            language={language}
+          />
+        ) : null; })()}
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type}
           onClose={() => setToast(p => ({ ...p, isVisible: false }))} />

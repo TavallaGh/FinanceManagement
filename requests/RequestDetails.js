@@ -534,6 +534,7 @@
     const [isLoading, setIsLoading] = useState(false);
     const [isDirty,   setIsDirty]   = useState(false);
     const [hasSaved,  setHasSaved]  = useState(false);
+    const [copyWarning, setCopyWarning] = useState(null);
     const [header,    setHeader]    = useState({});
     const [items,     setItems]     = useState([]);
     const [lookups,   setLookups]   = useState({
@@ -638,15 +639,17 @@
     }, [supabase, isRtl, currentUserId, showToast, t]);
 
     useEffect(() => {
-      if (!isOpen) { initialized.current = false; setHasSaved(false); return; }
+      if (!isOpen) { initialized.current = false; setHasSaved(false); setCopyWarning(null); return; }
       if (initialized.current) return;
       initialized.current = true;
 
       fetchDeps().then(async (lk) => {
         if (!lk) return;
 
-        if (formMode === 'CREATE') {
-          let code = '';
+        // generate a new code for both CREATE and COPY
+        const needNewCode = formMode === 'CREATE' || formMode === 'COPY';
+        let code = '';
+        if (needNewCode) {
           if (window.AutoNumberingService) {
             try {
               const preview = await window.AutoNumberingService.previewNext('REQUESTS');
@@ -654,7 +657,11 @@
             } catch {}
           }
           if (!code) code = `REQ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+        }
 
+        setCopyWarning(null);
+
+        if (formMode === 'CREATE') {
           setHeader({
             request_code:     code,
             registrar_id:     currentUserId,
@@ -670,6 +677,41 @@
           });
           setItems([]);
           setIsDirty(false);
+          setHasSaved(false);
+
+        } else if (formMode === 'COPY' && initialRecord) {
+          setCopyWarning(t(
+            `هشدار: این درخواست کپی از درخواست ${initialRecord.request_code} می‌باشد و نیازمند بررسی و تغییرات است.`,
+            `Warning: This is a copy of request ${initialRecord.request_code} and requires review.`
+          ));
+          setHeader({
+            ...initialRecord,
+            id:                undefined,       // new record
+            request_code:      code,
+            status:            'DRAFT',
+            registrar_id:      currentUserId,
+            requester_party_id: lk.currentUserPartyId,
+            requester_display:  lk.currentUserPartyName || lk.usersMap[currentUserId] || currentUserName,
+            department_id:     lk.currentUserDeptId,
+            department_title:  lk.currentUserDeptTitle,
+            created_at:        new Date().toISOString(),
+            need_date:         '',
+            // clear reviewer/approver metadata
+            reviewer_id: null, reviewer_name: null, reviewed_at: null,
+            approver_id: null, approver_name: null, approved_at: null,
+          });
+          const mapped = (initialRecord.req_request_items || []).map(item => ({
+            ...item,
+            _tempId:           crypto.randomUUID(),
+            id:                undefined,       // new items
+            request_id:        undefined,
+            deposit_amount:    item.deposit_amount    != null ? parseFloat(item.deposit_amount)    : 0,
+            withdrawal_amount: item.withdrawal_amount != null ? parseFloat(item.withdrawal_amount) : 0,
+            approved_amount:   0,
+            remaining_amount:  0,
+          })).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
+          setItems(mapped);
+          setIsDirty(true);   // dirty so save always persists items
           setHasSaved(false);
 
         } else if (formMode === 'EDIT' && initialRecord) {
@@ -884,10 +926,22 @@
 
     return (
       <Modal isOpen={isOpen} onClose={handleClose}
-        title={formMode === 'CREATE' ? t('ثبت درخواست جدید', 'New Request') : t('مشاهده / ویرایش درخواست', 'View / Edit Request')}
+        title={
+          formMode === 'CREATE' ? t('ثبت درخواست جدید', 'New Request') :
+          formMode === 'COPY'   ? t('کپی درخواست', 'Copy Request') :
+          t('مشاهده / ویرایش درخواست', 'View / Edit Request')
+        }
         language={language} width="max-w-6xl">
         <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
           <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
+
+            {/* Copy warning banner */}
+            {copyWarning && (
+              <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-center gap-2 shrink-0 animate-in slide-in-from-top-2">
+                <AlertTriangle size={16} className="shrink-0" />
+                <span className="text-[12px] font-bold">{copyWarning}</span>
+              </div>
+            )}
 
             {/* Header Card */}
             <Card title={headerCardTitle} action={statusActions}
