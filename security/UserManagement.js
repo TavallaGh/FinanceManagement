@@ -4,7 +4,7 @@
   const { useState, useEffect, useMemo, useCallback } = React;
   
   const { 
-    Button, PageHeader, Modal, AdvancedFilter, DataGrid, 
+    Button, PageHeader, Modal, AdvancedFilter, DataGrid, LOVField,
     TextField, SelectField, ToggleField, Badge, CheckboxField, EmptyState
   } = window.DesignSystem || window.DSCore || {};
   
@@ -21,7 +21,17 @@
     
     const [data, setData] = useState([]);
     const [allParties, setAllParties] = useState([]);
-    const [partiesDropdown, setPartiesDropdown] = useState([]);
+
+    const partiesDropdown = useMemo(() => {
+      const sysUsers = allParties.filter(p => p.roles && p.roles.includes('system_user') && p.is_active === true);
+      return sysUsers.map(p => ({
+        id: p.id,
+        code: p.code || '',
+        title: p.party_type === 'legal' ? (p.company_name || '') : `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        email: p.email || '',
+        mobile: p.mobile || ''
+      }));
+    }, [allParties]);
     
     const [roles, setRoles] = useState([]);
     const [userRoles, setUserRoles] = useState([]);
@@ -103,7 +113,7 @@
           { data: permsData },
           { data: menusData }
         ] = await Promise.all([
-          supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, roles, mobile, email'),
+          supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, roles, mobile, email, is_active'),
           supabase.from('sec_users').select('*').order('created_at', { ascending: false }),
           supabase.from('sec_roles').select('*'),
           supabase.from('sec_user_roles').select('*'),
@@ -113,13 +123,6 @@
           
         if (pData && !pError) {
           setAllParties(pData);
-          const sysUsers = pData.filter(p => p.roles && p.roles.includes('system_user'));
-          setPartiesDropdown(sysUsers.map(p => ({
-            id: p.id,
-            label: `${p.party_type === 'legal' ? (p.company_name || '') : ((p.first_name || '') + ' ' + (p.last_name || '')).trim()} (${p.code})`,
-            mobile: p.mobile,
-            email: p.email
-          })));
         }
 
         if (uError) throw uError;
@@ -231,19 +234,7 @@
            return;
         }
 
-        const partyLabel = `${newPartyData.first_name} ${newPartyData.last_name} (${newPartyData.code})`;
-        const newDropdownItem = {
-          id: newPartyData.id,
-          label: partyLabel,
-          mobile: newPartyData.mobile,
-          email: newPartyData.email
-        };
-
         setAllParties(prev => [...prev, newPartyData]);
-        
-        if (newPartyData.roles && newPartyData.roles.includes('system_user')) {
-            setPartiesDropdown(prev => [...prev, newDropdownItem]);
-        }
 
         setFormData(prev => ({
           ...prev,
@@ -333,15 +324,16 @@
       setIsModalOpen(true);
     };
 
-    const handlePartyChange = (e) => {
-      const selectedId = e.target.value;
-      const selectedParty = partiesDropdown.find(p => p.id === selectedId);
-      
+    const handlePartyLOVChange = (row) => {
+      if (!row) {
+        setFormData(prev => ({ ...prev, partyId: '', mobile: '', email: '' }));
+        return;
+      }
       setFormData(prev => ({
         ...prev,
-        partyId: selectedId,
-        mobile: selectedParty?.mobile || '',
-        email: selectedParty?.email || ''
+        partyId: row.id,
+        mobile: row.mobile || '',
+        email: row.email || ''
       }));
     };
 
@@ -471,12 +463,13 @@
         name: 'party', 
         label: t('شخص متصل', 'Linked Party'), 
         type: 'lov', 
-        lovData: partiesDropdown.map(p => ({ ...p, label: p.label })), 
+        lovData: partiesDropdown.map(p => ({ ...p, label: `${p.title} (${p.code})` })), 
         lovColumns: [
-          { field: 'label', header_fa: 'نام و کد', header_en: 'Name & Code', width: '250px' },
+          { field: 'code', header_fa: 'کد', header_en: 'Code', width: '100px' },
+          { field: 'title', header_fa: 'عنوان', header_en: 'Title', width: '200px' },
           { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '130px' }
         ],
-        dropdownWidth: 'min-w-[400px]'
+        dropdownWidth: 'min-w-[450px]'
       },
       { 
         name: 'accessType', 
@@ -615,17 +608,21 @@
 
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <SelectField 
-                    size="sm" 
-                    label={t('اتصال به شخص / پرسنل', 'Link to Party')} 
-                    value={formData.partyId} 
-                    onChange={handlePartyChange} 
-                    isRtl={isRtl}
-                    required
-                    options={[
-                      { value: '', label: `-- ${t('انتخاب کنید', 'Select')} --` },
-                      ...partiesDropdown.map(p => ({ value: p.id, label: p.label }))
+                  <LOVField
+                    size="sm"
+                    label={t('اتصال به شخص / پرسنل', 'Link to Party')}
+                    displayValue={formData.partyId ? (() => { const p = partiesDropdown.find(x => x.id === formData.partyId); return p ? `${p.title} (${p.code})` : ''; })() : ''}
+                    onChange={handlePartyLOVChange}
+                    data={partiesDropdown}
+                    columns={[
+                      { field: 'code', header_fa: 'کد', header_en: 'Code', width: '25%' },
+                      { field: 'title', header_fa: 'عنوان', header_en: 'Title', width: '25%' },
+                      { field: 'email', header_fa: 'ایمیل', header_en: 'Email', width: '25%' },
+                      { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '25%' }
                     ]}
+                    required
+                    isRtl={isRtl}
+                    dropdownWidth="min-w-[520px] max-w-[700px]"
                   />
                 </div>
                 <Button 

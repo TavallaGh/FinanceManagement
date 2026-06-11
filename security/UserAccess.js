@@ -228,7 +228,14 @@
             }
         });
 
-        return Array.from(map.values());
+        const result = Array.from(map.values());
+        return result.sort((a, b) => {
+            const aTemp = String(a.id).startsWith('temp_');
+            const bTemp = String(b.id).startsWith('temp_');
+            if (aTemp && !bTemp) return -1;
+            if (!aTemp && bTemp) return 1;
+            return 0;
+        });
     }, [assignedRoles, directPerms, allSystemForms, globalRolePerms, allRoles, t]);
 
     const currentDetailRow = useMemo(() => {

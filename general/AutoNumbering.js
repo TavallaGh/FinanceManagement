@@ -1,4 +1,4 @@
-/* Filename: financial/AutoNumbering.js */
+/* Filename: general/AutoNumbering.js */
 (() => {
   if (!window.AutoNumberingService) {
     window.AutoNumberingService = {
