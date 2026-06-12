@@ -180,14 +180,29 @@
                     targetIds.forEach(id => {
                         const menuObj = menusData.find(m => m.id === id);
                         if (menuObj) {
-                            const availActions = typeof menuObj.available_actions === 'string' 
-                                ? JSON.parse(menuObj.available_actions || '[]') 
+                            // عملیات: نرمال‌سازی به کدهای انگلیسی و حذف تکراری
+                            const rawActions = typeof menuObj.available_actions === 'string'
+                                ? JSON.parse(menuObj.available_actions || '[]')
                                 : (menuObj.available_actions || []);
-                                
+                            const normalizedActions = [...new Set(rawActions.map(a =>
+                                PERSIAN_TO_CODE[String(a).trim()] || String(a).toLowerCase().trim()
+                            ))];
+
+                            // دسترسی داده: همه option ها را انتخاب کن
+                            const rawScopes = typeof menuObj.available_scopes === 'string'
+                                ? JSON.parse(menuObj.available_scopes || 'null')
+                                : menuObj.available_scopes;
+                            const fullScopes = {};
+                            if (rawScopes && !Array.isArray(rawScopes) && typeof rawScopes === 'object') {
+                                Object.entries(rawScopes).forEach(([key, def]) => {
+                                    fullScopes[key] = (def.options || []).map(o => o.value);
+                                });
+                            }
+
                             nextPerms[id] = {
                                 id: prev[id]?.id || null,
-                                actions: [...availActions],
-                                scopes: prev[id]?.scopes || {}
+                                actions: normalizedActions,
+                                scopes: fullScopes
                             };
                         }
                     });
@@ -378,22 +393,27 @@
                                             {t('هیچ عملیات خاصی برای این فرم در دیتابیس تعریف نشده است.', 'No specific actions defined for this form in the database.')}
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                                             {availActions.map(actionId => {
                                                 const isChecked = (tempPermissions[selectedMenu.id]?.actions || []).some(a => (PERSIAN_TO_CODE[String(a).trim()] || String(a).toLowerCase().trim()) === actionId);
                                                 const labelObj = actionDictionary[actionId] || LOCAL_ACTION_LABELS[actionId];
                                                 const displayLabel = labelObj ? labelObj[isRtl ? 'fa' : 'en'] : actionId;
-                                                
                                                 return (
-                                                    <div key={actionId} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-2 rounded-xl">
-                                                        <CheckboxField
-                                                            label={displayLabel}
-                                                            checked={isChecked}
-                                                            onChange={() => toggleAction(actionId)}
-                                                            isRtl={isRtl}
-                                                        />
-                                                    </div>
-                                                )
+                                                    <button
+                                                        key={actionId}
+                                                        type="button"
+                                                        onClick={() => toggleAction(actionId)}
+                                                        className={[
+                                                            'w-full inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-all duration-150 select-none cursor-pointer',
+                                                            isChecked
+                                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-600 dark:hover:text-indigo-400'
+                                                        ].join(' ')}
+                                                    >
+                                                        {isChecked && React.createElement(Check, { size: 11, className: 'shrink-0' })}
+                                                        {displayLabel}
+                                                    </button>
+                                                );
                                             })}
                                         </div>
                                     )}
@@ -409,20 +429,19 @@
                                             {t('در صورت عدم انتخاب هیچ گزینه‌ای در یک بخش، کاربر به تمامی داده‌های آن بخش دسترسی خواهد داشت.', 'If no options are selected, the user will have access to all data in that scope.')}
                                         </div>
                                         
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-5">
                                             {availScopeKeys.map(scopeKey => {
                                                 const scopeDef = isNewScopeFormat ? availScopesRaw[scopeKey] : null;
                                                 const displayLabel = scopeDef
                                                     ? (isRtl ? (scopeDef.label_fa || scopeKey) : (scopeDef.label_en || scopeKey))
                                                     : (SCOPE_DICT[scopeKey] ? SCOPE_DICT[scopeKey][isRtl ? 'fa' : 'en'] : scopeKey);
                                                 const itemsList = scopeDef ? (scopeDef.options || []) : (scopesData[scopeKey] || []);
-                                                
                                                 return (
-                                                    <div key={scopeKey} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col shadow-sm">
-                                                        <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-[11px] font-black text-slate-700 dark:text-slate-300">
+                                                    <div key={scopeKey}>
+                                                        <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                                                             {displayLabel}
                                                         </div>
-                                                        <div className="p-3 grid grid-cols-1 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                                             {itemsList.length > 0 ? itemsList.map(item => {
                                                                 const itemValue = scopeDef ? item.value : item.id;
                                                                 const itemLabel = scopeDef
@@ -430,21 +449,27 @@
                                                                     : item.title;
                                                                 const isSelected = tempPermissions[selectedMenu.id]?.scopes?.[scopeKey]?.includes(itemValue);
                                                                 return (
-                                                                    <div key={itemValue} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-2 py-1.5 rounded-lg">
-                                                                        <CheckboxField
-                                                                            label={itemLabel}
-                                                                            checked={isSelected}
-                                                                            onChange={() => toggleScope(scopeKey, itemValue)}
-                                                                            isRtl={isRtl}
-                                                                        />
-                                                                    </div>
-                                                                )
+                                                                    <button
+                                                                        key={itemValue}
+                                                                        type="button"
+                                                                        onClick={() => toggleScope(scopeKey, itemValue)}
+                                                                        className={[
+                                                                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all duration-150 select-none cursor-pointer',
+                                                                            isSelected
+                                                                                ? 'bg-teal-600 border-teal-600 text-white shadow-sm shadow-teal-200 dark:shadow-teal-900'
+                                                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-teal-300 dark:hover:border-teal-700 hover:text-teal-600 dark:hover:text-teal-400'
+                                                                        ].join(' ')}
+                                                                    >
+                                                                        {isSelected && React.createElement(Check, { size: 11, className: 'shrink-0' })}
+                                                                        {itemLabel}
+                                                                    </button>
+                                                                );
                                                             }) : (
                                                                 <span className="text-[10px] text-slate-400 italic">{t('داده‌ای یافت نشد.', 'No data found.')}</span>
                                                             )}
                                                         </div>
                                                     </div>
-                                                )
+                                                );
                                             })}
                                         </div>
                                     </div>
