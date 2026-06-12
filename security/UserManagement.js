@@ -151,6 +151,10 @@
       if (!formData.username || !formData.partyId) {
         return;
       }
+      if (!formData.mobile || !formData.email) {
+        alert(t('وارد کردن موبایل و آدرس ایمیل الزامی است.', 'Mobile and email are required.'));
+        return;
+      }
       if (!currentRecord && !formData.password) return;
 
       setIsLoading(true);
@@ -653,7 +657,8 @@
                 value={formData.mobile} 
                 onChange={e => setFormData({...formData, mobile: e.target.value})} 
                 isRtl={isRtl} 
-                dir="ltr" 
+                dir="ltr"
+                required
               />
               <TextField 
                 size="sm" 
@@ -661,7 +666,8 @@
                 value={formData.email} 
                 onChange={e => setFormData({...formData, email: e.target.value})} 
                 isRtl={isRtl} 
-                dir="ltr" 
+                dir="ltr"
+                required
               />
 
               <div className="md:col-span-2 flex items-center mt-2">
