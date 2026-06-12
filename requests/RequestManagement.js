@@ -119,6 +119,62 @@
       setTimeout(() => setToast(p => ({ ...p, isVisible: false })), 3000);
     }, []);
 
+    const fetchMeta = useCallback(async () => {
+      try {
+        const [uRes, pRes, nRes] = await Promise.all([
+          supabase.from('sec_users').select('id, full_name, username'),
+          supabase.from('parties').select('id, first_name, last_name, company_name, party_type'),
+          supabase.from('fm_org_chart_nodes').select('id, title'),
+        ]);
+        const uMap = {}; (uRes.data || []).forEach(u => { uMap[u.id] = u.full_name || u.username || ''; });
+        setUsersMap(uMap);
+        const pMap = {}; (pRes.data || []).forEach(p => {
+          pMap[p.id] = p.party_type === 'legal' ? (p.company_name || '') : `${p.first_name || ''} ${p.last_name || ''}`.trim();
+        });
+        setPartiesMap(pMap);
+        const dMap = {}; (nRes.data || []).forEach(n => { dMap[n.id] = n.title; });
+        setDeptsMap(dMap);
+      } catch {}
+    }, [supabase]);
+
+    const fetchData = useCallback(async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('req_requests')
+          .select('*, req_request_items(*)')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        const visible = (data || []).filter(r =>
+          r.status !== 'DRAFT' || String(r.registrar_id) === String(currentUserId)
+        );
+        setRequests(visible);
+
+        // fetch comments and attachment counts in parallel
+        if (visible.length > 0) {
+          const reqIds = visible.map(r => String(r.id));
+          const [{ data: commentRows }, { data: attachRows }] = await Promise.all([
+            supabase.from('sys_comments').select('entity_id').eq('entity_type', 'REQUEST_MANAGEMENT').in('entity_id', reqIds),
+            supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'REQUEST_MANAGEMENT').in('entity_id', reqIds),
+          ]);
+          if (commentRows) setCommentedIds(new Set(commentRows.map(c => c.entity_id)));
+          if (attachRows) {
+            const counts = {};
+            attachRows.forEach(a => { counts[a.entity_id] = (counts[a.entity_id] || 0) + 1; });
+            setAttachmentCounts(counts);
+          }
+        }
+      } catch {
+        showToast(t('خطا در دریافت درخواست‌ها', 'Error loading requests'), 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    }, [supabase, currentUserId, showToast, t]);
+
+    useEffect(() => {
+      if (access.canView) { fetchMeta(); fetchData(); }
+    }, [fetchMeta, fetchData, access.canView]);
+
     const loadAttachments = useCallback(async (recordId) => {
       if (!supabase || !recordId) return;
       try {
@@ -182,62 +238,6 @@
         showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
       }
     }, [supabase, attachModal.record, showToast, t, loadAttachments, fetchData]);
-
-    const fetchMeta = useCallback(async () => {
-      try {
-        const [uRes, pRes, nRes] = await Promise.all([
-          supabase.from('sec_users').select('id, full_name, username'),
-          supabase.from('parties').select('id, first_name, last_name, company_name, party_type'),
-          supabase.from('fm_org_chart_nodes').select('id, title'),
-        ]);
-        const uMap = {}; (uRes.data || []).forEach(u => { uMap[u.id] = u.full_name || u.username || ''; });
-        setUsersMap(uMap);
-        const pMap = {}; (pRes.data || []).forEach(p => {
-          pMap[p.id] = p.party_type === 'legal' ? (p.company_name || '') : `${p.first_name || ''} ${p.last_name || ''}`.trim();
-        });
-        setPartiesMap(pMap);
-        const dMap = {}; (nRes.data || []).forEach(n => { dMap[n.id] = n.title; });
-        setDeptsMap(dMap);
-      } catch {}
-    }, [supabase]);
-
-    const fetchData = useCallback(async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('req_requests')
-          .select('*, req_request_items(*)')
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        const visible = (data || []).filter(r =>
-          r.status !== 'DRAFT' || String(r.registrar_id) === String(currentUserId)
-        );
-        setRequests(visible);
-
-        // fetch comments and attachment counts in parallel
-        if (visible.length > 0) {
-          const reqIds = visible.map(r => String(r.id));
-          const [{ data: commentRows }, { data: attachRows }] = await Promise.all([
-            supabase.from('sys_comments').select('entity_id').eq('entity_type', 'REQUEST_MANAGEMENT').in('entity_id', reqIds),
-            supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'REQUEST_MANAGEMENT').in('entity_id', reqIds),
-          ]);
-          if (commentRows) setCommentedIds(new Set(commentRows.map(c => c.entity_id)));
-          if (attachRows) {
-            const counts = {};
-            attachRows.forEach(a => { counts[a.entity_id] = (counts[a.entity_id] || 0) + 1; });
-            setAttachmentCounts(counts);
-          }
-        }
-      } catch {
-        showToast(t('خطا در دریافت درخواست‌ها', 'Error loading requests'), 'error');
-      } finally {
-        setIsLoading(false);
-      }
-    }, [supabase, currentUserId, showToast, t]);
-
-    useEffect(() => {
-      if (access.canView) { fetchMeta(); fetchData(); }
-    }, [fetchMeta, fetchData, access.canView]);
 
     const isDeletable = (r) => r.status === 'DRAFT';
 
@@ -357,7 +357,7 @@
                   icon: Paperclip,
                   tooltip: t('پیوست‌ها', 'Attachments'),
                   onClick: row => openAttachments(row),
-                  className: row => attachmentCounts[String(row.id)] > 0 ? 'text-indigo-600 hover:text-indigo-700' : 'text-slate-400 hover:text-indigo-600',
+                  className: row => attachmentCounts[String(row.id)] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600',
                 },
                 {
                   icon: MessageSquare,
