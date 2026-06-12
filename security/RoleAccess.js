@@ -50,6 +50,14 @@
     'import':                { fa: 'ورود اطلاعات',           en: 'Import' },
     'download_sample':       { fa: 'دانلود نمونه',           en: 'Download Sample' },
     'manage_balance_groups': { fa: 'گروه‌های بالانس',         en: 'Balance Groups' },
+    'add_party':             { fa: 'افزودن شخص/شرکت',         en: 'Add Party' },
+    'manage_contracts':      { fa: 'مدیریت قراردادها',         en: 'Manage Contracts' },
+    'view_aggregate':        { fa: 'مشاهده تجمیع',             en: 'View Aggregate' },
+    'design':                { fa: 'طراحی ساختار',             en: 'Design' },
+    'manage_nodes':          { fa: 'مدیریت گره‌ها',             en: 'Manage Nodes' },
+    'manage_personnel':      { fa: 'مدیریت پرسنل',             en: 'Manage Personnel' },
+    'manage_access':         { fa: 'مدیریت دسترسی',             en: 'Manage Access' },
+    'reset_password':        { fa: 'ریست پسوورد',               en: 'Reset Password' },
   };
 
   // نگاشت برچسب‌های فارسی قدیمی به کدهای انگلیسی استاندارد
