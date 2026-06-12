@@ -36,6 +36,9 @@
   const Modal      = safeComp(DSFeedback, 'Modal');
   const Toast      = safeComp(DSFeedback, 'Toast');
 
+  const DSForms           = window.DSForms || DS;
+  const AttachmentManager = safeComp(DSForms, 'AttachmentManager');
+
   const LucideIcons    = window.LucideIcons || {};
   const ClipboardList  = safeIcon(LucideIcons, 'ClipboardList');
   const Edit           = safeIcon(LucideIcons, 'Edit');
@@ -43,6 +46,7 @@
   const AlertTriangle  = safeIcon(LucideIcons, 'AlertTriangle');
   const MessageSquare  = safeIcon(LucideIcons, 'MessageSquare');
   const Copy           = safeIcon(LucideIcons, 'Copy');
+  const Paperclip      = safeIcon(LucideIcons, 'Paperclip');
 
   const REQUEST_TYPES = [
     { value: 'TRANSFER',   fa: 'انتقال',  en: 'Transfer'   },
@@ -61,6 +65,8 @@
     { value: 'REJECTED',    fa: 'عدم تایید',    en: 'Rejected',     color: 'red'     },
     { value: 'CLOSED',      fa: 'بسته شده',     en: 'Closed',       color: 'gray'    },
   ];
+
+  const lockedStatuses = ['REGISTERED', 'REVIEWED', 'APPROVED', 'IN_PROGRESS', 'DONE', 'REJECTED', 'CLOSED'];
 
   const getStatus    = (v) => STATUS_LIST.find(s => s.value === v) || STATUS_LIST[0];
   const getTypeLabel = (v, rtl) => {
@@ -103,12 +109,79 @@
     const [deleteConfirm,    setDeleteConfirm]    = useState({ isOpen: false, type: null, data: null });
     const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
     const [commentedIds,     setCommentedIds]     = useState(new Set());
+    const [attachmentCounts, setAttachmentCounts] = useState({});
+    const [attachModal,      setAttachModal]      = useState({ isOpen: false, record: null, files: [] });
+    const [isUploading,      setIsUploading]      = useState(false);
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
 
     const showToast = useCallback((msg, type = 'success') => {
       setToast({ isVisible: true, message: msg, type });
       setTimeout(() => setToast(p => ({ ...p, isVisible: false })), 3000);
     }, []);
+
+    const loadAttachments = useCallback(async (recordId) => {
+      if (!supabase || !recordId) return;
+      try {
+        const { data } = await supabase.from('fm_attachments').select('*')
+          .eq('entity_type', 'REQUEST_MANAGEMENT').eq('entity_id', String(recordId));
+        setAttachModal(prev => ({ ...prev, files: data || [] }));
+      } catch {}
+    }, [supabase]);
+
+    const openAttachments = useCallback((record) => {
+      setAttachModal({ isOpen: true, record, files: [] });
+      loadAttachments(record.id);
+    }, [loadAttachments]);
+
+    const handleFileUpload = useCallback(async (files) => {
+      if (!files || files.length === 0 || !attachModal.record) return;
+      const file = files[0];
+      setIsUploading(true);
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${attachModal.record.id}_${Date.now()}.${fileExt}`;
+        const filePath = `requests/${fileName}`;
+        let fileUrl = '';
+        if (supabase.storage) {
+          const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file);
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+          fileUrl = urlData.publicUrl;
+        } else {
+          fileUrl = URL.createObjectURL(file);
+        }
+        const payload = {
+          entity_type: 'REQUEST_MANAGEMENT',
+          entity_id:   String(attachModal.record.id),
+          file_name:   file.name,
+          file_size:   file.size,
+          file_type:   file.type || 'application/octet-stream',
+          file_url:    fileUrl,
+          created_by:  currentUserId,
+        };
+        const { error } = await supabase.from('fm_attachments').insert([payload]);
+        if (error) throw error;
+        showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
+        loadAttachments(attachModal.record.id);
+        fetchData();
+      } catch {
+        showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
+      } finally {
+        setIsUploading(false);
+      }
+    }, [supabase, attachModal.record, currentUserId, showToast, t, loadAttachments, fetchData]);
+
+    const handleDeleteAttachment = useCallback(async (file) => {
+      try {
+        const { error } = await supabase.from('fm_attachments').delete().eq('id', file.id);
+        if (error) throw error;
+        showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
+        loadAttachments(attachModal.record.id);
+        fetchData();
+      } catch {
+        showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
+      }
+    }, [supabase, attachModal.record, showToast, t, loadAttachments, fetchData]);
 
     const fetchMeta = useCallback(async () => {
       try {
@@ -141,15 +214,19 @@
         );
         setRequests(visible);
 
-        // fetch which requests have at least one comment
+        // fetch comments and attachment counts in parallel
         if (visible.length > 0) {
           const reqIds = visible.map(r => String(r.id));
-          const { data: commentRows } = await supabase
-            .from('sys_comments')
-            .select('entity_id')
-            .eq('entity_type', 'REQUEST_MANAGEMENT')
-            .in('entity_id', reqIds);
+          const [{ data: commentRows }, { data: attachRows }] = await Promise.all([
+            supabase.from('sys_comments').select('entity_id').eq('entity_type', 'REQUEST_MANAGEMENT').in('entity_id', reqIds),
+            supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'REQUEST_MANAGEMENT').in('entity_id', reqIds),
+          ]);
           if (commentRows) setCommentedIds(new Set(commentRows.map(c => c.entity_id)));
+          if (attachRows) {
+            const counts = {};
+            attachRows.forEach(a => { counts[a.entity_id] = (counts[a.entity_id] || 0) + 1; });
+            setAttachmentCounts(counts);
+          }
         }
       } catch {
         showToast(t('خطا در دریافت درخواست‌ها', 'Error loading requests'), 'error');
@@ -277,6 +354,12 @@
               onRowDoubleClick={row => setFormModal({ isOpen: true, mode: 'EDIT', record: row })}
               actions={[
                 {
+                  icon: Paperclip,
+                  tooltip: t('پیوست‌ها', 'Attachments'),
+                  onClick: row => openAttachments(row),
+                  className: row => attachmentCounts[String(row.id)] > 0 ? 'text-indigo-600 hover:text-indigo-700' : 'text-slate-400 hover:text-indigo-600',
+                },
+                {
                   icon: MessageSquare,
                   tooltip: t('کامنت‌ها', 'Comments'),
                   onClick: row => setCommentModalState({ isOpen: true, record: row }),
@@ -343,6 +426,37 @@
             }
           />
         </Modal>
+
+        {(() => {
+          const isAttachReadOnly = attachModal.record && lockedStatuses.includes(attachModal.record.status);
+          return attachModal.isOpen ? (
+            <Modal isOpen={attachModal.isOpen}
+              onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })}
+              title={t('پیوست‌های درخواست', 'Request Attachments')} language={language} width="max-w-xl">
+              <div className="p-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg">
+                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-lg flex items-center justify-between border border-indigo-100 dark:border-indigo-800/50 shrink-0">
+                  <span className="text-[12px] font-bold text-indigo-800 dark:text-indigo-300">{attachModal.record?.request_code}</span>
+                  {isAttachReadOnly && <Badge variant="slate" size="sm">{t('فقط خواندنی', 'Read Only')}</Badge>}
+                </div>
+                <div className="flex-1 overflow-hidden min-h-[300px] rounded-lg">
+                  <AttachmentManager
+                    files={attachModal.files}
+                    onUpload={handleFileUpload}
+                    onDelete={handleDeleteAttachment}
+                    onDownload={(f) => window.open(f.file_url, '_blank')}
+                    readOnly={isAttachReadOnly}
+                    isUploading={isUploading}
+                    language={language}
+                    formCode={formCode}
+                  />
+                </div>
+              </div>
+              <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
+                <Button variant="primary" size="sm" onClick={() => setAttachModal({ isOpen: false, record: null, files: [] })}>{t('بستن', 'Close')}</Button>
+              </div>
+            </Modal>
+          ) : null;
+        })()}
 
         {(() => { const { CommentModal } = window.DSComments || {}; return CommentModal && commentModalState.isOpen ? (
           <CommentModal

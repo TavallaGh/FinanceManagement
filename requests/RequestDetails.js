@@ -29,9 +29,10 @@
   const Card        = safeComp(Core, 'Card');
 
   const DSForms     = window.DSForms || DS;
-  const TextField   = safeComp(DSForms, 'TextField');
-  const SelectField = safeComp(DSForms, 'SelectField');
-  const DatePicker  = safeComp(DSForms, 'DatePicker');
+  const TextField         = safeComp(DSForms, 'TextField');
+  const SelectField       = safeComp(DSForms, 'SelectField');
+  const DatePicker        = safeComp(DSForms, 'DatePicker');
+  const AttachmentManager = safeComp(DSForms, 'AttachmentManager');
 
   const DSFeedback  = window.DSFeedback || window.DSOverlays || DS;
   const Modal       = safeComp(DSFeedback, 'Modal');
@@ -49,6 +50,7 @@
   const Lock          = safeIcon(LucideIcons, 'Lock');
   const PlayCircle    = safeIcon(LucideIcons, 'PlayCircle');
   const CheckSquare   = safeIcon(LucideIcons, 'CheckSquare');
+  const Paperclip     = safeIcon(LucideIcons, 'Paperclip');
 
   // ── Shared constants ───────────────────────────────────────────────────────
   const REQUEST_TYPES = [
@@ -117,6 +119,8 @@
     const [copyWarning, setCopyWarning] = useState(null);
     const [header,      setHeader]      = useState({});
     const [items,       setItems]       = useState([]);
+    const [attachFiles, setAttachFiles] = useState([]);
+    const [isUploading, setIsUploading] = useState(false);
     const [lookups,     setLookups]     = useState({
       leafAccounts: [], allAccounts: [], costTypes: [], incomeTypes: [],
       currencies: [], usersMap: {}, usersList: [], partiesMap: {},
@@ -126,6 +130,15 @@
 
     const gridRef     = useRef(null);
     const initialized = useRef(false);
+
+    const loadAttachments = useCallback(async (recordId) => {
+      if (!supabase || !recordId) return;
+      try {
+        const { data } = await supabase.from('fm_attachments').select('*')
+          .eq('entity_type', 'REQUEST_MANAGEMENT').eq('entity_id', String(recordId));
+        setAttachFiles(data || []);
+      } catch {}
+    }, [supabase]);
 
     const isReadOnly = useMemo(
       () => formMode !== 'CREATE' && formMode !== 'COPY' && lockedStatuses.includes(header.status || ''),
@@ -255,6 +268,7 @@
             status:            'DRAFT',
           });
           setItems([]);
+          setAttachFiles([]);
           setIsDirty(false);
           setHasSaved(false);
 
@@ -289,6 +303,7 @@
             remaining_amount:  0,
           })).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
           setItems(mapped);
+          setAttachFiles([]);
           setIsDirty(true);
           setHasSaved(false);
 
@@ -311,6 +326,7 @@
           setItems(mapped);
           setIsDirty(false);
           setHasSaved(false);
+          loadAttachments(initialRecord.id);
         }
       });
     }, [isOpen, formMode, initialRecord]);
@@ -319,6 +335,58 @@
       setHeader(p => ({ ...p, [field]: value }));
       setIsDirty(true);
     }, []);
+
+    const handleFileUpload = useCallback(async (files) => {
+      if (!files || files.length === 0) return;
+      if (!header.id) {
+        showToast(t('ابتدا درخواست را ذخیره کنید تا بتوانید پیوست اضافه کنید.', 'Save the request first to add attachments.'), 'warning');
+        return;
+      }
+      const file = files[0];
+      setIsUploading(true);
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${header.id}_${Date.now()}.${fileExt}`;
+        const filePath = `requests/${fileName}`;
+        let fileUrl = '';
+        if (supabase.storage) {
+          const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file);
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+          fileUrl = urlData.publicUrl;
+        } else {
+          fileUrl = URL.createObjectURL(file);
+        }
+        const payload = {
+          entity_type: 'REQUEST_MANAGEMENT',
+          entity_id:   String(header.id),
+          file_name:   file.name,
+          file_size:   file.size,
+          file_type:   file.type || 'application/octet-stream',
+          file_url:    fileUrl,
+          created_by:  currentUserId,
+        };
+        const { error } = await supabase.from('fm_attachments').insert([payload]);
+        if (error) throw error;
+        showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
+        loadAttachments(header.id);
+      } catch {
+        showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
+      } finally {
+        setIsUploading(false);
+      }
+    }, [supabase, header.id, currentUserId, showToast, t, loadAttachments]);
+
+    const handleDeleteAttachment = useCallback(async (file) => {
+      try {
+        const { error } = await supabase.from('fm_attachments').delete().eq('id', file.id);
+        if (error) throw error;
+        showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
+        loadAttachments(header.id);
+      } catch {
+        showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
+      }
+    }, [supabase, header.id, showToast, t, loadAttachments]);
 
     // ── save ─────────────────────────────────────────────────────────────
     const handleSave = async (overrideStatus) => {
@@ -553,7 +621,7 @@
                   {hasItems && !isReadOnly && (
                     <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
                       <AlertTriangle size={10} />
-                      {t('در صورت وجود اقلام، نوع قابل تغییر نیست.', 'Type is locked when items exist.')}
+                      {t('در صورت وجود اقلام، نوع درخواست قابل تغییر نیست.', 'Request Type is locked when items exist.')}
                     </p>
                   )}
                 </div>
@@ -572,7 +640,7 @@
                     value={fmtDT(header.approved_at)} disabled isRtl={isRtl} />
                 </>)}
 
-                <div className="lg:col-span-5 md:col-span-2 relative z-[70]">
+                <div className="lg:col-span-2 md:col-span-2 relative z-[70]">
                   <TextField size="sm" label={t('شرح درخواست', 'Description')}
                     value={header.description || ''} onChange={e => updateHeader('description', e.target.value)}
                     isRtl={isRtl} disabled={isReadOnly} required />
@@ -597,6 +665,41 @@
                   showToast={showToast}
                   formCode={formCode}
                 />
+              </div>
+            </Card>
+
+            <Card
+              title={
+                <div className="flex items-center gap-2">
+                  <Paperclip size={14} />
+                  <span>{t('پیوست‌ها', 'Attachments')}</span>
+                  {attachFiles.length > 0 && (
+                    <Badge variant="indigo" className="!py-0 !px-1.5 text-[10px]">{attachFiles.length}</Badge>
+                  )}
+                </div>
+              }
+              isCollapsible={true} noPadding={true} defaultCollapsed={true}
+              className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0"
+              headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
+              language={language}>
+              <div className="p-3 bg-white dark:bg-slate-800 min-h-[200px]">
+                {!header.id ? (
+                  <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 text-[12px] py-6">
+                    <AlertTriangle size={14} />
+                    {t('ابتدا درخواست را ذخیره کنید تا بتوانید پیوست اضافه کنید.', 'Save the request first to add attachments.')}
+                  </div>
+                ) : (
+                  <AttachmentManager
+                    files={attachFiles}
+                    onUpload={handleFileUpload}
+                    onDelete={handleDeleteAttachment}
+                    onDownload={(f) => window.open(f.file_url, '_blank')}
+                    readOnly={isReadOnly}
+                    isUploading={isUploading}
+                    language={language}
+                    formCode={formCode}
+                  />
+                )}
               </div>
             </Card>
 
