@@ -242,7 +242,9 @@
       indigo: "bg-indigo-100/50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400",
       blue: "bg-blue-100/50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
       orange: "bg-orange-100/50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
-      emerald: "bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+      emerald: "bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
+      teal: "bg-teal-100/50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400",
+      red: "bg-red-100/50 dark:bg-red-900/30 text-red-600 dark:text-red-400"
     };
     return <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[12px] font-black tracking-wide ${variants[variant] || variants.gray} ${className}`}>{children}</span>;
   };
