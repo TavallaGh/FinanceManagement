@@ -27,6 +27,42 @@
     'branches': { fa: 'شعب مجاز', en: 'Allowed Branches' }
   };
 
+  const LOCAL_ACTION_LABELS = {
+    'read':                  { fa: 'مشاهده',                en: 'Read' },
+    'create':                { fa: 'ایجاد',                  en: 'Create' },
+    'edit':                  { fa: 'ویرایش',                 en: 'Edit' },
+    'delete':                { fa: 'حذف',                    en: 'Delete' },
+    'print':                 { fa: 'چاپ',                    en: 'Print' },
+    'copy':                  { fa: 'کپی سند',                en: 'Copy Document' },
+    'attach':                { fa: 'مدیریت پیوست',           en: 'Attachments' },
+    'summary':               { fa: 'خلاصه ارزی',             en: 'Currency Summary' },
+    'comment':               { fa: 'کامنت‌ها',                en: 'Comments' },
+    'bulk_delete':           { fa: 'حذف گروهی',              en: 'Bulk Delete' },
+    'set_temporary':         { fa: 'تغییر به موقت',          en: 'Set Temporary' },
+    'set_draft':             { fa: 'تغییر به یادداشت',       en: 'Set Draft' },
+    'set_final':             { fa: 'تبدیل به بررسی شده',     en: 'Set Final' },
+    'set_approved':          { fa: 'تبدیل به تایید شده',     en: 'Set Approved' },
+    'revert_temporary':      { fa: 'برگشت به موقت',          en: 'Revert to Temporary' },
+    'update_rates':          { fa: 'بروزرسانی نرخ ارز',      en: 'Update Exchange Rates' },
+    'manage_accounts':       { fa: 'مدیریت حساب‌ها',         en: 'Manage Accounts' },
+    'manage_access':         { fa: 'مدیریت دسترسی‌ها',       en: 'Manage Access' },
+    'excel_export':          { fa: 'خروجی Excel',            en: 'Excel Export' },
+    'import':                { fa: 'ورود اطلاعات',           en: 'Import' },
+    'download_sample':       { fa: 'دانلود نمونه',           en: 'Download Sample' },
+    'manage_balance_groups': { fa: 'گروه‌های بالانس',         en: 'Balance Groups' },
+  };
+
+  // نگاشت برچسب‌های فارسی قدیمی به کدهای انگلیسی استاندارد
+  const PERSIAN_TO_CODE = {
+    'مشاهده': 'read', 'نمایش': 'read', 'خواندن': 'read',
+    'ایجاد': 'create', 'افزودن': 'create',
+    'ویرایش': 'edit', 'بروزرسانی': 'edit', 'update': 'edit',
+    'حذف': 'delete',
+    'چاپ': 'print',
+    'کپی': 'copy',
+    'حذف گروهی': 'bulk_delete',
+  };
+
   const RoleAccess = ({ isOpen, onClose, role, language = 'fa' }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
@@ -264,8 +300,22 @@
 
     if (!isOpen) return null;
 
-    const availActions = selectedMenu ? (typeof selectedMenu.available_actions === 'string' ? JSON.parse(selectedMenu.available_actions || '[]') : (selectedMenu.available_actions || [])) : [];
-    const availScopes = selectedMenu ? (typeof selectedMenu.available_scopes === 'string' ? JSON.parse(selectedMenu.available_scopes || '[]') : (selectedMenu.available_scopes || [])) : [];
+    const rawAvailActions = selectedMenu ? (typeof selectedMenu.available_actions === 'string' ? JSON.parse(selectedMenu.available_actions || '[]') : (selectedMenu.available_actions || [])) : [];
+    // نرمال‌سازی به کدهای انگلیسی کوچک + حذف تکراری‌ها بر اساس برچسب نمایشی
+    const _seenActionLabels = new Set();
+    const availActions = rawAvailActions.reduce((acc, a) => {
+        const id = PERSIAN_TO_CODE[String(a).trim()] || String(a).toLowerCase().trim();
+        const lbl = actionDictionary[id] || LOCAL_ACTION_LABELS[id];
+        const key = lbl ? lbl[isRtl ? 'fa' : 'en'] : id;
+        if (!_seenActionLabels.has(key)) { _seenActionLabels.add(key); acc.push(id); }
+        return acc;
+    }, []);
+    // پارسینگ available_scopes - دو فرمت پشتیبانی می‌شود:
+    //   فرمت جدید: آبجکت JSONB با options تعبیه‌شده { key: { label_fa, label_en, options: [{value, label_fa, label_en}] } }
+    //   فرمت قدیمی: آرایه کلیدها ['docTypes', 'branches'] که داده از جداول جداگانه می‌آید
+    const availScopesRaw = selectedMenu ? (typeof selectedMenu.available_scopes === 'string' ? JSON.parse(selectedMenu.available_scopes || 'null') : selectedMenu.available_scopes) : null;
+    const isNewScopeFormat = availScopesRaw && !Array.isArray(availScopesRaw) && typeof availScopesRaw === 'object';
+    const availScopeKeys = isNewScopeFormat ? Object.keys(availScopesRaw) : (Array.isArray(availScopesRaw) ? availScopesRaw : []);
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`${t('مدیریت دسترسی‌های نقش:', 'Role Permissions Management:')} ${role?.title || ''}`} width="max-w-6xl" language={language}>
@@ -330,8 +380,8 @@
                                     ) : (
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                             {availActions.map(actionId => {
-                                                const isChecked = tempPermissions[selectedMenu.id]?.actions?.includes(actionId);
-                                                const labelObj = actionDictionary[actionId];
+                                                const isChecked = (tempPermissions[selectedMenu.id]?.actions || []).some(a => (PERSIAN_TO_CODE[String(a).trim()] || String(a).toLowerCase().trim()) === actionId);
+                                                const labelObj = actionDictionary[actionId] || LOCAL_ACTION_LABELS[actionId];
                                                 const displayLabel = labelObj ? labelObj[isRtl ? 'fa' : 'en'] : actionId;
                                                 
                                                 return (
@@ -349,7 +399,7 @@
                                     )}
                                 </div>
 
-                                {availScopes.length > 0 && (
+                                {availScopeKeys.length > 0 && (
                                     <div className="space-y-4 pt-2">
                                         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                                             <div className="w-6 h-6 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center"><Lock size={14}/></div>
@@ -360,25 +410,31 @@
                                         </div>
                                         
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {availScopes.map(scopeId => {
-                                                const scopeDataList = scopesData[scopeId] || [];
-                                                const labelObj = SCOPE_DICT[scopeId];
-                                                const displayLabel = labelObj ? labelObj[isRtl ? 'fa' : 'en'] : scopeId;
+                                            {availScopeKeys.map(scopeKey => {
+                                                const scopeDef = isNewScopeFormat ? availScopesRaw[scopeKey] : null;
+                                                const displayLabel = scopeDef
+                                                    ? (isRtl ? (scopeDef.label_fa || scopeKey) : (scopeDef.label_en || scopeKey))
+                                                    : (SCOPE_DICT[scopeKey] ? SCOPE_DICT[scopeKey][isRtl ? 'fa' : 'en'] : scopeKey);
+                                                const itemsList = scopeDef ? (scopeDef.options || []) : (scopesData[scopeKey] || []);
                                                 
                                                 return (
-                                                    <div key={scopeId} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col shadow-sm">
+                                                    <div key={scopeKey} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col shadow-sm">
                                                         <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-[11px] font-black text-slate-700 dark:text-slate-300">
                                                             {displayLabel}
                                                         </div>
                                                         <div className="p-3 grid grid-cols-1 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
-                                                            {scopeDataList.length > 0 ? scopeDataList.map(item => {
-                                                                const isSelected = tempPermissions[selectedMenu.id]?.scopes?.[scopeId]?.includes(item.id);
+                                                            {itemsList.length > 0 ? itemsList.map(item => {
+                                                                const itemValue = scopeDef ? item.value : item.id;
+                                                                const itemLabel = scopeDef
+                                                                    ? (isRtl ? (item.label_fa || item.value) : (item.label_en || item.value))
+                                                                    : item.title;
+                                                                const isSelected = tempPermissions[selectedMenu.id]?.scopes?.[scopeKey]?.includes(itemValue);
                                                                 return (
-                                                                    <div key={item.id} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-2 py-1.5 rounded-lg">
+                                                                    <div key={itemValue} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-2 py-1.5 rounded-lg">
                                                                         <CheckboxField
-                                                                            label={item.title}
+                                                                            label={itemLabel}
                                                                             checked={isSelected}
-                                                                            onChange={() => toggleScope(scopeId, item.id)}
+                                                                            onChange={() => toggleScope(scopeKey, itemValue)}
                                                                             isRtl={isRtl}
                                                                         />
                                                                     </div>
