@@ -292,6 +292,13 @@
         setTempPermissions(prev => {
             const current = prev[selectedMenu.id] || { actions: [], scopes: {} };
             const hasAction = current.actions.includes(actionId);
+            // اگر دسترسی «مشاهده» حذف شود، تمام عملیات‌ها و محدودیت داده هم پاک می‌شوند
+            if (actionId === 'read' && hasAction) {
+                return {
+                    ...prev,
+                    [selectedMenu.id]: { ...current, actions: [], scopes: {} }
+                };
+            }
             return {
                 ...prev,
                 [selectedMenu.id]: {
@@ -339,6 +346,9 @@
     const availScopesRaw = selectedMenu ? (typeof selectedMenu.available_scopes === 'string' ? JSON.parse(selectedMenu.available_scopes || 'null') : selectedMenu.available_scopes) : null;
     const isNewScopeFormat = availScopesRaw && !Array.isArray(availScopesRaw) && typeof availScopesRaw === 'object';
     const availScopeKeys = isNewScopeFormat ? Object.keys(availScopesRaw) : (Array.isArray(availScopesRaw) ? availScopesRaw : []);
+
+    const currentMenuPerm = selectedMenu ? (tempPermissions[selectedMenu.id] || { actions: [], scopes: {} }) : { actions: [], scopes: {} };
+    const hasReadAccess = currentMenuPerm.actions.some(a => (PERSIAN_TO_CODE[String(a).trim()] || String(a).toLowerCase().trim()) === 'read');
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`${t('مدیریت دسترسی‌های نقش:', 'Role Permissions Management:')} ${role?.title || ''}`} width="max-w-6xl" language={language}>
@@ -404,21 +414,26 @@
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                                             {availActions.map(actionId => {
                                                 const isChecked = (tempPermissions[selectedMenu.id]?.actions || []).some(a => (PERSIAN_TO_CODE[String(a).trim()] || String(a).toLowerCase().trim()) === actionId);
+                                                const isReadAction = actionId === 'read';
+                                                const isDisabled = !isReadAction && !hasReadAccess;
                                                 const labelObj = actionDictionary[actionId] || LOCAL_ACTION_LABELS[actionId];
                                                 const displayLabel = labelObj ? labelObj[isRtl ? 'fa' : 'en'] : actionId;
                                                 return (
                                                     <button
                                                         key={actionId}
                                                         type="button"
-                                                        onClick={() => toggleAction(actionId)}
+                                                        disabled={isDisabled}
+                                                        onClick={() => !isDisabled && toggleAction(actionId)}
                                                         className={[
-                                                            'w-full inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-all duration-150 select-none cursor-pointer',
-                                                            isChecked
-                                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-600 dark:hover:text-indigo-400'
+                                                            'w-full inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-all duration-150 select-none',
+                                                            isDisabled
+                                                                ? 'bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-700/50 text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                                                : isChecked
+                                                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm cursor-pointer'
+                                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer'
                                                         ].join(' ')}
                                                     >
-                                                        {isChecked && React.createElement(Check, { size: 11, className: 'shrink-0' })}
+                                                        {isChecked && !isDisabled && React.createElement(Check, { size: 11, className: 'shrink-0' })}
                                                         {displayLabel}
                                                     </button>
                                                 );
@@ -431,10 +446,11 @@
                                     <div className="space-y-4 pt-2">
                                         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                                             <div className="w-6 h-6 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center"><Lock size={14}/></div>
-                                            <span className="text-[12px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">{t('محدودیت دسترسی به داده‌ها', 'Data Scope Restrictions')}</span>
+                                            <span className="text-[12px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">{t('جزئیات دسترسی به داده‌ها', 'Data Scope Details')}</span>
                                         </div>
-                                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
-                                            {t('در صورت عدم انتخاب هیچ گزینه‌ای در یک بخش، کاربر به تمامی داده‌های آن بخش دسترسی خواهد داشت.', 'If no options are selected, the user will have access to all data in that scope.')}
+                                        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2 shrink-0">
+                                            {React.createElement(AlertTriangle, { size: 14, className: 'shrink-0' })}
+                                            <span className="text-[11px] font-bold">{t('در صورت عدم انتخاب هیچ گزینه‌ای در یک بخش، کاربر به تمامی داده‌های آن بخش دسترسی خواهد داشت.', 'If no options are selected in a scope, the user will have access to all data in that scope.')}</span>
                                         </div>
                                         
                                         <div className="flex flex-col gap-5">
@@ -460,15 +476,18 @@
                                                                     <button
                                                                         key={itemValue}
                                                                         type="button"
-                                                                        onClick={() => toggleScope(scopeKey, itemValue)}
+                                                                        disabled={!hasReadAccess}
+                                                                        onClick={() => hasReadAccess && toggleScope(scopeKey, itemValue)}
                                                                         className={[
-                                                                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all duration-150 select-none cursor-pointer',
-                                                                            isSelected
-                                                                                ? 'bg-teal-600 border-teal-600 text-white shadow-sm shadow-teal-200 dark:shadow-teal-900'
-                                                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-teal-300 dark:hover:border-teal-700 hover:text-teal-600 dark:hover:text-teal-400'
+                                                                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all duration-150 select-none',
+                                                                            !hasReadAccess
+                                                                                ? 'bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-700/50 text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                                                                : isSelected
+                                                                                    ? 'bg-teal-600 border-teal-600 text-white shadow-sm shadow-teal-200 dark:shadow-teal-900 cursor-pointer'
+                                                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-teal-300 dark:hover:border-teal-700 hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer'
                                                                         ].join(' ')}
                                                                     >
-                                                                        {isSelected && React.createElement(Check, { size: 11, className: 'shrink-0' })}
+                                                                        {isSelected && hasReadAccess && React.createElement(Check, { size: 11, className: 'shrink-0' })}
                                                                         {itemLabel}
                                                                     </button>
                                                                 );
