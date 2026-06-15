@@ -669,44 +669,42 @@
                   placeholder="********"
                 />
               ) : (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <TextField 
-                        size="sm" 
-                        label={t('رمز عبور', 'Password')} 
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      {t('رمز عبور', 'Password')} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
                         type="text"
-                        value={formData.password} 
-                        onChange={e => { setFormData(p => ({...p, password: e.target.value})); setGeneratedPassword(''); }} 
-                        isRtl={isRtl} 
+                        value={formData.password}
+                        onChange={e => { setFormData(p => ({...p, password: e.target.value})); setGeneratedPassword(''); }}
                         required
-                        dir="ltr" 
-                        placeholder={t('رمز عبور را وارد یا ایجاد کنید', 'Enter or generate password')}
+                        dir="ltr"
+                        placeholder={t('رمز را وارد یا ایجاد کنید', 'Enter or generate')}
+                        className="w-full h-8 text-[12px] font-mono border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all pl-3 pr-8"
                       />
+                      {formData.password && (
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(formData.password).then(() => showToast(t('رمز عبور کپی شد.', 'Password copied.'), 'success'))}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                          title={t('کپی رمز عبور', 'Copy Password')}
+                        >
+                          {React.createElement(Copy, { size: 13 })}
+                        </button>
+                      )}
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      icon={RefreshCw}
-                      onClick={() => { const pwd = generatePassword(); setFormData(p => ({...p, password: pwd})); setGeneratedPassword(pwd); }}
-                      className="h-8 shrink-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/40 mb-[1px] text-[11px] whitespace-nowrap"
-                    >
-                      {t('ایجاد رمز', 'Generate')}
-                    </Button>
                   </div>
-                  {generatedPassword && formData.password === generatedPassword && (
-                    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg px-3 py-1.5">
-                      <span className="text-[11px] font-mono text-amber-800 dark:text-amber-300 flex-1 select-all" dir="ltr">{generatedPassword}</span>
-                      <button 
-                        type="button"
-                        onClick={() => navigator.clipboard.writeText(generatedPassword).then(() => showToast(t('رمز عبور کپی شد.', 'Password copied.'), 'success'))}
-                        className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 transition-colors"
-                        title={t('کپی رمز عبور', 'Copy Password')}
-                      >
-                        {React.createElement(Copy, { size: 14 })}
-                      </button>
-                    </div>
-                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    icon={RefreshCw}
+                    onClick={() => { const pwd = generatePassword(); setFormData(p => ({...p, password: pwd})); setGeneratedPassword(pwd); }}
+                    className="h-8 shrink-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/40 mb-[1px] text-[11px] whitespace-nowrap"
+                  >
+                    {t('ایجاد رمز', 'Generate')}
+                  </Button>
                 </div>
               )}
 
