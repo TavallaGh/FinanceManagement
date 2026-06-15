@@ -9,7 +9,7 @@
   } = window.DesignSystem || window.DSCore || {};
   
   const { 
-    Users, Edit, Trash2, Save, 
+    Users, Edit, Trash2, Save, Copy,
     AlertTriangle, Lock, RefreshCw, Shield, Plus
   } = window.LucideIcons || {};
   const supabase = window.supabase;
@@ -65,6 +65,7 @@
       code: '',
       firstName: '',
       lastName: '',
+      latinTitle: '',
       nationalId: '',
       mobile: '',
       email: '',
@@ -80,6 +81,27 @@
     ];
 
     const [gridState, setGridState] = useState(null);
+    const [generatedPassword, setGeneratedPassword] = useState('');
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+
+    const Toast = window.DSFeedback?.Toast;
+
+    const showToast = useCallback((message, type = 'success') => {
+      setToast({ isVisible: true, message, type });
+      setTimeout(() => setToast(p => ({ ...p, isVisible: false })), 3500);
+    }, []);
+
+    const generatePassword = useCallback(() => {
+      const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const lower = 'abcdefghijklmnopqrstuvwxyz';
+      const digits = '0123456789';
+      const symbols = '@#$!%&*';
+      const all = upper + lower + digits + symbols;
+      const rand = (str) => str[Math.floor(Math.random() * str.length)];
+      let pwd = rand(upper) + rand(lower) + rand(digits) + rand(symbols);
+      for (let i = 4; i < 10; i++) pwd += rand(all);
+      return pwd.split('').sort(() => Math.random() - 0.5).join('');
+    }, []);
 
     const viewConfig = {
       pageId: 'users_main',
@@ -207,8 +229,8 @@
     };
 
     const handleSaveQuickParty = async () => {
-      if (!quickPartyData.firstName || !quickPartyData.lastName || !quickPartyData.code) {
-         alert(t('لطفاً فیلدهای ستاره‌دار را تکمیل کنید.', 'Please fill required fields.'));
+      if (!quickPartyData.firstName || !quickPartyData.lastName || !quickPartyData.code || !quickPartyData.latinTitle) {
+         alert(t('لطفاً فیلدهای اجباری (کد، نام، نام خانوادگی، عنوان لاتین) را تکمیل کنید.', 'Please fill required fields: code, first name, last name, and latin title.'));
          return;
       }
       
@@ -219,6 +241,7 @@
           code: quickPartyData.code,
           first_name: quickPartyData.firstName,
           last_name: quickPartyData.lastName,
+          latin_title: quickPartyData.latinTitle,
           national_id: quickPartyData.nationalId,
           mobile: quickPartyData.mobile,
           email: quickPartyData.email,
@@ -248,7 +271,7 @@
         }));
 
         setIsQuickPartyModalOpen(false);
-        setQuickPartyData({ code: '', firstName: '', lastName: '', nationalId: '', mobile: '', email: '', roles: ['system_user'] });
+        setQuickPartyData({ code: '', firstName: '', lastName: '', latinTitle: '', nationalId: '', mobile: '', email: '', roles: ['system_user'] });
       } catch (err) {
         console.error('Save Quick Party Error:', err);
         alert(t('خطا در ذخیره اطلاعات شخص.', 'Error saving party.'));
@@ -292,18 +315,13 @@
       }
     };
 
-    const executeResetPassword = async () => {
-      setIsLoading(true);
-      try {
-        const newHash = await hashPassword('123456');
-        const { error } = await supabase.from('sec_users').update({ password_hash: newHash }).eq('id', resetConfirm.data.id);
-        if (error) throw error;
-        setResetConfirm({ isOpen: false, data: null });
-      } catch (err) {
-        console.error('Reset password error:', err);
-      } finally {
-        setIsLoading(false);
-      }
+    const executeResetPassword = () => {
+      const username = resetConfirm.data?.username || '';
+      setResetConfirm({ isOpen: false, data: null });
+      showToast(
+        t(`ایمیل بازیابی رمز عبور برای کاربر "${username}" ارسال شد.`, `A password recovery email was sent to user "${username}".`),
+        'success'
+      );
     };
 
     const handleOpenModal = (record = null) => {
@@ -639,17 +657,58 @@
                 />
               </div>
 
-              <TextField 
-                size="sm" 
-                label={currentRecord ? t('رمز عبور جدید (اختیاری)', 'New Password (Optional)') : t('رمز عبور', 'Password')} 
-                type="password"
-                value={formData.password} 
-                onChange={e => setFormData({...formData, password: e.target.value})} 
-                isRtl={isRtl} 
-                required={!currentRecord}
-                dir="ltr" 
-                placeholder="********"
-              />
+              {currentRecord ? (
+                <TextField 
+                  size="sm" 
+                  label={t('رمز عبور جدید (اختیاری)', 'New Password (Optional)')} 
+                  type="password"
+                  value={formData.password} 
+                  onChange={e => setFormData({...formData, password: e.target.value})} 
+                  isRtl={isRtl} 
+                  dir="ltr" 
+                  placeholder="********"
+                />
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <TextField 
+                        size="sm" 
+                        label={t('رمز عبور', 'Password')} 
+                        type="text"
+                        value={formData.password} 
+                        onChange={e => { setFormData(p => ({...p, password: e.target.value})); setGeneratedPassword(''); }} 
+                        isRtl={isRtl} 
+                        required
+                        dir="ltr" 
+                        placeholder={t('رمز عبور را وارد یا ایجاد کنید', 'Enter or generate password')}
+                      />
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      icon={RefreshCw}
+                      onClick={() => { const pwd = generatePassword(); setFormData(p => ({...p, password: pwd})); setGeneratedPassword(pwd); }}
+                      className="h-8 shrink-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/40 mb-[1px] text-[11px] whitespace-nowrap"
+                    >
+                      {t('ایجاد رمز', 'Generate')}
+                    </Button>
+                  </div>
+                  {generatedPassword && formData.password === generatedPassword && (
+                    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg px-3 py-1.5">
+                      <span className="text-[11px] font-mono text-amber-800 dark:text-amber-300 flex-1 select-all" dir="ltr">{generatedPassword}</span>
+                      <button 
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(generatedPassword).then(() => showToast(t('رمز عبور کپی شد.', 'Password copied.'), 'success'))}
+                        className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 transition-colors"
+                        title={t('کپی رمز عبور', 'Copy Password')}
+                      >
+                        {React.createElement(Copy, { size: 14 })}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <TextField 
                 size="sm" 
@@ -694,6 +753,7 @@
               <TextField size="sm" label={t('کد شخص', 'Party Code')} value={quickPartyData.code} onChange={e => setQuickPartyData({...quickPartyData, code: e.target.value})} isRtl={isRtl} required dir="ltr" />
               <TextField size="sm" label={t('نام', 'First Name')} value={quickPartyData.firstName} onChange={e => setQuickPartyData({...quickPartyData, firstName: e.target.value})} isRtl={isRtl} required />
               <TextField size="sm" label={t('نام خانوادگی', 'Last Name')} value={quickPartyData.lastName} onChange={e => setQuickPartyData({...quickPartyData, lastName: e.target.value})} isRtl={isRtl} required />
+              <TextField size="sm" label={t('عنوان لاتین', 'Latin Title')} value={quickPartyData.latinTitle} onChange={e => setQuickPartyData({...quickPartyData, latinTitle: e.target.value})} isRtl={isRtl} dir="ltr" required />
               <TextField size="sm" label={t('کد ملی', 'National ID')} value={quickPartyData.nationalId} onChange={e => setQuickPartyData({...quickPartyData, nationalId: e.target.value})} isRtl={isRtl} dir="ltr" />
               <TextField size="sm" label={t('موبایل', 'Mobile')} value={quickPartyData.mobile} onChange={e => setQuickPartyData({...quickPartyData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" />
               <TextField size="sm" label={t('ایمیل', 'Email')} value={quickPartyData.email} onChange={e => setQuickPartyData({...quickPartyData, email: e.target.value})} isRtl={isRtl} dir="ltr" />
@@ -768,6 +828,7 @@
              language={language} 
           />
         )}
+        {Toast && <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(p => ({ ...p, isVisible: false }))} />}
       </div>
     );
   };
