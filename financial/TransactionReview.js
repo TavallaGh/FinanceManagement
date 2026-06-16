@@ -261,7 +261,7 @@
                 const { data: commentRows } = await supabase
                     .from('sys_comments')
                     .select('entity_id')
-                    .eq('entity_type', 'TRANSACTION_MAIN')
+                    .eq('entity_type', 'fm_transactions')
                     .in('entity_id', txIds);
                 if (commentRows) {
                     setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
@@ -285,7 +285,7 @@
 
     useEffect(() => {
         const handleFilterToRecord = (e) => {
-            if (e.detail && e.detail.entity_type === 'TRANSACTION_REVIEW') {
+            if (e.detail && e.detail.form_component === 'TransactionReview') {
                 setFilteredRecordId(String(e.detail.entity_id));
             }
         };
@@ -735,7 +735,7 @@
         CommentModal && commentModalState.isOpen ? React.createElement(CommentModal, {
             isOpen: commentModalState.isOpen,
             onClose: () => { setCommentModalState({ isOpen: false, record: null }); fetchData(); },
-            entityType: 'TRANSACTION_REVIEW',
+            entityType: 'fm_transactions',
             entityId: commentModalState.record ? String(commentModalState.record.id) : '',
             entityTitle: commentModalState.record ? `${t('کد:', 'Code:')} ${commentModalState.record.document_code || '-'}  |  ${t('شرح:', 'Desc:')} ${commentModalState.record.description || '-'}` : '',
             formTitle: t('ثبت تراکنش', 'Transaction'),

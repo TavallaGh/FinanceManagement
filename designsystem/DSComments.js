@@ -264,13 +264,14 @@
                     user_id: u.id,
                     title: t('کامنت جدید', 'New Mention'),
                     message: t(
-                        `شما در یک کامنت روی فرم ${eformTitle || etype}، ${etitle}، منشن شده‌اید.`,
-                        `You were mentioned in a comment on form ${eformTitle || etype}: ${etitle}.`
+                        `شما در یک کامنت روی ${eformTitle || etype}، ${etitle}، منشن شده‌اید.`,
+                        `You were mentioned in a comment on ${eformTitle || etype}: ${etitle}.`
                     ),
                     type: 'info',
+                    // form_component intentionally omitted — NotificationSidebar resolves
+                    // the correct form dynamically based on each user's access rights.
                     action_payload: {
                         action: 'open_record',
-                        form_component: eform,
                         entity_type: etype,
                         entity_id: String(eid),
                         entity_title: etitle

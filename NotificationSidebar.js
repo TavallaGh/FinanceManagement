@@ -4,6 +4,32 @@
   const { useState, useEffect, useMemo } = React;
   const { Trash2, Bell, Loader2, Check } = window.LucideIcons || {};
 
+  // ─── Entity → ordered list of form components that can show it ───────────
+  // First accessible form (based on the current user's permissions) will be opened.
+  const ENTITY_TO_FORMS = {
+    'fm_transactions':   ['TransactionMain', 'TransactionReview'],
+    'req_requests':      ['RequestDetails',  'RequestManagement'],
+    'organization_info': ['OrganizationInfo'],
+    'parties':           ['Parties'],
+    'fm_coa_charts':     ['ChartOfAccountsMain'],
+    'fm_coa_accounts':   ['ChartOfAccountsMain'],
+    'fm_brokers':        ['BrokerManagement'],
+    'fm_broker_contracts': ['BrokerContract'],
+  };
+
+  // Map form component name → formCode used in SecurityContext permissions
+  const FORM_CODE_MAP = {
+    'TransactionMain':    'FIN_TRANSACTION_MAIN',
+    'TransactionReview':  'FIN_TRANSACTION_REVIEW',
+    'RequestManagement':  'REQ_REQUEST_MNGMT',
+    'RequestDetails':     'REQ_REQUEST_MNGMT',
+    'OrganizationInfo':   'organization_info_main',
+    'Parties':            'PARTIES',
+    'ChartOfAccountsMain':'CHART_OF_ACCOUNTS_MAIN',
+    'BrokerManagement':   'BROKER_MANAGEMENT',
+    'BrokerContract':     'BROKER_CONTRACT',
+  };
+
   const NotificationSidebar = ({ isOpen, onClose, language = 'fa', onUpdateUnread }) => {
     const DS = window.DesignSystem || {};
     const DSCore = window.DSCore || DS;
@@ -17,6 +43,8 @@
     const Toast = DSFeedback.Toast || (() => null);
     const NotificationCard = DSFeedback.NotificationCard || (() => null);
     const Drawer = DSOverlays.Drawer || (() => null);
+
+    const { hasAccess, isFullAccess } = (window.SecurityManager?.useSecurity?.() || {});
 
     const supabase = window.supabase;
 
@@ -107,14 +135,18 @@
       };
     }, [supabase]);
 
-    // mapping from entity_type to form component name
-    const ENTITY_FORM_MAP = {
-      'ORGANIZATION_INFO': 'OrganizationInfo',
-      'PARTIES': 'Parties',
-      'CHART_OF_ACCOUNTS': 'ChartOfAccountsMain',
-      'TRANSACTION_MAIN': 'TransactionMain',
-      'BROKER_CONTRACT': 'BrokerContract',
-      'BROKER_MANAGEMENT': 'BrokerManagement',
+    // Resolve the first form component the current user has access to for this entity_type.
+    // Returns null if the user has no access to any form that can show this entity.
+    const resolveFormComponent = (entityType) => {
+      if (!entityType) return null;
+      const candidates = ENTITY_TO_FORMS[entityType] || [];
+      if (candidates.length === 0) return null;
+      if (isFullAccess) return candidates[0];
+      for (const formComp of candidates) {
+        const code = FORM_CODE_MAP[formComp];
+        if (code && hasAccess && hasAccess(code)) return formComp;
+      }
+      return null; // no accessible form found
     };
 
     const handleNotificationClick = async (notif) => {
@@ -125,25 +157,31 @@
       onClose();
 
       const action = payload.action || 'open_record';
-      const formComponent = payload.form_component || ENTITY_FORM_MAP[payload.entity_type] || null;
 
       if (action === 'open_record' || action === 'open_comments') {
+        const formComponent = resolveFormComponent(payload.entity_type);
+
+        if (!formComponent) {
+          // User has no access to any form that can display this entity — do nothing
+          return;
+        }
+
         const dispatchFilter = () => {
           window.dispatchEvent(new CustomEvent('filterToRecord', {
-            detail: { entity_type: payload.entity_type, entity_id: payload.entity_id }
+            detail: {
+              form_component: formComponent,
+              entity_type: payload.entity_type,
+              entity_id: payload.entity_id
+            }
           }));
         };
 
-        if (formComponent) {
-          if (window.__navigateToForm) {
-            window.__navigateToForm(formComponent);
-            setTimeout(dispatchFilter, 300);
-          } else {
-            window.dispatchEvent(new CustomEvent('navigateToForm', { detail: { formComponent } }));
-            setTimeout(dispatchFilter, 500);
-          }
+        if (window.__navigateToForm) {
+          window.__navigateToForm(formComponent);
+          setTimeout(dispatchFilter, 300);
         } else {
-          dispatchFilter();
+          window.dispatchEvent(new CustomEvent('navigateToForm', { detail: { formComponent } }));
+          setTimeout(dispatchFilter, 500);
         }
       }
     };

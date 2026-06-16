@@ -88,7 +88,7 @@
 
     useEffect(() => {
       const handleFilterToRecord = (e) => {
-          if (e.detail && e.detail.entity_type === 'ORGANIZATION_INFO') {
+          if (e.detail && e.detail.form_component === 'OrganizationInfo') {
               setFilteredRecordId(String(e.detail.entity_id));
           }
       };
@@ -126,7 +126,7 @@
           const { data: commentRows } = await supabase
             .from('sys_comments')
             .select('entity_id')
-            .eq('entity_type', 'ORGANIZATION_INFO')
+            .eq('entity_type', 'organization_info')
             .in('entity_id', ids);
           if (commentRows) {
             setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
@@ -389,7 +389,7 @@
           <CommentModal 
             isOpen={commentModalOpen}
             onClose={() => { setCommentModalOpen(false); fetchData(); }}
-            entityType="ORGANIZATION_INFO"
+            entityType="organization_info"
             entityId={selectedEntityForComment.id}
             entityTitle={selectedEntityForComment.title}
             formTitle={t('اطلاعات سازمان', 'Organization Info')}

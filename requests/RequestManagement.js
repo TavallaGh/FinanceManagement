@@ -154,7 +154,7 @@
         if (visible.length > 0) {
           const reqIds = visible.map(r => String(r.id));
           const [{ data: commentRows }, { data: attachRows }] = await Promise.all([
-            supabase.from('sys_comments').select('entity_id').eq('entity_type', 'REQUEST_MANAGEMENT').in('entity_id', reqIds),
+            supabase.from('sys_comments').select('entity_id').eq('entity_type', 'req_requests').in('entity_id', reqIds),
             supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'REQUEST_MANAGEMENT').in('entity_id', reqIds),
           ]);
           if (commentRows) setCommentedIds(new Set(commentRows.map(c => c.entity_id)));
@@ -462,7 +462,7 @@
           <CommentModal
             isOpen={commentModalState.isOpen}
             onClose={() => { setCommentModalState({ isOpen: false, record: null }); fetchData(); }}
-            entityType="REQUEST_MANAGEMENT"
+            entityType="req_requests"
             entityId={commentModalState.record ? String(commentModalState.record.id) : ''}
             entityTitle={commentModalState.record ? `${t('کد:', 'Code:')} ${commentModalState.record.request_code || '-'}  |  ${t('شرح:', 'Desc:')} ${commentModalState.record.description || '-'}` : ''}
             formTitle={t('مدیریت درخواست‌ها', 'Request Management')}
