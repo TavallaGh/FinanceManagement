@@ -699,9 +699,9 @@
                 <button onClick={toggleTheme} className="flex items-center justify-center p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-600 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" title={t('تغییر تم', 'Change Theme')}>
                   {theme === 'dark' ? <Sun size={14} className="text-amber-500" /> : <Moon size={14} className="text-indigo-500" />}
                 </button>
-                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-slate-600 dark:text-slate-300 font-bold text-[11px] border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-sans" title={t(`منطقه زمانی: ${userTimezone}`, `Timezone: ${userTimezone}`)}>
-                  <Clock size={13} className="text-emerald-500 dark:text-emerald-400" />
-                  <span className="mt-[1px] text-[10px] tracking-wide">{userTimezone.split('/').pop()}</span>
+                <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-slate-600 dark:text-slate-300 font-bold text-[12px] border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-sans" title={t(`منطقه زمانی: ${userTimezone}`, `Timezone: ${userTimezone}`)}>
+                  <Clock size={14} className="text-emerald-500 dark:text-emerald-400" />
+                  <span className="mt-[1px] tracking-wide">{userTimezone.split('/').pop()}</span>
                 </div>
                 <button onClick={toggleCalendar} className="flex items-center gap-1 px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-600 dark:text-slate-300 font-bold text-[12px] transition-colors border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-sans tracking-wider" title={t('تغییر تقویم', 'Change Calendar')}>
                   <Calendar size={14} className="text-indigo-500 dark:text-indigo-400" /><span className="mt-[1px]">{calendarMode === 'jalali' ? 'Gre' : 'Ja'}</span>
