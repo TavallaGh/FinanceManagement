@@ -350,6 +350,7 @@
               formCode={formCode} isLoading={isLoading} hideImport={true}
               selectable={true} selectedIds={selectedIds} onSelectChange={setSelectedIds}
               gridState={gridState} onGridStateChange={setGridState}
+              actionWidth="180px"
               onAdd={access.canCreate ? () => setFormModal({ isOpen: true, mode: 'CREATE', record: null }) : undefined}
               onRowDoubleClick={row => setFormModal({ isOpen: true, mode: 'EDIT', record: row })}
               actions={[

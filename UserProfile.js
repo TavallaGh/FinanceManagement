@@ -96,6 +96,25 @@
     exchange:    { fa: 'صرافی',       en: 'Exchange'      },
   };
 
+  // ─── Common timezones list ──────────────────────────────────────────────────
+  const COMMON_TIMEZONES = [
+    { value: 'Asia/Tehran',          label: '(UTC+3:30) Tehran (تهران)', offset: '+03:30' },
+    { value: 'Asia/Dubai',           label: '(UTC+4:00) Dubai (دبی)', offset: '+04:00' },
+    { value: 'Europe/Istanbul',      label: '(UTC+3:00) Istanbul (استانبول)', offset: '+03:00' },
+    { value: 'Europe/London',        label: '(UTC+0:00) London (لندن)', offset: '+00:00' },
+    { value: 'Europe/Paris',         label: '(UTC+1:00) Paris (پاریس)', offset: '+01:00' },
+    { value: 'Europe/Berlin',        label: '(UTC+1:00) Berlin (برلین)', offset: '+01:00' },
+    { value: 'America/New_York',     label: '(UTC-5:00) New York (نیویورک)', offset: '-05:00' },
+    { value: 'America/Los_Angeles',  label: '(UTC-8:00) Los Angeles (لس‌آنجلس)', offset: '-08:00' },
+    { value: 'America/Chicago',      label: '(UTC-6:00) Chicago (شیکاگو)', offset: '-06:00' },
+    { value: 'America/Toronto',      label: '(UTC-5:00) Toronto (تورنتو)', offset: '-05:00' },
+    { value: 'Asia/Tokyo',           label: '(UTC+9:00) Tokyo (توکیو)', offset: '+09:00' },
+    { value: 'Asia/Shanghai',        label: '(UTC+8:00) Shanghai (شانگهای)', offset: '+08:00' },
+    { value: 'Asia/Singapore',       label: '(UTC+8:00) Singapore (سنگاپور)', offset: '+08:00' },
+    { value: 'Australia/Sydney',     label: '(UTC+10:00) Sydney (سیدنی)', offset: '+10:00' },
+    { value: 'Pacific/Auckland',     label: '(UTC+12:00) Auckland (اوکلند)', offset: '+12:00' },
+  ];
+
   // ─── Apply theme to DOM ──────────────────────────────────────────────────────
   const applyTheme = (theme) => {
     if (theme === 'dark') {
@@ -141,6 +160,7 @@
       theme:             'system',
       language:          'fa',
       calendarType:      'jalali',
+      timezone:          'Asia/Tehran',
       defaultCostTypeId: '',
     });
 
@@ -306,7 +326,7 @@
       try {
         const { data, error } = await supabase
           .from('fm_user_preferences')
-          .select('theme, language, calendar_type, default_cost_type_id, photo_url')
+          .select('theme, language, calendar_type, timezone, default_cost_type_id, photo_url')
           .eq('user_id', userId)
           .maybeSingle();
         if (!error && data) {
@@ -314,6 +334,7 @@
             theme:             data.theme             ?? 'system',
             language:          data.language          ?? 'fa',
             calendarType:      data.calendar_type     ?? 'jalali',
+            timezone:          data.timezone          ?? 'Asia/Tehran',
             defaultCostTypeId: data.default_cost_type_id ?? '',
           });
           if (data.photo_url) {
@@ -412,6 +433,7 @@
               theme:                preferences.theme,
               language:             preferences.language,
               calendar_type:        preferences.calendarType,
+              timezone:             preferences.timezone,
               default_cost_type_id: preferences.defaultCostTypeId || null,
               updated_at:           new Date().toISOString(),
             },
@@ -583,6 +605,18 @@
                           : <span className="text-[11px] text-slate-400 px-1">{t('ندارد', 'None')}</span>
                         }
                       </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        <Globe size={12} /> {t('منطقه زمانی', 'Timezone')}
+                      </label>
+                      <SelectField
+                        size="sm"
+                        value={preferences.timezone}
+                        onChange={e => setPreferences(p => ({ ...p, timezone: e.target.value }))}
+                        options={COMMON_TIMEZONES.map(tz => ({ value: tz.value, label: tz.label }))}
+                        isRtl={isRtl}
+                      />
                     </div>
                   </div>
                 </div>
@@ -774,9 +808,9 @@
             {/* Panel footer */}
             <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end items-center shrink-0 rounded-b-xl gap-2 h-12">
               {activeTab === 'personal' && (
-                <span className="text-[11px] text-slate-500 font-bold ml-auto">
-                  {t('اطلاعات شخصی فقط جهت نمایش است.', 'Personal info is read-only.')}
-                </span>
+                <Button variant="primary" size="sm" icon={Save} onClick={handleSavePreferences} isLoading={isLoading}>
+                  {t('ذخیره تغییرات', 'Save Changes')}
+                </Button>
               )}
               {(activeTab === 'preferences' || activeTab === 'financial') && (
                 <Button variant="primary" size="sm" icon={Save} onClick={handleSavePreferences} isLoading={isLoading}>

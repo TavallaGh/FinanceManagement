@@ -32,7 +32,6 @@
   const TextField         = safeComp(DSForms, 'TextField');
   const SelectField       = safeComp(DSForms, 'SelectField');
   const DatePicker        = safeComp(DSForms, 'DatePicker');
-  const AttachmentManager = safeComp(DSForms, 'AttachmentManager');
 
   const DSFeedback  = window.DSFeedback || window.DSOverlays || DS;
   const Modal       = safeComp(DSFeedback, 'Modal');
@@ -50,7 +49,6 @@
   const Lock          = safeIcon(LucideIcons, 'Lock');
   const PlayCircle    = safeIcon(LucideIcons, 'PlayCircle');
   const CheckSquare   = safeIcon(LucideIcons, 'CheckSquare');
-  const Paperclip     = safeIcon(LucideIcons, 'Paperclip');
 
   // ── Shared constants ───────────────────────────────────────────────────────
   const REQUEST_TYPES = [
@@ -58,6 +56,14 @@
     { value: 'CONVERSION', fa: 'تبدیل',   en: 'Conversion' },
     { value: 'BUDGET',     fa: 'بودجه',   en: 'Budget'     },
     { value: 'GENERAL',    fa: 'عمومی',   en: 'General'    },
+  ];
+
+  const PAYMENT_TYPES = [
+    { value: 'CASH',   fa: 'نقد',     en: 'Cash'   },
+    { value: 'CHECK',  fa: 'چک',      en: 'Check'  },
+    { value: 'CRYPTO', fa: 'کریپتو',  en: 'Crypto' },
+    { value: 'BANK',   fa: 'بانک',    en: 'Bank'   },
+    { value: 'TC',     fa: 'TC',      en: 'TC'     },
   ];
 
   const STATUS_LIST = [
@@ -119,26 +125,15 @@
     const [copyWarning, setCopyWarning] = useState(null);
     const [header,      setHeader]      = useState({});
     const [items,       setItems]       = useState([]);
-    const [attachFiles, setAttachFiles] = useState([]);
-    const [isUploading, setIsUploading] = useState(false);
     const [lookups,     setLookups]     = useState({
       leafAccounts: [], allAccounts: [], costTypes: [], incomeTypes: [],
-      currencies: [], usersMap: {}, usersList: [], partiesMap: {},
+      currencies: [], usersMap: {}, usersList: [], partiesMap: {}, partiesList: [],
       nodesMap: {}, currentUserDeptId: null, currentUserDeptTitle: '',
       currentUserPartyId: null, currentUserPartyName: '',
     });
 
     const gridRef     = useRef(null);
     const initialized = useRef(false);
-
-    const loadAttachments = useCallback(async (recordId) => {
-      if (!supabase || !recordId) return;
-      try {
-        const { data } = await supabase.from('fm_attachments').select('*')
-          .eq('entity_type', 'REQUEST_MANAGEMENT').eq('entity_id', String(recordId));
-        setAttachFiles(data || []);
-      } catch {}
-    }, [supabase]);
 
     const isReadOnly = useMemo(
       () => formMode !== 'CREATE' && formMode !== 'COPY' && lockedStatuses.includes(header.status || ''),
@@ -156,7 +151,7 @@
             supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
             supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
             supabase.from('sec_users').select('id, full_name, username, party_id'),
-            supabase.from('parties').select('id, first_name, last_name, company_name, party_type'),
+            supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, mobile').eq('is_active', true),
             supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
             supabase.from('fm_org_chart_nodes').select('id, title'),
             supabase.from('fm_currencies').select('id, code, title'),
@@ -194,10 +189,15 @@
         (usersRes.data || []).forEach(u => { usersMap[u.id] = u.full_name || u.username || ''; });
 
         const partiesMap = {};
-        (partiesRes.data || []).forEach(p => {
-          partiesMap[p.id] = p.party_type === 'legal'
+        const partiesList = (partiesRes.data || []).map(p => {
+          const name = p.party_type === 'legal'
             ? (p.company_name || '')
             : `${p.first_name || ''} ${p.last_name || ''}`.trim();
+          partiesMap[p.id] = name;
+          return {
+            ...p,
+            displayLabel: name,
+          };
         });
 
         const nodesMap = {};
@@ -218,7 +218,7 @@
           costTypes:    buildLeafs(costRes.data   || []),
           incomeTypes:  buildLeafs(incRes.data    || []),
           currencies:   currRes.data || [],
-          usersMap, usersList: usersRes.data || [], partiesMap, nodesMap,
+          usersMap, usersList: usersRes.data || [], partiesMap, partiesList, nodesMap,
           currentUserDeptId: myDeptId, currentUserDeptTitle: myDeptTitle,
           currentUserPartyId: myPartyId, currentUserPartyName: myPartyName,
         };
@@ -264,11 +264,11 @@
             created_at:        new Date().toISOString(),
             need_date:         '',
             request_type:      'GENERAL',
+            payment_type:      '',
             description:       '',
             status:            'DRAFT',
           });
           setItems([]);
-          setAttachFiles([]);
           setIsDirty(false);
           setHasSaved(false);
 
@@ -289,6 +289,7 @@
             department_title:   lk.currentUserDeptTitle,
             created_at:         new Date().toISOString(),
             need_date:          '',
+            payment_type:       initialRecord.payment_type || '',
             reviewer_id: null, reviewer_name: null, reviewed_at: null,
             approver_id: null, approver_name: null, approved_at: null,
           });
@@ -297,13 +298,13 @@
             _tempId:           crypto.randomUUID(),
             id:                undefined,
             request_id:        undefined,
+            account_id:        undefined,
             deposit_amount:    item.deposit_amount    != null ? parseFloat(item.deposit_amount)    : 0,
             withdrawal_amount: item.withdrawal_amount != null ? parseFloat(item.withdrawal_amount) : 0,
             approved_amount:   0,
             remaining_amount:  0,
           })).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
           setItems(mapped);
-          setAttachFiles([]);
           setIsDirty(true);
           setHasSaved(false);
 
@@ -318,6 +319,7 @@
           const mapped = (initialRecord.req_request_items || []).map(item => ({
             ...item,
             _tempId:           crypto.randomUUID(),
+            account_id:        undefined,
             deposit_amount:    item.deposit_amount    != null ? parseFloat(item.deposit_amount)    : 0,
             withdrawal_amount: item.withdrawal_amount != null ? parseFloat(item.withdrawal_amount) : 0,
             approved_amount:   item.approved_amount   != null ? parseFloat(item.approved_amount)   : 0,
@@ -326,7 +328,6 @@
           setItems(mapped);
           setIsDirty(false);
           setHasSaved(false);
-          loadAttachments(initialRecord.id);
         }
       });
     }, [isOpen, formMode, initialRecord]);
@@ -335,58 +336,6 @@
       setHeader(p => ({ ...p, [field]: value }));
       setIsDirty(true);
     }, []);
-
-    const handleFileUpload = useCallback(async (files) => {
-      if (!files || files.length === 0) return;
-      if (!header.id) {
-        showToast(t('ابتدا درخواست را ذخیره کنید تا بتوانید پیوست اضافه کنید.', 'Save the request first to add attachments.'), 'warning');
-        return;
-      }
-      const file = files[0];
-      setIsUploading(true);
-      try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${header.id}_${Date.now()}.${fileExt}`;
-        const filePath = `requests/${fileName}`;
-        let fileUrl = '';
-        if (supabase.storage) {
-          const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, file);
-          if (uploadError) throw uploadError;
-          const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
-          fileUrl = urlData.publicUrl;
-        } else {
-          fileUrl = URL.createObjectURL(file);
-        }
-        const payload = {
-          entity_type: 'REQUEST_MANAGEMENT',
-          entity_id:   String(header.id),
-          file_name:   file.name,
-          file_size:   file.size,
-          file_type:   file.type || 'application/octet-stream',
-          file_url:    fileUrl,
-          created_by:  currentUserId,
-        };
-        const { error } = await supabase.from('fm_attachments').insert([payload]);
-        if (error) throw error;
-        showToast(t('فایل با موفقیت پیوست شد.', 'File attached successfully.'));
-        loadAttachments(header.id);
-      } catch {
-        showToast(t('خطا در آپلود فایل.', 'Error uploading file.'), 'error');
-      } finally {
-        setIsUploading(false);
-      }
-    }, [supabase, header.id, currentUserId, showToast, t, loadAttachments]);
-
-    const handleDeleteAttachment = useCallback(async (file) => {
-      try {
-        const { error } = await supabase.from('fm_attachments').delete().eq('id', file.id);
-        if (error) throw error;
-        showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
-        loadAttachments(header.id);
-      } catch {
-        showToast(t('خطا در حذف پیوست.', 'Error deleting attachment.'), 'error');
-      }
-    }, [supabase, header.id, showToast, t, loadAttachments]);
 
     // ── save ─────────────────────────────────────────────────────────────
     const handleSave = async (overrideStatus) => {
@@ -419,6 +368,7 @@
           department_id:      header.department_id || null,
           need_date:          header.need_date || null,
           request_type:       header.request_type || 'GENERAL',
+          payment_type:       header.payment_type || null,
           description:        header.description || '',
           status:             statusToSave,
           ...metaPayload,
@@ -440,18 +390,51 @@
         }
 
         if (isDirty || !header.id) {
+          // validation بالانس برای انتقال و تبدیل
+          if ((header.request_type === 'TRANSFER' || header.request_type === 'CONVERSION') && items.length > 0) {
+            const currencies = lookups.currencies || [];
+            const usdCurrency = currencies.find(c => c.code === 'USD');
+            const irrCurrency = currencies.find(c => c.code === 'IRR');
+            
+            let usdBalance = 0, irrBalance = 0;
+            items.forEach(item => {
+              const parse = v => parseFloat(String(v || '0').replace(/,/g, '')) || 0;
+              const dep = parse(item.deposit_amount);
+              const wid = parse(item.withdrawal_amount);
+              const net = dep - wid;
+              
+              if (item.currency === 'USD') usdBalance += net;
+              else if (item.currency === 'IRR') irrBalance += net;
+            });
+            
+            const tolerance = 0.01;
+            if (Math.abs(usdBalance) > tolerance || Math.abs(irrBalance) > tolerance) {
+              showToast(
+                t(
+                  `بالانس درخواست ${header.request_type === 'TRANSFER' ? 'انتقال' : 'تبدیل'} صحیح نیست. دلار: ${usdBalance.toFixed(2)}, ریال: ${irrBalance.toFixed(2)}`,
+                  `${header.request_type === 'TRANSFER' ? 'Transfer' : 'Conversion'} balance mismatch. USD: ${usdBalance.toFixed(2)}, IRR: ${irrBalance.toFixed(2)}`
+                ),
+                'error'
+              );
+              setIsLoading(false);
+              return;
+            }
+          }
+
           await supabase.from('req_request_items').delete().eq('request_id', reqId);
           if (items.length > 0) {
             const parse = v => parseFloat(String(v || '0').replace(/,/g, '')) || 0;
             const itemsPayload = items.map((item, idx) => ({
               request_id:         reqId,
               row_number:         idx + 1,
-              account_id:         item.account_id         || null,
               currency:           item.currency           || null,
               transaction_action: item.transaction_action || 'DEPOSIT',
               transaction_group:  item.transaction_group  || null,
               cost_type_id:       item.cost_type_id       || null,
               income_type_id:     item.income_type_id     || null,
+              party_id:           item.party_id           || null,
+              department_id:      item.department_id      || null,
+              project_id:         item.project_id         || null,
               deposit_amount:     parse(item.deposit_amount),
               withdrawal_amount:  parse(item.withdrawal_amount),
               approved_amount:    parse(item.approved_amount),
@@ -489,6 +472,28 @@
     };
 
     const handleClose = () => { if (hasSaved && onSuccess) onSuccess(); else onClose(); };
+    
+    // ── balance check for TRANSFER and CONVERSION ───────────────────────────────────
+    const balanceInfo = useMemo(() => {
+      if ((header.request_type !== 'TRANSFER' && header.request_type !== 'CONVERSION') || items.length === 0) return { isUnbalanced: false, diffUsd: 0, diffIrr: 0 };
+      
+      let usdBalance = 0, irrBalance = 0;
+      items.forEach(item => {
+        const parse = v => parseFloat(String(v || '0').replace(/,/g, '')) || 0;
+        const dep = parse(item.deposit_amount);
+        const wid = parse(item.withdrawal_amount);
+        const net = dep - wid;
+        
+        if (item.currency === 'USD') usdBalance += net;
+        else if (item.currency === 'IRR') irrBalance += net;
+      });
+      
+      const tolerance = 0.01;
+      const isUnbalanced = Math.abs(usdBalance) > tolerance || Math.abs(irrBalance) > tolerance;
+      
+      return { isUnbalanced, diffUsd: usdBalance, diffIrr: irrBalance };
+    }, [header.request_type, items]);
+    
     if (!isOpen) return null;
 
     const statusInfo = getStatus(header.status || 'DRAFT');
@@ -626,6 +631,14 @@
                   )}
                 </div>
 
+                <div className="relative z-[78]">
+                  <SelectField size="sm" label={t('نوع پرداخت', 'Payment Type')}
+                    value={header.payment_type || ''}
+                    onChange={e => updateHeader('payment_type', e.target.value)}
+                    options={PAYMENT_TYPES.map(r => ({ value: r.value, label: isRtl ? r.fa : r.en }))}
+                    isRtl={isRtl} disabled={isReadOnly} required />
+                </div>
+
                 {(header.reviewer_id || header.reviewer_name) && (<>
                   <TextField size="sm" label={t('بررسی کننده', 'Reviewed By')}
                     value={header.reviewer_name || lookups.usersMap[header.reviewer_id] || '-'} disabled isRtl={isRtl} />
@@ -648,7 +661,25 @@
               </div>
             </Card>
 
-            <Card title={t('اقلام درخواست', 'Request Items')}
+            <Card title={
+              <div className="flex items-center gap-4 w-full">
+                <span>{t('اقلام درخواست', 'Request Items')}</span>
+                {balanceInfo.isUnbalanced && (
+                  <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800/50">
+                    <AlertTriangle size={14} />
+                    <span className="text-[11px] font-bold">
+                      {t('مغایرت بالانس:', 'Balance Diff:')}
+                      {Math.abs(balanceInfo.diffUsd) > 0.01 && (
+                        <span dir="ltr" className="inline-block px-1 font-black">USD: {balanceInfo.diffUsd.toFixed(2)}</span>
+                      )}
+                      {Math.abs(balanceInfo.diffIrr) > 0.01 && (
+                        <span dir="ltr" className="inline-block px-1 font-black">IRR: {balanceInfo.diffIrr.toFixed(2)}</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            }
               isCollapsible={true} noPadding={true}
               className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[320px] relative z-10"
               headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
@@ -665,41 +696,6 @@
                   showToast={showToast}
                   formCode={formCode}
                 />
-              </div>
-            </Card>
-
-            <Card
-              title={
-                <div className="flex items-center gap-2">
-                  <Paperclip size={14} />
-                  <span>{t('پیوست‌ها', 'Attachments')}</span>
-                  {attachFiles.length > 0 && (
-                    <Badge variant="indigo" className="!py-0 !px-1.5 text-[10px]">{attachFiles.length}</Badge>
-                  )}
-                </div>
-              }
-              isCollapsible={true} noPadding={true} defaultCollapsed={true}
-              className="border border-slate-200 dark:border-slate-700 shadow-sm shrink-0"
-              headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
-              language={language}>
-              <div className="p-3 bg-white dark:bg-slate-800 min-h-[200px]">
-                {!header.id ? (
-                  <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 text-[12px] py-6">
-                    <AlertTriangle size={14} />
-                    {t('ابتدا درخواست را ذخیره کنید تا بتوانید پیوست اضافه کنید.', 'Save the request first to add attachments.')}
-                  </div>
-                ) : (
-                  <AttachmentManager
-                    files={attachFiles}
-                    onUpload={handleFileUpload}
-                    onDelete={handleDeleteAttachment}
-                    onDownload={(f) => window.open(f.file_url, '_blank')}
-                    readOnly={isReadOnly}
-                    isUploading={isUploading}
-                    language={language}
-                    formCode={formCode}
-                  />
-                )}
               </div>
             </Card>
 
