@@ -49,7 +49,7 @@
         let cls = 'text-xs text-slate-700 dark:text-slate-300';
         if (variant === 'h1') cls = 'text-xl font-extrabold text-slate-900 dark:text-white';
         if (variant === 'h2') cls = 'text-lg font-bold text-slate-900 dark:text-white';
-        if (variant === 'caption') cls = 'text-[11px] text-slate-500 dark:text-slate-400';
+        if (variant === 'caption') cls = 'text-[12px] text-slate-500 dark:text-slate-400';
         if (weight === 'bold') cls += ' font-bold';
         if (weight === 'medium') cls += ' font-medium';
         if (color === 'primary') cls += ' text-indigo-600 dark:text-indigo-400';
@@ -76,7 +76,7 @@
             warning: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200',
             primary: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200'
         };
-        return React.createElement('span', { className: `px-2 py-0.5 text-[11px] font-bold border rounded-md whitespace-nowrap ${colors[variant] || colors.primary} ${className}` }, children);
+        return React.createElement('span', { className: `px-2 py-0.5 text-[12px] font-bold border rounded-md whitespace-nowrap ${colors[variant] || colors.primary} ${className}` }, children);
     });
 
     const Divider = safeGet('Divider') || (({ margin = 'md', className = '' }) => {
@@ -142,7 +142,7 @@
     ));
 
     const Select = safeGet('Select') || (({ label, options, value, onChange, fullWidth }) => React.createElement('div', { className: `flex flex-col gap-1 ${fullWidth ? 'w-full' : ''}` },
-        label && React.createElement('label', { className: "text-[11px] font-bold text-slate-500 dark:text-slate-400" }, label),
+        label && React.createElement('label', { className: "text-[12px] font-bold text-slate-500 dark:text-slate-400" }, label),
         React.createElement('select', { value, onChange: (e) => onChange(e.target.value), className: "w-full border border-slate-300 dark:border-slate-600 rounded-md p-1.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" },
             options.map(o => React.createElement('option', { key: o.value, value: o.value }, o.label))
         )
@@ -151,7 +151,7 @@
     const SimplePrintTable = ({ columns, rows, totals, language, showGroupTotals }) => {
         const isRtl = language === 'fa';
         return React.createElement('div', { className: "w-full overflow-hidden border border-slate-300 mt-4 rounded shadow-sm" },
-            React.createElement('table', { className: `w-full text-[11px] text-slate-900 border-collapse ${isRtl ? 'text-right' : 'text-left'}` },
+            React.createElement('table', { className: `w-full text-[12px] text-slate-900 border-collapse ${isRtl ? 'text-right' : 'text-left'}` },
                 React.createElement('thead', { className: "bg-slate-100 border-b-2 border-slate-300 text-slate-800" },
                     React.createElement('tr', null,
                         columns.map((c, i) => React.createElement('th', { key: i, className: "px-2 py-2 font-bold text-center border-x border-slate-200", style: { width: c.width } }, c.header))
@@ -540,7 +540,7 @@
                         @page { size: A5 landscape; margin: 10mm; }
                         body { 
                             font-family: Tahoma, Arial, "IRANSans", sans-serif; 
-                            font-size: 11px; 
+                            font-size: 12px; 
                             color: #000; 
                             background: #fff;
                             margin: 0; 
@@ -570,7 +570,7 @@
                         .info-label { font-weight: normal; color: #555; }
                         .info-val { font-weight: bold; }
                         
-                        .desc-box { margin-bottom: 10px; padding: 5px 10px; font-size: 11px; display: flex; gap: 5px; }
+                        .desc-box { margin-bottom: 10px; padding: 5px 10px; font-size: 12px; display: flex; gap: 5px; }
                         
                         table { width: 100%; border-collapse: collapse; margin-bottom: 0; font-size: 10px; }
                         th, td { border: 1px solid #000; padding: 4px 6px; text-align: ${isRtl ? 'right' : 'left'}; }
@@ -593,9 +593,9 @@
                             text-align: center;
                         }
                         .sig-box { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-                        .sig-title { font-weight: bold; font-size: 11px; color: #333; margin-bottom: 30px; }
+                        .sig-title { font-weight: bold; font-size: 12px; color: #333; margin-bottom: 30px; }
                         .sig-line { width: 80%; border-top: 1px dashed #666; margin-bottom: 5px; }
-                        .sig-name { font-size: 11px; font-weight: bold; }
+                        .sig-name { font-size: 12px; font-weight: bold; }
                     </style>
                 </head>
                 <body>

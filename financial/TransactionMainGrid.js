@@ -367,7 +367,7 @@
             onAdd={isReadOnly ? undefined : handleAddItemClick} 
             hideImport={true} 
             hideExport={true} 
-            hideToolbar={true}
+            hideToolbar={false}
             selectable={!isReadOnly} 
             bulkActions={itemBulkActions} 
             onRowDoubleClick={(row) => handleEditItemClick(row)} 

@@ -110,7 +110,11 @@
                 exchange_rate_to_usd: toUsd,
                 exchange_rate_usd_to_irr: usdToIrr,
                 amount_usd: usd,
-                amount_irr: irr
+                amount_irr: irr,
+                dep_usd: rawDep * toUsd,
+                dep_irr: rawDep * toUsd * usdToIrr,
+                wid_usd: rawWid * toUsd,
+                wid_irr: rawWid * toUsd * usdToIrr,
             };
         });
 
@@ -136,19 +140,72 @@
         onClose();
     };
 
+    // ── AmountCell: original amount + ≈$ + ≈﷼ stacked (same format as RequestSummary) ──
+    const AmountCell = ({ amount, usd, irr, cur, isDeposit }) => {
+        if (!amount) return <span className="text-slate-300 dark:text-slate-600 text-[12px]" dir="ltr">—</span>;
+        const mainColor = isDeposit ? 'text-emerald-600 dark:text-emerald-500' : 'text-rose-500 dark:text-rose-400';
+        return (
+            <div className="flex flex-col gap-[3px]" dir="ltr">
+                <span className={`font-bold text-[12px] ${mainColor}`}>
+                    {formatNumber(amount)}&nbsp;<span className="text-[10px] font-semibold">{cur}</span>
+                </span>
+                <span className="text-[10px] text-slate-400">≈&nbsp;$&nbsp;{formatNumber(usd)}</span>
+                <span className="text-[10px] text-slate-400">≈&nbsp;﷼&nbsp;{formatNumber(irr)}</span>
+            </div>
+        );
+    };
+
     const summaryColumns = [
-        { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px' },
-        { field: 'account_id', header_fa: 'حساب', header_en: 'Account', width: 'minmax(120px, 1fr)', render: val => {
-            const acc = (lookups?.accounts || []).find(a => a.id === val);
-            return <span className="font-bold text-slate-700 dark:text-slate-300 truncate block" title={acc ? acc.displayLabel : val}>{acc ? acc.displayLabel : val}</span>;
-        }},
-        { field: 'deposit_amount', header_fa: 'مبلغ واریز', header_en: 'Deposit', width: '110px', render: val => <span dir="ltr" className="text-emerald-600 dark:text-emerald-400 font-bold">{formatNumber(val)}</span> },
-        { field: 'withdrawal_amount', header_fa: 'مبلغ برداشت', header_en: 'Withdrawal', width: '110px', render: val => <span dir="ltr" className="text-orange-600 dark:text-orange-400 font-bold">{formatNumber(val)}</span> },
-        { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '60px', render: val => <Badge size="sm" variant="slate">{val}</Badge> },
-        { field: 'exchange_rate_to_usd', header_fa: 'نرخ به دلار', header_en: 'USD Rate', width: '80px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
-        { field: 'amount_usd', header_fa: 'مبلغ به دلار', header_en: 'USD Amount', width: '110px', render: val => <span dir="ltr" className="font-bold text-slate-800 dark:text-slate-200">{formatNumber(val)}</span> },
-        { field: 'exchange_rate_usd_to_irr', header_fa: 'نرخ دلار به ریال', header_en: 'USD to IRR Rate', width: '110px', render: val => <span dir="ltr">{formatNumber(val)}</span> },
-        { field: 'amount_irr', header_fa: 'مبلغ به ریال', header_en: 'IRR Amount', width: '120px', render: val => <span dir="ltr" className="font-bold text-slate-800 dark:text-slate-200">{formatNumber(val)}</span> },
+        {
+            field: 'row_number', header_fa: '#', header_en: '#', width: '32px',
+            render: val => <span className="text-[12px] text-slate-400">{val}</span>,
+        },        
+        {
+            field: 'account_id', header_fa: 'حساب', header_en: 'Account', width: '120px',
+            render: val => {
+                const acc = (lookups?.accounts || []).find(a => a.id === val);
+                return <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate block" title={acc ? acc.displayLabel : val}>{acc ? acc.displayLabel : (val || '—')}</span>;
+            },
+        },
+        {
+            field: 'currency', header_fa: 'ارز / نوع', header_en: 'Cur / Type', width: '65px',
+            render: (val, row) => {
+                const isDep = row.transaction_action === 'DEPOSIT';
+                return (
+                    <div className="flex flex-col gap-0.5 items-start">
+                        <Badge size="sm" variant="slate">{val}</Badge>
+                        <span className={`text-[10px] font-bold ${isDep ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
+                            {isRtl ? (isDep ? '↑ واریز' : '↓ برداشت') : (isDep ? '↑ Dep' : '↓ Wid')}
+                        </span>
+                    </div>
+                );
+            },
+        },
+        {
+            field: 'exchange_rate_to_usd', header_fa: 'نرخ تبدیل', header_en: 'Rates', width: '90px',
+            render: (val, row) => (
+                <div className="flex flex-col gap-[2px]" dir="ltr">
+                    <span className="text-[10px] text-slate-500">
+                        1 {row.currency} = <span className="font-bold text-slate-700 dark:text-slate-300">{formatNumber(val)}</span> $
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                        1 $ = <span className="font-bold text-slate-700 dark:text-slate-300">{formatNumber(row.exchange_rate_usd_to_irr)}</span> ﷼
+                    </span>
+                </div>
+            ),
+        },
+        {
+            field: 'deposit_amount', header_fa: 'واریز', header_en: 'Deposit', width: '110px',
+            render: (val, row) => <AmountCell amount={val} usd={row.dep_usd} irr={row.dep_irr} cur={row.currency} isDeposit={true} />,
+        },
+        {
+            field: 'withdrawal_amount', header_fa: 'برداشت', header_en: 'Withdrawal', width: '110px',
+            render: (val, row) => <AmountCell amount={val} usd={row.wid_usd} irr={row.wid_irr} cur={row.currency} isDeposit={false} />,
+        },
+        {
+            field: 'description', header_fa: 'شرح', header_en: 'Description', width: '120px',
+            render: val => <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate block" title={val || ''}>{val || '—'}</span>,
+        },
     ];
 
     const modalWidthClass = showGrid ? "max-w-6xl" : "max-w-xs";
@@ -228,7 +285,7 @@
 
                 {/* Data Grid Column */}
                 {showGrid && (
-                    <div className="flex-1 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 flex flex-col min-w-0 min-h-[350px] animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex-1 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 flex flex-col min-w-0 animate-in fade-in zoom-in-95 duration-200" style={{ height: isTransfer ? '350px' : '280px' }}>
                         <DataGrid 
                             data={mappedItems} 
                             columns={summaryColumns} 

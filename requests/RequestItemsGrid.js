@@ -40,8 +40,8 @@
   // ── Constants (must stay in sync with RequestDetails.js) ──────────────────
   const TYPES_WITH_GROUP = ['GENERAL', 'BUDGET'];
   const TYPES_WITH_TRANSFER = ['TRANSFER'];
-  const TYPES_WITH_CONVERSION = ['CONVERSION'];
-  const TYPES_BALANCED = ['TRANSFER', 'CONVERSION'];
+  const TYPES_WITH_EXCHANGE = ['EXCHANGE'];
+  const TYPES_BALANCED = ['TRANSFER', 'EXCHANGE'];
 
   const formatNumberSafe = (val, forDisplay = false) => {
     if (val === null || val === undefined || val === '') return forDisplay ? '0' : '';
@@ -64,7 +64,7 @@
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
     const showGroup = TYPES_WITH_GROUP.includes(requestType);
     const isTransfer = TYPES_WITH_TRANSFER.includes(requestType);
-    const isConversion = TYPES_WITH_CONVERSION.includes(requestType);
+    const isExchange = TYPES_WITH_EXCHANGE.includes(requestType);
     const isBalanced = TYPES_BALANCED.includes(requestType);
     const isBudget = requestType === 'BUDGET';
 
@@ -95,7 +95,7 @@
       if (isReadOnly) return;
       if (inlineItemEdit) return showToast(t('ابتدا با Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
       
-      // پیشنهاد خودکار ارز از آخرین ردیف در TRANSFER و CONVERSION
+      // پیشنهاد خودکار ارز از آخرین ردیف در TRANSFER و EXCHANGE
       let suggestedCurrency = '';
       if (isBalanced && itemsData.length > 0) {
         const lastItem = itemsData[itemsData.length - 1];
@@ -223,7 +223,7 @@
     const partyLovCols = [
       { field: 'code',         header_fa: 'کد',      header_en: 'Code',   width: '90px' },
       { field: 'displayLabel', header_fa: 'نام',     header_en: 'Name',   width: '200px' },
-      { field: 'mobile',       header_fa: 'موبایل',  header_en: 'Mobile', width: '120px', render: (val) => <span dir="ltr" className="font-mono text-[11px]">{val || '-'}</span> },
+      { field: 'mobile',       header_fa: 'موبایل',  header_en: 'Mobile', width: '120px', render: (val) => <span dir="ltr" className="font-mono text-[12px]">{val || '-'}</span> },
     ];
 
     const deptLovCols = [
@@ -537,9 +537,9 @@
       ...(isBudget ? [] : [baseColumns[1]]), // نوع (واریز/برداشت) - مخفی در BUDGET
       ...(showGroup ? [groupColumns[0]] : []), // گروه
       ...(showGroup ? [groupColumns[1]] : []), // نوع هزینه/درآمد
-      ...(isConversion || isBudget ? [] : [partyColumn]), // طرف مقابل - مخفی در CONVERSION و BUDGET
-      ...(isConversion ? [] : (isTransfer ? [transferDepartmentColumn] : [generalDepartmentColumn])), // دپارتمان - مخفی در CONVERSION
-      ...(isConversion ? [] : [projectColumn]), // پروژه - مخفی در CONVERSION
+      ...(isExchange || isBudget ? [] : [partyColumn]), // طرف مقابل - مخفی در EXCHANGE و BUDGET
+      ...(isExchange ? [] : (isTransfer ? [transferDepartmentColumn] : [generalDepartmentColumn])), // دپارتمان - مخفی در EXCHANGE
+      ...(isExchange ? [] : [projectColumn]), // پروژه - مخفی در EXCHANGE
       currencyColumn, // ارز
       amountColumns[0], // مبلغ واریز
       ...(isBudget ? [] : [amountColumns[1]]), // مبلغ برداشت - مخفی در BUDGET
@@ -590,7 +590,7 @@
         onAdd={isReadOnly ? undefined : handleAddItemClick}
         hideImport={true}
         hideExport={true}
-        hideToolbar={true}
+        hideToolbar={false}
         selectable={!isReadOnly}
         bulkActions={itemBulkActions}
         onRowDoubleClick={(row) => handleEditItemClick(row)}

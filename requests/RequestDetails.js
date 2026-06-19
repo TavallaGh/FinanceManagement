@@ -52,10 +52,10 @@
 
   // ── Shared constants ───────────────────────────────────────────────────────
   const REQUEST_TYPES = [
-    { value: 'TRANSFER',   fa: 'انتقال',  en: 'Transfer'   },
-    { value: 'CONVERSION', fa: 'تبدیل',   en: 'Conversion' },
-    { value: 'BUDGET',     fa: 'بودجه',   en: 'Budget'     },
-    { value: 'GENERAL',    fa: 'عمومی',   en: 'General'    },
+    { value: 'TRANSFER',   fa: 'انتقال وجه',  en: 'Transfer'   },
+    { value: 'EXCHANGE',   fa: 'تبدیل ارز',   en: 'Exchange' },
+    { value: 'BUDGET',     fa: 'مصرف بودجه',   en: 'Budget'     },
+    { value: 'GENERAL',    fa: 'واریز/ برداشت',   en: 'General'    },
   ];
 
   const PAYMENT_TYPES = [
@@ -391,7 +391,7 @@
 
         if (isDirty || !header.id) {
           // validation بالانس برای انتقال و تبدیل
-          if ((header.request_type === 'TRANSFER' || header.request_type === 'CONVERSION') && items.length > 0) {
+          if ((header.request_type === 'TRANSFER' || header.request_type === 'EXCHANGE') && items.length > 0) {
             const currencies = lookups.currencies || [];
             const usdCurrency = currencies.find(c => c.code === 'USD');
             const irrCurrency = currencies.find(c => c.code === 'IRR');
@@ -411,8 +411,8 @@
             if (Math.abs(usdBalance) > tolerance || Math.abs(irrBalance) > tolerance) {
               showToast(
                 t(
-                  `بالانس درخواست ${header.request_type === 'TRANSFER' ? 'انتقال' : 'تبدیل'} صحیح نیست. دلار: ${usdBalance.toFixed(2)}, ریال: ${irrBalance.toFixed(2)}`,
-                  `${header.request_type === 'TRANSFER' ? 'Transfer' : 'Conversion'} balance mismatch. USD: ${usdBalance.toFixed(2)}, IRR: ${irrBalance.toFixed(2)}`
+                  `بالانس درخواست ${header.request_type === 'TRANSFER' ? 'انتقال وجه' : 'تبدیل ارز'} صحیح نیست. دلار: ${usdBalance.toFixed(2)}, ریال: ${irrBalance.toFixed(2)}`,
+                  `${header.request_type === 'TRANSFER' ? 'Transfer' : 'Exchange'} balance mismatch. USD: ${usdBalance.toFixed(2)}, IRR: ${irrBalance.toFixed(2)}`
                 ),
                 'error'
               );
@@ -464,7 +464,7 @@
           ? t('وضعیت درخواست تغییر کرد.', 'Request status updated.')
           : t('درخواست با موفقیت ذخیره شد.', 'Request saved successfully.'));
       } catch (err) {
-        console.error('RequestFormModal save error:', err);
+        console.error('RequestFormModal save error:', err?.message || err, '| code:', err?.code, '| details:', err?.details, '| hint:', err?.hint);
         showToast(t('خطا در ذخیره درخواست.', 'Error saving request.'), 'error');
       } finally {
         setIsLoading(false);
@@ -473,9 +473,9 @@
 
     const handleClose = () => { if (hasSaved && onSuccess) onSuccess(); else onClose(); };
     
-    // ── balance check for TRANSFER and CONVERSION ───────────────────────────────────
+    // ── balance check for TRANSFER and EXCHANGE ───────────────────────────────────
     const balanceInfo = useMemo(() => {
-      if ((header.request_type !== 'TRANSFER' && header.request_type !== 'CONVERSION') || items.length === 0) return { isUnbalanced: false, diffUsd: 0, diffIrr: 0 };
+      if ((header.request_type !== 'TRANSFER' && header.request_type !== 'EXCHANGE') || items.length === 0) return { isUnbalanced: false, diffUsd: 0, diffIrr: 0 };
       
       let usdBalance = 0, irrBalance = 0;
       items.forEach(item => {

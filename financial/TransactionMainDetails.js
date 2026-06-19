@@ -761,7 +761,7 @@
             {balanceInfo.isUnbalanced && (
                 <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800/50">
                     <AlertTriangle size={14} />
-                    <span className="text-[11px] font-bold">
+                    <span className="text-[12px] font-bold">
                         {t('اختلاف تراز دلاری:', 'USD Diff:')} <span dir="ltr" className="inline-block px-1 font-black">{formatNumber(Math.abs(balanceInfo.diff))}</span>
                     </span>
                 </div>
@@ -772,7 +772,7 @@
     const itemsCardAction = (
         <div className="flex items-center gap-2">
             {balanceInfo.isUnbalanced && !isReadOnly && (
-                <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[11px]" icon={Scale} onClick={(e) => { e.stopPropagation(); gridRef.current?.triggerBalanceRow(balanceInfo.diff); }}>
+                <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[12px]" icon={Scale} onClick={(e) => { e.stopPropagation(); gridRef.current?.triggerBalanceRow(balanceInfo.diff); }}>
                     {t('تراز کردن ارزی', 'Balance (USD)')}
                 </Button>
             )}

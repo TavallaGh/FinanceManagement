@@ -47,12 +47,14 @@
   const MessageSquare  = safeIcon(LucideIcons, 'MessageSquare');
   const Copy           = safeIcon(LucideIcons, 'Copy');
   const Paperclip      = safeIcon(LucideIcons, 'Paperclip');
+  const DollarSign     = safeIcon(LucideIcons, 'DollarSign');
+  const RefreshCw      = safeIcon(LucideIcons, 'RefreshCw');
 
   const REQUEST_TYPES = [
-    { value: 'TRANSFER',   fa: 'انتقال',  en: 'Transfer'   },
-    { value: 'CONVERSION', fa: 'تبدیل',   en: 'Conversion' },
-    { value: 'BUDGET',     fa: 'بودجه',   en: 'Budget'     },
-    { value: 'GENERAL',    fa: 'عمومی',   en: 'General'    },
+    { value: 'TRANSFER',   fa: 'انتقال وجه',  en: 'Transfer'   },
+    { value: 'EXCHANGE',   fa: 'تبدیل ارز',   en: 'Exchange' },
+    { value: 'BUDGET',     fa: 'مصرف بودجه',   en: 'Budget'     },
+    { value: 'GENERAL',    fa: 'واریز/ برداشت',   en: 'General'    },
   ];
 
   const STATUS_LIST = [
@@ -97,14 +99,14 @@
       return a || { canView: true, canCreate: true, canEdit: true, canDelete: true };
     }, [secCtx, formCode]);
 
-    const [requests,    setRequests]    = useState([]);
-    const [usersMap,    setUsersMap]    = useState({});
-    const [deptsMap,    setDeptsMap]    = useState({});
-    const [partiesMap,  setPartiesMap]  = useState({});
-    const [isLoading,   setIsLoading]   = useState(false);
-    const [filters,     setFilters]     = useState({});
-    const [gridState,   setGridState]   = useState(null);
-    const [selectedIds, setSelectedIds] = useState([]);
+    const [requests,         setRequests]         = useState([]);
+    const [usersMap,         setUsersMap]         = useState({});
+    const [deptsMap,         setDeptsMap]         = useState({});
+    const [partiesMap,       setPartiesMap]       = useState({});
+    const [isLoading,        setIsLoading]        = useState(false);
+    const [filters,          setFilters]          = useState({});
+    const [gridState,        setGridState]        = useState(null);
+    const [selectedIds,      setSelectedIds]      = useState([]);
     const [formModal,        setFormModal]        = useState({ isOpen: false, mode: 'CREATE', record: null });
     const [deleteConfirm,    setDeleteConfirm]    = useState({ isOpen: false, type: null, data: null });
     const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
@@ -112,7 +114,8 @@
     const [attachmentCounts, setAttachmentCounts] = useState({});
     const [attachModal,      setAttachModal]      = useState({ isOpen: false, record: null, files: [] });
     const [isUploading,      setIsUploading]      = useState(false);
-    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+    const [toast,            setToast]            = useState({ isVisible: false, message: '', type: 'success' });
+    const [summaryModal,     setSummaryModal]     = useState({ isOpen: false, record: null });
 
     const showToast = useCallback((msg, type = 'success') => {
       setToast({ isVisible: true, message: msg, type });
@@ -239,6 +242,78 @@
       }
     }, [supabase, attachModal.record, showToast, t, loadAttachments, fetchData]);
 
+    // ── exchange-rate helpers ──────────────────────────────────────────────
+    const resolveRates = (ratesMap, currency) => {
+      let toUsd = 1;
+      if (currency !== 'USD') {
+        const direct  = ratesMap[`${currency}_USD`];
+        const inverse = ratesMap[`USD_${currency}`];
+        if (direct)       toUsd = parseFloat(direct);
+        else if (inverse) toUsd = 1 / parseFloat(inverse);
+      }
+      let usdToIrr = parseFloat(ratesMap['USD_IRR'] || 1);
+      if (!ratesMap['USD_IRR'] && ratesMap['IRR_USD'])
+        usdToIrr = 1 / parseFloat(ratesMap['IRR_USD']);
+      return { toUsd, usdToIrr };
+    };
+
+    const handleBulkUpdateRates = async (ids) => {
+      setIsLoading(true);
+      try {
+        const updatableStatuses = ['DRAFT', 'REGISTERED'];
+        const selected = requests.filter(r => ids.includes(r.id) && updatableStatuses.includes(r.status));
+        if (selected.length === 0) {
+          showToast(t('فقط درخواست‌های «یادداشت» یا «ثبت‌شده» امکان بروزرسانی نرخ ارز دارند.', 'Only Draft or Registered requests can have exchange rates updated.'), 'warning');
+          setIsLoading(false);
+          return;
+        }
+
+        const uniqueDates = [...new Set(selected.map(r => r.need_date || r.created_at).filter(Boolean))];
+        const ratesByDate = {};
+        for (const dateRaw of uniqueDates) {
+          const dateKey     = dateRaw.replace(/\//g, '-').split('T')[0];
+          const { data }    = await supabase
+            .from('fm_currency_rates')
+            .select('base_currency, target_currency, rate, rate_date')
+            .lte('rate_date', dateKey)
+            .order('rate_date', { ascending: false });
+          const latest = {};
+          (data || []).forEach(r => {
+            const key = `${r.base_currency}_${r.target_currency}`;
+            if (!latest[key]) latest[key] = r.rate;
+          });
+          ratesByDate[dateRaw] = latest;
+        }
+
+        let updatedCount = 0;
+        for (const req of selected) {
+          const dateKey  = req.need_date || req.created_at;
+          const ratesMap = ratesByDate[dateKey] || {};
+          for (const item of (req.req_request_items || [])) {
+            const cur = item.currency || 'IRR';
+            const { toUsd, usdToIrr } = resolveRates(ratesMap, cur);
+            const { error } = await supabase
+              .from('req_request_items')
+              .update({
+                exchange_rate_to_usd:     toUsd,
+                exchange_rate_usd_to_irr: usdToIrr,
+              })
+              .eq('id', item.id);
+            if (!error) updatedCount++;
+          }
+        }
+
+        showToast(t(`${updatedCount} قلم درخواست با آخرین نرخ‌های ارز بروز شد.`, `${updatedCount} items updated with latest exchange rates.`));
+        fetchData();
+      } catch {
+        showToast(t('خطا در بروزرسانی نرخ ارزها.', 'Error updating exchange rates.'), 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const openSummary = (record) => setSummaryModal({ isOpen: true, record });
+
     const isDeletable = (r) => r.status === 'DRAFT';
 
     const executeDelete = async () => {
@@ -278,11 +353,18 @@
         render: val => { const s = getStatus(val); return <Badge variant={s.color} size="sm">{isRtl ? s.fa : s.en}</Badge>; },
       },
       {
-        field: 'request_type', header_fa: 'نوع درخواست', header_en: 'Type', width: '105px',
-        render: val => <span className="text-[11px] text-slate-600 dark:text-slate-400">{getTypeLabel(val, isRtl)}</span>,
+        field: 'request_type', header_fa: 'نوع درخواست', header_en: 'Type', width: '100px',
+        render: val => <span className="text-[12px] text-slate-600 dark:text-slate-400">{getTypeLabel(val, isRtl)}</span>,
+      },      
+      {
+        field: 'payment_type', header_fa: 'نوع پرداخت', header_en: 'Payment', width: '100px',
+        render: val => {
+          const types = { CASH: t('نقد', 'Cash'), CHECK: t('چک', 'Check'), CRYPTO: t('کریپتو', 'Crypto'), BANK: t('بانک', 'Bank'), TC: 'TC' };
+          return <span className="text-[11px] text-slate-600 dark:text-slate-400">{val ? (types[val] || val) : '-'}</span>;
+        },
       },
       {
-        field: 'requester_party_id', header_fa: 'درخواست دهنده', header_en: 'Requester', width: '160px',
+        field: 'requester_party_id', header_fa: 'درخواست دهنده', header_en: 'Requester', width: '100px',
         render: (val, row) => (
           <span className="text-[12px] font-medium text-slate-700 dark:text-slate-300">
             {val ? (partiesMap[val] || val) : (row.registrar_id ? (usersMap[row.registrar_id] || '-') : '-')}
@@ -290,20 +372,20 @@
         ),
       },
       {
-        field: 'department_id', header_fa: 'دپارتمان', header_en: 'Department', width: '130px',
-        render: val => <span className="text-[11px] text-slate-500 dark:text-slate-400">{val ? (deptsMap[val] || val) : '-'}</span>,
+        field: 'department_id', header_fa: 'دپارتمان', header_en: 'Department', width: '100px',
+        render: val => <span className="text-[12px] text-slate-500 dark:text-slate-400">{val ? (deptsMap[val] || val) : '-'}</span>,
       },
       {
         field: 'created_at', header_fa: 'تاریخ ثبت', header_en: 'Submitted', width: '100px',
-        render: val => <span className="text-[11px] text-slate-500">{fmtDate(val)}</span>,
+        render: val => <span className="text-[12px] text-slate-500">{fmtDate(val)}</span>,
       },
       {
         field: 'need_date', header_fa: 'تاریخ نیاز', header_en: 'Need Date', width: '100px',
-        render: val => <span className="text-[11px] text-slate-500">{val ? fmtDate(val) : '-'}</span>,
+        render: val => <span className="text-[12px] text-slate-500">{val ? fmtDate(val) : '-'}</span>,
       },
       {
         field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto',
-        render: val => <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate block max-w-xs" title={val}>{val || '-'}</span>,
+        render: val => <span className="text-[12px] text-slate-500 dark:text-slate-400 truncate block max-w-xs" title={val}>{val || '-'}</span>,
       },
     ], [usersMap, partiesMap, deptsMap, isRtl]);
 
@@ -355,6 +437,12 @@
               onRowDoubleClick={row => setFormModal({ isOpen: true, mode: 'EDIT', record: row })}
               actions={[
                 {
+                  icon: DollarSign,
+                  tooltip: t('خلاصه ارزی', 'Currency Summary'),
+                  onClick: row => openSummary(row),
+                  className: 'text-indigo-500 hover:text-indigo-600',
+                },
+                {
                   icon: Paperclip,
                   tooltip: t('پیوست‌ها', 'Attachments'),
                   onClick: row => openAttachments(row),
@@ -387,14 +475,22 @@
                   className: row => isDeletable(row) ? 'text-slate-400 hover:text-red-600' : '!text-slate-200 dark:!text-slate-700 cursor-not-allowed',
                 },
               ]}
-              bulkActions={[{
-                label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline',
-                onClick: ids => {
-                  const ok = requests.filter(r => ids.includes(r.id) && isDeletable(r)).map(r => r.id);
-                  if (!ok.length) { showToast(t('هیچ‌کدام قابل حذف نیستند.', 'None can be deleted.'), 'warning'); return; }
-                  setDeleteConfirm({ isOpen: true, type: 'bulk', data: ok });
+              bulkActions={[
+                {
+                  label: t('بروزرسانی نرخ ارز', 'Update Exchange Rates'),
+                  icon: RefreshCw, variant: 'outline',
+                  onClick: ids => handleBulkUpdateRates(ids),
+                  className: 'text-indigo-600 dark:text-indigo-400',
                 },
-              }]}
+                {
+                  label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline',
+                  onClick: ids => {
+                    const ok = requests.filter(r => ids.includes(r.id) && isDeletable(r)).map(r => r.id);
+                    if (!ok.length) { showToast(t('هیچ‌کدام قابل حذف نیستند.', 'None can be deleted.'), 'warning'); return; }
+                    setDeleteConfirm({ isOpen: true, type: 'bulk', data: ok });
+                  },
+                },
+              ]}
             />
           </div>
         </div>
@@ -469,6 +565,16 @@
             formTitle={t('مدیریت درخواست‌ها', 'Request Management')}
             formComponent="RequestManagement"
             language={language}
+          />
+        ) : null; })()}
+
+        {(() => { const RequestSummaryModal = safeComp(window, 'RequestSummary'); return summaryModal.isOpen ? (
+          <RequestSummaryModal
+            isOpen={summaryModal.isOpen}
+            onClose={() => setSummaryModal({ isOpen: false, record: null })}
+            record={summaryModal.record}
+            language={language}
+            formCode={formCode}
           />
         ) : null; })()}
 
