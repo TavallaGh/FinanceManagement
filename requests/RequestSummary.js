@@ -367,4 +367,3 @@
 
   window.RequestSummary = RequestSummary;
 })();
-
