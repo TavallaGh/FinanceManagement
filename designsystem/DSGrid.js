@@ -152,7 +152,7 @@
               dir={isRtl ? 'rtl' : 'ltr'}
             />
           ) : (
-            <div className={`w-full truncate ${displayValue ? (isRtl ? 'pl-6' : 'pr-6') : ''}`}>
+            <div className={`w-full truncate ${displayValue ? (isRtl ? 'pl-6' : 'pr-6') : ''} ${!displayValue ? 'text-slate-400 dark:text-slate-500' : ''}`}>
                {displayValue || placeholder || t('انتخاب کنید...', 'Select...')}
             </div>
           )}
@@ -267,7 +267,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, onImport, formCode, actionWidth = '120px' }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, formCode, actionWidth = '120px' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -626,7 +626,7 @@
 
     return (
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm flex flex-col font-sans h-full overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
-        <div className="flex flex-wrap items-stretch p-1.5 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 gap-2 shrink-0 min-h-[46px]">
+        {!hideToolbar && <div className="flex flex-wrap items-stretch p-1.5 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 gap-2 shrink-0 min-h-[46px]">
           <div className="flex items-center shrink-0">
             {onAdd && access.canCreate && (
               <Button size="sm" variant="primary" icon={Plus} onClick={onAdd} className="h-full px-3.5 text-[12px] shadow-sm">
@@ -738,7 +738,7 @@
               <button onClick={exportCSV} title={t('خروجی اکسل', 'Export')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileSpreadsheet size={16} /></button>
             )}
           </div>
-        </div>
+        </div>}
 
         <div className="overflow-auto custom-scrollbar flex-1 relative bg-white dark:bg-slate-800">
           <table className="w-full h-full text-start border-separate border-spacing-0 min-w-max" dir={isRtl ? 'rtl' : 'ltr'}>
