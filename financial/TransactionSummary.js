@@ -164,7 +164,7 @@
             field: 'account_id', header_fa: 'حساب', header_en: 'Account', width: '120px',
             render: val => {
                 const acc = (lookups?.accounts || []).find(a => a.id === val);
-                return <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate block" title={acc ? acc.displayLabel : val}>{acc ? acc.displayLabel : (val || '—')}</span>;
+                return <span className="text-[12px] text-slate-600 dark:text-slate-400 truncate block" title={acc ? acc.displayLabel : val}>{acc ? acc.displayLabel : (val || '—')}</span>;
             },
         },
         {
@@ -204,7 +204,7 @@
         },
         {
             field: 'description', header_fa: 'شرح', header_en: 'Description', width: '120px',
-            render: val => <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate block" title={val || ''}>{val || '—'}</span>,
+            render: val => <span className="text-[12px] text-slate-500 dark:text-slate-400 truncate block" title={val || ''}>{val || '—'}</span>,
         },
     ];
 

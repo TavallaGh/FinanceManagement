@@ -244,7 +244,7 @@
       return (
         <div className="flex flex-col items-center justify-center p-6 text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 w-full">
            <Box size={24} className="opacity-40 mb-2" />
-           <span className="text-[11px] font-bold">{t('اطلاعات ساختاری برای مقایسه یافت نشد.', 'No structural data found for comparison.')}</span>
+           <span className="text-[12px] font-bold">{t('اطلاعات ساختاری برای مقایسه یافت نشد.', 'No structural data found for comparison.')}</span>
         </div>
       );
     }
@@ -263,14 +263,14 @@
        }
 
        if (changes.length === 0) return (
-          <div className="p-3 text-center text-[11px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700/50 w-full">
+          <div className="p-3 text-center text-[12px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700/50 w-full">
             {t('تغییر مقداری در فیلدها یافت نشد.', 'No value changes found in fields.')}
           </div>
        );
        
        return (
           <div className="flex flex-col gap-3 w-full">
-              <h4 className="text-[11px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <h4 className="text-[12px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                   <Edit size={12} className="text-amber-500" />
                   {t('فیلدهای تغییر یافته:', 'Changed Fields:')}
               </h4>
@@ -291,7 +291,7 @@
     if (actionType === 'CREATE' && newData) {
        return (
           <div className="flex flex-col gap-3 w-full">
-              <h4 className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 px-1 border-b border-emerald-100 dark:border-emerald-900/30 pb-2">
+              <h4 className="text-[12px] font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 px-1 border-b border-emerald-100 dark:border-emerald-900/30 pb-2">
                   <Plus size={14} />
                   {t('اطلاعات رکورد ایجاد شده:', 'Created Record Data:')}
               </h4>
@@ -310,7 +310,7 @@
     if (actionType === 'DELETE' && oldData) {
        return (
           <div className="flex flex-col gap-3 w-full">
-              <h4 className="text-[11px] font-black text-rose-600 dark:text-rose-400 flex items-center gap-1.5 px-1 border-b border-rose-100 dark:border-rose-900/30 pb-2">
+              <h4 className="text-[12px] font-black text-rose-600 dark:text-rose-400 flex items-center gap-1.5 px-1 border-b border-rose-100 dark:border-rose-900/30 pb-2">
                   <Trash2 size={14} />
                   {t('اطلاعات رکورد حذف شده:', 'Deleted Record Data:')}
               </h4>
@@ -516,7 +516,7 @@
           </div>
           <div className="flex-1 min-w-0">
             <h4 className={`text-[12px] font-bold mb-1 leading-tight ${isRead ? 'text-slate-600 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>{title}</h4>
-            <p className={`text-[11px] leading-relaxed mb-1.5 line-clamp-2 ${isRead ? 'text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'}`}>{message}</p>
+            <p className={`text-[12px] leading-relaxed mb-1.5 line-clamp-2 ${isRead ? 'text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'}`}>{message}</p>
             <div className="flex items-center gap-1.5 mt-1.5">
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{formatTime(timestamp)}</span>
               {isActionable && <span className="text-[9px] text-indigo-500 dark:text-indigo-400 flex items-center gap-0.5"><ExternalLink size={10}/></span>}

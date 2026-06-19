@@ -71,7 +71,7 @@
           key={v}
           type="button"
           onClick={() => onChange(v)}
-          className={`flex items-center gap-1.5 px-4 py-2 text-[11px] font-bold transition-all border-0 ${
+          className={`flex items-center gap-1.5 px-4 py-2 text-[12px] font-bold transition-all border-0 ${
             value === v
               ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-inner'
               : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -527,10 +527,10 @@
                 </label>
               </div>
               <h2 className="text-[14px] font-black text-slate-800 dark:text-white mb-0.5">{profileInfo.fullName}</h2>
-              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-3 truncate w-full dir-ltr">{profileInfo.username}</p>
+              <p className="text-[12px] font-medium text-slate-500 dark:text-slate-400 mb-3 truncate w-full dir-ltr">{profileInfo.username}</p>
               <div className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700">
                 <Building2 size={14} className="text-slate-400 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate">{profileInfo.department}</span>
+                <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 truncate">{profileInfo.department}</span>
               </div>
             </div>
 
@@ -587,7 +587,7 @@
                                 {formatRole(role)}
                               </span>
                             ))
-                          : <span className="text-[11px] text-slate-400 px-1">{t('ندارد', 'None')}</span>
+                          : <span className="text-[12px] text-slate-400 px-1">{t('ندارد', 'None')}</span>
                         }
                       </div>
                     </div>
@@ -602,7 +602,7 @@
                                 {role}
                               </span>
                             ))
-                          : <span className="text-[11px] text-slate-400 px-1">{t('ندارد', 'None')}</span>
+                          : <span className="text-[12px] text-slate-400 px-1">{t('ندارد', 'None')}</span>
                         }
                       </div>
                     </div>
@@ -630,7 +630,7 @@
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <Sun size={12} className="text-slate-500 dark:text-slate-400" />
-                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('تم رنگی', 'Color Theme')}</span>
+                      <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('تم رنگی', 'Color Theme')}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {[
@@ -660,7 +660,7 @@
                             }`}>
                               <Icon size={12} strokeWidth={2} />
                             </div>
-                            <span className={`text-[11px] font-bold ${
+                            <span className={`text-[12px] font-bold ${
                               sel ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'
                             }`}>{isRtl ? fa : en}</span>
                             {sel && <span className="ms-auto text-indigo-400 text-[10px] font-black">✓</span>}
@@ -674,7 +674,7 @@
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <Globe size={12} className="text-slate-500 dark:text-slate-400" />
-                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('زبان سیستم', 'System Language')}</span>
+                      <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('زبان سیستم', 'System Language')}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {[
@@ -695,7 +695,7 @@
                             }`}>
                             <span className="text-lg select-none leading-none">{flag}</span>
                             <div className="flex flex-col items-start">
-                              <span className={`text-[11px] font-bold ${
+                              <span className={`text-[12px] font-bold ${
                                 sel ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'
                               }`}>{label}</span>
                               <span className="text-[9px] text-slate-400">{sublabel}</span>
@@ -711,7 +711,7 @@
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <Calendar size={12} className="text-slate-500 dark:text-slate-400" />
-                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('نوع تقویم', 'Calendar Type')}</span>
+                      <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('نوع تقویم', 'Calendar Type')}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {[
@@ -735,7 +735,7 @@
                             }`}>
                               <span className="text-[9px] font-black leading-none">{isRtl ? abbrFa : abbrEn}</span>
                             </div>
-                            <span className={`text-[11px] font-bold ${
+                            <span className={`text-[12px] font-bold ${
                               sel ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'
                             }`}>{isRtl ? fa : en}</span>
                             {sel && <span className="ms-auto text-indigo-400 text-[10px] font-black">✓</span>}
@@ -772,7 +772,7 @@
                   <input type="password" name="password_fake" autoComplete="new-password" style={{ display: 'none' }} readOnly />
 
                   <div className="bg-blue-50/80 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800/50 p-3 rounded-xl shadow-sm">
-                    <p className="text-[11px] font-medium text-blue-700 dark:text-blue-300 leading-relaxed text-justify">
+                    <p className="text-[12px] font-medium text-blue-700 dark:text-blue-300 leading-relaxed text-justify">
                       {t(
                         'راهنما: رمز عبور باید بین ۸ تا ۱۴ کاراکتر باشد و شامل حداقل یک حرف بزرگ، یک حرف کوچک، یک عدد و یک علامت باشد.',
                         'Hint: Password must be 8–14 characters, including at least one uppercase letter, one lowercase letter, one number, and one symbol.'

@@ -428,7 +428,7 @@
         header_fa: 'آخرین ورود', 
         header_en: 'Last Login', 
         width: '140px',
-        render: (val) => <span className="text-[11px] text-slate-500 inline-block w-full text-left" dir="ltr">{formatDateTime(val)}</span>
+        render: (val) => <span className="text-[12px] text-slate-500 inline-block w-full text-left" dir="ltr">{formatDateTime(val)}</span>
       },
       { 
         field: 'is_active', 
@@ -701,7 +701,7 @@
                     size="sm" 
                     icon={RefreshCw}
                     onClick={() => { const pwd = generatePassword(); setFormData(p => ({...p, password: pwd})); setGeneratedPassword(pwd); }}
-                    className="h-8 shrink-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/40 mb-[1px] text-[11px] whitespace-nowrap"
+                    className="h-8 shrink-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/40 mb-[1px] text-[12px] whitespace-nowrap"
                   >
                     {t('ایجاد رمز', 'Generate')}
                   </Button>

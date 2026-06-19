@@ -399,7 +399,7 @@
       { field: 'fullName', header_fa: 'نام و نام خانوادگی', width: '250px', render: (val) => <span className="font-bold text-slate-800 dark:text-slate-200 text-[12px]">{val}</span> },
       { field: 'username', header_fa: 'نام کاربری', width: '130px', render: (val) => <span className="text-[12px] text-slate-600 dark:text-slate-400" dir="ltr">{val}</span> },
       { field: 'accessLevel', header_fa: 'سطح دسترسی', width: '150px', render: (v) => <Badge variant={v === 'full' ? 'indigo' : 'amber'} size="sm">{v === 'full' ? t('کامل', 'Full') : t('مشاهده', 'View')}</Badge> },
-      { field: 'reason', header_fa: 'نحوه ارث‌بری', width: 'auto', render: (val) => <span className="text-[11px] text-slate-500">{val}</span> }
+      { field: 'reason', header_fa: 'نحوه ارث‌بری', width: 'auto', render: (val) => <span className="text-[12px] text-slate-500">{val}</span> }
     ];
 
     const bgColumns = [
@@ -473,7 +473,7 @@
     const bgConsolidatedColumns = [
       { field: 'fullName', header_fa: 'نام و نام خانوادگی', width: '250px', render: (val) => <span className="font-bold text-slate-800 dark:text-slate-200 text-[12px]">{val}</span> },
       { field: 'username', header_fa: 'نام کاربری', width: '130px', render: (val) => <span className="text-[12px] text-slate-600 dark:text-slate-400" dir="ltr">{val}</span> },
-      { field: 'reason', header_fa: 'نحوه ارث‌بری', width: 'auto', render: (val) => <span className="text-[11px] text-slate-500">{val}</span> }
+      { field: 'reason', header_fa: 'نحوه ارث‌بری', width: 'auto', render: (val) => <span className="text-[12px] text-slate-500">{val}</span> }
     ];
 
     return (

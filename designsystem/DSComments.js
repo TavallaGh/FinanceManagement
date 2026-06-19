@@ -386,7 +386,7 @@
                 ) : comments.length === 0 ? (
                     React.createElement('div', { className: "flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 py-10" },
                         React.createElement(MessageSquare, { size: 28, className: "opacity-30" }),
-                        React.createElement('span', { className: "text-[11px]" }, t('هنوز کامنتی ثبت نشده است.', 'No comments yet.'))
+                        React.createElement('span', { className: "text-[12px]" }, t('هنوز کامنتی ثبت نشده است.', 'No comments yet.'))
                     )
                 ) : (
                     comments.map(comment => {
@@ -399,7 +399,7 @@
                                 React.createElement('div', { className: `w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shrink-0 ${isOwn ? 'bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300'}` },
                                     authorName.charAt(0)
                                 ),
-                                React.createElement('span', { className: `text-[11px] font-black ${isOwn ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}` }, authorName),
+                                React.createElement('span', { className: `text-[12px] font-black ${isOwn ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}` }, authorName),
                                 React.createElement('span', { className: "text-[10px] text-slate-400 dark:text-slate-500 font-medium", dir: "ltr" }, formatDate(comment.created_at)),
                                 // reply button — available on all comments
                                 !isOwn && React.createElement('button', {
@@ -432,11 +432,11 @@
                                     React.createElement('div', { className: "flex gap-2 justify-end" },
                                         React.createElement('button', {
                                             onClick: () => { setEditingCommentId(null); setEditingContent(''); },
-                                            className: "flex items-center gap-1 px-2 py-1 rounded text-[11px] text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
+                                            className: "flex items-center gap-1 px-2 py-1 rounded text-[12px] text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
                                         }, React.createElement(X, { size: 11 }), t('انصراف', 'Cancel')),
                                         React.createElement('button', {
                                             onClick: () => updateComment(comment.id),
-                                            className: "flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                                            className: "flex items-center gap-1 px-2 py-1 rounded text-[12px] bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                                         }, React.createElement(Check, { size: 11 }), t('ذخیره', 'Save'))
                                     )
                                   )
@@ -456,7 +456,7 @@
 
             // Input area
             React.createElement('div', { className: "shrink-0 px-4 py-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 relative" },
-                replyingTo && React.createElement('div', { className: "flex items-center gap-1.5 mb-2 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40 rounded-lg text-[11px]" },
+                replyingTo && React.createElement('div', { className: "flex items-center gap-1.5 mb-2 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40 rounded-lg text-[12px]" },
                     React.createElement(CornerUpLeft, { size: 11, className: "text-indigo-500 shrink-0" }),
                     React.createElement('span', { className: "text-indigo-700 dark:text-indigo-300 font-bold flex-1" },
                         `${t('پاسخ به', 'Replying to')} ${replyingTo.authorName}`
@@ -468,7 +468,7 @@
                 ),
                 showMentions && React.createElement('div', { className: "absolute bottom-full left-4 right-4 mb-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-40 overflow-y-auto z-50 p-1" },
                     filteredUsers.length === 0 ? (
-                        React.createElement('div', { className: "p-2 text-center text-slate-500 text-[11px]" }, t('کاربری یافت نشد', 'No users found'))
+                        React.createElement('div', { className: "p-2 text-center text-slate-500 text-[12px]" }, t('کاربری یافت نشد', 'No users found'))
                     ) : (
                         filteredUsers.map(u => (
                             React.createElement('div', { 
@@ -477,7 +477,7 @@
                                 className: "flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer rounded transition-colors" 
                             },
                                 React.createElement(AtSign, { size: 12, className: "text-slate-400 shrink-0" }),
-                                React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-200 text-[11px]" }, u.username),
+                                React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-200 text-[12px]" }, u.username),
                                 u.displayName !== u.username && React.createElement('span', { className: "text-slate-400 dark:text-slate-500 text-[10px]" }, u.displayName)
                             )
                         ))

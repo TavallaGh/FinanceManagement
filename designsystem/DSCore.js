@@ -463,7 +463,7 @@
           
           <div className="flex items-center gap-2 shrink-0">
             {notifFilter && notifFilter.isActive && (
-              <div className="flex items-center gap-1.5 px-3 h-8 rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+              <div className="flex items-center gap-1.5 px-3 h-8 rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50 text-[12px] font-bold text-amber-700 dark:text-amber-300">
                 <span>{isRtl ? 'فیلتر اعلان' : 'Notif Filter'}</span>
                 <button
                   onClick={notifFilter.onClear}

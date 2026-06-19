@@ -325,7 +325,7 @@
     }, [allUsers, assignedUsers, inlineUserEdit]);
 
     const columns = [
-      { field: 'code', header_fa: 'کد نقش', header_en: 'Role Code', width: '120px', render: (val) => <span className="text-[11px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{val}</span> },
+      { field: 'code', header_fa: 'کد نقش', header_en: 'Role Code', width: '120px', render: (val) => <span className="text-[12px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{val}</span> },
       { field: 'title', header_fa: 'عنوان نقش', header_en: 'Role Title', width: '200px', render: (val, row) => (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-slate-800 dark:text-slate-200 text-[12px]">{val}</span>
@@ -335,10 +335,10 @@
           </div>
         )
       },
-      { field: 'start_date', header_fa: 'تاریخ شروع', header_en: 'Start Date', width: '120px', render: (val) => val ? <div className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-400" /><span className="text-[11px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{formatGlobalDate(val, globalCalendarMode)}</span></div> : '-' },
-      { field: 'end_date', header_fa: 'تاریخ پایان', header_en: 'End Date', width: '120px', render: (val) => val ? <div className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-400" /><span className="text-[11px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{formatGlobalDate(val, globalCalendarMode)}</span></div> : '-' },
+      { field: 'start_date', header_fa: 'تاریخ شروع', header_en: 'Start Date', width: '120px', render: (val) => val ? <div className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-400" /><span className="text-[12px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{formatGlobalDate(val, globalCalendarMode)}</span></div> : '-' },
+      { field: 'end_date', header_fa: 'تاریخ پایان', header_en: 'End Date', width: '120px', render: (val) => val ? <div className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-400" /><span className="text-[12px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{formatGlobalDate(val, globalCalendarMode)}</span></div> : '-' },
       { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', width: '120px', type: 'toggle', onToggle: (row, val) => handleToggleActive(row, val) },
-      { field: 'description', header_fa: 'توضیحات', header_en: 'Description', width: 'auto', minWidth: '200px', render: (val) => <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate block w-full" title={val}>{val || '-'}</span> }
+      { field: 'description', header_fa: 'توضیحات', header_en: 'Description', width: 'auto', minWidth: '200px', render: (val) => <span className="text-[12px] text-slate-600 dark:text-slate-400 truncate block w-full" title={val}>{val || '-'}</span> }
     ];
 
     const assignedUsersColumns = [
@@ -364,7 +364,7 @@
                 }
                 return (
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-slate-700 dark:text-slate-200 text-[11px]">{val}</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200 text-[12px]">{val}</span>
                         {isInvalidByDate(row.start_date, row.end_date) && (
                             <Badge variant="red" size="sm">{t('نامعتبر', 'Invalid')}</Badge>
                         )}
@@ -376,9 +376,9 @@
             field: 'username', header_fa: 'نام کاربری', header_en: 'Username', width: '150px',
             render: (val, row) => {
                 if (inlineUserEdit?.id === row.id) {
-                    return <span className="text-[11px] text-slate-500 dir-ltr inline-block">{inlineUserEdit.data.user_obj?.username || '-'}</span>;
+                    return <span className="text-[12px] text-slate-500 dir-ltr inline-block">{inlineUserEdit.data.user_obj?.username || '-'}</span>;
                 }
-                return <span className="text-[11px] text-slate-500 dir-ltr inline-block">{val}</span>;
+                return <span className="text-[12px] text-slate-500 dir-ltr inline-block">{val}</span>;
             }
         },
         { 
@@ -387,7 +387,7 @@
                 if (inlineUserEdit?.id === row.id) {
                     return <div onClick={(e)=>e.stopPropagation()}><DatePicker size="sm" value={inlineUserEdit.data.start_date} onChange={(v) => setInlineUserEdit(prev => ({...prev, data: {...prev.data, start_date: v}}))} isRtl={isRtl} language={language} /></div>
                 }
-                return val ? <div className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-400" /><span className="text-[11px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{formatGlobalDate(val, globalCalendarMode)}</span></div> : '-';
+                return val ? <div className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-400" /><span className="text-[12px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{formatGlobalDate(val, globalCalendarMode)}</span></div> : '-';
             }
         },
         { 
@@ -396,7 +396,7 @@
                 if (inlineUserEdit?.id === row.id) {
                     return <div onClick={(e)=>e.stopPropagation()}><DatePicker size="sm" value={inlineUserEdit.data.end_date} onChange={(v) => setInlineUserEdit(prev => ({...prev, data: {...prev.data, end_date: v}}))} isRtl={isRtl} language={language} /></div>
                 }
-                return val ? <div className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-400" /><span className="text-[11px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{formatGlobalDate(val, globalCalendarMode)}</span></div> : '-';
+                return val ? <div className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-400" /><span className="text-[12px] text-slate-700 dark:text-slate-300 dir-ltr inline-block">{formatGlobalDate(val, globalCalendarMode)}</span></div> : '-';
             }
         }
     ];

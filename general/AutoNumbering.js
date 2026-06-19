@@ -367,7 +367,7 @@
                  <ToggleField size="sm" label={t('وضعیت فعال', 'Active Status')} checked={formData.is_active} onChange={v => setFormData({...formData, is_active: v})} isRtl={isRtl} />
                  
                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{t('پیش‌نمایش شماره بعدی:', 'Next Number Preview:')}</span>
+                    <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('پیش‌نمایش شماره بعدی:', 'Next Number Preview:')}</span>
                     <span className="font-mono text-[14px] font-black text-indigo-600 dark:text-indigo-400" dir="ltr">{generatePreview()}</span>
                  </div>
               </div>

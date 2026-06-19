@@ -512,7 +512,7 @@
     };
 
     // ── status transition buttons ────────────────────────────────────────
-    const btnBase = 'flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 border rounded-md transition-colors';
+    const btnBase = 'flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-1 border rounded-md transition-colors';
     const statusActions = (
       <div className="flex flex-wrap items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
         {cur === 'DRAFT' && access.canEdit && (
@@ -667,7 +667,7 @@
                 {balanceInfo.isUnbalanced && (
                   <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800/50">
                     <AlertTriangle size={14} />
-                    <span className="text-[11px] font-bold">
+                    <span className="text-[12px] font-bold">
                       {t('مغایرت بالانس:', 'Balance Diff:')}
                       {Math.abs(balanceInfo.diffUsd) > 0.01 && (
                         <span dir="ltr" className="inline-block px-1 font-black">USD: {balanceInfo.diffUsd.toFixed(2)}</span>

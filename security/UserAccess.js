@@ -589,7 +589,7 @@
                             {assignedRoles.map(rId => {
                                 const role = allRoles.find(r => String(r.id) === String(rId));
                                 return (
-                                    <div key={rId} className="flex items-center gap-1 bg-white dark:bg-slate-700 border border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-[11px] font-bold shadow-sm">
+                                    <div key={rId} className="flex items-center gap-1 bg-white dark:bg-slate-700 border border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-[12px] font-bold shadow-sm">
                                         {role?.title || rId}
                                         <button onClick={() => handleRemoveRole(rId)} className="hover:text-red-500 rounded-full p-0.5 transition-colors">
                                             <X size={10} strokeWidth={3}/>
@@ -710,7 +710,7 @@
                                             {!isReadOnly && (
                                                 <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800 p-2.5 rounded shadow-sm mb-4">
                                                     <Zap size={14} className="text-blue-600 dark:text-blue-400" />
-                                                    <span className="font-bold text-[11px] text-blue-800 dark:text-blue-300">
+                                                    <span className="font-bold text-[12px] text-blue-800 dark:text-blue-300">
                                                         {t('شما در حال ویرایش دسترسی مستقیم هستید.', 'Editing Direct Access.')}
                                                     </span>
                                                 </div>
@@ -724,7 +724,7 @@
                                             )}
 
                                             <div className="space-y-3">
-                                                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
+                                                <div className="text-[12px] font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
                                                     {t('عملیات مجاز (Actions)', 'Allowed Actions')}
                                                 </div>
 
@@ -764,7 +764,7 @@
 
                                             {availScopeKeys.length > 0 && (
                                                 <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
-                                                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
+                                                    <div className="text-[12px] font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
                                                         {t('محدودیت دسترسی به داده‌ها', 'Data Scopes')}
                                                     </div>
                                                     

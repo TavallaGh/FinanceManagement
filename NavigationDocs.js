@@ -174,7 +174,7 @@
             <div className="flex items-center gap-2">
                {docType === 'dev' ? <FileText className="text-amber-500" size={18}/> : <HelpCircle className="text-indigo-500" size={18}/>}
                <span className="text-[14px] font-black">{modalTitle}</span>
-               <span className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 text-[11px] font-bold px-2.5 py-0.5 rounded-full">{pageName}</span>
+               <span className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 text-[12px] font-bold px-2.5 py-0.5 rounded-full">{pageName}</span>
             </div>
           }
           width="max-w-xl"
@@ -257,10 +257,10 @@
                           type="file" 
                           ref={fileInputRef}
                           onChange={handleFileSelect}
-                          className={`block w-full text-[11px] text-slate-500 dark:text-slate-400
+                          className={`block w-full text-[12px] text-slate-500 dark:text-slate-400
                             file:mr-4 file:py-2 file:px-4
                             file:rounded-full file:border-0
-                            file:text-[11px] file:font-bold
+                            file:text-[12px] file:font-bold
                             file:bg-indigo-50 file:text-indigo-700
                             dark:file:bg-indigo-900/30 dark:file:text-indigo-400
                             file:cursor-pointer hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/50

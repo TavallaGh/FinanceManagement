@@ -225,7 +225,7 @@
                       <button 
                         type="button" 
                         onClick={() => setAuthView('forgot-identify')}
-                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                        className="text-[12px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
                       >
                         {t.forgotPasswordLink || (isRtl ? 'رمز عبور را فراموش کرده‌اید؟' : 'Forgot password?')}
                       </button>
@@ -287,7 +287,7 @@
                   </div>
                   <div className="text-start flex-1">
                     <div className="font-bold text-slate-800 text-[13px]">{t.sendEmail || (isRtl ? 'ارسال ایمیل' : 'Send Email')}</div>
-                    <div className="text-[11px] text-slate-500 mt-0.5 dir-ltr w-full text-start">***@domain.com</div>
+                    <div className="text-[12px] text-slate-500 mt-0.5 dir-ltr w-full text-start">***@domain.com</div>
                   </div>
                 </button>
 
@@ -297,7 +297,7 @@
                   </div>
                   <div className="text-start flex-1">
                     <div className="font-bold text-slate-800 text-[13px]">{t.sendSms || (isRtl ? 'ارسال پیامک' : 'Send SMS')}</div>
-                    <div className="text-[11px] text-slate-500 mt-0.5 dir-ltr w-full text-start">0912 *** **89</div>
+                    <div className="text-[12px] text-slate-500 mt-0.5 dir-ltr w-full text-start">0912 *** **89</div>
                   </div>
                 </button>
 
@@ -359,7 +359,7 @@
               <form onSubmit={handleResetPasswordSubmit} className="space-y-4 animate-in fade-in slide-in-from-right-4">
                 
                 <div className="bg-blue-50/80 border border-blue-100 p-3 rounded-xl mb-4 shadow-sm">
-                  <p className="text-[11px] font-medium text-blue-700 leading-relaxed text-justify">
+                  <p className="text-[12px] font-medium text-blue-700 leading-relaxed text-justify">
                      {isRtl ? 'راهنما: رمز عبور باید بین 8 تا 14 کاراکتر باشد و شامل حداقل یک حرف بزرگ، یک حرف کوچک، یک عدد و یک علامت (مانند @, #, $) باشد.' : 'Hint: Password must be 8-14 chars, including uppercase, lowercase, number, and symbol.'}
                   </p>
                 </div>
@@ -407,7 +407,7 @@
 
           </div>
 
-          <div className="text-center mt-6 text-[11px] text-slate-400 font-medium">
+          <div className="text-center mt-6 text-[12px] text-slate-400 font-medium">
             {isRtl ? 'تمامی حقوق برای شرکت توسعه نرم‌افزار محفوظ است. © 2026' : 'All rights reserved © 2026'}
           </div>
         </div>

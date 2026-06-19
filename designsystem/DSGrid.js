@@ -99,7 +99,7 @@
             <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm z-10">
               <tr>
                 {columns.map((col, idx) => (
-                  <th key={idx} className={`p-2.5 text-[11px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 ${isRtl ? 'text-right' : 'text-left'}`} style={{ width: col.width || 'auto' }}>
+                  <th key={idx} className={`p-2.5 text-[12px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 ${isRtl ? 'text-right' : 'text-left'}`} style={{ width: col.width || 'auto' }}>
                     {t(col.header_fa, col.header_en)}
                   </th>
                 ))}

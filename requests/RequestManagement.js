@@ -360,7 +360,7 @@
         field: 'payment_type', header_fa: 'نوع پرداخت', header_en: 'Payment', width: '100px',
         render: val => {
           const types = { CASH: t('نقد', 'Cash'), CHECK: t('چک', 'Check'), CRYPTO: t('کریپتو', 'Crypto'), BANK: t('بانک', 'Bank'), TC: 'TC' };
-          return <span className="text-[11px] text-slate-600 dark:text-slate-400">{val ? (types[val] || val) : '-'}</span>;
+          return <span className="text-[12px] text-slate-600 dark:text-slate-400">{val ? (types[val] || val) : '-'}</span>;
         },
       },
       {

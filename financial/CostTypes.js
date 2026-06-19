@@ -378,7 +378,7 @@
 
                     <div className="pt-2">
                         <ToggleField size="sm" formCode={formCode} label={t('وضعیت فعال بودن', 'Active Status')} checked={treeFormData.isActive !== false} onChange={(v) => setTreeFormData({...treeFormData, isActive: v})} isRtl={isRtl} wrapperClassName="pt-2" />
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                        <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-2">
                             {t('هزینه‌های غیرفعال در لیست‌های انتخاب فرم‌های عملیاتی نمایش داده نمی‌شوند.', 'Inactive costs will not appear in selection dropdowns.')}
                         </p>
                     </div>

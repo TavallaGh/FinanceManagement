@@ -358,7 +358,7 @@
                     {menusData.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
                             <AlertCircle size={24} className="opacity-50" />
-                            <span className="text-[11px]">{t('در حال دریافت یا منویی وجود ندارد.', 'Loading or no menus available.')}</span>
+                            <span className="text-[12px]">{t('در حال دریافت یا منویی وجود ندارد.', 'Loading or no menus available.')}</span>
                         </div>
                     ) : (
                         <Tree 
@@ -390,10 +390,10 @@
                                     </h3>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Button size="sm" variant="outline" icon={CheckSquare} onClick={handleGrantFullAccessRecursive} className="text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/20 text-[11px] font-bold">
+                                    <Button size="sm" variant="outline" icon={CheckSquare} onClick={handleGrantFullAccessRecursive} className="text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/20 text-[12px] font-bold">
                                         {t('دسترسی کامل شاخه', 'Full Branch Access')}
                                     </Button>
-                                    <Button size="sm" variant="outline" icon={Trash2} onClick={handleRemoveAccessRecursive} className="text-red-500 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20 text-[11px] font-bold">
+                                    <Button size="sm" variant="outline" icon={Trash2} onClick={handleRemoveAccessRecursive} className="text-red-500 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20 text-[12px] font-bold">
                                         {t('حذف دسترسی شاخه', 'Remove Branch Access')}
                                     </Button>
                                 </div>
@@ -407,7 +407,7 @@
                                     </div>
                                     
                                     {availActions.length === 0 ? (
-                                        <div className="text-[11px] text-slate-400 italic bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                                        <div className="text-[12px] text-slate-400 italic bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                                             {t('هیچ عملیات خاصی برای این فرم در دیتابیس تعریف نشده است.', 'No specific actions defined for this form in the database.')}
                                         </div>
                                     ) : (
@@ -450,7 +450,7 @@
                                         </div>
                                         <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2 shrink-0">
                                             {React.createElement(AlertTriangle, { size: 14, className: 'shrink-0' })}
-                                            <span className="text-[11px] font-bold">{t('در صورت عدم انتخاب هیچ گزینه‌ای در یک بخش، کاربر به تمامی داده‌های آن بخش دسترسی خواهد داشت.', 'If no options are selected in a scope, the user will have access to all data in that scope.')}</span>
+                                            <span className="text-[12px] font-bold">{t('در صورت عدم انتخاب هیچ گزینه‌ای در یک بخش، کاربر به تمامی داده‌های آن بخش دسترسی خواهد داشت.', 'If no options are selected in a scope, the user will have access to all data in that scope.')}</span>
                                         </div>
                                         
                                         <div className="flex flex-col gap-5">

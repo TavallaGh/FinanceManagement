@@ -316,7 +316,7 @@
         )
       },
       { field: 'nationalId', header_fa: 'کد/شناسه ملی', header_en: 'National ID', width: '120px' },
-      { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '120px', render: (val) => <span className="text-slate-500 dir-ltr inline-block text-[11px]">{val || '-'}</span> },
+      { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '120px', render: (val) => <span className="text-slate-500 dir-ltr inline-block text-[12px]">{val || '-'}</span> },
       { 
         field: 'roles', 
         header_fa: 'نقش‌ها', 
@@ -398,7 +398,7 @@
             {/* Bento Panel 1: Configuration / Type */}
             <div className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
                <div className="flex items-center gap-4">
-                 <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 px-2">{t('نوع موجودیت:', 'Entity Type:')}</span>
+                 <span className="text-[12px] font-black text-slate-500 dark:text-slate-400 px-2">{t('نوع موجودیت:', 'Entity Type:')}</span>
                  <RadioGroup 
                     options={[
                       { label: t('شخص حقیقی', 'Real Person'), value: 'real' },
@@ -488,7 +488,7 @@
                  
                  <div className="mt-2 space-y-1.5 max-h-[110px] overflow-y-auto custom-scrollbar pr-1 bg-slate-50 dark:bg-slate-900/30 p-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50">
                    {formData.addresses.map(a => (
-                     <div key={a.id} className={`flex justify-between items-center px-2.5 py-1.5 rounded-md border text-[11px] group shadow-sm transition-all ${a.isDefault ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800/50' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600'}`}>
+                     <div key={a.id} className={`flex justify-between items-center px-2.5 py-1.5 rounded-md border text-[12px] group shadow-sm transition-all ${a.isDefault ? 'bg-indigo-50/80 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800/50' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600'}`}>
                        <div className="flex items-center gap-2 flex-1 min-w-0">
                          {a.isDefault && <CheckCircle2 size={12} className="text-indigo-600 dark:text-indigo-400 shrink-0" />}
                          <span className="text-slate-700 dark:text-slate-300 truncate">{a.text}</span>
