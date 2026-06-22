@@ -33,6 +33,7 @@
     const [accessViewMode, setAccessViewMode] = useState('assign');
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, targetType: null, type: null, data: null });
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+    const [importErrors, setImportErrors] = useState({ isOpen: false, errors: [], successCount: 0 });
 
     // Arrays
     const [groupAccounts, setGroupAccounts] = useState([]);
@@ -253,10 +254,11 @@
             const { error } = await supabase.from('fm_balance_group_accounts').insert(toInsert);
             if (error) throw error;
             fetchGroupAccounts();
-            const msg = errors.length > 0
-              ? t(`${toInsert.length} رکورد وارد شد. ${errors.length} ردیف با خطا مواجه شد.`, `${toInsert.length} records imported. ${errors.length} row(s) had errors.`)
-              : t(`${toInsert.length} رکورد با موفقیت وارد شد.`, `${toInsert.length} record(s) imported successfully.`);
-            showToast(msg, errors.length > 0 ? 'warning' : 'success');
+            if (errors.length > 0) {
+              setImportErrors({ isOpen: true, errors, successCount: toInsert.length });
+            } else {
+              showToast(t(`${toInsert.length} رکورد با موفقیت وارد شد.`, `${toInsert.length} record(s) imported successfully.`), 'success');
+            }
           } catch (err) {
             showToast(t('خطا در ذخیره اطلاعات وارد شده.', 'Error saving imported data.'), 'error');
           } finally {
@@ -600,6 +602,31 @@
           )}
 
         </div>
+
+        <Modal isOpen={importErrors.isOpen} onClose={() => setImportErrors({ isOpen: false, errors: [], successCount: 0 })} title={t('گزارش خطاهای ایمپورت', 'Import Error Report')} language={language} width="max-w-lg">
+          <div className="p-4 flex flex-col gap-3">
+            {importErrors.successCount > 0 && (
+              <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-lg px-3 py-2 text-[13px] font-medium border border-emerald-200 dark:border-emerald-800">
+                <span>✓</span>
+                <span>{t(`${importErrors.successCount} رکورد با موفقیت وارد شد.`, `${importErrors.successCount} record(s) imported successfully.`)}</span>
+              </div>
+            )}
+            <div className="text-[12px] font-medium text-slate-600 dark:text-slate-400">
+              {t(`${importErrors.errors.length} ردیف با خطا مواجه شد:`, `${importErrors.errors.length} row(s) had errors:`)}
+            </div>
+            <div className="flex flex-col gap-1 max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-slate-50 dark:bg-slate-900">
+              {importErrors.errors.map((err, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-[12px] text-red-600 dark:text-red-400 py-1 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                  <span className="shrink-0 mt-0.5">•</span>
+                  <span>{err}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button variant="outline" size="sm" onClick={() => setImportErrors({ isOpen: false, errors: [], successCount: 0 })}>{t('بستن', 'Close')}</Button>
+            </div>
+          </div>
+        </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, targetType: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
           <EmptyState
