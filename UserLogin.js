@@ -60,7 +60,7 @@
         const { data: userData, error: userErr } = await supabase
           .from('sec_users')
           .select('id')
-          .eq('username', resetData.identifier)
+          .ilike('username', resetData.identifier.trim())
           .single();
           
         if (userErr || !userData) {

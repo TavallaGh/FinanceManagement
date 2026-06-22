@@ -44,7 +44,7 @@
         const { data, error: dbError } = await window.supabase
           .from('sec_users')
           .select('*')
-          .eq('username', loginData.identifier)
+          .ilike('username', loginData.identifier.trim())
           .single();
 
         if (dbError || !data) {
