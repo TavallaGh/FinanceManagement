@@ -164,11 +164,20 @@
       return result;
     }, [groups, filters]);
 
-    const openGroupForm = (group = null) => {
+    const openGroupForm = async (group = null) => {
       if (group) {
         setCurrentGroup(group);
       } else {
-        setCurrentGroup({ id: null, code: '', title_fa: '', title_en: '', description: '', is_active: true });
+        let nextCode = '';
+        if (window.AutoNumberingService) {
+          try {
+            const preview = await window.AutoNumberingService.previewNext('BALANCE_GROUP');
+            nextCode = typeof preview === 'string' ? preview : (preview?.formattedCode || '');
+          } catch (err) {
+            console.error('AutoNumbering Error:', err);
+          }
+        }
+        setCurrentGroup({ id: null, code: nextCode, title_fa: '', title_en: '', description: '', is_active: true });
       }
       setIsGroupModalOpen(true);
     };
@@ -191,6 +200,9 @@
         } else {
           const { error } = await supabase.from('fm_balance_groups').insert([payload]);
           if (error) throw error;
+          if (window.AutoNumberingService) {
+            try { await window.AutoNumberingService.consumeNext('BALANCE_GROUP'); } catch (err) { console.error('AutoNumbering consume error:', err); }
+          }
         }
         setIsGroupModalOpen(false);
         fetchInitialData();
