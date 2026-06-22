@@ -331,7 +331,8 @@
                   employee: t('کارمند', 'Employee'),
                   shareholder: t('سهامدار', 'Shareholder'),
                   system_user: t('کاربر سیستم', 'System User'),
-                  exchange: t('صرافی', 'Exchange')
+                  exchange: t('صرافی', 'Exchange'),
+                  broker: t('بروکر', 'Broker')
                 };
                 return <Badge key={r} variant="slate" size="sm" className="text-[10px] px-1.5 py-0.5">{roleLabels[r] || r}</Badge>
              })}
@@ -459,6 +460,7 @@
                       <CheckboxField size="sm" wrapperClassName="!m-0" label={t('تامین‌کننده', 'Vendor')} checked={formData.roles.includes('vendor')} onChange={() => toggleRole('vendor')} isRtl={isRtl} formCode={FORM_CODE} />
                       <CheckboxField size="sm" wrapperClassName="!m-0" label={t('سهامدار', 'Shareholder')} checked={formData.roles.includes('shareholder')} onChange={() => toggleRole('shareholder')} isRtl={isRtl} formCode={FORM_CODE} />
                       <CheckboxField size="sm" wrapperClassName="!m-0" label={t('صرافی', 'Exchange')} checked={formData.roles.includes('exchange')} onChange={() => toggleRole('exchange')} isRtl={isRtl} formCode={FORM_CODE} />
+                      <CheckboxField size="sm" wrapperClassName="!m-0" label={t('بروکر', 'Broker')} checked={formData.roles.includes('broker')} onChange={() => toggleRole('broker')} isRtl={isRtl} formCode={FORM_CODE} />
                       
                       {formData.partyType === 'real' && (
                         <div className="w-full flex flex-wrap gap-x-6 gap-y-3">

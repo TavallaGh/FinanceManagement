@@ -360,6 +360,146 @@
       }
     };
 
+    const handleDownloadSample = () => {
+      const headers = isRtl
+        ? 'کد حساب,عنوان فارسی,عنوان انگلیسی,نوع حساب (main/intermediate),کد ارز (مثال: IRR),کنترل موجودی (1/0),وضعیت (1/0)'
+        : 'Account Code,Persian Title,English Title,Account Type (main/intermediate),Currency Code (e.g. IRR),Control Inventory (1/0),Status (1/0)';
+
+      const lenG  = parseInt(chart?.len_group        || 1, 10);
+      const lenGe = parseInt(chart?.len_general      || 2, 10);
+      const lenSb = parseInt(chart?.len_subsidiary   || 3, 10);
+
+      const c1 = '1'.padEnd(lenG,  '0');
+      const c2 = c1 + '1'.padEnd(lenGe,  '0');
+      const c3 = c2 + '1'.padEnd(lenSb,  '0');
+
+      const sampleRows = [
+        `${c1},دارایی‌ها,Assets,intermediate,,0,1`,
+        `${c2},دارایی‌های جاری,Current Assets,intermediate,,0,1`,
+        `${c3},صندوق و بانک,Cash and Bank,main,IRR,0,1`,
+      ];
+
+      const csv = '\uFEFF' + headers + '\n' + sampleRows.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', `ChartOfAccounts_${chart?.code || 'Sample'}_Import.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    const handleImportTree = (file) => {
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const cleanText = (e.target.result || '').replace(/^\uFEFF/, '');
+          const lines = cleanText.split(/\r?\n/).filter(l => l.trim());
+
+          if (lines.length < 2) {
+            return showToast(t('فایل خالی یا نامعتبر است', 'File is empty or invalid'), 'error');
+          }
+
+          const dataLines = lines.slice(1);
+          const rows = dataLines.map(line => {
+            const parts = line.split(',');
+            return {
+              code:             (parts[0] || '').trim(),
+              titleFa:          (parts[1] || '').trim().replace(/^"|"$/g, ''),
+              titleEn:          (parts[2] || '').trim().replace(/^"|"$/g, ''),
+              accountType:      (parts[3] || 'main').trim().toLowerCase(),
+              currencyCode:     (parts[4] || '').trim().toUpperCase(),
+              controlInventory: (parts[5] || '0').trim() === '1',
+              isActive:         (parts[6] || '1').trim() !== '0',
+            };
+          }).filter(r => r.code);
+
+          if (rows.length === 0) {
+            return showToast(t('هیچ داده‌ای برای ورود وجود ندارد', 'No data to import'), 'warning');
+          }
+
+          const lenG  = parseInt(chart?.len_group        || 1, 10);
+          const lenGe = parseInt(chart?.len_general      || 2, 10);
+          const lenSb = parseInt(chart?.len_subsidiary   || 3, 10);
+          const lenDt = parseInt(chart?.len_detail       || 4, 10);
+
+          const level1 = lenG;
+          const level2 = lenG + lenGe;
+          const level3 = lenG + lenGe + lenSb;
+
+          const getParentCode = (code) => {
+            const cl = code.length;
+            if (cl <= level1) return null;
+            if (cl <= level2) return code.substring(0, level1);
+            if (cl <= level3) return code.substring(0, level2);
+            return code.substring(0, level3);
+          };
+
+          // Sort ascending by code length so parents are inserted before children
+          rows.sort((a, b) => a.code.length - b.code.length || a.code.localeCompare(b.code));
+
+          // Seed map with existing accounts
+          const codeToId = {};
+          rawAccounts.forEach(a => { if (a.code) codeToId[a.code] = a.id; });
+
+          let insertedCount = 0;
+          let updatedCount  = 0;
+          let errorCount    = 0;
+
+          for (const row of rows) {
+            try {
+              const parentCode = getParentCode(row.code);
+              const parentId   = parentCode ? (codeToId[parentCode] ?? null) : null;
+
+              const matchedCurrency = row.currencyCode
+                ? lookups.currencies.find(c => (c.code || '').toUpperCase() === row.currencyCode)
+                : null;
+
+              const payload = {
+                chart_id:          chart.id,
+                code:              row.code,
+                title_fa:          row.titleFa || row.code,
+                title_en:          row.titleEn || null,
+                account_type:      ['main', 'intermediate'].includes(row.accountType) ? row.accountType : 'main',
+                currency_id:       matchedCurrency ? matchedCurrency.id : null,
+                control_inventory: row.controlInventory,
+                is_active:         row.isActive,
+                parent_id:         parentId,
+              };
+
+              const existing = rawAccounts.find(a => a.code === row.code);
+              if (existing) {
+                const { error } = await supabase.from('fm_coa_accounts').update(payload).eq('id', existing.id);
+                if (error) throw error;
+                codeToId[row.code] = existing.id;
+                updatedCount++;
+              } else {
+                const { data: inserted, error } = await supabase.from('fm_coa_accounts').insert([payload]).select('id');
+                if (error) throw error;
+                if (inserted && inserted.length > 0) codeToId[row.code] = inserted[0].id;
+                insertedCount++;
+              }
+            } catch (err) {
+              console.error('Import row error:', row, err);
+              errorCount++;
+            }
+          }
+
+          await fetchDesignerData();
+
+          const msg = isRtl
+            ? `ورود اطلاعات کامل شد: ${insertedCount} ردیف جدید، ${updatedCount} ردیف به‌روز شد${errorCount > 0 ? `، ${errorCount} خطا` : ''}`
+            : `Import complete: ${insertedCount} inserted, ${updatedCount} updated${errorCount > 0 ? `, ${errorCount} errors` : ''}`;
+          showToast(msg, errorCount > 0 ? 'warning' : 'success');
+        } catch (err) {
+          showToast(t('خطا در پردازش فایل', 'Error processing file'), 'error');
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+    };
+
     const handleExportTree = () => {
       if (!rawAccounts || rawAccounts.length === 0) {
          return showToast(t('داده‌ای برای خروجی وجود ندارد.', 'No data to export.'), 'warning');
@@ -369,25 +509,25 @@
       
       try {
         const headers = isRtl 
-          ? 'کد حساب,عنوان فارسی,عنوان انگلیسی,نوع حساب,ارز,کنترل موجودی,وضعیت' 
-          : 'Account Code,Persian Title,English Title,Account Type,Currency,Control Inventory,Status';
+          ? 'کد حساب,عنوان فارسی,عنوان انگلیسی,نوع حساب (main/intermediate),کد ارز (مثال: IRR),کنترل موجودی (1/0),وضعیت (1/0)' 
+          : 'Account Code,Persian Title,English Title,Account Type (main/intermediate),Currency Code (e.g. IRR),Control Inventory (1/0),Status (1/0)';
         
         const csvRows = rawAccounts.map(row => {
           const code = row.code || '';
           const titleFa = `"${(row.titleFa || '').replace(/"/g, '""')}"`;
           const titleEn = `"${(row.titleEn || '').replace(/"/g, '""')}"`;
-          const type = row.accountType === 'main' ? (isRtl ? 'اصلی' : 'Main') : (isRtl ? 'واسط/کنترلی' : 'Intermediate');
+          const type = row.accountType || 'main';
           
-          let currency = isRtl ? 'ریال' : 'IRR';
+          let currencyCode = '';
           if (row.currencyId) {
              const c = lookups.currencies.find(x => String(x.id) === String(row.currencyId));
-             if (c) currency = (isRtl ? (c.title_fa || c.code) : (c.title_en || c.code));
+             if (c) currencyCode = c.code || '';
           }
           
-          const controlInv = row.controlInventory ? (isRtl ? 'بله' : 'Yes') : (isRtl ? 'خیر' : 'No');
-          const status = row.isActive ? (isRtl ? 'فعال' : 'Active') : (isRtl ? 'غیرفعال' : 'Inactive');
+          const controlInv = row.controlInventory ? '1' : '0';
+          const status = row.isActive ? '1' : '0';
 
-          return `${code},${titleFa},${titleEn},${type},${currency},${controlInv},${status}`;
+          return `${code},${titleFa},${titleEn},${type},${currencyCode},${controlInv},${status}`;
         });
 
         const csvContent = '\uFEFF' + headers + '\n' + csvRows.join('\n');
@@ -455,9 +595,9 @@
                 onAddRoot={access.canCreate ? handleAddTreeRoot : undefined}
                 onAddChild={access.canCreate ? handleAddTreeChild : undefined}
                 onDelete={access.canDelete ? handleDeleteNode : undefined}
-                onImport={(file) => showToast(t(`فایل ${file.name} جهت پردازش بارگذاری شد.`, `File ${file.name} uploaded for processing.`), 'info')}
+                onImport={handleImportTree}
                 onExport={handleExportTree}
-                onDownloadSample={() => showToast(t('در حال دانلود نمونه فایل اکسل...', 'Downloading Excel Sample...'), 'info')}
+                onDownloadSample={handleDownloadSample}
               />
             </div>
 

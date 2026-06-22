@@ -130,14 +130,18 @@
 
     const handleDownloadSample = () => {
       const headers = isRtl
-        ? 'کد حساب,تاریخ شروع (YYYY/MM/DD),تاریخ پایان (YYYY/MM/DD),وضعیت (1 فعال / 0 غیرفعال)'
-        : 'Account Code,Valid From (YYYY/MM/DD),Valid To (YYYY/MM/DD),Status (1 Active / 0 Inactive)';
-        
-      const sampleRow = isRtl
-        ? '1101001,1403/01/01,,1'
-        : '1101001,2024/03/20,,1';
-        
-      const csv = '\uFEFF' + headers + '\n' + sampleRow;
+        ? 'کد حساب,اسم حساب,تاریخ شروع (YYYY-MM-DD یا YYYY/MM/DD شمسی),تاریخ پایان (YYYY-MM-DD یا YYYY/MM/DD شمسی),وضعیت (1 فعال / 0 غیرفعال)'
+        : 'Account Code,Account Name,Valid From (YYYY-MM-DD or Jalali YYYY/MM/DD),Valid To (YYYY-MM-DD or Jalali YYYY/MM/DD),Status (1 Active / 0 Inactive)';
+
+      const sampleRow1 = isRtl
+        ? '1101001,,1403/01/01,,1'
+        : '1101001,,2024-03-20,,1';
+
+      const sampleRow2 = isRtl
+        ? ',موجودی نقد,1403/01/01,,1'
+        : ',Cash and Cash Equivalents,2024-03-20,,1';
+
+      const csv = '\uFEFF' + headers + '\n' + sampleRow1 + '\n' + sampleRow2;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
@@ -147,9 +151,122 @@
       document.body.removeChild(link);
     };
 
+    const jalaliToIso = (jy, jm, jd) => {
+      const jy2 = jy - 979, jm2 = jm - 1, jd2 = jd - 1;
+      let j_dn = 365 * jy2 + Math.floor(jy2 / 4) * 8 - Math.floor(jy2 / 100) + Math.floor(jy2 / 400);
+      for (let i = 0; i < jm2; i++) j_dn += [31,31,31,31,31,31,30,30,30,30,30,29][i];
+      j_dn += jd2;
+      let g_dn = j_dn + 79;
+      let gy = 1600 + 400 * Math.floor(g_dn / 146097);
+      g_dn %= 146097;
+      let leap = true;
+      if (g_dn >= 36525) { g_dn--; gy += 100 * Math.floor(g_dn / 36524); g_dn %= 36524; if (g_dn >= 365) g_dn++; else leap = false; }
+      gy += 4 * Math.floor(g_dn / 1461); g_dn %= 1461;
+      if (g_dn >= 366) { leap = false; g_dn--; gy += Math.floor(g_dn / 365); g_dn %= 365; }
+      const gml = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      let gm = 0;
+      for (; gm < 12; gm++) { if (g_dn < gml[gm]) break; g_dn -= gml[gm]; }
+      return `${gy}-${String(gm + 1).padStart(2, '0')}-${String(g_dn + 1).padStart(2, '0')}`;
+    };
+
+    const parseImportDate = (dateStr) => {
+      if (!dateStr) return null;
+      const parts = dateStr.trim().replace(/-/g, '/').split('/');
+      if (parts.length !== 3) return dateStr.trim();
+      const [p0, p1, p2] = parts.map(Number);
+      if (p0 > 1400) return jalaliToIso(p0, p1, p2);
+      return `${String(p0).padStart(4, '0')}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`;
+    };
+
     const handleImport = (file) => {
-        if (!file) return;
-        showToast(t(`فایل ${file.name} جهت پردازش بارگذاری شد.`, `File ${file.name} uploaded for processing.`), 'info');
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const XLSX = window.XLSX;
+          if (!XLSX) {
+            showToast(t('کتابخانه پردازش فایل در دسترس نیست.', 'File processing library not available.'), 'error');
+            return;
+          }
+          const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+          if (allRows.length < 2) {
+            showToast(t('فایل خالی است یا فرمت صحیح ندارد.', 'File is empty or has invalid format.'), 'error');
+            return;
+          }
+          const toInsert = [];
+          const errors = [];
+          for (let i = 1; i < allRows.length; i++) {
+            const cols = allRows[i].map(c => String(c ?? '').trim());
+            const accountCode = cols[0]?.trim();
+            const accountName = cols[1]?.trim();
+            const validFrom   = cols[2]?.trim();
+            const validTo     = cols[3]?.trim();
+            const isActiveRaw = cols[4]?.trim();
+            const rowLabel = t(`ردیف ${i + 1}`, `Row ${i + 1}`);
+            if (!accountCode && !accountName) {
+              errors.push(t(`${rowLabel}: کد یا اسم حساب الزامی است.`, `${rowLabel}: Account code or name is required.`));
+              continue;
+            }
+            if (!validFrom) {
+              errors.push(t(`${rowLabel}: تاریخ شروع الزامی است.`, `${rowLabel}: Valid From is required.`));
+              continue;
+            }
+            let account = null;
+            if (accountCode) {
+              account = leafAccounts.find(a => String(a.code).trim() === accountCode);
+              if (!account) {
+                errors.push(t(`${rowLabel}: حسابی با کد «${accountCode}» یافت نشد.`, `${rowLabel}: No account found with code "${accountCode}".`));
+                continue;
+              }
+            } else {
+              const matches = leafAccounts.filter(a => a.title_fa && a.title_fa.trim() === accountName);
+              if (matches.length === 0) {
+                errors.push(t(`${rowLabel}: حسابی با اسم «${accountName}» یافت نشد.`, `${rowLabel}: No account found with name "${accountName}".`));
+                continue;
+              }
+              if (matches.length > 1) {
+                errors.push(t(`${rowLabel}: چند حساب با اسم «${accountName}» یافت شد. لطفاً کد حساب را وارد کنید.`, `${rowLabel}: Multiple accounts match "${accountName}". Please use account code.`));
+                continue;
+              }
+              account = matches[0];
+            }
+            if (groupAccounts.some(a => String(a.account_id) === String(account.id))) {
+              errors.push(t(`${rowLabel}: حساب «${account.code}» قبلاً در این گروه وجود دارد.`, `${rowLabel}: Account "${account.code}" already exists in this group.`));
+              continue;
+            }
+            toInsert.push({
+              group_id: group.id,
+              account_id: account.id,
+              valid_from: parseImportDate(validFrom),
+              valid_to: parseImportDate(validTo) || null,
+              is_active: isActiveRaw === '0' ? false : true
+            });
+          }
+          if (toInsert.length === 0) {
+            showToast(errors.length > 0 ? errors[0] : t('رکورد معتبری برای درج یافت نشد.', 'No valid records to import.'), 'error');
+            return;
+          }
+          setModalLoading(true);
+          try {
+            const { error } = await supabase.from('fm_balance_group_accounts').insert(toInsert);
+            if (error) throw error;
+            fetchGroupAccounts();
+            const msg = errors.length > 0
+              ? t(`${toInsert.length} رکورد وارد شد. ${errors.length} ردیف با خطا مواجه شد.`, `${toInsert.length} records imported. ${errors.length} row(s) had errors.`)
+              : t(`${toInsert.length} رکورد با موفقیت وارد شد.`, `${toInsert.length} record(s) imported successfully.`);
+            showToast(msg, errors.length > 0 ? 'warning' : 'success');
+          } catch (err) {
+            showToast(t('خطا در ذخیره اطلاعات وارد شده.', 'Error saving imported data.'), 'error');
+          } finally {
+            setModalLoading(false);
+          }
+        } catch (err) {
+          showToast(t('خطا در خواندن فایل.', 'Error reading file.'), 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
     };
 
     const accountGridData = useMemo(() => {
@@ -213,6 +330,15 @@
        if (inlineAccessEdit && inlineAccessEdit.id === 'new') data.unshift({ id: 'new', _isNew: true, ...inlineAccessEdit.data });
        return data;
     }, [groupAccesses, inlineAccessEdit]);
+
+    const availableAccountsForLov = useMemo(() => {
+      const existingIds = new Set(
+        groupAccounts
+          .filter(a => inlineAccountEdit?.id === 'new' || String(a.id) !== String(inlineAccountEdit?.id))
+          .map(a => String(a.account_id))
+      );
+      return leafAccounts.filter(a => !existingIds.has(String(a.id)));
+    }, [leafAccounts, groupAccounts, inlineAccountEdit?.id]);
 
     const availableUsersForAccess = useMemo(() => {
       return users.filter(u => !groupAccesses.some(ga => ga.grantee_type?.toLowerCase() === 'user' && String(ga.grantee_id) === String(u.id)));
@@ -285,7 +411,7 @@
              return (
                <div onClick={(e)=>e.stopPropagation()}>
                  <LOVField 
-                   size="sm" data={leafAccounts} columns={lovAccountColumns} dropdownWidth="min-w-[650px]"
+                   size="sm" data={availableAccountsForLov} columns={lovAccountColumns} dropdownWidth="min-w-[650px]"
                    displayValue={inlineAccountEdit.data.account_obj ? `${inlineAccountEdit.data.account_obj.code} - ${inlineAccountEdit.data.account_obj.title_fa}` : ''}
                    onChange={(r) => setInlineAccountEdit(prev => ({...prev, data: {...prev.data, account_id: r?.id, account_obj: r}}))}
                  />

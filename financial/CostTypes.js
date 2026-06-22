@@ -316,6 +316,136 @@
       }
     };
 
+    const handleDownloadSample = () => {
+      const headers = isRtl
+        ? 'کد (خالی = اتوماتیک),عنوان فارسی,عنوان انگلیسی,کد والد (خالی = ریشه),وضعیت (1/0)'
+        : 'Code (empty=auto),Persian Title,English Title,Parent Code (empty=root),Status (1/0)';
+      const sampleRows = [
+        `,هزینه‌های عملیاتی,Operational Costs,,1`,
+        `,هزینه‌های پرسنلی,Personnel Costs,,1`,
+        `,حقوق و مزایا,Salaries,,1`,
+      ];
+      const csv = '\uFEFF' + headers + '\n' + sampleRows.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', 'CostTypes_Import_Sample.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    const handleExportTree = () => {
+      if (!rawNodes || rawNodes.length === 0)
+        return showToast(t('داده‌ای برای خروجی وجود ندارد.', 'No data to export.'), 'warning');
+
+      const headers = isRtl
+        ? 'کد,عنوان فارسی,عنوان انگلیسی,کد والد,وضعیت (1/0)'
+        : 'Code,Persian Title,English Title,Parent Code,Status (1/0)';
+      const csvRows = rawNodes.map(node => {
+        const parent = rawNodes.find(n => n.id === node.parentId);
+        const parentCode = parent ? (parent.code || '') : '';
+        const titleFa = `"${(node.titleFa || '').replace(/"/g, '""')}"`;
+        const titleEn = `"${(node.titleEn || '').replace(/"/g, '""')}"`;
+        return `${node.code || ''},${titleFa},${titleEn},${parentCode},${node.isActive ? '1' : '0'}`;
+      });
+      const csv = '\uFEFF' + headers + '\n' + csvRows.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', 'CostTypes_Export.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    const handleImportTree = (file) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          let rows;
+          if (window.XLSX) {
+            const wb = window.XLSX.read(e.target.result, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rawRows = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            if (rawRows.length < 2) return showToast(t('فایل خالی یا نامعتبر است', 'File is empty or invalid'), 'error');
+            rows = rawRows.slice(1).map(parts => ({
+              code:       String(parts[0] ?? '').trim(),
+              titleFa:    String(parts[1] ?? '').trim(),
+              titleEn:    String(parts[2] ?? '').trim(),
+              parentCode: String(parts[3] ?? '').trim(),
+              isActive:   String(parts[4] ?? '1').trim() !== '0',
+            })).filter(r => r.titleFa);
+          } else {
+            const cleanText = (new TextDecoder('utf-8')).decode(e.target.result).replace(/^\uFEFF/, '');
+            const lines = cleanText.split(/\r?\n/).filter(l => l.trim());
+            if (lines.length < 2) return showToast(t('فایل خالی یا نامعتبر است', 'File is empty or invalid'), 'error');
+            rows = lines.slice(1).map(line => {
+              const parts = line.split(',');
+              return {
+                code: (parts[0]||'').trim(), titleFa: (parts[1]||'').trim().replace(/^"|"$/g,''),
+                titleEn: (parts[2]||'').trim().replace(/^"|"$/g,''), parentCode: (parts[3]||'').trim(),
+                isActive: (parts[4]||'1').trim() !== '0',
+              };
+            }).filter(r => r.titleFa);
+          }
+
+          if (rows.length === 0) return showToast(t('هیچ داده‌ای برای ورود وجود ندارد', 'No data to import'), 'warning');
+
+          rows.sort((a, b) => (!a.parentCode && b.parentCode ? -1 : a.parentCode && !b.parentCode ? 1 : 0));
+
+          const codeToId = {};
+          rawNodes.forEach(n => { if (n.code) codeToId[n.code] = n.id; });
+
+          let insertedCount = 0, updatedCount = 0, errorCount = 0;
+
+          for (const row of rows) {
+            try {
+              const parentId = row.parentCode ? (codeToId[row.parentCode] ?? null) : null;
+
+              let finalCode = row.code;
+              let consumeAutoNumber = false;
+              if (!finalCode && window.AutoNumberingService) {
+                const preview = await window.AutoNumberingService.previewNext('COST_TYPE').catch(() => null);
+                finalCode = preview?.formattedCode || (typeof preview === 'string' ? preview : '');
+                consumeAutoNumber = !!finalCode;
+              }
+
+              const payload = {
+                code: finalCode || null, title_fa: row.titleFa, title_en: row.titleEn || null,
+                parent_id: parentId, is_active: row.isActive,
+              };
+
+              const existing = finalCode ? rawNodes.find(n => n.code === finalCode) : null;
+              if (existing) {
+                const { error } = await supabase.from('fm_cost_types').update(payload).eq('id', existing.id);
+                if (error) throw error;
+                codeToId[finalCode] = existing.id;
+                updatedCount++;
+              } else {
+                const { data: ins, error } = await supabase.from('fm_cost_types').insert([payload]).select('id, code');
+                if (error) throw error;
+                if (ins?.[0]) codeToId[ins[0].code || finalCode] = ins[0].id;
+                if (consumeAutoNumber && window.AutoNumberingService)
+                  await window.AutoNumberingService.consumeNext('COST_TYPE').catch(() => {});
+                insertedCount++;
+              }
+            } catch (err) { console.error('Import row error:', row, err); errorCount++; }
+          }
+
+          await fetchData();
+          const msg = isRtl
+            ? `ورود کامل شد: ${insertedCount} جدید، ${updatedCount} به‌روز${errorCount > 0 ? `، ${errorCount} خطا` : ''}`
+            : `Import done: ${insertedCount} inserted, ${updatedCount} updated${errorCount > 0 ? `, ${errorCount} errors` : ''}`;
+          showToast(msg, errorCount > 0 ? 'warning' : 'success');
+        } catch (err) {
+          showToast(t('خطا در پردازش فایل', 'Error processing file'), 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    };
+
     const parentNodeOptions = useMemo(() => {
         return rawNodes
             .filter(n => n.id !== treeFormData.id) 
@@ -342,6 +472,9 @@
               onAddRoot={access.canCreate ? handleAddTreeRoot : undefined}
               onAddChild={access.canCreate ? handleAddTreeChild : undefined}
               onDelete={access.canDelete ? handleDeleteTreeNode : undefined}
+              onExport={handleExportTree}
+              onImport={access.canCreate ? handleImportTree : undefined}
+              onDownloadSample={handleDownloadSample}
             />
           </div>
 
