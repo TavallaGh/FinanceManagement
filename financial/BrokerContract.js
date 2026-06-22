@@ -4,7 +4,7 @@
   const { useState, useEffect, useMemo, useCallback } = React;
   
   const { 
-    Button, DataGrid, Modal,
+    Button, DataGrid, Modal, LOVField,
     TextField, SelectField, CurrencyField, Badge,
     DatePicker, Toast, EmptyState
   } = window.DesignSystem || {};
@@ -77,9 +77,10 @@
 
     const handleAddClick = () => {
         if (inlineEdit) return;
+        const defaultCurrencyId = broker?.account?.currency_id || '';
         setInlineEdit({
             id: 'new',
-            data: { currencyId: '', fromDate: '', toDate: '', minAmount: 0, maxAmount: '', commissionPct: 0 }
+            data: { currencyId: defaultCurrencyId, fromDate: '', toDate: '', minAmount: 0, maxAmount: '', commissionPct: 0 }
         });
     };
 
@@ -89,6 +90,11 @@
         
         if (!form.fromDate) {
             showToast(t('وارد کردن تاریخ شروع الزامی است.', 'From Date is required.'), 'error');
+            return;
+        }
+
+        if (!form.currencyId) {
+            showToast(t('انتخاب ارز الزامی است.', 'Currency selection is required.'), 'error');
             return;
         }
 
@@ -115,6 +121,67 @@
         }
 
         setIsLoading(true);
+
+        // ── بررسی تداخل (overlap) با قراردادهای معتبر همین بروکر ──────────────
+        try {
+          // دریافت تازه از DB تا از stale state جلوگیری شود
+          const { data: freshContracts } = await supabase
+              .from('fm_broker_contracts')
+              .select('id, from_date, to_date, min_amount, max_amount, currency_id')
+              .eq('broker_id', broker.id);
+
+          // نرمال‌سازی فرمت تاریخ: YYYY/MM/DD → YYYY-MM-DD
+          const toIso = (d) => d ? String(d).replace(/\//g, '-') : null;
+
+          const today   = new Date().toISOString().split('T')[0];
+          const newFrom = toIso(form.fromDate)  || '2000-01-01';
+          const newTo   = toIso(form.toDate)    || '2100-01-01';
+          const newMin  = sanitizeAmount(form.minAmount) ?? 0;
+          const newMax  = sanitizeAmount(form.maxAmount) ?? 9999999999;
+          const newCur  = form.currencyId || null;
+
+          const validContracts = (freshContracts || []).filter(c => {
+              if (inlineEdit.id !== 'new' && c.id === inlineEdit.id) return false;
+              const cTo = toIso(c.to_date) || '2100-01-01';
+              return cTo >= today;
+          });
+
+          const conflicting = validContracts.find(c => {
+              // ارز: null = همه ارزها؛ اگر هر دو مشخص و متفاوت باشند → تداخل ندارند
+              const cCurId = c.currency_id || null;
+              if (cCurId !== null && newCur !== null && cCurId !== newCur) return false;
+
+              // تداخل تاریخی
+              const cFrom = toIso(c.from_date) || '2000-01-01';
+              const cTo   = toIso(c.to_date)   || '2100-01-01';
+              if (!(newFrom <= cTo && cFrom <= newTo)) return false;
+
+              // تداخل بازه مبلغ
+              const cMin = c.min_amount ?? 0;
+              const cMax = c.max_amount ?? 9999999999;
+              return newMin <= cMax && cMin <= newMax;
+          });
+
+          if (conflicting) {
+              const cCurLabel = getCurrencyName(conflicting.currency_id);
+              const cMin  = (conflicting.min_amount ?? 0).toLocaleString();
+              const cMax  = conflicting.max_amount != null ? conflicting.max_amount.toLocaleString() : '∞';
+              const cFrom = conflicting.from_date || '---';
+              const cTo   = conflicting.to_date   || '---';
+              showToast(
+                  t(
+                      `تداخل با قرارداد معتبر موجود: بازه ${cMin} – ${cMax} (${cCurLabel})، از ${cFrom} تا ${cTo}`,
+                      `Overlap with existing valid contract: ${cMin} – ${cMax} (${cCurLabel}), from ${cFrom} to ${cTo}`
+                  ),
+                  'error'
+              );
+              setIsLoading(false);
+              return;
+          }
+        } catch (overlapErr) {
+          console.error('Overlap check error:', overlapErr);
+        }
+        // ────────────────────────────────────────────────────────────────────────
         try {
             const payload = {
                 broker_id: broker.id,
@@ -210,27 +277,31 @@
             field: 'currency_id', 
             header_fa: 'ارز', 
             header_en: 'Currency', 
-            width: '85px',
+            width: '140px',
             render: (val, row) => {
                 if (inlineEdit?.id === row.id) {
+                    const currencyLovColumns = [
+                        { field: 'code',  header_fa: 'کد ارز',   header_en: 'Code',  width: '80px' },
+                        { field: 'title', header_fa: 'عنوان ارز', header_en: 'Title', width: '160px' }
+                    ];
+                    const selectedCurrency = currencies.find(c => c.id === inlineEdit.data.currencyId);
                     return (
                         <div onClick={(e)=>e.stopPropagation()}>
-                            <SelectField 
-                                size="sm" 
-                                value={inlineEdit.data.currencyId} 
-                                onChange={e => setInlineEdit(prev => ({...prev, data: {...prev.data, currencyId: e.target.value}}))} 
+                            <LOVField
+                                size="sm"
+                                data={currencies}
+                                columns={currencyLovColumns}
+                                displayValue={selectedCurrency ? `${selectedCurrency.code} - ${selectedCurrency.title}` : ''}
+                                onChange={row => setInlineEdit(prev => ({...prev, data: {...prev.data, currencyId: row ? row.id : ''}}))}
                                 isRtl={isRtl}
-                                options={[
-                                    { value: '', label: t('همه', 'All') },
-                                    ...currencies.map(c => ({ value: c.id, label: c.title }))
-                                ]}
+                                required
                             />
                         </div>
                     );
                 }
                 return val ? 
                     <Badge variant="indigo" size="sm" className="whitespace-nowrap">{getCurrencyName(val)}</Badge> : 
-                    <Badge variant="slate" size="sm" className="whitespace-nowrap">{t('همه', 'All')}</Badge>;
+                    <Badge variant="slate" size="sm" className="whitespace-nowrap">{t('نامشخص', 'Unset')}</Badge>;
             }
         },
         { 

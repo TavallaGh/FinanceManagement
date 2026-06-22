@@ -172,11 +172,16 @@
 
     const parseImportDate = (dateStr) => {
       if (!dateStr) return null;
-      const parts = dateStr.trim().replace(/-/g, '/').split('/');
-      if (parts.length !== 3) return dateStr.trim();
-      const [p0, p1, p2] = parts.map(Number);
-      if (p0 > 1400) return jalaliToIso(p0, p1, p2);
-      return `${String(p0).padStart(4, '0')}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`;
+      const str = dateStr.trim();
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) {
+          const [p0, p1, p2] = parts.map(Number);
+          if (p0 >= 1300 && p0 <= 1600) return jalaliToIso(p0, p1, p2);
+        }
+        return str.replace(/\//g, '-');
+      }
+      return str;
     };
 
     const handleImport = (file) => {

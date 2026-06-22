@@ -13,7 +13,7 @@
     HelpCircle = FallbackIcon, LogOut = FallbackIcon
   } = LucideIcons;
 
-  const FormLoader = ({ path, language }) => {
+  const FormLoader = ({ path, menuUniqueCode, language }) => {
     if (!path) return null;
 
     const componentName = path.split('/').pop();
@@ -33,7 +33,10 @@
       );
     }
 
-    return <DynamicComponent language={language} formCode={DynamicComponent.formCode || componentName} />;
+    // اولویت: unique_code منو (همان کلیدی که سیستم دسترسی ناوبری استفاده می‌کند)
+    // در صورت نبود، از formCode کامپوننت و در نهایت نام کامپوننت استفاده می‌شود
+    const resolvedFormCode = menuUniqueCode || DynamicComponent.formCode || componentName;
+    return <DynamicComponent language={language} formCode={resolvedFormCode} />;
   };
 
   const NavigationSystem = ({ isAdmin = true, initialLanguage = 'fa' }) => {
@@ -722,7 +725,7 @@
 
           <div className="flex-1 overflow-y-auto custom-scrollbar font-sans">
             {activeForm && activeForm.component_path ? (
-              <FormLoader path={activeForm.component_path} language={currentLanguage} />
+              <FormLoader path={activeForm.component_path} menuUniqueCode={activeForm.unique_code} language={currentLanguage} />
             ) : activeDomainId === 'HOME_FAV' ? renderHomeView() : viewMode === 'tile' ? renderFioriTiles() : (
               <div className="h-full flex flex-col items-center justify-center text-center p-12 font-sans">
                 <Monitor size={40} className="text-slate-300 dark:text-slate-700 mb-4" strokeWidth={1.5} />

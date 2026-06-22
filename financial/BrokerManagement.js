@@ -13,6 +13,7 @@
   const Button = DSCore.Button || DS.Button || Fallback;
   const PageHeader = DSCore.PageHeader || DS.PageHeader || Fallback;
   const Modal = DSFeedback.Modal || DS.Modal || Fallback;
+  const Toast = DSFeedback.Toast || DS.Toast || Fallback;
   const DataGrid = DSGrid.DataGrid || DS.DataGrid || Fallback;
   const LOVField = DSGrid.LOVField || DS.LOVField || Fallback;
   const TextField = DSForms.TextField || DS.TextField || Fallback;
@@ -22,6 +23,15 @@
   const DatePicker = DSForms.DatePicker || DS.DatePicker || Fallback;
   const LogTimeline = DSFeedback.LogTimeline || DS.LogTimeline || Fallback;
   const EmptyState = DSCore.EmptyState || DS.EmptyState || Fallback;
+  const Badge = DSCore.Badge || DS.Badge || Fallback;
+
+  // برمی‌گرداند اعتبار زمانی بروکر — بر اساس valid_from / valid_to
+  const getBrokerValidityStatus = (validFrom, validTo) => {
+    const today = new Date().toISOString().split('T')[0];
+    if (validTo   && validTo   < today) return 'expired';
+    if (validFrom && validFrom > today) return 'notyet';
+    return 'valid';
+  };
   
   const LucideIcons = window.LucideIcons || {};
   const FallbackIcon = () => null;
@@ -48,7 +58,12 @@
     const [accounts, setAccounts] = useState([]);
 
     const [isLoading, setIsLoading] = useState(false);
-    
+    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+    const showToast = (message, type = 'success') => {
+      setToast({ isVisible: true, message, type });
+      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3500);
+    };
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentRecord, setCurrentRecord] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
@@ -160,7 +175,7 @@
           { data: brokersData, error: bError }
         ] = await Promise.all([
           supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, roles, mobile, email'),
-          supabase.from('fm_brokers').select('*, account:fm_coa_accounts(id, title_fa, title_en, code)').order('created_at', { ascending: false })
+          supabase.from('fm_brokers').select('*, account:fm_coa_accounts(id, title_fa, title_en, code, currency_id)').order('created_at', { ascending: false })
         ]);
           
         if (pData && !pError) {
@@ -176,10 +191,19 @@
 
         if (bError) throw bError;
         
-        const mappedData = (brokersData || []).map(item => ({
+        const mappedData = (brokersData || []).map(item => {
+          const party = (pData || []).find(p => p.id === item.party_id);
+          const brokerName = party
+            ? (party.party_type === 'legal'
+                ? (party.company_name || '-')
+                : `${party.first_name || ''} ${party.last_name || ''}`.trim() || '-')
+            : '-';
+          return {
             ...item,
+            brokerName,
             accountName: item.account ? `[${item.account.code}] ${isRtl ? item.account.title_fa : item.account.title_en}` : '---'
-        }));
+          };
+        });
 
         setData(mappedData);
 
@@ -411,13 +435,136 @@
       return p.party_type === 'legal' ? p.company_name : `${p.first_name || ''} ${p.last_name || ''}`.trim();
     };
 
+    const handleDownloadSample = () => {
+      const headers = isRtl
+        ? 'کد Party,نام Party (برای اطمینان),کد حساب مرتبط,تاریخ اعتبار از (YYYY-MM-DD),تاریخ اعتبار تا (YYYY-MM-DD),وضعیت (1/0)'
+        : 'Party Code,Party Name (for reference),Linked Account Code,Valid From (YYYY-MM-DD),Valid To (YYYY-MM-DD),Status (1/0)';
+
+      const sampleRows = [
+        'BRK001,شرکت آلفا تجارت,11101,2024-01-01,2024-12-31,1',
+        'BRK002,محمد احمدی,,2024-03-01,,1',
+      ];
+
+      const csv = '\uFEFF' + headers + '\n' + sampleRows.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', 'Brokers_Import_Sample.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    const handleImportBrokers = (file) => {
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const cleanText = (e.target.result || '').replace(/^\uFEFF/, '');
+          const lines = cleanText.split(/\r?\n/).filter(l => l.trim());
+
+          if (lines.length < 2) {
+            return showToast(t('فایل خالی یا نامعتبر است', 'File is empty or invalid'), 'error');
+          }
+
+          const rows = lines.slice(1).map(line => {
+            const parts = line.split(',');
+            return {
+              partyCode:   (parts[0] || '').trim(),
+              partyName:   (parts[1] || '').trim().replace(/^"|"$/g, ''),
+              accountCode: (parts[2] || '').trim(),
+              validFrom:   (parts[3] || '').trim(),
+              validTo:     (parts[4] || '').trim(),
+              isActive:    (parts[5] || '1').trim() !== '0',
+            };
+          }).filter(r => r.partyCode);
+
+          if (rows.length === 0) {
+            return showToast(t('هیچ داده‌ای برای ورود وجود ندارد', 'No data to import'), 'warning');
+          }
+
+          let insertedCount = 0;
+          let updatedCount  = 0;
+          let errorCount    = 0;
+          const notFoundCodes = [];
+
+          for (const row of rows) {
+            try {
+              const party = allParties.find(p => (p.code || '').trim() === row.partyCode);
+              if (!party) {
+                notFoundCodes.push(row.partyCode);
+                errorCount++;
+                continue;
+              }
+
+              const account = row.accountCode
+                ? accounts.find(a => (a.code || '').trim() === row.accountCode)
+                : null;
+
+              const payload = {
+                party_id:   party.id,
+                account_id: account ? account.id : null,
+                valid_from: row.validFrom || null,
+                valid_to:   row.validTo   || null,
+                is_active:  row.isActive,
+                updated_at: new Date().toISOString(),
+              };
+
+              const existing = data.find(b => String(b.party_id) === String(party.id));
+              if (existing) {
+                const { error } = await supabase.from('fm_brokers').update(payload).eq('id', existing.id);
+                if (error) throw error;
+                updatedCount++;
+              } else {
+                const { error } = await supabase.from('fm_brokers').insert([{ ...payload, created_at: new Date().toISOString() }]);
+                if (error) throw error;
+                insertedCount++;
+              }
+            } catch (err) {
+              console.error('Import row error:', row, err);
+              errorCount++;
+            }
+          }
+
+          await fetchData();
+
+          let msg = isRtl
+            ? `ورود اطلاعات کامل شد: ${insertedCount} جدید، ${updatedCount} به‌روزرسانی`
+            : `Import complete: ${insertedCount} inserted, ${updatedCount} updated`;
+          if (notFoundCodes.length > 0) {
+            msg += isRtl
+              ? `\nکدهای Party یافت نشد: ${notFoundCodes.join(', ')}`
+              : `\nParty codes not found: ${notFoundCodes.join(', ')}`;
+          }
+          showToast(msg, errorCount > 0 ? 'warning' : 'success');
+        } catch (err) {
+          showToast(t('خطا در پردازش فایل', 'Error processing file'), 'error');
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+    };
+
     const columns = [
       { 
-        field: 'party_id', 
+        field: 'brokerName', 
         header_fa: 'نام بروکر (شخص/شرکت)', 
         header_en: 'Broker Name', 
         width: '250px',
-        render: (val) => <span className="font-bold text-slate-700 dark:text-slate-200">{getPartyName(val)}</span>
+        render: (val, row) => {
+          const status = getBrokerValidityStatus(row.valid_from, row.valid_to);
+          return (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-slate-700 dark:text-slate-200">{val}</span>
+              {status === 'expired' && (
+                <Badge variant="red" size="sm">{t('منقضی شده', 'Expired')}</Badge>
+              )}
+              {status === 'notyet' && (
+                <Badge variant="yellow" size="sm">{t('نامعتبر', 'Not Yet Valid')}</Badge>
+              )}
+            </div>
+          );
+        }
       },
       {
         field: 'accountName',
@@ -489,6 +636,8 @@
               onToggle={(row, field, val) => {
                  if (field === 'is_active') handleToggleActive(row, val);
               }}
+              onDownloadSample={handleDownloadSample}
+              onImport={handleImportBrokers}
               actions={[
                 { icon: Edit, tooltip: t('ویرایش مشخصات', 'Edit Details'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
                 { icon: Percent, tooltip: t('قراردادها و کارمزدها', 'Contracts & Commissions'), onClick: (row) => { setSelectedBroker(row); setIsContractsModalOpen(true); }, className: 'text-slate-400 hover:text-emerald-600' },
@@ -676,6 +825,8 @@
         >
           <LogTimeline logs={recordLogs} isLoading={isLogsLoading} language={language} />
         </Modal>
+
+        <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} language={language} />
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
           <EmptyState
