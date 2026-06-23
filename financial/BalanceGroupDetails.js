@@ -413,6 +413,12 @@
     const accountColumns = [
       {
         field: '_date_validity', header_fa: 'اعتبار', header_en: 'Validity', width: '90px',
+        exportValue: (_, row) => {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const parseDate = (s) => { if (!s) return null; const d = new Date(s.replace(/\//g, '-')); return isNaN(d.getTime()) ? null : d; };
+          const isInvalid = (parseDate(row.valid_from) > today) || (parseDate(row.valid_to) && parseDate(row.valid_to) < today);
+          return isInvalid ? (isRtl ? 'نامعتبر' : 'Invalid') : (isRtl ? 'معتبر' : 'Valid');
+        },
         render: (_, row) => {
           if (inlineAccountEdit?.id === row.id || row._isNew) return null;
           const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -424,7 +430,8 @@
         }
       },
       { 
-        field: 'account', header_fa: 'حساب', header_en: 'Account', width: 'auto', 
+        field: 'account', header_fa: 'کد حساب', header_en: 'Account Code', width: 'auto',
+        exportValue: (_, row) => row.fm_coa_accounts?.code || '',
         render: (_, row) => {
           if (inlineAccountEdit?.id === row.id) {
              return (
@@ -445,6 +452,7 @@
           );
         }
       },
+      { field: '_acc_title', header_fa: 'نام حساب', header_en: 'Account Name', exportOnly: true, exportValue: (_, row) => row.fm_coa_accounts?.title_fa || '' },
       { 
         field: 'valid_from', header_fa: 'از تاریخ', header_en: 'Valid From', width: '140px', 
         render: (val, row) => {
