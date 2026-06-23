@@ -406,7 +406,7 @@
       const visibleFields = columnOrder.filter(f => !hiddenCols.includes(f));
       const pinned = visibleFields.filter(f => pinnedCols.includes(f));
       const unpinned = visibleFields.filter(f => !pinnedCols.includes(f));
-      return [...pinned, ...unpinned].map(f => columns.find(c => c.field === f)).filter(Boolean);
+      return [...pinned, ...unpinned].map(f => columns.find(c => c.field === f)).filter(Boolean).filter(c => !c.exportOnly);
     }, [columnOrder, hiddenCols, pinnedCols, columns]);
 
     const processedData = useMemo(() => {
@@ -582,11 +582,12 @@
          }
          return;
       }
-      const headers = visibleColumns.map(c => t(c.header_fa, c.header_en)).join(',');
-      const rows = gridData.map(row => visibleColumns.map(c => {
-        let val = row[c.field];
+      const exportCols = [...visibleColumns, ...columns.filter(c => c.exportOnly && !visibleColumns.find(v => v.field === c.field))];
+      const headers = exportCols.map(c => t(c.header_fa, c.header_en || c.header_fa)).join(',');
+      const rows = gridData.map(row => exportCols.map(c => {
+        let val = c.exportValue ? c.exportValue(row[c.field], row) : row[c.field];
         if (c.type === 'date') val = formatGlobalDate(val, globalMode);
-        return `"${(val || '').toString().replace(/"/g, '""')}"`;
+        return `"${(val ?? '').toString().replace(/"/g, '""')}"`;
       }).join(',')).join('\n');
       const csv = '\uFEFF' + headers + '\n' + rows;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

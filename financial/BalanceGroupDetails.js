@@ -430,7 +430,7 @@
         }
       },
       { 
-        field: 'account', header_fa: 'کد حساب', header_en: 'Account Code', width: 'auto',
+        field: 'account', header_fa: 'حساب', header_en: 'Account', width: 'auto',
         exportValue: (_, row) => row.fm_coa_accounts?.code || '',
         render: (_, row) => {
           if (inlineAccountEdit?.id === row.id) {
