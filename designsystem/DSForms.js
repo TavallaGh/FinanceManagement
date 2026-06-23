@@ -509,6 +509,16 @@
             dir="ltr"
           />
           <div className={`absolute ${isRtl ? 'left-1' : 'right-1'} flex items-center gap-0.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded p-0.5 z-10`}>
+            {value && !isDisabled && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onChange(''); setIsOpen(false); }}
+                className={`rounded ${isXs ? 'p-0.5' : 'p-0.5'} transition-all text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30`}
+                title={t('حذف تاریخ', 'Clear Date')}
+              >
+                <X size={isXs ? 10 : 12} />
+              </button>
+            )}
             <button 
               type="button" onClick={(e) => { e.stopPropagation(); toggleCalendarMode(); }}
               className={`rounded ${isXs ? 'px-1 py-0.5 text-[8px]' : 'px-1.5 py-0.5 text-[10px]'} font-black transition-all bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300`}
