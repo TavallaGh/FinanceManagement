@@ -422,10 +422,16 @@
                         </div>
                     );
                 }
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                const parseDate = (s) => { if (!s) return null; const d = new Date(s.replace(/\//g, '-')); return isNaN(d.getTime()) ? null : d; };
+                const startD = parseDate(row.valid_from);
+                const endD = parseDate(row.valid_to);
+                const isInvalid = (startD && startD > today) || (endD && endD < today);
                 return (
                     <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-800 dark:text-slate-200">{row.fm_balance_groups?.code}</span>
                         <span className="text-slate-600 dark:text-slate-300">- {row.fm_balance_groups?.title_fa}</span>
+                        {isInvalid && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 whitespace-nowrap">{t('نامعتبر', 'Invalid')}</span>}
                     </div>
                 );
             }

@@ -256,7 +256,22 @@
 
     const chartColumns = [
       { field: 'code', header_fa: 'کد ساختار', header_en: 'Code', width: '120px' },
-      { field: 'title', header_fa: 'عنوان ساختار', header_en: 'Structure Title', width: '180px' },
+      {
+        field: 'title', header_fa: 'عنوان ساختار', header_en: 'Structure Title', width: '200px',
+        render: (val, row) => {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const parseDate = (s) => { if (!s) return null; const d = new Date(s.replace(/\//g, '-')); return isNaN(d.getTime()) ? null : d; };
+          const startD = parseDate(row.start_date);
+          const endD = parseDate(row.end_date);
+          const isInvalid = (startD && startD > today) || (endD && endD < today);
+          return (
+            <div className="flex items-center gap-1.5">
+              <span>{val}</span>
+              {isInvalid && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 whitespace-nowrap">{t('نامعتبر', 'Expired')}</span>}
+            </div>
+          );
+        }
+      },
       { field: 'start_date', header_fa: 'تاریخ شروع موثر', header_en: 'Effective Start', width: '120px', type: 'date' },
       { field: 'end_date', header_fa: 'تاریخ پایان موثر', header_en: 'Effective End', width: '120px', type: 'date' },
       { field: 'is_active', header_fa: 'وضعیت', header_en: 'Active', type: 'toggle', width: '120px', onToggle: (row, val) => handleToggleActive(row, val) }
