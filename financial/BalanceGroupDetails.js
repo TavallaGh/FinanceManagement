@@ -411,6 +411,18 @@
     // Columns & Actions
     // ----------------------------------------------------------------------
     const accountColumns = [
+      {
+        field: '_date_validity', header_fa: 'اعتبار', header_en: 'Validity', width: '90px',
+        render: (_, row) => {
+          if (inlineAccountEdit?.id === row.id || row._isNew) return null;
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const parseDate = (s) => { if (!s) return null; const d = new Date(s.replace(/\//g, '-')); return isNaN(d.getTime()) ? null : d; };
+          const startD = parseDate(row.valid_from);
+          const endD = parseDate(row.valid_to);
+          const isInvalid = (startD && startD > today) || (endD && endD < today);
+          return <Badge variant={isInvalid ? 'rose' : 'emerald'} size="sm" className="text-[10px]">{isInvalid ? t('نامعتبر', 'Invalid') : t('معتبر', 'Valid')}</Badge>;
+        }
+      },
       { 
         field: 'account', header_fa: 'حساب', header_en: 'Account', width: 'auto', 
         render: (_, row) => {
