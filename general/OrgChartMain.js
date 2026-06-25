@@ -8,7 +8,7 @@
   const {
     Save = FallbackIcon, Edit = FallbackIcon, Trash2 = FallbackIcon,
     ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, AlertTriangle = FallbackIcon,
-    X = FallbackIcon, RefreshCw = FallbackIcon
+    X = FallbackIcon, RefreshCw = FallbackIcon, Network = FallbackIcon
   } = LucideIcons;
 
   const OrgChartMain = ({ chart, onBack, language = 'fa', formCode = 'ORG_CHART' }) => {
@@ -21,7 +21,7 @@
     const { TextField = FallbackComponent, SelectField = FallbackComponent, ToggleField = FallbackComponent, DatePicker = FallbackComponent } = Forms;
 
     const Grid = window.DSGrid || window.DesignSystem || {};
-    const { DataGrid = FallbackComponent, LOVField = FallbackComponent } = Grid;
+    const { DataGrid = FallbackComponent, LOVField = FallbackComponent, AdvancedFilter = FallbackComponent } = Grid;
 
     const Feedback = window.DSFeedback || window.DesignSystem || {};
     const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
@@ -56,10 +56,12 @@
     const [nodeForm, setNodeForm] = useState({ id: null, code: '', title: '', parentId: '', isActive: true, officeId: '' });
     const [isNodeEditMode, setIsNodeEditMode] = useState(false);
     const [activeNodeTab, setActiveNodeTab] = useState('info');
+    const [showNodeForm, setShowNodeForm] = useState(false);
 
     const [employees, setEmployees] = useState([]);
     const [inlineAssignEdit, setInlineAssignEdit] = useState(null);
     const [orgOffices, setOrgOffices] = useState([]);
+    const [advancedFilter, setAdvancedFilter] = useState({});
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -156,7 +158,14 @@
             setSelectedNode(target);
             setNodeForm({ id: target.id, code: target.code || '', title: target.title, parentId: target.parentId || '', isActive: target.isActive ?? true, officeId: target.officeId || '' });
             setIsNodeEditMode(true);
+            setShowNodeForm(true);
           }
+        } else if (mappedNodes.length > 0) {
+          const first = mappedNodes[0];
+          setSelectedNode(first);
+          setNodeForm({ id: first.id, code: first.code || '', title: first.title, parentId: first.parentId || '', isActive: first.isActive ?? true, officeId: first.officeId || '' });
+          setIsNodeEditMode(true);
+          setShowNodeForm(true);
         }
       } catch (err) {
         showToast(t('خطا در دریافت ساختار چارت', 'Error fetching chart structure'), 'error');
@@ -177,6 +186,7 @@
       setIsNodeEditMode(true);
       setActiveNodeTab('info');
       setInlineAssignEdit(null);
+      setShowNodeForm(true);
     };
 
     const handlePrepareNewNode = async (parentNode = null) => {
@@ -194,6 +204,7 @@
       setIsNodeEditMode(false);
       setActiveNodeTab('info');
       setInlineAssignEdit(null);
+      setShowNodeForm(true);
     };
 
     const handleSaveNode = async () => {
@@ -235,6 +246,7 @@
       setIsNodeEditMode(false);
       setActiveNodeTab('info');
       setInlineAssignEdit(null);
+      setShowNodeForm(false);
     };
 
     const handleDownloadSample = () => {
@@ -359,6 +371,12 @@
           };
         });
     }, [employees, personnelDataForSelectedNode, inlineAssignEdit, t]);
+
+    const allEmployeeOptions = useMemo(() => {
+      return employees
+        .filter(e => e.roles && e.roles.includes('employee'))
+        .map(e => ({ id: e.id, value: e.id, label: e.name, code: e.code, mobile: e.mobile || '-', email: e.email || '-' }));
+    }, [employees]);
 
     const personnelGridData = useMemo(() => {
       const data = [...personnelDataForSelectedNode];
@@ -498,6 +516,46 @@
 
     const parentNodeOptions = rawNodes.filter(n => n.id !== nodeForm.id).map(n => ({ value: n.id, label: n.title }));
 
+    const filteredTreeNodes = useMemo(() => {
+      const officeId = advancedFilter.officeId || '';
+      const personId = (advancedFilter.personnel && typeof advancedFilter.personnel === 'object')
+        ? advancedFilter.personnel.value || ''
+        : '';
+      if (!officeId && !personId) return rawNodes;
+      const matchingIds = new Set();
+      rawNodes.forEach(node => {
+        let matches = true;
+        if (officeId && node.officeId !== officeId) matches = false;
+        if (matches && personId) {
+          const hasMatch = rawPersonnel.filter(p => p.node_id === node.id).some(p => String(p.person_id) === String(personId));
+          if (!hasMatch) matches = false;
+        }
+        if (matches) matchingIds.add(node.id);
+      });
+      const addAncestors = (nodeId) => {
+        const node = rawNodes.find(n => n.id === nodeId);
+        if (!node || !node.parentId) return;
+        if (!matchingIds.has(node.parentId)) {
+          matchingIds.add(node.parentId);
+          addAncestors(node.parentId);
+        }
+      };
+      [...matchingIds].forEach(id => addAncestors(id));
+      return rawNodes.filter(n => matchingIds.has(n.id));
+    }, [rawNodes, rawPersonnel, advancedFilter]);
+
+    useEffect(() => {
+      if (!selectedNode) return;
+      if (!filteredTreeNodes.find(n => n.id === selectedNode.id)) {
+        setSelectedNode(null);
+        setNodeForm({ id: null, code: '', title: '', parentId: '', isActive: true, officeId: '' });
+        setIsNodeEditMode(false);
+        setActiveNodeTab('info');
+        setInlineAssignEdit(null);
+        setShowNodeForm(false);
+      }
+    }, [filteredTreeNodes, selectedNode?.id]);
+
     const nodeTabOptions = [
       { id: 'info', label: t('مشخصات', 'Details') },
       ...(isNodeEditMode ? [{ id: 'personnel', label: t('پرسنل مرتبط', 'Personnel') }] : [])
@@ -519,10 +577,32 @@
             <Button variant="ghost" size="sm" icon={RefreshCw} onClick={() => fetchDesignerData()} className="h-8 w-8 px-0" />
           </div>
 
-          <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
+          <div className="px-3 pt-2 shrink-0">
+            <AdvancedFilter
+              language={language}
+              fields={[
+                { type: 'select', name: 'officeId', label: t('دفتر', 'Office'), options: [{ value: '', label: t('همه دفاتر', 'All Offices') }, ...orgOffices] },
+                { type: 'lov', name: 'personnel', label: t('پرسنل', 'Personnel'),
+                  lovData: allEmployeeOptions,
+                  lovColumns: [
+                    { field: 'code', header_fa: 'کد', header_en: 'Code', width: '70px' },
+                    { field: 'label', header_fa: 'نام کامل', header_en: 'Full Name', width: '170px' },
+                    { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '110px' },
+                    { field: 'email', header_fa: 'ایمیل', header_en: 'Email', width: '160px' },
+                  ],
+                  dropdownWidth: 'min-w-[560px]'
+                }
+              ]}
+              onFilter={(vals) => setAdvancedFilter(vals)}
+              onClear={() => setAdvancedFilter({})}
+              initialValues={advancedFilter}
+            />
+          </div>
+
+          <div className="flex-1 flex overflow-hidden flex-col md:flex-row min-h-0">
             <div className={`w-full md:w-[40%] flex flex-col bg-slate-50/40 dark:bg-slate-900/10 border-b md:border-b-0 ${isRtl ? 'md:border-l' : 'md:border-r'} border-slate-200 dark:border-slate-700 overflow-y-auto`}>
               <Tree
-                data={rawNodes} language={language} formCode={formCode}
+                data={filteredTreeNodes} language={language} formCode={formCode}
                 idField="id" parentField="parentId" displayField="title" secondaryField="code" activeField="isActive"
                 selectedId={selectedNode?.id}
                 onSelect={handleSelectNode}
@@ -536,6 +616,7 @@
             </div>
 
             <div className="flex-1 flex flex-col overflow-auto p-4 gap-3 bg-slate-50/50 dark:bg-slate-900/20">
+              {showNodeForm ? (
               <Card noPadding={true} className="flex-1 border border-slate-200 dark:border-slate-700 flex flex-col min-h-0 bg-white dark:bg-slate-800 shadow-sm h-full">
                 <div className="px-3 pt-3 pb-0 border-b border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 shrink-0">
                   <Tabs tabs={nodeTabOptions} activeTab={activeNodeTab} onChange={setActiveNodeTab} />
@@ -574,6 +655,12 @@
                   )}
                 </div>
               </Card>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500 gap-3 text-[12px] font-medium p-8">
+                  <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700"><Network size={26} className="text-slate-300 dark:text-slate-600"/></div>
+                  <span>{rawNodes.length === 0 ? t('از دکمه + در درخت برای ایجاد اولین گره استفاده کنید.', 'Use the + button in the tree to create the first node.') : t('یک گره از درخت انتخاب کنید تا اطلاعات آن نمایش داده شود.', 'Select a node from the tree to view or edit its details.')}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

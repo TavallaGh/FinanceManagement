@@ -23,6 +23,9 @@
     const Feedback = window.DSFeedback || window.DesignSystem || {};
     const { Modal = FallbackComponent, Toast = FallbackComponent } = Feedback;
 
+    const Grid = window.DSGrid || window.DesignSystem || {};
+    const { AdvancedFilter = FallbackComponent, LOVField = FallbackComponent } = Grid;
+
     const TreeSystem = window.DSTree || window.DesignSystem || {};
     const { Tree = FallbackComponent } = TreeSystem;
 
@@ -41,6 +44,7 @@
     const [activeTab, setActiveTab] = useState('details');
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
+    const [importErrors, setImportErrors] = useState({ isOpen: false, errors: [], insertedCount: 0, updatedCount: 0 });
 
     const [rawAccounts, setRawAccounts] = useState([]);
     const [selectedNodeId, setSelectedNodeId] = useState(null);
@@ -56,6 +60,10 @@
       systemParties: [],
       balanceGroupsMaster: []
     });
+
+    const [advancedFilter, setAdvancedFilter] = useState({});
+    const [allPermissions, setAllPermissions] = useState([]);
+    const [allAccountBalanceGroups, setAllAccountBalanceGroups] = useState([]);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -188,6 +196,20 @@
         });
 
         setRawAccounts(mapped);
+
+        // Fetch permissions and balance group assignments for filter
+        const accountIds = mapped.map(a => a.id);
+        if (accountIds.length > 0) {
+          const [permRes, bgRes] = await Promise.all([
+            safeFetch(supabase.from('fm_coa_permissions').select('account_id, grantee_type, grantee_id').in('account_id', accountIds)),
+            safeFetch(supabase.from('fm_balance_group_accounts').select('account_id, group_id').in('account_id', accountIds))
+          ]);
+          setAllPermissions(permRes.data || []);
+          setAllAccountBalanceGroups(bgRes.data || []);
+        } else {
+          setAllPermissions([]);
+          setAllAccountBalanceGroups([]);
+        }
 
         if (retainNodeId) {
           const match = mapped.find(m => String(m.id) === String(retainNodeId));
@@ -395,26 +417,27 @@
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const cleanText = (e.target.result || '').replace(/^\uFEFF/, '');
-          const lines = cleanText.split(/\r?\n/).filter(l => l.trim());
+          const XLSX = window.XLSX;
+          if (!XLSX) {
+            return showToast(t('کتابخانه پردازش فایل در دسترس نیست.', 'File processing library not available.'), 'error');
+          }
+          const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
 
-          if (lines.length < 2) {
+          if (allRows.length < 2) {
             return showToast(t('فایل خالی یا نامعتبر است', 'File is empty or invalid'), 'error');
           }
 
-          const dataLines = lines.slice(1);
-          const rows = dataLines.map(line => {
-            const parts = line.split(',');
-            return {
-              code:             (parts[0] || '').trim(),
-              titleFa:          (parts[1] || '').trim().replace(/^"|"$/g, ''),
-              titleEn:          (parts[2] || '').trim().replace(/^"|"$/g, ''),
-              accountType:      (parts[3] || 'main').trim().toLowerCase(),
-              currencyCode:     (parts[4] || '').trim().toUpperCase(),
-              controlInventory: (parts[5] || '0').trim() === '1',
-              isActive:         (parts[6] || '1').trim() !== '0',
-            };
-          }).filter(r => r.code);
+          const rows = allRows.slice(1).map(cols => ({
+            code:             String(cols[0] ?? '').trim(),
+            titleFa:          String(cols[1] ?? '').trim(),
+            titleEn:          String(cols[2] ?? '').trim(),
+            accountType:      String(cols[3] ?? 'main').trim().toLowerCase(),
+            currencyCode:     String(cols[4] ?? '').trim().toUpperCase(),
+            controlInventory: String(cols[5] ?? '0').trim() === '1',
+            isActive:         String(cols[6] ?? '1').trim() !== '0',
+          })).filter(r => r.code);
 
           if (rows.length === 0) {
             return showToast(t('هیچ داده‌ای برای ورود وجود ندارد', 'No data to import'), 'warning');
@@ -446,7 +469,7 @@
 
           let insertedCount = 0;
           let updatedCount  = 0;
-          let errorCount    = 0;
+          const rowErrors   = [];
 
           for (const row of rows) {
             try {
@@ -483,21 +506,25 @@
               }
             } catch (err) {
               console.error('Import row error:', row, err);
-              errorCount++;
+              rowErrors.push(`${t('کد', 'Code')} ${row.code}: ${err?.message || JSON.stringify(err)}`);
             }
           }
 
           await fetchDesignerData();
 
-          const msg = isRtl
-            ? `ورود اطلاعات کامل شد: ${insertedCount} ردیف جدید، ${updatedCount} ردیف به‌روز شد${errorCount > 0 ? `، ${errorCount} خطا` : ''}`
-            : `Import complete: ${insertedCount} inserted, ${updatedCount} updated${errorCount > 0 ? `, ${errorCount} errors` : ''}`;
-          showToast(msg, errorCount > 0 ? 'warning' : 'success');
+          if (rowErrors.length > 0) {
+            setImportErrors({ isOpen: true, errors: rowErrors, insertedCount, updatedCount });
+          } else {
+            const msg = isRtl
+              ? `ورود اطلاعات کامل شد: ${insertedCount} ردیف جدید، ${updatedCount} ردیف به‌روز شد`
+              : `Import complete: ${insertedCount} inserted, ${updatedCount} updated`;
+            showToast(msg, 'success');
+          }
         } catch (err) {
           showToast(t('خطا در پردازش فایل', 'Error processing file'), 'error');
         }
       };
-      reader.readAsText(file, 'UTF-8');
+      reader.readAsArrayBuffer(file);
     };
 
     const handleExportTree = () => {
@@ -571,6 +598,69 @@
       ] : [])
     ];
 
+    const userLovData = useMemo(() => {
+      return lookups.systemUsers.map(u => {
+        const party = lookups.systemParties.find(p => String(p.id) === String(u.party_id || u.person_id || ''));
+        let fullName = '';
+        if (party) fullName = party.party_type === 'legal' ? (party.company_name || '') : `${party.first_name || ''} ${party.last_name || ''}`.trim();
+        if (!fullName) fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.name || '';
+        return { value: u.id, label: fullName || u.username || u.email || String(u.id), username: u.username || u.email || '---' };
+      });
+    }, [lookups.systemUsers, lookups.systemParties]);
+
+    const currencyLovData = useMemo(() => {
+      return lookups.currencies.map(c => ({
+        value: c.id || c.currency_id || c.code,
+        label: isRtl ? (c.name_fa || c.title_fa || c.name || c.code || '') : (c.name_en || c.title_en || c.name || c.code || ''),
+        code: c.code || ''
+      }));
+    }, [lookups.currencies, isRtl]);
+
+    const filteredAccounts = useMemo(() => {
+      const userId = (advancedFilter.user && typeof advancedFilter.user === 'object') ? advancedFilter.user.value || '' : '';
+      const balanceGroupId = advancedFilter.balanceGroupId || '';
+      const currencyId = (advancedFilter.currency && typeof advancedFilter.currency === 'object') ? advancedFilter.currency.value || '' : '';
+      const accountType = advancedFilter.accountType || '';
+      if (!userId && !balanceGroupId && !currencyId && !accountType) return rawAccounts;
+      const matchingIds = new Set();
+      rawAccounts.forEach(acc => {
+        let matches = true;
+        if (currencyId && String(acc.currencyId || '') !== String(currencyId)) matches = false;
+        if (matches && accountType && acc.accountType !== accountType) matches = false;
+        if (matches && balanceGroupId) {
+          const hasBg = allAccountBalanceGroups.some(bg => String(bg.account_id) === String(acc.id) && String(bg.group_id) === String(balanceGroupId));
+          if (!hasBg) matches = false;
+        }
+        if (matches && userId) {
+          const userRoleIds = lookups.userRolesMapping.filter(m => String(m.user_id) === String(userId)).map(m => String(m.role_id));
+          const hasAccess = allPermissions.some(p =>
+            String(p.account_id) === String(acc.id) && (
+              (p.grantee_type === 'user' && String(p.grantee_id) === String(userId)) ||
+              (p.grantee_type === 'role' && userRoleIds.includes(String(p.grantee_id)))
+            )
+          );
+          if (!hasAccess) matches = false;
+        }
+        if (matches) matchingIds.add(acc.id);
+      });
+      const addAncestors = (nodeId) => {
+        const node = rawAccounts.find(n => n.id === nodeId);
+        if (!node || !node.parentId) return;
+        if (!matchingIds.has(node.parentId)) { matchingIds.add(node.parentId); addAncestors(node.parentId); }
+      };
+      [...matchingIds].forEach(id => addAncestors(id));
+      return rawAccounts.filter(a => matchingIds.has(a.id));
+    }, [rawAccounts, advancedFilter, allPermissions, allAccountBalanceGroups, lookups]);
+
+    useEffect(() => {
+      if (!selectedNodeId) return;
+      if (!filteredAccounts.find(a => String(a.id) === String(selectedNodeId))) {
+        setSelectedNodeId(null);
+        setNodeFormData({});
+        setIsCreatingNode(false);
+      }
+    }, [filteredAccounts, selectedNodeId]);
+
     return (
       <div className="p-4 h-full flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
@@ -585,10 +675,47 @@
             <Button variant="ghost" size="sm" icon={RefreshCw} onClick={() => fetchDesignerData(selectedNodeId)} className="h-8 w-8 px-0" />
           </div>
 
-          <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
+          <div className="px-3 pt-2 shrink-0">
+            <AdvancedFilter
+              language={language}
+              fields={[
+                { type: 'lov', name: 'user', label: t('دسترسی کاربر', 'User Access'),
+                  lovData: userLovData,
+                  lovColumns: [
+                    { field: 'username', header_fa: 'نام کاربری', header_en: 'Username', width: '130px' },
+                    { field: 'label', header_fa: 'نام کامل', header_en: 'Full Name', width: '180px' },
+                  ],
+                  dropdownWidth: 'min-w-[360px]'
+                },
+                { type: 'select', name: 'balanceGroupId', label: t('گروه بالانس', 'Balance Group'),
+                  options: [{ value: '', label: t('همه گروه‌ها', 'All Groups') }, ...lookups.balanceGroupsMaster.map(bg => ({ value: bg.id, label: `${bg.code} - ${isRtl ? bg.title_fa : (bg.title_en || bg.title_fa)}` }))]
+                },
+                { type: 'lov', name: 'currency', label: t('نوع ارز', 'Currency'),
+                  lovData: currencyLovData,
+                  lovColumns: [
+                    { field: 'code', header_fa: 'کد ارز', header_en: 'Code', width: '80px' },
+                    { field: 'label', header_fa: 'نام ارز', header_en: 'Currency Name', width: '160px' },
+                  ],
+                  dropdownWidth: 'min-w-[280px]'
+                },
+                { type: 'select', name: 'accountType', label: t('نوع حساب', 'Account Type'),
+                  options: [
+                    { value: '', label: t('همه انواع', 'All Types') },
+                    { value: 'main', label: t('حساب اصلی', 'Main Account') },
+                    { value: 'intermediate', label: t('حساب واسط / کنترلی', 'Intermediate') }
+                  ]
+                }
+              ]}
+              onFilter={(vals) => setAdvancedFilter(vals)}
+              onClear={() => setAdvancedFilter({})}
+              initialValues={advancedFilter}
+            />
+          </div>
+
+          <div className="flex-1 flex overflow-hidden flex-col md:flex-row min-h-0">
             <div className={`w-full md:w-[40%] flex flex-col bg-slate-50/40 dark:bg-slate-900/10 border-b md:border-b-0 ${isRtl ? 'md:border-l' : 'md:border-r'} border-slate-200 dark:border-slate-700 overflow-y-auto`}>
               <Tree
-                data={rawAccounts} language={language} formCode={formCode}
+                data={filteredAccounts} language={language} formCode={formCode}
                 idField="id" parentField="parentId" displayField="title" secondaryField="code" activeField="isActive"
                 selectedId={selectedNodeId}
                 onSelect={handleSelectTreeNode}
@@ -707,6 +834,31 @@
             </div>
           </div>
         </div>
+
+        <Modal isOpen={importErrors.isOpen} onClose={() => setImportErrors({ isOpen: false, errors: [], insertedCount: 0, updatedCount: 0 })} title={t('گزارش خطاهای ایمپورت', 'Import Error Report')} language={language} width="max-w-lg">
+          <div className="p-4 flex flex-col gap-3">
+            {(importErrors.insertedCount > 0 || importErrors.updatedCount > 0) && (
+              <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-lg px-3 py-2 text-[13px] font-medium border border-emerald-200 dark:border-emerald-800">
+                <span>✓</span>
+                <span>{t(`${importErrors.insertedCount} ردیف جدید درج شد، ${importErrors.updatedCount} ردیف به‌روز شد.`, `${importErrors.insertedCount} inserted, ${importErrors.updatedCount} updated.`)}</span>
+              </div>
+            )}
+            <div className="text-[12px] font-medium text-slate-600 dark:text-slate-400">
+              {t(`${importErrors.errors.length} ردیف با خطا مواجه شد:`, `${importErrors.errors.length} row(s) had errors:`)}
+            </div>
+            <div className="flex flex-col gap-1 max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-slate-50 dark:bg-slate-900">
+              {importErrors.errors.map((err, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-[12px] text-red-600 dark:text-red-400 py-1 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                  <span className="shrink-0 mt-0.5">•</span>
+                  <span dir="ltr" className="text-left">{err}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button variant="outline" size="sm" onClick={() => setImportErrors({ isOpen: false, errors: [], insertedCount: 0, updatedCount: 0 })}>{t('بستن', 'Close')}</Button>
+            </div>
+          </div>
+        </Modal>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید حذف قطعی رکورد', 'Confirm Permanent Revocation')} language={language} width="max-w-sm">
           <EmptyState
