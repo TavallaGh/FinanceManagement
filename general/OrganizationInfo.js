@@ -1,7 +1,7 @@
 /* Filename: general/OrganizationInfo.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef, useCallback, useMemo } = React;
   
   const { 
     Button, PageHeader, Modal, DataGrid, 
@@ -10,10 +10,9 @@
   
   const { 
     Building2, Plus, Edit, Trash2, MapPin, Upload, X, Save, 
-    AlertTriangle, Lock, MessageSquare
+    AlertTriangle, Lock, Briefcase
   } = window.LucideIcons || {};
-  
-  const { CommentModal } = window.DSComments || {};
+  const { LOVField } = window.DSGrid || window.DesignSystem || {};
   const supabase = window.supabase;
 
   const OrganizationInfo = ({ isAdmin, language = 'fa' }) => {
@@ -30,10 +29,7 @@
     
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
     
-    const [commentModalOpen, setCommentModalOpen] = useState(false);
-    const [selectedEntityForComment, setSelectedEntityForComment] = useState({ id: '', title: '' });
     const [filteredRecordId, setFilteredRecordId] = useState(null);
-    const [commentedIds, setCommentedIds] = useState(new Set());
 
     const [formData, setFormData] = useState({
       code: '', 
@@ -48,6 +44,13 @@
     const [newAddress, setNewAddress] = useState('');
 
     const [gridState, setGridState] = useState(null);
+
+    const [officesModal, setOfficesModal] = useState({ isOpen: false, org: null });
+    const [offices, setOffices] = useState([]);
+    const [officesLoading, setOfficesLoading] = useState(false);
+    const [officeInlineEdit, setOfficeInlineEdit] = useState(null);
+    const [employees, setEmployees] = useState([]);
+    const [orgIdsWithOffices, setOrgIdsWithOffices] = useState(new Set());
 
     const viewConfig = {
       pageId: FORM_CODE,
@@ -66,25 +69,6 @@
     useEffect(() => {
       fetchData();
     }, []);
-
-    useEffect(() => {
-      const handleOpenCommentNotification = (e) => {
-          if (e.detail && e.detail.entity_type === 'ORGANIZATION_INFO') {
-              const targetRecord = data.find(item => String(item.id) === String(e.detail.entity_id));
-              const recordTitle = targetRecord ? targetRecord.name : String(e.detail.entity_id);
-              setSelectedEntityForComment({
-                  id: String(e.detail.entity_id),
-                  title: recordTitle
-              });
-              setCommentModalOpen(true);
-          }
-      };
-
-      window.addEventListener('openCommentModal', handleOpenCommentNotification);
-      return () => {
-          window.removeEventListener('openCommentModal', handleOpenCommentNotification);
-      };
-    }, [data, t]);
 
     useEffect(() => {
       const handleFilterToRecord = (e) => {
@@ -120,18 +104,11 @@
         
         setData(mappedData);
 
-        // fetch which records have at least one comment
-        if (mappedData.length > 0) {
-          const ids = mappedData.map(r => String(r.id));
-          const { data: commentRows } = await supabase
-            .from('sys_comments')
-            .select('entity_id')
-            .eq('entity_type', 'organization_info')
-            .in('entity_id', ids);
-          if (commentRows) {
-            setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
-          }
-        }
+        // fetch which orgs have offices
+        try {
+          const { data: officeRows } = await supabase.from('fm_org_offices').select('org_id');
+          if (officeRows) setOrgIdsWithOffices(new Set(officeRows.map(r => r.org_id)));
+        } catch (_) {}
       } catch (err) {
         console.error('Fetch Error:', err);
       } finally {
@@ -189,14 +166,19 @@
         if (deleteConfirm.type === 'single') {
           const { error } = await supabase.from('organization_info').delete().eq('id', deleteConfirm.data.id);
           if (error) throw error;
+          setSelectedIds([]);
+          fetchData();
         } else if (deleteConfirm.type === 'bulk') {
           const { error } = await supabase.from('organization_info').delete().in('id', deleteConfirm.data);
           if (error) throw error;
+          setSelectedIds([]);
+          fetchData();
+        } else if (deleteConfirm.type === 'office') {
+          const { error } = await supabase.from('fm_org_offices').delete().eq('id', deleteConfirm.data);
+          if (error) throw error;
+          fetchOffices(officesModal.org?.id);
         }
-        
-        setSelectedIds([]);
         setDeleteConfirm({ isOpen: false, type: null, data: null });
-        fetchData();
       } catch (err) {
         console.error("Delete error:", err);
       } finally {
@@ -214,12 +196,82 @@
       setIsModalOpen(true);
     };
 
-    const handleOpenComment = (row) => {
-      setSelectedEntityForComment({
-        id: String(row.id),
-        title: row.name
-      });
-      setCommentModalOpen(true);
+    const fetchEmployees = useCallback(async () => {
+      try {
+        if (!supabase) return;
+        const { data, error } = await supabase.from('parties')
+          .select('id, code, first_name, last_name, company_name, party_type, roles, mobile, email')
+          .eq('is_active', true);
+        if (error) throw error;
+        setEmployees(
+          (data || [])
+            .filter(p => (p.roles || []).includes('employee'))
+            .map(p => ({
+              id: p.id, value: p.id,
+              label: p.party_type === 'legal' ? p.company_name : `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+              code: p.code,
+              mobile: p.mobile || '-',
+              email: p.email || '-',
+            }))
+        );
+      } catch (err) {
+        console.error('Error fetching employees:', err);
+      }
+    }, [supabase]);
+
+    const fetchOffices = useCallback(async (orgId) => {
+      if (!orgId) return;
+      setOfficesLoading(true);
+      try {
+        const { data, error } = await supabase.from('fm_org_offices').select('*').eq('org_id', orgId).order('created_at', { ascending: true });
+        if (error) throw error;
+        const mapped = (data || []).map(o => ({
+          id: o.id, title: o.title, managerId: o.manager_id, managerName: o.manager_name, isActive: o.is_active
+        }));
+        setOffices(mapped);
+        setOrgIdsWithOffices(prev => {
+          const next = new Set(prev);
+          if (mapped.length > 0) next.add(orgId);
+          else next.delete(orgId);
+          return next;
+        });
+      } catch (err) {
+        console.error('Error fetching offices:', err);
+      } finally {
+        setOfficesLoading(false);
+      }
+    }, [supabase]);
+
+    const handleOpenOfficesModal = (row) => {
+      setOfficesModal({ isOpen: true, org: row });
+      setOfficeInlineEdit(null);
+      fetchOffices(row.id);
+      fetchEmployees();
+    };
+
+    const handleSaveOffice = async () => {
+      const form = officeInlineEdit?.data;
+      if (!form || !form.title) return;
+      try {
+        const payload = {
+          org_id: officesModal.org?.id,
+          title: form.title,
+          manager_id: form.manager_id || null,
+          manager_name: form.manager_name || null,
+          is_active: form.isActive ?? true,
+        };
+        if (officeInlineEdit.id === 'new') {
+          const { error } = await supabase.from('fm_org_offices').insert([payload]);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('fm_org_offices').update(payload).eq('id', officeInlineEdit.id);
+          if (error) throw error;
+        }
+        setOfficeInlineEdit(null);
+        fetchOffices(officesModal.org?.id);
+      } catch (err) {
+        console.error('Error saving office:', err);
+      }
     };
 
     const handleSetDefaultAddress = (addrId) => {
@@ -272,7 +324,7 @@
               onGridStateChange={setGridState}
               hideImport={true}
               actions={[
-                { icon: MessageSquare, tooltip: t('کامنت / کامنت', 'Comments'), onClick: (row) => handleOpenComment(row), className: (row) => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600' },
+                { icon: Briefcase, tooltip: t('مدیریت دفاتر', 'Manage Offices'), onClick: (row) => handleOpenOfficesModal(row), className: (row) => orgIdsWithOffices.has(row.id) ? 'text-emerald-500 hover:text-emerald-700' : 'text-slate-400 hover:text-emerald-600' },
                 { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
                 { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600' }
               ]}
@@ -368,13 +420,106 @@
           </div>
         </Modal>
 
+        {/* Offices management modal */}
+        <Modal
+          isOpen={officesModal.isOpen}
+          onClose={() => { setOfficesModal({ isOpen: false, org: null }); setOfficeInlineEdit(null); }}
+          title={t(`مدیریت دفاتر: ${officesModal.org?.name || ''}`, `Manage Offices: ${officesModal.org?.name || ''}`)}
+          width="max-w-3xl"
+          language={language}
+        >
+          {(() => {
+            const officesGridData = (() => {
+              const d = [...offices];
+              if (officeInlineEdit?.id === 'new') d.unshift({ id: 'new', _isNew: true, ...officeInlineEdit.data });
+              return d;
+            })();
+
+            const officeColumns = [
+              {
+                field: 'title', header_fa: 'عنوان دفتر', header_en: 'Office Title', width: '200px',
+                render: (val, row) => {
+                  if (officeInlineEdit?.id === row.id) {
+                    return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={officeInlineEdit.data.title} onChange={e => setOfficeInlineEdit(p => ({...p, data: {...p.data, title: e.target.value}}))} isRtl={isRtl} required wrapperClassName="!mb-0" formCode={FORM_CODE} /></div>;
+                  }
+                  return <span className="font-semibold text-slate-700 dark:text-slate-200">{val}</span>;
+                }
+              },
+              {
+                field: 'managerId', header_fa: 'مدیر دفتر', header_en: 'Manager', width: '220px',
+                render: (val, row) => {
+                  if (officeInlineEdit?.id === row.id) {
+                    return (
+                      <div onClick={e => e.stopPropagation()}>
+                        <LOVField size="sm" data={employees}
+                          columns={[
+                            { field: 'code', header_fa: 'کد', header_en: 'Code', width: '70px' },
+                            { field: 'label', header_fa: 'نام کامل', header_en: 'Full Name', width: '170px' },
+                            { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '110px' },
+                            { field: 'email', header_fa: 'ایمیل', header_en: 'Email', width: '160px' },
+                          ]}
+                          dropdownWidth="min-w-[560px]"
+                          displayValue={officeInlineEdit.data.manager_obj ? officeInlineEdit.data.manager_obj.label : (officeInlineEdit.data.managerName || '')}
+                          onChange={r => setOfficeInlineEdit(p => ({...p, data: {...p.data, manager_id: r?.value, manager_obj: r, manager_name: r?.label}}))}
+                        />
+                      </div>
+                    );
+                  }
+                  return <span className="text-slate-600 dark:text-slate-300">{row.managerName || '-'}</span>;
+                }
+              },
+              {
+                field: 'isActive', header_fa: 'فعال', header_en: 'Active', width: '80px',
+                render: (val, row) => {
+                  if (officeInlineEdit?.id === row.id) {
+                    return <div onClick={e => e.stopPropagation()}><ToggleField size="sm" checked={officeInlineEdit.data.isActive ?? true} onChange={v => setOfficeInlineEdit(p => ({...p, data: {...p.data, isActive: v}}))} isRtl={isRtl} /></div>;
+                  }
+                  return <Badge variant={val ? 'emerald' : 'slate'} size="sm" className="text-[10px]">{val ? t('بله', 'Yes') : t('خیر', 'No')}</Badge>;
+                }
+              }
+            ];
+
+            const officeActions = [
+              { icon: Save, tooltip: t('ذخیره', 'Save'), hidden: row => officeInlineEdit?.id !== row.id, onClick: () => handleSaveOffice(), className: '!text-emerald-600 hover:!text-emerald-800' },
+              { icon: X, tooltip: t('انصراف', 'Cancel'), hidden: row => officeInlineEdit?.id !== row.id, onClick: () => setOfficeInlineEdit(null), className: '!text-slate-500 hover:!text-slate-700' },
+              { icon: Edit, tooltip: t('ویرایش', 'Edit'), hidden: row => officeInlineEdit?.id === row.id || row._isNew, onClick: row => {
+                  const mgr = employees.find(e => String(e.value) === String(row.managerId));
+                  setOfficeInlineEdit({ id: row.id, data: { title: row.title, manager_id: row.managerId, manager_obj: mgr, manager_name: row.managerName, isActive: row.isActive } });
+              }, className: 'text-slate-400 hover:text-indigo-500' },
+              { icon: Trash2, tooltip: t('حذف', 'Delete'), hidden: row => officeInlineEdit?.id === row.id || row._isNew, onClick: row => setDeleteConfirm({ isOpen: true, type: 'office', data: row.id }), className: 'text-red-500 hover:text-red-600' }
+            ];
+
+            return (
+              <div className="p-4 h-[480px] flex flex-col">
+                <DataGrid
+                  data={officesGridData}
+                  columns={officeColumns}
+                  actions={officeActions}
+                  language={language}
+                  formCode={FORM_CODE}
+                  isLoading={officesLoading}
+                  hideImport={true}
+                  hideExport={true}
+                  onAdd={() => {
+                    if (officeInlineEdit) return;
+                    setOfficeInlineEdit({ id: 'new', data: { title: '', manager_id: '', manager_obj: null, manager_name: '', isActive: true } });
+                  }}
+                />
+              </div>
+            );
+          })()}
+        </Modal>
+
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })} title={t('تایید عملیات حذف', 'Confirm Deletion')} language={language} width="max-w-sm">
           <EmptyState
             icon={AlertTriangle}
             title={t('هشدار: غیرقابل بازگشت', 'WARNING: IRREVERSIBLE')}
-            description={deleteConfirm.type === 'bulk' 
-              ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
-              : t(`آیا از حذف سازمان ${deleteConfirm.data?.name} اطمینان دارید؟`, `Delete ${deleteConfirm.data?.name}?`)
+            description={
+              deleteConfirm.type === 'bulk'
+                ? t(`آیا از حذف ${deleteConfirm.data?.length} مورد انتخاب شده اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} selected items?`)
+                : deleteConfirm.type === 'office'
+                  ? t('آیا از حذف این دفتر اطمینان دارید؟', 'Delete this office?')
+                  : t(`آیا از حذف سازمان ${deleteConfirm.data?.name} اطمینان دارید؟`, `Delete ${deleteConfirm.data?.name}?`)
             }
             action={
               <div className="flex gap-2 w-full mt-2 px-4">
@@ -385,18 +530,7 @@
           />
         </Modal>
 
-        {CommentModal && (
-          <CommentModal 
-            isOpen={commentModalOpen}
-            onClose={() => { setCommentModalOpen(false); fetchData(); }}
-            entityType="organization_info"
-            entityId={selectedEntityForComment.id}
-            entityTitle={selectedEntityForComment.title}
-            formTitle={t('اطلاعات سازمان', 'Organization Info')}
-            formComponent="OrganizationInfo"
-            language={language}
-          />
-        )}
+
       </div>
     );
   };
