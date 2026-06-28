@@ -7,7 +7,7 @@
   const LucideIcons = window.LucideIcons || {};
   const { 
     Edit = FallbackIcon, Trash2 = FallbackIcon, History = FallbackIcon, Calculator = FallbackIcon, Save = FallbackIcon, Globe = FallbackIcon, 
-    ArrowRightLeft = FallbackIcon, AlertTriangle = FallbackIcon, Clock = FallbackIcon, Calendar = FallbackIcon, Zap = FallbackIcon, ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, Lock = FallbackIcon
+    ArrowRightLeft = FallbackIcon, AlertTriangle = FallbackIcon, Clock = FallbackIcon, Calendar = FallbackIcon, Zap = FallbackIcon, ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, Lock = FallbackIcon, Copy = FallbackIcon, Download = FallbackIcon
   } = LucideIcons;
 
   const CurrencyHistory = ({ currencies = [], language = 'fa', formCode, access, rateFilters, setRateFilters, ratesGridState, setRatesGridState }) => {
@@ -120,6 +120,17 @@
       setIsManualModalOpen(true);
     };
 
+    const handleCopyLastRates = useCallback(() => {
+      const filled = manualRatesList.map(item => {
+        const lastRate = rates
+          .filter(r => r.base_currency === item.base && r.target_currency === item.target)
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+        return { ...item, rate: lastRate ? String(lastRate.rate) : item.rate };
+      });
+      setManualRatesList(filled);
+      showToast(t('آخرین نرخ‌های موجود کپی شدند.', 'Last available rates copied.'));
+    }, [manualRatesList, rates, showToast, t]);
+
     const handleSaveManualRates = async () => {
       try {
         const validRates = manualRatesList.filter(r => r.rate && r.rate !== '0');
@@ -139,7 +150,8 @@
         if (data) for (const rate of data) await logAction('fm_currency_rates', rate.id, 'ایجاد', `ثبت دستی نرخ: ${rate.base_currency} به ${rate.target_currency}`, null, rate);
 
         showToast(t('نرخ‌های دستی با موفقیت ثبت شدند.', 'Manual rates saved successfully.'));
-        setIsManualModalOpen(false); fetchRates();
+        setIsManualModalOpen(false);
+        await fetchRates();
       } catch (err) { showToast(t('خطا در ثبت نرخ‌های دستی', 'Error saving manual rates'), 'error'); }
     };
 
@@ -178,30 +190,57 @@
       } catch (err) { showToast(t('خطا در حذف', 'Delete error'), 'error'); setDeleteConfirm({ isOpen: false, type: null, data: null }); }
     };
 
-    const getRateValue = (baseCode, targetCode, targetDate) => {
-      if (baseCode === targetCode) return 1;
-      const formattedDate = targetDate ? targetDate.replace(/\//g, '-') : null;
-      const validRates = formattedDate ? rates.filter(r => r.rate_date === formattedDate) : rates;
-      if (validRates.length === 0) return null;
-      let direct = validRates.find(r => r.base_currency === baseCode && r.target_currency === targetCode); if (direct) return direct.rate;
-      let inverse = validRates.find(r => r.base_currency === targetCode && r.target_currency === baseCode); if (inverse) return 1 / inverse.rate;
-      const intermediates = currencies.map(c => c.code).filter(c => c !== baseCode && c !== targetCode);
-      for (let intermediate of intermediates) {
-        const r1 = validRates.find(r => r.base_currency === baseCode && r.target_currency === intermediate)?.rate || (validRates.find(r => r.base_currency === intermediate && r.target_currency === baseCode) ? 1/validRates.find(r => r.base_currency === intermediate && r.target_currency === baseCode).rate : null);
-        const r2 = validRates.find(r => r.base_currency === intermediate && r.target_currency === targetCode)?.rate || (validRates.find(r => r.base_currency === targetCode && r.target_currency === intermediate) ? 1/validRates.find(r => r.base_currency === targetCode && r.target_currency === intermediate).rate : null);
+    const currentConvRate = useMemo(() => {
+      if (!convFrom || !convTo || !convDate) return null;
+      if (convFrom === convTo) return 1;
+      const fd = convDate.replace(/\//g, '-');
+      const d10 = (d) => d ? String(d).substring(0, 10) : null;
+
+      // Step 1: exact match by rate_date
+      const exactPool = rates.filter(r => d10(r.rate_date) === fd);
+
+      // Step 2: fallback — most recently *entered* batch (by created_at) on or before selected date
+      let pool;
+      if (exactPool.length > 0) {
+        pool = exactPool.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      } else {
+        const endOfDay = new Date(`${fd}T23:59:59.999`).getTime();
+        const eligible = rates.filter(r => r.created_at && new Date(r.created_at).getTime() <= endOfDay);
+        if (!eligible.length) return null;
+        const maxTs = eligible.reduce((mx, r) => { const t = new Date(r.created_at).getTime(); return t > mx ? t : mx; }, 0);
+        const maxDay = new Date(maxTs).toISOString().split('T')[0];
+        pool = eligible
+          .filter(r => r.created_at && new Date(r.created_at).toISOString().split('T')[0] === maxDay)
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      }
+
+      // Deduplicate per pair (newest first)
+      const seen = new Set();
+      const vr = [];
+      for (const r of pool) {
+        const key = `${r.base_currency}|${r.target_currency}`;
+        if (!seen.has(key)) { seen.add(key); vr.push(r); }
+      }
+      if (!vr.length) return null;
+
+      const find = (b, t) => vr.find(r => r.base_currency === b && r.target_currency === t);
+      let dir = find(convFrom, convTo); if (dir) return dir.rate;
+      let inv = find(convTo, convFrom); if (inv) return 1 / inv.rate;
+      for (const c of currencies) {
+        if (c.code === convFrom || c.code === convTo) continue;
+        const r1 = find(convFrom, c.code)?.rate ?? (find(c.code, convFrom) ? 1 / find(c.code, convFrom).rate : null);
+        const r2 = find(c.code, convTo)?.rate ?? (find(convTo, c.code) ? 1 / find(convTo, c.code).rate : null);
         if (r1 && r2) return r1 * r2;
       }
       return null;
-    };
-
-    const currentConvRate = useMemo(() => (!convFrom || !convTo || !convDate) ? null : getRateValue(convFrom, convTo, convDate), [convFrom, convTo, convDate, rates, currencies]);
+    }, [convFrom, convTo, convDate, rates, currencies]);
     const convResult = useMemo(() => {
       if (!convAmount || currentConvRate === null) return null;
       const amount = parseFloat(String(convAmount).replace(/,/g, ''));
       return isNaN(amount) ? null : (amount * currentConvRate).toLocaleString(undefined, { maximumFractionDigits: 10 });
     }, [convAmount, currentConvRate]);
 
-    const openConverter = () => { setConvDate(getTodayGregorian()); setConvFrom(currencies[0]?.code || ''); setConvTo(currencies[1]?.code || ''); setIsConverterOpen(true); };
+    const openConverter = () => { fetchRates(); setConvDate(getTodayGregorian()); setConvFrom(currencies[0]?.code || ''); setConvTo(currencies[1]?.code || ''); setIsConverterOpen(true); };
 
     const historyColumns = [
       { 
@@ -248,6 +287,76 @@
       return result;
     }, [rates, rateFilters]);
 
+    const handleDownloadSample = useCallback(() => {
+      const headers = ['base_currency', 'target_currency', 'rate', 'rate_date'];
+      const today = getTodayGregorian().replace(/\//g, '-');
+      const csvRows = [headers.join(',')];
+      const manualCurrencies = currencies.filter(c => c.fetch_type === 'manual');
+      if (manualCurrencies.length > 0) {
+        manualCurrencies.forEach(c => {
+          (c.targets || []).forEach(tCode => csvRows.push([c.code, tCode, '', today].join(',')));
+        });
+      } else {
+        csvRows.push(['USD', 'IRR', '42000', today]);
+        csvRows.push(['EUR', 'IRR', '46000', today]);
+      }
+      const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'currency_rates_sample.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }, [currencies]);
+
+    const handleImport = useCallback((file) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const XLSX = window.XLSX;
+          if (!XLSX) { showToast(t('کتابخانه پردازش فایل در دسترس نیست.', 'File processing library not available.'), 'error'); return; }
+          const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+          if (allRows.length < 2) { showToast(t('فایل خالی است یا فرمت صحیح ندارد.', 'File is empty or has invalid format.'), 'error'); return; }
+
+          const knownCodes = new Set(currencies.map(c => c.code.toUpperCase()));
+          const nowStr = new Date().toISOString();
+          const toInsert = [];
+          const errors = [];
+
+          for (let i = 1; i < allRows.length; i++) {
+            const cols = allRows[i].map(c => String(c ?? '').trim());
+            const base = cols[0]?.toUpperCase();
+            const target = cols[1]?.toUpperCase();
+            const rateRaw = cols[2]?.replace(/,/g, '');
+            const rateDate = cols[3]?.replace(/\//g, '-');
+            const rowLabel = t(`ردیف ${i + 1}`, `Row ${i + 1}`);
+
+            if (!base || !target) { errors.push(t(`${rowLabel}: ارز پایه و هدف الزامی است.`, `${rowLabel}: base and target currency are required.`)); continue; }
+            if (!knownCodes.has(base)) { errors.push(t(`${rowLabel}: ارز «${base}» در سیستم تعریف نشده.`, `${rowLabel}: Currency "${base}" not found.`)); continue; }
+            if (!knownCodes.has(target)) { errors.push(t(`${rowLabel}: ارز «${target}» در سیستم تعریف نشده.`, `${rowLabel}: Currency "${target}" not found.`)); continue; }
+            const rateNum = parseFloat(rateRaw);
+            if (!rateRaw || isNaN(rateNum) || rateNum <= 0) { errors.push(t(`${rowLabel}: نرخ معتبر نیست.`, `${rowLabel}: Invalid rate value.`)); continue; }
+            if (!rateDate || isNaN(Date.parse(rateDate))) { errors.push(t(`${rowLabel}: تاریخ معتبر نیست. فرمت مورد انتظار: YYYY-MM-DD`, `${rowLabel}: Invalid date. Expected format: YYYY-MM-DD`)); continue; }
+
+            toInsert.push({ base_currency: base, target_currency: target, rate: rateNum, rate_date: rateDate, created_at: nowStr, source: 'Manual', created_by: currentUser, updated_by: currentUser, updated_at: nowStr });
+          }
+
+          if (errors.length > 0 && toInsert.length === 0) { showToast(errors[0], 'error'); return; }
+          if (toInsert.length === 0) { showToast(t('رکورد معتبری یافت نشد.', 'No valid records found.'), 'error'); return; }
+
+          const { data, error } = await supabase.from('fm_currency_rates').insert(toInsert).select();
+          if (error) throw error;
+          if (data) for (const rate of data) await logAction('fm_currency_rates', rate.id, 'ایجاد', `ایمپورت نرخ: ${rate.base_currency} به ${rate.target_currency} = ${rate.rate}`, null, rate);
+
+          showToast(t(`${toInsert.length} نرخ با موفقیت ایمپورت شد.${errors.length > 0 ? ` (${errors.length} ردیف نادیده گرفته شد)` : ''}`, `${toInsert.length} rates imported successfully.${errors.length > 0 ? ` (${errors.length} rows skipped)` : ''}`));
+          fetchRates();
+        } catch (err) {
+          showToast(t('خطا در پردازش فایل ایمپورت.', 'Error processing import file.'), 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }, [currencies, supabase, currentUser, showToast, fetchRates, t]);
+
     const rateOps = [
       { label: t('گرفتن نرخ ارزها از XE', 'Fetch Rates from XE'), icon: Globe, onClick: handleXeFetch, className: 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300', requiredAccess: 'xe_fetch' },
       { label: t('بروزرسانی دستی نرخ‌ها', 'Manual Rate Update'), icon: Edit, onClick: openManualUpdateModal, className: 'text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300', requiredAccess: 'manual_rate' },
@@ -274,6 +383,8 @@
             <DataGrid 
               data={filteredRates} columns={historyColumns} language={language} formCode={formCode} selectable={true}
               gridState={ratesGridState} onGridStateChange={setRatesGridState} bulkActions={historyBulkActions}
+              onDownloadSample={handleDownloadSample}
+              onImport={access.canCreate ? handleImport : undefined}
               actions={[
                 { id: 'view_log', icon: History, tooltip: t('مشاهده لاگ سیستم', 'View System Log'), onClick: (row) => openLogModal('fm_currency_rates', row.id), className: 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300' },
                 { id: 'edit', icon: Edit, tooltip: t('ویرایش سابقه', 'Edit Record'), onClick: (row) => { setEditingRate({...row}); setIsEditRateModalOpen(true); }, hidden: (row) => !(row.source === 'Manual' && isWithinOneWeek(row.created_at)), className: 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400' },
@@ -291,6 +402,10 @@
                     <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">{t('ساعت ثبت', 'Rate Time')} <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input type="time" disabled={isReadOnly} value={manualTime} onChange={(e) => setManualTime(e.target.value)} className={`h-8 text-[12px] rounded-lg outline-none px-2.5 transition-all ${isReadOnly ? 'bg-slate-100/50 dark:bg-slate-800/50 text-slate-500 border border-slate-200 dark:border-slate-700 cursor-not-allowed' : 'bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 px-2.5'}`} required />
                  </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">{t('نرخ‌های دستی را وارد کنید یا از آخرین نرخ‌های ثبت‌شده کپی بگیرید.', 'Enter rates or copy from last saved values.')}</span>
+                {!isReadOnly && <Button variant="outline" size="sm" icon={Copy} onClick={handleCopyLastRates} disabled={manualRatesList.length === 0}>{t('کپی از آخرین نرخ‌ها', 'Copy Last Rates')}</Button>}
               </div>
               <div className="flex flex-col max-h-[350px] overflow-y-auto custom-scrollbar pr-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                  {manualRatesList.map((item, idx) => (

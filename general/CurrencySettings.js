@@ -53,7 +53,7 @@
     const [recordLogs, setRecordLogs] = useState([]);
     const [isLogsLoading, setIsLogsLoading] = useState(false);
 
-    const [rateFilters, setRateFilters] = useState({ fromDate: todayStr, toDate: todayStr });
+    const [rateFilters, setRateFilters] = useState({});
     const [ratesGridState, setRatesGridState] = useState(null);
 
     const viewConfig = useMemo(() => ({
@@ -70,7 +70,7 @@
           setActiveTab('list');
           setCurrencyFilters({});
           setCurrenciesGridState(null);
-          setRateFilters({ fromDate: todayStr, toDate: todayStr });
+          setRateFilters({});
           setRatesGridState(null);
         }
       }
@@ -137,6 +137,7 @@
           code: selectedCurrency.code.toUpperCase(), title: selectedCurrency.title, symbol: selectedCurrency.symbol,
           is_active: selectedCurrency.is_active ?? true, fetch_type: selectedCurrency.fetch_type || 'manual',
           decimal_places: parseInt(selectedCurrency.decimal_places) || 0, targets: selectedCurrency.targets || [],
+          currency_type: selectedCurrency.currency_type || 'fiat',
           updated_by: currentUser, updated_at: nowStr
         };
 
@@ -233,13 +234,18 @@
         render: (v) => <Badge variant={v === 'auto' ? 'emerald' : 'slate'} className="text-[10px]">{v === 'auto' ? (isRtl ? 'اتوماتیک' : 'Auto') : (isRtl ? 'دستی' : 'Manual')}</Badge>
       },
       { field: 'decimal_places', header_fa: 'اعشار', header_en: 'Decimals', width: '70px', render: (v) => <span className="text-slate-500 dark:text-slate-400 font-sans">{v}</span> },
+      { 
+        field: 'currency_type', header_fa: 'نوع ارز', header_en: 'Currency Type', width: '110px', type: 'select',
+        options: [{value: 'fiat', label: isRtl ? 'فیات' : 'Fiat'}, {value: 'digital', label: isRtl ? 'دیجیتال' : 'Digital'}],
+        render: (v) => <Badge variant={v === 'digital' ? 'indigo' : 'amber'} className="text-[10px]">{v === 'digital' ? (isRtl ? 'دیجیتال' : 'Digital') : (isRtl ? 'فیات' : 'Fiat')}</Badge>
+      },
       { field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', type: 'toggle', width: '90px' },
     ], [isRtl]);
 
     const handleOpenEdit = useCallback((row) => { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); }, []);
     const handleOpenDelete = useCallback((row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), []);
     const handleOpenLog = useCallback((row) => openLogModal('fm_currencies', row.id), [openLogModal]);
-    const handleOpenAdd = useCallback(() => { setSelectedCurrency({ code: '', title: '', symbol: '', is_active: true, fetch_type: 'manual', decimal_places: 0, targets: [] }); setIsCurrencyModalOpen(true); }, []);
+    const handleOpenAdd = useCallback(() => { setSelectedCurrency({ code: '', title: '', symbol: '', is_active: true, fetch_type: 'manual', decimal_places: 0, targets: [], currency_type: 'fiat' }); setIsCurrencyModalOpen(true); }, []);
     const handleRowDoubleClick = useCallback((row) => { if (access.canEdit || access.canView) { setSelectedCurrency({...row}); setIsCurrencyModalOpen(true); } }, [access.canEdit, access.canView]);
 
     const gridActions = useMemo(() => [
@@ -314,12 +320,10 @@
         <Modal isOpen={isCurrencyModalOpen} onClose={() => setIsCurrencyModalOpen(false)} title={selectedCurrency?.id ? t('ویرایش اطلاعات ارز', 'Edit Currency Info') : t('تعریف ارز جدید در سیستم', 'Define New Currency')} language={language} width="max-w-xl">
           <div className="p-4 flex flex-col gap-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <TextField formCode={formCode} label={t('کد ارز', 'Code')} value={selectedCurrency?.code || ''} onChange={(e) => setSelectedCurrency({...selectedCurrency, code: e.target.value.toUpperCase()})} isRtl={isRtl} required size="sm" wrapperClassName="sm:col-span-1" />
-              <div className="sm:col-span-2 flex flex-col gap-1 w-full">
-                  <div className="flex items-center justify-between">
-                      <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">{t('عنوان ارز', 'Title')} <span className="text-red-500 dark:text-red-400">*</span></label>
-                      <ToggleField formCode={formCode} label={t('فعال', 'Active')} checked={selectedCurrency?.is_active ?? true} onChange={(val) => setSelectedCurrency({...selectedCurrency, is_active: val})} isRtl={isRtl} />
-                  </div>
+              <TextField formCode={formCode} label={t('کد ارز', 'Code')} value={selectedCurrency?.code || ''} onChange={(e) => setSelectedCurrency({...selectedCurrency, code: e.target.value.toUpperCase()})} isRtl={isRtl} required size="sm" />
+              <SelectField formCode={formCode} label={t('نوع ارز', 'Currency Type')} value={selectedCurrency?.currency_type || 'fiat'} onChange={(e) => setSelectedCurrency({...selectedCurrency, currency_type: e.target.value})} isRtl={isRtl} size="sm" options={[{value: 'fiat', label: t('فیات', 'Fiat')}, {value: 'digital', label: t('دیجیتال', 'Digital')}]} />
+              <div className="flex flex-col gap-1 w-full">
+                  <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">{t('عنوان ارز', 'Title')} <span className="text-red-500 dark:text-red-400">*</span></label>
                   <input
                       type="text" disabled={isReadOnly} value={selectedCurrency?.title || ''} onChange={(e) => setSelectedCurrency({...selectedCurrency, title: e.target.value})}
                       className={`w-full h-8 text-[12px] px-2.5 rounded-lg transition-all outline-none 
@@ -334,21 +338,24 @@
               <SelectField formCode={formCode} label={t('نوع دریافت نرخ', 'Fetch Method')} value={selectedCurrency?.fetch_type || 'manual'} onChange={(e) => setSelectedCurrency({...selectedCurrency, fetch_type: e.target.value})} isRtl={isRtl} size="sm" options={[{value: 'manual', label: t('دستی', 'Manual')}, {value: 'auto', label: t('اتوماتیک (API)', 'Automatic')}]} />
               <TextField formCode={formCode} label={t('تعداد اعشار', 'Decimals')} type="number" value={selectedCurrency?.decimal_places ?? 0} onChange={(e) => setSelectedCurrency({...selectedCurrency, decimal_places: e.target.value})} isRtl={isRtl} size="sm" />
             </div>
-            
-            <div className="mt-1 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-               <label className="text-[12px] font-black text-slate-500 dark:text-slate-400 mb-1.5 block uppercase tracking-wider">{t('ارزهای هدف (ارزهایی که این ارز به آنها تبدیل می‌شود):', 'Target Currencies (Conversion Base):')}</label>
-               <div className="flex flex-col gap-2">
-                 <SelectField formCode={formCode} value="" onChange={(e) => { const val = e.target.value; if (val && !(selectedCurrency?.targets || []).includes(val)) setSelectedCurrency({...selectedCurrency, targets: [...(selectedCurrency?.targets || []), val]}); }} isRtl={isRtl} size="sm" wrapperClassName="w-full sm:w-1/2" options={[{ value: '', label: t('انتخاب ارز جهت افزودن...', 'Select currency to add...') }, ...currencies.filter(c => c.code !== selectedCurrency?.code && !(selectedCurrency?.targets || []).includes(c.code)).map(c => ({value: c.code, label: `${c.title} (${c.code})`}))]} />
-                 <div className="flex flex-wrap gap-1.5 p-2.5 min-h-[44px] bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] mt-1">
-                    {(selectedCurrency?.targets || []).map(tcode => (
-                      <Badge key={tcode} variant="indigo" className="flex items-center gap-1.5 pl-1 pr-2 py-0.5 group">
-                        <span className="font-bold text-[10px]">{tcode}</span>
-                        {!isReadOnly && <div className="w-3.5 h-3.5 flex items-center justify-center rounded-full bg-indigo-200/50 dark:bg-indigo-900/50 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-400 cursor-pointer transition-all" onClick={() => setSelectedCurrency({...selectedCurrency, targets: selectedCurrency.targets.filter(x => x !== tcode)})}><X size={10} /></div>}
-                      </Badge>
-                    ))}
-                    {(!selectedCurrency?.targets || selectedCurrency.targets.length === 0) && <span className="text-slate-300 dark:text-slate-500 text-[10px] italic py-1">{t('هیچ ارزی انتخاب نشده است.', 'No targets selected.')}</span>}
-                 </div>
-               </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{t('ارزهای هدف', 'Target Currencies')}</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div className="sm:col-span-2">
+                  <SelectField formCode={formCode} value="" onChange={(e) => { const val = e.target.value; if (val && !(selectedCurrency?.targets || []).includes(val)) setSelectedCurrency({...selectedCurrency, targets: [...(selectedCurrency?.targets || []), val]}); }} isRtl={isRtl} size="sm" options={[{ value: '', label: t('انتخاب ارز جهت افزودن...', 'Select currency to add...') }, ...currencies.filter(c => c.code !== selectedCurrency?.code && !(selectedCurrency?.targets || []).includes(c.code)).map(c => ({value: c.code, label: `${c.title} (${c.code})`}))]} />
+                </div>
+                <ToggleField formCode={formCode} label={t('فعال', 'Active')} checked={selectedCurrency?.is_active ?? true} onChange={(val) => setSelectedCurrency({...selectedCurrency, is_active: val})} isRtl={isRtl} />
+              </div>
+              <div className="flex flex-wrap gap-1.5 p-2.5 min-h-[44px] bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">
+                {(selectedCurrency?.targets || []).map(tcode => (
+                  <Badge key={tcode} variant="indigo" className="flex items-center gap-1.5 pl-1 pr-2 py-0.5 group">
+                    <span className="font-bold text-[10px]">{tcode}</span>
+                    {!isReadOnly && <div className="w-3.5 h-3.5 flex items-center justify-center rounded-full bg-indigo-200/50 dark:bg-indigo-900/50 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-400 cursor-pointer transition-all" onClick={() => setSelectedCurrency({...selectedCurrency, targets: selectedCurrency.targets.filter(x => x !== tcode)})}><X size={10} /></div>}
+                  </Badge>
+                ))}
+                {(!selectedCurrency?.targets || selectedCurrency.targets.length === 0) && <span className="text-slate-300 dark:text-slate-500 text-[10px] italic py-1">{t('هیچ ارزی انتخاب نشده است.', 'No targets selected.')}</span>}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
