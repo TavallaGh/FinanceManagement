@@ -271,15 +271,23 @@
     };
 
     const handleDownloadSample = () => {
+      const rolesCol = isRtl
+        ? 'نقش‌ها (با | جدا شود: customer|vendor|employee|shareholder|system_user|exchange|broker)'
+        : 'Roles (separate with |: customer|vendor|employee|shareholder|system_user|exchange|broker)';
+
       const headers = isRtl
-        ? 'کد شخص,نوع شخص (real/legal),نام,نام خانوادگی,نام شرکت,کد/شناسه ملی,کد اقتصادی,موبایل,تلفن ثابت,ایمیل'
-        : 'Code,Party Type (real/legal),First Name,Last Name,Company Name,National ID,Economic Code,Mobile,Phone,Email';
-        
-      const sampleRow = isRtl
-        ? '1001,real,علی,احمدی,,1234567890,,09120000000,0210000000,test@test.com'
-        : '1001,real,Ali,Ahmadi,,1234567890,,09120000000,0210000000,test@test.com';
-        
-      const csv = '\uFEFF' + headers + '\n' + sampleRow;
+        ? `کد شخص,نوع شخص (real/legal),نام,نام خانوادگی,نام شرکت,کد/شناسه ملی,کد اقتصادی,موبایل,تلفن ثابت,ایمیل,عنوان لاتین,${rolesCol}`
+        : `Code,Party Type (real/legal),First Name,Last Name,Company Name,National ID,Economic Code,Mobile,Phone,Email,Latin Title,${rolesCol}`;
+
+      const sampleRow1 = isRtl
+        ? '1001,real,علی,احمدی,,1234567890,,09120000000,0210000000,ali@test.com,AliAhmadi,customer|vendor'
+        : '1001,real,Ali,Ahmadi,,1234567890,,09120000000,0210000000,ali@test.com,AliAhmadi,customer|vendor';
+
+      const sampleRow2 = isRtl
+        ? '1002,legal,,,شرکت نمونه,10987654321,12345678901,09130000000,0211111111,co@test.com,NamonehCo,vendor|shareholder'
+        : '1002,legal,,,Sample Company,10987654321,12345678901,09130000000,0211111111,co@test.com,SampleCo,vendor|shareholder';
+
+      const csv = '\uFEFF' + headers + '\n' + sampleRow1 + '\n' + sampleRow2;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
@@ -291,7 +299,111 @@
 
     const handleImportFile = (file) => {
       if (!file) return;
-      console.log('Import file selected:', file.name);
+
+      const validRoles = ['customer', 'vendor', 'employee', 'shareholder', 'system_user', 'exchange', 'broker'];
+
+      const parseCSVLine = (line) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          if (line[i] === '"') { inQuotes = !inQuotes; }
+          else if (line[i] === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+          else { current += line[i]; }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          setIsLoading(true);
+          let text = e.target.result;
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+
+          const lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim());
+          if (lines.length < 2) {
+            showToast('فایل خالی است یا فاقد داده می‌باشد.', 'File is empty or has no data.', 'warning');
+            return;
+          }
+
+          const dataLines = lines.slice(1);
+          const records = [];
+          const errors = [];
+
+          dataLines.forEach((line, idx) => {
+            const cols = parseCSVLine(line);
+            const [code, partyType, firstName, lastName, companyName, nationalId, economicCode, mobile, phone, email, latinTitle, rolesRaw] = cols;
+
+            if (!code || !partyType || !latinTitle) {
+              errors.push(isRtl
+                ? `ردیف ${idx + 2}: کد، نوع شخص و عنوان لاتین اجباری هستند.`
+                : `Row ${idx + 2}: Code, party type, and latin title are required.`);
+              return;
+            }
+
+            if (partyType !== 'real' && partyType !== 'legal') {
+              errors.push(isRtl
+                ? `ردیف ${idx + 2}: نوع شخص باید real یا legal باشد.`
+                : `Row ${idx + 2}: Party type must be 'real' or 'legal'.`);
+              return;
+            }
+
+            const type = partyType;
+            const rolesParsed = rolesRaw
+              ? rolesRaw.split('|').map(r => r.trim().toLowerCase()).filter(r => validRoles.includes(r))
+              : [];
+            const finalRoles = type === 'legal'
+              ? rolesParsed.filter(r => r !== 'employee' && r !== 'system_user')
+              : rolesParsed;
+
+            records.push({
+              code,
+              party_type: type,
+              first_name: type === 'real' ? (firstName || null) : null,
+              last_name: type === 'real' ? (lastName || null) : null,
+              company_name: type === 'legal' ? (companyName || null) : null,
+              national_id: nationalId || null,
+              economic_code: type === 'legal' ? (economicCode || null) : null,
+              mobile: mobile || null,
+              phone: phone || null,
+              email: email || null,
+              latin_title: latinTitle,
+              addresses: [],
+              roles: finalRoles,
+              is_active: true,
+              updated_at: new Date().toISOString()
+            });
+          });
+
+          if (errors.length > 0) {
+            showToast(errors[0], errors[0], 'warning');
+            return;
+          }
+
+          if (records.length === 0) {
+            showToast('هیچ رکورد معتبری برای وارد کردن یافت نشد.', 'No valid records found to import.', 'warning');
+            return;
+          }
+
+          const { error } = await supabase.from('parties').insert(records);
+          if (error) throw error;
+
+          showToast(
+            `${records.length} رکورد با موفقیت وارد شد.`,
+            `${records.length} records imported successfully.`,
+            'success'
+          );
+          fetchData();
+        } catch (err) {
+          console.error('Import Error:', err);
+          showToast('خطا در وارد کردن اطلاعات. لطفا فرمت فایل را بررسی کنید.', 'Error importing data. Please check file format.', 'error');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
     };
 
     const columns = [
