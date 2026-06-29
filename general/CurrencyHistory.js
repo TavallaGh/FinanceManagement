@@ -15,7 +15,7 @@
     const Core = window.DSCore || window.DesignSystem || {};
     const { Button = FallbackComponent, SelectField = FallbackComponent, Badge = FallbackComponent, CurrencyField = FallbackComponent, DatePicker = FallbackComponent } = Core;
     const Grid = window.DSGrid || window.DesignSystem || {};
-    const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent } = Grid;
+    const { DataGrid = FallbackComponent } = Grid;
     const Feedback = window.DSFeedback || window.DesignSystem || {};
     const { Modal = FallbackComponent, Toast = FallbackComponent, LogTimeline = FallbackComponent } = Feedback;
 
@@ -368,16 +368,6 @@
 
     return (
       <>
-        <AdvancedFilter 
-          fields={[
-            { name: 'base', label: t('ارز پایه', 'Base Currency'), type: 'select', options: currencies.map(c => ({value: c.code, label: c.code})) },
-            { name: 'target', label: t('ارز هدف', 'Target Currency'), type: 'select', options: currencies.map(c => ({value: c.code, label: c.code})) },
-            { name: 'fromDate', label: t('از تاریخ', 'From Date'), type: 'date' },
-            { name: 'toDate', label: t('تا تاریخ', 'To Date'), type: 'date' },
-            { name: 'source', label: t('منبع', 'Source'), type: 'select', options: [{value:'XE', label:'XE (اتوماتیک)'}, {value:'Manual', label:'دستی'}] }
-          ]}
-          initialValues={rateFilters} onFilter={setRateFilters} onClear={() => setRateFilters({})} language={language}
-        />
         
         <div className="flex-1 min-h-0">
             <DataGrid 

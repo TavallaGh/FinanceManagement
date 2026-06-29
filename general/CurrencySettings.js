@@ -19,7 +19,7 @@
     } = Core;
     
     const Grid = window.DSGrid || window.DesignSystem || {};
-    const { DataGrid = FallbackComponent, AdvancedFilter = FallbackComponent } = Grid;
+    const { DataGrid = FallbackComponent } = Grid;
     
     const Feedback = window.DSFeedback || window.DesignSystem || {};
     const { Modal = FallbackComponent, Toast = FallbackComponent, LogTimeline = FallbackComponent } = Feedback;
@@ -285,10 +285,6 @@
           
           {activeTab === 'list' && (
             <>
-              <AdvancedFilter 
-                fields={[{ name: 'code', label: t('کد ارز', 'Code'), type: 'text' }]} 
-                initialValues={currencyFilters} onFilter={setCurrencyFilters} onClear={() => setCurrencyFilters({})} language={language} 
-              />
               <div className="flex-1 min-h-0">
                 <DataGrid 
                   data={filteredCurrencies} columns={currencyColumns} language={language} formCode={formCode}
