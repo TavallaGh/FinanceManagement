@@ -75,8 +75,9 @@
     const [selectedIds,   setSelectedIds]   = useState([]);
     const [formData,      setFormData]      = useState(EMPTY_FORM);
 
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
-    const [toast,         setToast]         = useState({ isVisible: false, message: '', type: 'success' });
+    const [deleteConfirm,  setDeleteConfirm]  = useState({ isOpen: false, type: null, data: null });
+    const [toast,          setToast]          = useState({ isVisible: false, message: '', type: 'success' });
+    const [importErrors,   setImportErrors]   = useState({ isOpen: false, errors: [], insertedCount: 0, updatedCount: 0 });
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -292,6 +293,158 @@
       return opt ? (isRtl ? opt.label_fa : opt.label_en) : val;
     };
 
+    /* ── download sample CSV ── */
+    const handleDownloadSample = useCallback(() => {
+      const headers = isRtl
+        ? 'کد (خالی = اتوماتیک),عنوان فارسی,عنوان لاتین,نوع مرکز (ADMINISTRATIVE|PRODUCTION|SERVICE|SUPPORT),وضعیت (1 فعال / 0 غیرفعال),عنوان دفتر (محل مرکز),توضیحات'
+        : 'Code (empty=auto),Persian Title,English Title,Center Type (ADMINISTRATIVE|PRODUCTION|SERVICE|SUPPORT),Status (1 Active / 0 Inactive),Office Title (Location),Description';
+      const officeSample = offices.length > 0 ? offices[0].label : '';
+      const sampleRows = isRtl
+        ? [
+            `,مرکز هزینه اداری,Administrative Center,ADMINISTRATIVE,1,${officeSample},دفتر مرکزی`,
+            ',مرکز تولید شماره یک,Production Center 1,PRODUCTION,1,,',
+            ',واحد خدمات فنی,Technical Services,SERVICE,1,,خدمات پس از فروش',
+            ',واحد پشتیبانی,Support Unit,SUPPORT,0,,',
+          ]
+        : [
+            `,Administrative Center,مرکز هزینه اداری,ADMINISTRATIVE,1,${officeSample},Head office`,
+            ',Production Center 1,مرکز تولید شماره یک,PRODUCTION,1,,',
+            ',Technical Services,واحد خدمات فنی,SERVICE,1,,After sales',
+            ',Support Unit,واحد پشتیبانی,SUPPORT,0,,',
+          ];
+      const csv = '\uFEFF' + headers + '\n' + sampleRows.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', 'CostCenters_Import_Sample.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, [isRtl, offices]);
+
+    /* ── import CSV / Excel ── */
+    const handleImport = useCallback((file) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          let rows;
+          if (window.XLSX) {
+            const wb = window.XLSX.read(e.target.result, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rawRows = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            if (rawRows.length < 2) {
+              showToast(t('فایل خالی یا نامعتبر است', 'File is empty or invalid'), 'error');
+              return;
+            }
+            rows = rawRows.slice(1).map(parts => ({
+              code:        String(parts[0] ?? '').trim(),
+              titleFa:     String(parts[1] ?? '').trim(),
+              titleEn:     String(parts[2] ?? '').trim(),
+              centerType:  String(parts[3] ?? '').trim().toUpperCase() || 'ADMINISTRATIVE',
+              isActive:    String(parts[4] ?? '1').trim() !== '0',
+              officeTitle: String(parts[5] ?? '').trim(),
+              description: String(parts[6] ?? '').trim(),
+            }));
+          } else {
+            const text = (new TextDecoder('utf-8')).decode(e.target.result).replace(/^\uFEFF/, '');
+            const lines = text.split(/\r?\n/).filter(l => l.trim());
+            if (lines.length < 2) {
+              showToast(t('فایل خالی یا نامعتبر است', 'File is empty or invalid'), 'error');
+              return;
+            }
+            rows = lines.slice(1).map(line => {
+              const parts = line.split(',');
+              return {
+                code:        (parts[0] || '').trim(),
+                titleFa:     (parts[1] || '').trim().replace(/^"|"$/g, ''),
+                titleEn:     (parts[2] || '').trim().replace(/^"|"$/g, ''),
+                centerType:  ((parts[3] || '').trim().toUpperCase()) || 'ADMINISTRATIVE',
+                isActive:    (parts[4] || '1').trim() !== '0',
+                officeTitle: (parts[5] || '').trim().replace(/^"|"$/g, ''),
+                description: (parts[6] || '').trim().replace(/^"|"$/g, ''),
+
+              };
+            });
+          }
+          const VALID_TYPES = new Set(['ADMINISTRATIVE', 'PRODUCTION', 'SERVICE', 'SUPPORT']);
+          rows = rows.filter(r => r.titleFa && r.titleEn);
+          if (rows.length === 0) {
+            showToast(t('هیچ داده‌ای برای ورود وجود ندارد', 'No valid rows to import'), 'warning');
+            return;
+          }
+          let insertedCount = 0, updatedCount = 0;
+          const rowErrors = [];
+          // build a code->id map from existing data
+          const codeToId = {};
+          data.forEach(d => { if (d.code) codeToId[d.code] = d.id; });
+          for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+            const row = rows[rowIdx];
+            const rowLabel = isRtl ? `ردیف ${rowIdx + 2}` : `Row ${rowIdx + 2}`;
+            try {
+              const centerType = VALID_TYPES.has(row.centerType) ? row.centerType : 'ADMINISTRATIVE';
+              let finalCode = row.code;
+              let consumeAutoNumber = false;
+              if (!finalCode && window.AutoNumberingService) {
+                try {
+                  const preview = await window.AutoNumberingService.previewNext('COST_CENTER');
+                  finalCode = typeof preview === 'string' ? preview : (preview?.formattedCode || '');
+                  consumeAutoNumber = !!finalCode;
+                } catch (_) {}
+              }
+              const matchedOffice = row.officeTitle
+                ? offices.find(o => o.label.trim() === row.officeTitle.trim())
+                : null;
+              if (row.officeTitle && !matchedOffice) {
+                rowErrors.push(`${rowLabel}: دفتر «${row.officeTitle}» در سیستم یافت نشد، فیلد محل مرکز خالی ماند.`);
+              }
+              const payload = {
+                code:        finalCode || null,
+                title_fa:    row.titleFa,
+                title_en:    row.titleEn,
+                center_type: centerType,
+                is_active:   row.isActive,
+                office_id:   matchedOffice ? matchedOffice.id : null,
+                description: row.description || null,
+                updated_at:  new Date().toISOString(),
+              };
+              const existingId = finalCode ? codeToId[finalCode] : null;
+              if (existingId) {
+                const { error } = await supabase.from('fm_cost_centers').update(payload).eq('id', existingId);
+                if (error) throw error;
+                updatedCount++;
+              } else {
+                const { data: ins, error } = await supabase.from('fm_cost_centers').insert([payload]).select('id, code').single();
+                if (error) throw error;
+                if (ins) codeToId[ins.code || finalCode] = ins.id;
+                if (consumeAutoNumber && window.AutoNumberingService) {
+                  await window.AutoNumberingService.consumeNext('COST_CENTER').catch(() => {});
+                }
+                insertedCount++;
+              }
+            } catch (err) {
+              console.error('Import row error:', row, err);
+              const detail = err?.message || '';
+              rowErrors.push(`${rowLabel} («${row.titleFa}»): ${isRtl ? 'خطا در ذخیره‌سازی' : 'Save error'} — ${detail}`);
+            }
+          }
+          await fetchData();
+          if (rowErrors.length > 0) {
+            setImportErrors({ isOpen: true, errors: rowErrors, insertedCount, updatedCount });
+          } else {
+            const msg = isRtl
+              ? `ورود کامل شد: ${insertedCount} جدید، ${updatedCount} به‌روز`
+              : `Import successful: ${insertedCount} inserted, ${updatedCount} updated`;
+            showToast(msg, 'success');
+          }
+        } catch (err) {
+          console.error('Import error:', err);
+          showToast(t('خطا در پردازش فایل', 'Error processing file'), 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }, [data, offices, supabase, fetchData, showToast, isRtl, t]);
+
     /* ── grid columns ── */
     const columns = [
       {
@@ -310,7 +463,8 @@
         width: '140px',
         render: (val) => <span>{getCenterTypeLabel(val)}</span>,
       },
-      { field: 'officeName', header_fa: 'محل مرکز', header_en: 'Location', width: '160px', render: (val) => <span>{val || '-'}</span> },
+      { field: 'officeName',  header_fa: 'محل مرکز',  header_en: 'Location',    width: '160px', render: (val) => <span>{val || '-'}</span> },
+      { field: 'description', header_fa: 'توضیحات',   header_en: 'Description', width: '200px', render: (val) => <span className="text-slate-500 dark:text-slate-400">{val || '-'}</span> },
       {
         field: 'isActive',
         header_fa: 'وضعیت',
@@ -355,7 +509,8 @@
               onRowDoubleClick={(row) => access.canEdit ? handleOpenModal(row) : undefined}
               gridState={gridState}
               onGridStateChange={setGridState}
-              hideImport={true}
+              onDownloadSample={handleDownloadSample}
+              onImport={access.canCreate ? handleImport : undefined}
               actions={[
                 { icon: Edit,   tooltip: t('ویرایش', 'Edit'),   onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600'  },
                 { icon: Trash2, tooltip: t('حذف', 'Delete'),    onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600' },
@@ -426,8 +581,8 @@
                 formCode={FORM_CODE}
               />
 
-              {/* office LOV */}
-              <div className="md:col-span-2">
+              {/* office LOV + is_active toggle */}
+              <div>
                 <LOVField
                   size="sm"
                   label={t('محل مرکز (دفتر)', 'Location (Office)')}
@@ -446,6 +601,17 @@
                 />
               </div>
 
+              <div className="flex items-end pb-1">
+                <ToggleField
+                  size="sm"
+                  label={t('فعال', 'Active')}
+                  checked={formData.isActive}
+                  onChange={v => setFormData(p => ({ ...p, isActive: v }))}
+                  isRtl={isRtl}
+                  formCode={FORM_CODE}
+                />
+              </div>
+
               {/* description */}
               <div className="md:col-span-2">
                 <TextField
@@ -453,18 +619,6 @@
                   label={t('توضیحات', 'Description')}
                   value={formData.description}
                   onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
-                  isRtl={isRtl}
-                  formCode={FORM_CODE}
-                />
-              </div>
-
-              {/* is_active toggle */}
-              <div className="md:col-span-2 flex items-center">
-                <ToggleField
-                  size="sm"
-                  label={t('فعال', 'Active')}
-                  checked={formData.isActive}
-                  onChange={v => setFormData(p => ({ ...p, isActive: v }))}
                   isRtl={isRtl}
                   formCode={FORM_CODE}
                 />
@@ -527,6 +681,40 @@
               </div>
             }
           />
+        </Modal>
+
+        {/* ─── Import Errors Modal ─── */}
+        <Modal
+          isOpen={importErrors.isOpen}
+          onClose={() => setImportErrors({ isOpen: false, errors: [], insertedCount: 0, updatedCount: 0 })}
+          title={t('گزارش خطاهای ایمپورت', 'Import Error Report')}
+          language={language}
+          width="max-w-lg"
+        >
+          <div className="p-4 flex flex-col gap-3">
+            {(importErrors.insertedCount > 0 || importErrors.updatedCount > 0) && (
+              <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-lg px-3 py-2 text-[13px] font-medium border border-emerald-200 dark:border-emerald-800">
+                <span>✓</span>
+                <span>{t(`${importErrors.insertedCount} ردیف جدید درج شد، ${importErrors.updatedCount} ردیف به‌روز شد.`, `${importErrors.insertedCount} inserted, ${importErrors.updatedCount} updated.`)}</span>
+              </div>
+            )}
+            <div className="text-[12px] font-medium text-slate-600 dark:text-slate-400">
+              {t(`${importErrors.errors.length} ردیف با خطا مواجه شد:`, `${importErrors.errors.length} row(s) had errors:`)}
+            </div>
+            <div className="flex flex-col gap-1 max-h-72 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-slate-50 dark:bg-slate-900">
+              {importErrors.errors.map((err, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-[12px] text-red-600 dark:text-red-400 py-1 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                  <span className="shrink-0 mt-0.5">•</span>
+                  <span>{err}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button variant="outline" size="sm" onClick={() => setImportErrors({ isOpen: false, errors: [], insertedCount: 0, updatedCount: 0 })}>
+                {t('بستن', 'Close')}
+              </Button>
+            </div>
+          </div>
         </Modal>
 
         <Toast
