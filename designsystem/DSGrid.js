@@ -267,7 +267,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, formCode, actionWidth = '120px' }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, formCode, actionWidth = '120px', groupable = false }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -646,7 +646,7 @@
                 </Button>
               ))}
             </div>
-          ) : (
+          ) : groupable ? (
             <div className={`flex-1 flex items-center gap-2 px-3 py-1 border border-dashed rounded-md transition-colors overflow-x-auto custom-scrollbar ${groupCols.length > 0 ? 'bg-indigo-50/30 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'}`} onDragOver={(e) => e.preventDefault()} onDrop={handleGroupDrop}>
               <Layers size={14} className={groupCols.length > 0 ? 'text-indigo-500 dark:text-indigo-400 shrink-0' : 'text-slate-400 dark:text-slate-500 shrink-0'} />
               {groupCols.length === 0 ? (
@@ -675,6 +675,8 @@
                 </div>
               )}
             </div>
+          ) : (
+            <div className="flex-1" />
           )}
 
           <div className="flex items-center gap-1 shrink-0">
