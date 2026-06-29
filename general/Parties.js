@@ -302,39 +302,21 @@
 
       const validRoles = ['customer', 'vendor', 'employee', 'shareholder', 'system_user', 'exchange', 'broker'];
 
-      const parseCSVLine = (line) => {
-        const result = [];
-        let current = '';
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          if (line[i] === '"') { inQuotes = !inQuotes; }
-          else if (line[i] === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
-          else { current += line[i]; }
-        }
-        result.push(current.trim());
-        return result;
-      };
-
-      const reader = new FileReader();
-      reader.onload = async (e) => {
+      const processRows = async (rows) => {
         try {
           setIsLoading(true);
-          let text = e.target.result;
-          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-
-          const lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim());
-          if (lines.length < 2) {
+          if (rows.length < 2) {
             showToast('فایل خالی است یا فاقد داده می‌باشد.', 'File is empty or has no data.', 'warning');
             return;
           }
 
-          const dataLines = lines.slice(1);
+          const dataRows = rows.slice(1);
           const records = [];
           const errors = [];
 
-          dataLines.forEach((line, idx) => {
-            const cols = parseCSVLine(line);
-            const [code, partyType, firstName, lastName, companyName, nationalId, economicCode, mobile, phone, email, latinTitle, rolesRaw] = cols;
+          dataRows.forEach((cols, idx) => {
+            const normalize = (v) => (v !== undefined && v !== null) ? String(v).trim() : '';
+            const [code, partyType, firstName, lastName, companyName, nationalId, economicCode, mobile, phone, email, latinTitle, rolesRaw] = cols.map(normalize);
 
             if (!code || !partyType || !latinTitle) {
               errors.push(isRtl
@@ -403,7 +385,55 @@
           setIsLoading(false);
         }
       };
-      reader.readAsText(file, 'UTF-8');
+
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if (ext === 'xlsx' || ext === 'xls') {
+        const loadXLSX = () => new Promise((resolve, reject) => {
+          if (window.XLSX) { resolve(window.XLSX); return; }
+          const script = document.createElement('script');
+          script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+          script.onload = () => resolve(window.XLSX);
+          script.onerror = () => reject(new Error('Failed to load XLSX library'));
+          document.head.appendChild(script);
+        });
+
+        loadXLSX().then(XLSX => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+            processRows(rows);
+          };
+          reader.readAsArrayBuffer(file);
+        }).catch(() => {
+          showToast('خطا در بارگذاری کتابخانه پردازش Excel.', 'Error loading Excel library.', 'error');
+        });
+      } else {
+        const parseCSVLine = (line) => {
+          const result = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            if (line[i] === '"') { inQuotes = !inQuotes; }
+            else if (line[i] === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+            else { current += line[i]; }
+          }
+          result.push(current.trim());
+          return result;
+        };
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          let text = e.target.result;
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+          const lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim());
+          processRows(lines.map(parseCSVLine));
+        };
+        reader.readAsText(file, 'UTF-8');
+      }
     };
 
     const columns = [
