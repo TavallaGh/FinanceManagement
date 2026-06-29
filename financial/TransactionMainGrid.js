@@ -16,13 +16,27 @@
 
   function FallbackComponent() { return null; }
 
-  const formatNumberSafe = (val, forDisplay = false) => {
+  const formatNumberSafe = (val, forDisplay = false, decimals = null) => {
       if (val === null || val === undefined || val === '') return forDisplay ? '0' : '';
       const strVal = String(val).replace(/,/g, '');
       if (strVal.trim() === '' || isNaN(Number(strVal))) return forDisplay ? '0' : '';
+      const num = parseFloat(strVal);
+      // Only apply fixed decimal formatting for display — NOT while the user is typing
+      if (forDisplay && decimals !== null && decimals >= 0) {
+          const fixed = num.toFixed(decimals);
+          const parts = fixed.split('.');
+          parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+          return decimals === 0 ? parts[0] : parts.join('.');
+      }
       const parts = strVal.split('.');
       parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       return parts.join('.');
+  };
+
+  const getCurrencyDecimals = (currencyCode, currencies) => {
+      if (!currencyCode || !currencies || currencies.length === 0) return 2;
+      const curr = currencies.find(c => c.code === currencyCode);
+      return (curr && curr.decimal_places !== null && curr.decimal_places !== undefined) ? parseInt(curr.decimal_places) : 2;
   };
 
   const TransactionMainGrid = React.forwardRef(({ itemsData = [], onItemsChange, lookups, isReadOnly, formCode, language = 'fa', showToast }, ref) => {
@@ -50,6 +64,7 @@
                     transaction_group: 'BALANCE',
                     cost_type_id: '',
                     income_type_id: '',
+                    center_id: '',
                     currency: itemsData.length > 0 ? itemsData[0].currency : 'IRR',
                     deposit_amount: String(reqDep),
                     withdrawal_amount: String(reqWid),
@@ -71,9 +86,19 @@
         { value: 'OTHER', label: t('سایر', 'Other') }
     ];
 
+    const CENTER_KIND_LABELS = {
+        DEPARTMENT: { fa: 'دپارتمان', en: 'Department' },
+        TEAM: { fa: 'تیم', en: 'Team' },
+        PROJECT: { fa: 'پروژه', en: 'Project' },
+        OTHER: { fa: 'سایر', en: 'Other' }
+    };
+
     const handleAmountChange = (e, field) => {
         const raw = e.target.value.replace(/,/g, '');
         if (raw === '' || !isNaN(raw)) {
+            const decimals = getCurrencyDecimals(inlineItemEdit?.data?.currency, lookups.currencies);
+            const dotIdx = raw.indexOf('.');
+            if (dotIdx !== -1 && (raw.length - dotIdx - 1) > decimals) return;
             setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, [field]: raw } }));
         }
     };
@@ -83,7 +108,7 @@
         if (inlineItemEdit) return showToast(t('ابتدا با زدن دکمه Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
         setInlineItemEdit({
             id: 'new',
-            data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', currency: '', deposit_amount: '', withdrawal_amount: '0', description: '' }
+            data: { row_number: itemsData.length + 1, account_id: '', account_obj: null, transaction_action: 'DEPOSIT', transaction_group: 'COST', cost_type_id: '', income_type_id: '', center_id: '', currency: '', deposit_amount: '', withdrawal_amount: '0', description: '' }
         });
     };
 
@@ -167,14 +192,15 @@
     };
 
     const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart Structure', width: '250px' },
-        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '120px' },
-        { field: isRtl ? 'title_fa' : 'title_en', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (val, row) => (
+        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart Structure', width: '430px' },
+        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '110px' },
+        { field: isRtl ? 'title_fa' : 'title_en', header_fa: 'عنوان حساب', header_en: 'Account Title', width: '210px', render: (val, row) => (
             <div className="flex flex-col">
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val || row.title_fa}</span>
                 {(isRtl ? row.pathTitle_fa : row.pathTitle_en) && <span className="text-[10px] text-slate-500 truncate" title={isRtl ? row.pathTitle_fa : row.pathTitle_en}>{isRtl ? row.pathTitle_fa : row.pathTitle_en}</span>}
             </div>
-        )}
+        )},
+        { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '70px' }
     ];
 
     const costLovColumns = [
@@ -197,6 +223,18 @@
         )}
     ];
 
+    const centerLovColumns = [
+        { field: isRtl ? 'titleFa' : 'titleEn', header_fa: 'عنوان مرکز', header_en: 'Center Title', width: '200px', render: (val, row) => (
+            <span className="font-bold text-slate-800 dark:text-slate-200">{val || row.titleFa}</span>
+        )},
+        { field: 'managerName', header_fa: 'مسئول', header_en: 'Manager', width: '150px' },
+        { field: 'centerKind', header_fa: 'گروه مرکز', header_en: 'Center Group', width: '110px', render: (val) => {
+            const lbl = CENTER_KIND_LABELS[val];
+            return <span>{lbl ? (isRtl ? lbl.fa : lbl.en) : val}</span>;
+        }},
+        { field: 'officeName', header_fa: 'محل مرکز', header_en: 'Location', width: '150px' }
+    ];
+
     const itemGridData = useMemo(() => {
         const data = [...itemsData];
         if (inlineItemEdit && inlineItemEdit.id === 'new') data.unshift({ id: 'new', _isNew: true, ...inlineItemEdit.data });
@@ -215,7 +253,7 @@
                 return (
                     <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
                         <LOVField 
-                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[650px]"
+                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[830px]"
                             displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${isRtl ? inlineItemEdit.data.account_obj.title_fa : (inlineItemEdit.data.account_obj.title_en || inlineItemEdit.data.account_obj.title_fa)}` : ''}
                             onChange={(r) => {
                                 const currObj = lookups.currencies?.find(c => String(c.id) === String(r?.currency_id));
@@ -251,7 +289,7 @@
         }},
         { field: 'transaction_group', header_fa: 'گروه', header_en: 'Group', width: '80px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[80]"><SelectField size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: ''}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[80]"><SelectField size="sm" options={TRANSACTION_GROUPS} value={inlineItemEdit.data.transaction_group} onChange={e => setInlineItemEdit(prev => ({...prev, data: {...prev.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: '', center_id: ''}}))} isRtl={isRtl} wrapperClassName="m-0" /></div>;
             }
             return <span className="text-[12px]">{TRANSACTION_GROUPS.find(a => a.value === val)?.label || val}</span>;
         }},
@@ -300,6 +338,33 @@
             }
             return '-';
         }},
+        { field: 'center_id', header_fa: 'مرکز هزینه/درآمد', header_en: 'Cost/Income Center', width: '170px', render: (val, row) => {
+            const group = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId) ? inlineItemEdit.data.transaction_group : row.transaction_group;
+            const isCenterGroup = group === 'COST' || group === 'INCOME';
+            if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
+                if (!isCenterGroup) {
+                    return <div className="h-[32px] w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
+                }
+                const activeCenters = (lookups.costBenefitCenters || []).filter(c =>
+                    c.isActive && (group === 'COST' ? c.isCostCenter : c.isBenefitCenter)
+                );
+                const selectedCenter = activeCenters.find(c => String(c.id) === String(inlineItemEdit.data.center_id));
+                const displayVal = selectedCenter ? (isRtl ? selectedCenter.titleFa : (selectedCenter.titleEn || selectedCenter.titleFa)) : '';
+                return (
+                    <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[60]">
+                        <LOVField
+                            size="sm" formCode={formCode} data={activeCenters} columns={centerLovColumns} dropdownWidth="min-w-[580px]"
+                            displayValue={displayVal}
+                            onChange={(r) => setInlineItemEdit(prev => ({...prev, data: {...prev.data, center_id: r?.id || ''}}))}
+                            isRtl={isRtl} wrapperClassName="m-0"
+                        />
+                    </div>
+                );
+            }
+            if (!isCenterGroup) return <span className="text-slate-400 dark:text-slate-600 text-[11px]">-</span>;
+            const c = (lookups.costBenefitCenters || []).find(x => String(x.id) === String(val));
+            return <span className="text-[12px] truncate block">{c ? (isRtl ? c.titleFa : (c.titleEn || c.titleFa)) : ''}</span>;
+        }},
         { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '50px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 return <div onClick={e => e.stopPropagation()}><TextField size="sm" value={inlineItemEdit.data.currency} disabled isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
@@ -310,17 +375,19 @@
             const rawVal = row.deposit_amount !== undefined ? row.deposit_amount : val;
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 const disabled = inlineItemEdit.data.transaction_action !== 'DEPOSIT';
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumberSafe(inlineItemEdit.data.deposit_amount)} onChange={(e) => handleAmountChange(e, 'deposit_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                const decimals = getCurrencyDecimals(inlineItemEdit.data.currency, lookups.currencies);
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumberSafe(inlineItemEdit.data.deposit_amount, false, decimals)} onChange={(e) => handleAmountChange(e, 'deposit_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
-            return <span dir="ltr" className="block w-full text-right text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{formatNumberSafe(rawVal, true)}</span>;
+            return <span dir="ltr" className="block w-full text-right text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{formatNumberSafe(rawVal, true, getCurrencyDecimals(row.currency, lookups.currencies))}</span>;
         }},
         { field: 'withdrawal_amount', header_fa: 'برداشت *', header_en: 'Withdrawal *', width: '100px', render: (val, row) => {
             const rawVal = row.withdrawal_amount !== undefined ? row.withdrawal_amount : val;
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
                 const disabled = inlineItemEdit.data.transaction_action !== 'WITHDRAWAL';
-                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumberSafe(inlineItemEdit.data.withdrawal_amount)} onChange={(e) => handleAmountChange(e, 'withdrawal_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
+                const decimals = getCurrencyDecimals(inlineItemEdit.data.currency, lookups.currencies);
+                return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}><TextField size="sm" type="text" disabled={disabled} value={formatNumberSafe(inlineItemEdit.data.withdrawal_amount, false, decimals)} onChange={(e) => handleAmountChange(e, 'withdrawal_amount')} isRtl={isRtl} dir="ltr" wrapperClassName="m-0" /></div>;
             }
-            return <span dir="ltr" className="block w-full text-right text-[12px] font-medium text-rose-600 dark:text-rose-500">{formatNumberSafe(rawVal, true)}</span>;
+            return <span dir="ltr" className="block w-full text-right text-[12px] font-medium text-rose-600 dark:text-rose-500">{formatNumberSafe(rawVal, true, getCurrencyDecimals(row.currency, lookups.currencies))}</span>;
         }},
         { field: 'description', header_fa: 'شرح *', header_en: 'Description *', width: 'auto', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
@@ -367,7 +434,7 @@
             onAdd={isReadOnly ? undefined : handleAddItemClick} 
             hideImport={true} 
             hideExport={true} 
-            hideToolbar={false}
+            hideToolbar={isReadOnly}
             selectable={!isReadOnly} 
             bulkActions={itemBulkActions} 
             onRowDoubleClick={(row) => handleEditItemClick(row)} 

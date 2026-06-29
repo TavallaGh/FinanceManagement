@@ -6,7 +6,9 @@
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
   const {
-    AlertTriangle = FallbackIcon, Check = FallbackIcon, Scale = FallbackIcon
+    AlertTriangle = FallbackIcon, Check = FallbackIcon, Scale = FallbackIcon,
+    ChevronRight = FallbackIcon, ChevronLeft = FallbackIcon, Paperclip = FallbackIcon,
+    Printer = FallbackIcon, DollarSign = FallbackIcon, RefreshCw = FallbackIcon
   } = LucideIcons;
 
   const DS = window.DesignSystem || {};
@@ -34,6 +36,8 @@
   const TransactionMainDetails = ({ isOpen, onClose, onSuccess, formMode, initialRecord, language = 'fa', formCode }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
+    const calendarMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : (isRtl ? 'jalali' : 'gregorian');
+    const dateLocale = calendarMode === 'jalali' ? 'fa-IR-u-nu-latn' : 'en-US';
 
     const supabase = window.supabase;
     const currentUserObj = window.NavigationSystem?.currentUser || {};
@@ -90,6 +94,9 @@
 
     const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
     const [isUploading, setIsUploading] = useState(false);
+    const [printModal, setPrintModal] = useState({ isOpen: false, transactionId: null });
+    const [summaryModal, setSummaryModal] = useState({ isOpen: false });
+    const [isRatesUpdating, setIsRatesUpdating] = useState(false);
 
     const [currencyRates, setCurrencyRates] = useState({});
 
@@ -104,7 +111,8 @@
         departments: [],
         usersMap: {},
         usersList: [],
-        currencies: []
+        currencies: [],
+        costBenefitCenters: []
     });
 
     const isReadOnly = useMemo(() => {
@@ -139,7 +147,7 @@
     const fetchDependencies = useCallback(async () => {
         if (!supabase) return null;
         try {
-            const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes, currRes] = await Promise.all([
+            const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes, currRes, cbcRes] = await Promise.all([
                 supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
@@ -147,7 +155,8 @@
                 supabase.from('sec_users').select('id, full_name, username, party_id'),
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title'),
-                supabase.from('fm_currencies').select('id, code, title')
+                supabase.from('fm_currencies').select('id, code, title, decimal_places'),
+                supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)')
             ]);
             
             const uMap = {};
@@ -207,7 +216,12 @@
             };
 
             const allAccounts = accRes.data || [];
-            const leafAccs = buildPathsAndFilterLeafs(allAccounts, activeCharts);
+            const currenciesData = currRes.data || [];
+            const leafAccs = buildPathsAndFilterLeafs(allAccounts, activeCharts).map(acc => ({
+                ...acc,
+                displayLabel: isRtl ? (acc.title_fa || acc.code || '') : (acc.title_en || acc.title_fa || acc.code || ''),
+                currency_code: currenciesData.find(c => c.id === acc.currency_id)?.code || ''
+            }));
             const costLeafs = buildPathsAndFilterLeafs(costRes.data || []);
             const incomeLeafs = buildPathsAndFilterLeafs(incRes.data || []);
 
@@ -215,6 +229,18 @@
             (nodesRes.data || []).forEach(n => {
                 nodesMap[n.id] = n.title;
             });
+
+            const costBenefitCenters = (cbcRes.data || []).map(r => ({
+                id: r.id,
+                titleFa: r.title_fa || '',
+                titleEn: r.title_en || '',
+                centerKind: r.center_kind || '',
+                isCostCenter: r.is_cost_center ?? false,
+                isBenefitCenter: r.is_benefit_center ?? false,
+                isActive: r.is_active ?? true,
+                managerName: r.manager ? `${r.manager.first_name || ''} ${r.manager.last_name || ''}`.trim() : '',
+                officeName: r.office?.title || ''
+            }));
 
             const newLookups = {
                 accounts: allAccounts,
@@ -226,7 +252,8 @@
                 currentUserDeptId: myDeptId,
                 currentUserDeptTitle: myDeptTitle,
                 currencies: currRes.data || [],
-                departmentsMap: nodesMap
+                departmentsMap: nodesMap,
+                costBenefitCenters
             };
 
             setLookups(newLookups);
@@ -324,7 +351,15 @@
                     registered_at: formMode === 'COPY' ? new Date().toISOString() : initialRecord.registered_at,
                     department_id: finalDeptId,
                     department_title: finalDeptTitle,
-                    registrar_id: formMode === 'COPY' ? safeFinalRegistrar : initialRecord.registrar_id
+                    registrar_id: formMode === 'COPY' ? safeFinalRegistrar : initialRecord.registrar_id,
+                    // در حالت کپی، اطلاعات ثبت/بررسی/تایید سند قبلی باید پاک شوند
+                    created_at: formMode === 'COPY' ? null : initialRecord.created_at,
+                    reviewed_by: formMode === 'COPY' ? null : initialRecord.reviewed_by,
+                    reviewed_by_name: formMode === 'COPY' ? null : initialRecord.reviewed_by_name,
+                    reviewed_at: formMode === 'COPY' ? null : initialRecord.reviewed_at,
+                    approved_by: formMode === 'COPY' ? null : initialRecord.approved_by,
+                    approved_by_name: formMode === 'COPY' ? null : initialRecord.approved_by_name,
+                    approved_at: formMode === 'COPY' ? null : initialRecord.approved_at
                 });
                 
                 const mappedItems = (initialRecord.fm_transaction_items || []).map(item => {
@@ -526,10 +561,11 @@
             };
 
             if (!txId) {
-                const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
+                const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id, created_at');
                 if (error) throw error;
                 txId = data[0].id;
-                setHeaderData(prev => ({ ...prev, id: txId }));
+                setHeaderData(prev => ({ ...prev, id: txId, created_at: data[0].created_at }));
+                setAttachModal(prev => ({ ...prev, record: { id: txId, document_code: headerData.document_code, status: statusToSave } }));
                 
                 if (window.AutoNumberingService) {
                     try {
@@ -582,6 +618,7 @@
                             transaction_group: (item.transaction_group && String(item.transaction_group).trim() !== '') ? item.transaction_group : null,
                             cost_type_id: (item.cost_type_id && String(item.cost_type_id).trim() !== '') ? item.cost_type_id : null,
                             income_type_id: (item.income_type_id && String(item.income_type_id).trim() !== '') ? item.income_type_id : null,
+                            center_id: (item.center_id && String(item.center_id).trim() !== '') ? item.center_id : null,
                             currency: cur,
                             deposit_amount: dep,
                             withdrawal_amount: wid,
@@ -593,8 +630,20 @@
                         };
                     });
 
-                    const { data: newItems, error: itemsError } = await supabase.from('fm_transaction_items').insert(itemsPayload).select();
-                    if (itemsError) throw itemsError;
+                    let newItems;
+                    {
+                        const { data: d1, error: e1 } = await supabase.from('fm_transaction_items').insert(itemsPayload).select();
+                        if (e1) {
+                            // Graceful retry without center_id if the column doesn't exist in DB yet
+                            console.warn('fm_transaction_items insert failed, retrying without center_id:', e1.message);
+                            const payloadWithoutCenter = itemsPayload.map(({ center_id, ...rest }) => rest);
+                            const { data: d2, error: e2 } = await supabase.from('fm_transaction_items').insert(payloadWithoutCenter).select();
+                            if (e2) throw e2;
+                            newItems = d2;
+                        } else {
+                            newItems = d1;
+                        }
+                    }
                     await logAction('update_items', txId, `بروزرسانی ${itemsPayload.length} قلم سند ${headerData.document_code} - توسط ${currentUserName}`);
 
                     const mappedItems = newItems.map(item => {
@@ -620,6 +669,7 @@
             }));
             setIsDirty(false);
             setHasSaved(true);
+            setCopyWarning(null);
             
             if (typeof overrideStatus === 'string') {
                 showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
@@ -704,6 +754,42 @@
         }
     };
 
+    const handleUpdateRates = async () => {
+        if (!headerData.id || !['DRAFT', 'TEMPORARY'].includes(headerData.status)) {
+            return showToast(t('فقط سندهای یادداشت یا موقت امکان بروزرسانی نرخ ارز دارند.', 'Only Draft or Temporary transactions can have exchange rates updated.'), 'warning');
+        }
+        const savedItems = itemsData.filter(i => i.id);
+        if (savedItems.length === 0) {
+            return showToast(t('اقلامی برای بروزرسانی وجود ندارد. ابتدا سند را ذخیره کنید.', 'No saved items found. Save the transaction first.'), 'warning');
+        }
+        setIsRatesUpdating(true);
+        try {
+            let updatedCount = 0;
+            for (const item of savedItems) {
+                const cur = item.currency || 'IRR';
+                const { toUsd, usdToIrr } = getExchangeRates(cur);
+                const dep = parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0;
+                const wid = parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0;
+                const val = dep > 0 ? dep : wid;
+                const amtUsd = val * toUsd;
+                const amtIrr = amtUsd * usdToIrr;
+                const { error } = await supabase.from('fm_transaction_items').update({
+                    exchange_rate_to_usd: toUsd,
+                    exchange_rate_usd_to_irr: usdToIrr,
+                    amount_usd: amtUsd,
+                    amount_irr: amtIrr
+                }).eq('id', item.id);
+                if (!error) updatedCount++;
+            }
+            showToast(t(`${updatedCount} قلم با آخرین نرخ‌های ارز بروز شد.`, `${updatedCount} items updated with latest exchange rates.`));
+            await logAction('update_rates', headerData.id, `بروزرسانی نرخ ارز ${updatedCount} قلم سند ${headerData.document_code}`);
+        } catch (error) {
+            showToast(t('خطا در بروزرسانی نرخ ارز.', 'Error updating exchange rates.'), 'error');
+        } finally {
+            setIsRatesUpdating(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     const TransactionMainGrid = window.TransactionMainGrid || FallbackComponent;
@@ -721,7 +807,7 @@
     const headerCardAction = (
         <div className="flex items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
             {/* وضعیت یادداشت -> موقت */}
-            {currentStatus === 'DRAFT' && access.canEdit && (
+            {currentStatus === 'DRAFT' && headerData.id && access.canEdit && (
                 <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                     {t('تبدیل به موقت', 'Set Temporary')}
                 </Button>
@@ -780,9 +866,52 @@
     );
 
     return (
-        <Modal isOpen={isOpen} onClose={handleCloseModal} title={isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : (formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'EDIT' ? t('ویرایش تراکنش', 'Edit Transaction') : t('کپی تراکنش', 'Copy Transaction'))} language={language} width="max-w-6xl">
-            <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
-                <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
+        <div className="flex-1 min-h-0 flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900 text-[12px] animate-in fade-in duration-300" dir={isRtl ? 'rtl' : 'ltr'}>
+            <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between shrink-0 shadow-sm z-30 relative">
+                <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="sm" icon={isRtl ? ChevronRight : ChevronLeft} onClick={handleCloseModal}>{t('بازگشت به لیست', 'Back to List')}</Button>
+                    <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">
+                            {isReadOnly ? t('مشاهده تراکنش', 'View Transaction') : formMode === 'CREATE' ? t('ثبت تراکنش جدید', 'New Transaction') : formMode === 'COPY' ? t('کپی تراکنش', 'Copy Transaction') : t('ویرایش تراکنش', 'Edit Transaction')}
+                        </span>
+                        {headerData.document_code && (
+                            <>
+                                <span className="text-slate-300 dark:text-slate-600 select-none">·</span>
+                                <span className="text-[12px] font-bold text-indigo-600 dark:text-indigo-400" dir="ltr">{headerData.document_code}</span>
+                            </>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    {headerData.id && (
+                        <Button variant="ghost" size="sm" icon={DollarSign} onClick={() => setSummaryModal({ isOpen: true })} title={t('خلاصه ارزی', 'Currency Summary')} />
+                    )}
+                    {headerData.id && (headerData.status === 'DRAFT' || headerData.status === 'TEMPORARY') && itemsData.some(i => i.id) && (
+                        <Button variant="ghost" size="sm" icon={RefreshCw} onClick={handleUpdateRates} isLoading={isRatesUpdating} title={t('بروزرسانی نرخ ارز', 'Update Exchange Rates')} />
+                    )}
+                    {headerData.id && window.TransactionPrint && (
+                        <Button variant="ghost" size="sm" icon={Printer} onClick={() => setPrintModal({ isOpen: true, transactionId: headerData.id })} title={t('چاپ سند', 'Print')} />
+                    )}
+                    {headerData.id && (
+                        <Button variant="ghost" size="sm" icon={Paperclip} onClick={() => {
+                            const recId = attachModal.record?.id || headerData.id;
+                            loadAttachments(recId);
+                            setAttachModal(prev => ({
+                                ...prev,
+                                record: prev.record || { id: headerData.id, document_code: headerData.document_code, status: headerData.status },
+                                isOpen: true
+                            }));
+                        }} title={t('پیوست‌ها', 'Attachments')} />
+                    )}
+                    {headerData.id && <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>}
+                    <Button variant="outline" size="sm" className="!px-5" onClick={handleCloseModal}>{t('انصراف', 'Cancel')}</Button>
+                    {!isReadOnly && access.canEdit && (
+                        <Button variant="primary" size="sm" className="!px-5" icon={Check} onClick={() => handleSaveTransaction()} isLoading={isLoading} disabled={!isDirty}>{t('ذخیره', 'Save')}</Button>
+                    )}
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4">
                     
                     {copyWarning && (
                         <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2 shrink-0">
@@ -800,13 +929,14 @@
                         action={headerCardAction}
                         language={language}
                     >
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
-                            <TextField size="sm" formCode={formCode} label={t('کد سند', 'Transaction Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
+                            <TextField size="sm" formCode={formCode} label={t('کد تراکنش', 'Transaction Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
-                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ سند', 'Transaction Date')} value={headerData.document_date || ''} onChange={val => { setHeaderData({...headerData, document_date: val}); setIsDirty(true); }} isRtl={isRtl} disabled={isReadOnly} required />
+                                <DatePicker size="sm" formCode={formCode} label={t('تاریخ تراکنش', 'Transaction Date')} value={headerData.document_date || ''} onChange={val => { setHeaderData({...headerData, document_date: val}); setIsDirty(true); }} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
+                            <TextField size="sm" formCode={formCode} label={t('تاریخ و ساعت ثبت', 'Registered At')} value={headerData.created_at ? new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.created_at)) : t('پس از ذخیره', 'After save')} disabled isRtl={isRtl} />
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
                             <div className="relative z-[80]">
@@ -814,7 +944,7 @@
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
                             
-                            <div className="lg:col-span-3 sm:col-span-2 relative z-[70]">
+                            <div className="lg:col-span-2 md:col-span-2 col-span-2 relative z-[70]">
                                 <TextField size="sm" formCode={formCode} label={t('شرح سربرگ', 'Header Description')} value={headerData.description || ''} onChange={e => { setHeaderData({...headerData, description: e.target.value}); setIsDirty(true); }} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
 
@@ -822,13 +952,13 @@
                             {(headerData.reviewed_by || headerData.reviewed_by_name) && (
                                 <>
                                     <TextField size="sm" formCode={formCode} label={t('بررسی کننده', 'Reviewed By')} value={headerData.reviewed_by_name || lookups.usersMap[headerData.reviewed_by] || '-'} disabled isRtl={isRtl} />
-                                    <TextField size="sm" formCode={formCode} label={t('تاریخ بررسی', 'Reviewed At')} value={headerData.reviewed_at ? new Intl.DateTimeFormat(isRtl ? 'fa-IR' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.reviewed_at)) : '-'} disabled isRtl={isRtl} />
+                                    <TextField size="sm" formCode={formCode} label={t('تاریخ بررسی', 'Reviewed At')} value={headerData.reviewed_at ? new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.reviewed_at)) : '-'} disabled isRtl={isRtl} />
                                 </>
                             )}
                             {(headerData.approved_by || headerData.approved_by_name) && (
                                 <>
                                     <TextField size="sm" formCode={formCode} label={t('تایید کننده', 'Approved By')} value={headerData.approved_by_name || lookups.usersMap[headerData.approved_by] || '-'} disabled isRtl={isRtl} />
-                                    <TextField size="sm" formCode={formCode} label={t('تاریخ تایید', 'Approved At')} value={headerData.approved_at ? new Intl.DateTimeFormat(isRtl ? 'fa-IR' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.approved_at)) : '-'} disabled isRtl={isRtl} />
+                                    <TextField size="sm" formCode={formCode} label={t('تاریخ تایید', 'Approved At')} value={headerData.approved_at ? new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.approved_at)) : '-'} disabled isRtl={isRtl} />
                                 </>
                             )}
                         </div>
@@ -856,16 +986,7 @@
                             />
                         </div>
                     </Card>
-                </div>
 
-                <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
-                    <Button variant="outline" size="sm" onClick={handleCloseModal}>{t('بستن', 'Close')}</Button>
-                    {!isReadOnly && access.canEdit && (
-                        <Button variant="primary" size="sm" icon={Check} onClick={() => handleSaveTransaction()} isLoading={isLoading} disabled={!isDirty}>
-                            {t('ذخیره', 'Save')}
-                        </Button>
-                    )}
-                </div>
             </div>
             
             <Modal isOpen={attachModal.isOpen} onClose={() => setAttachModal({ isOpen: false, record: null, files: [] })} title={t('پیوست‌های سند', 'Attachments')} language={language} width="max-w-xl">
@@ -893,8 +1014,23 @@
                 </div>
             </Modal>
 
+            {printModal.isOpen && window.TransactionPrint && React.createElement(window.TransactionPrint, {
+                transactionId: printModal.transactionId,
+                onClose: () => setPrintModal({ isOpen: false, transactionId: null }),
+                language: language
+            })}
+
+            {summaryModal.isOpen && window.TransactionSummary && React.createElement(window.TransactionSummary, {
+                isOpen: summaryModal.isOpen,
+                onClose: () => setSummaryModal({ isOpen: false }),
+                record: { ...headerData, fm_transaction_items: itemsData },
+                lookups: { ...lookups, accounts: lookups.leafAccounts },
+                language: language,
+                formCode: formCode
+            })}
+
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
-        </Modal>
+        </div>
     );
   };
 

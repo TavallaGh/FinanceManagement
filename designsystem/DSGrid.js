@@ -168,28 +168,36 @@
           )}
         </div>
 
-        {isOpen && rect && (
-          ReactDOM ? ReactDOM.createPortal(
-            <div 
-              style={{
-                position: 'fixed',
-                top: rect.bottom + 4,
-                left: isRtl ? undefined : rect.left,
-                right: isRtl ? (window.innerWidth - rect.right) : undefined,
-                width: containerRef.current ? containerRef.current.offsetWidth : 'auto',
-                zIndex: 999999
-              }}
+        {isOpen && rect && (() => {
+          const inputWidth = containerRef.current ? containerRef.current.offsetWidth : 0;
+          const minWMatch = dropdownWidth && dropdownWidth.match(/min-w-\[(\d+)px\]/);
+          const estWidth = Math.max(inputWidth, minWMatch ? parseInt(minWMatch[1]) : 300);
+          let posH;
+          if (isRtl) {
+            const leftEdge = rect.right - estWidth;
+            posH = leftEdge >= 8
+              ? { right: window.innerWidth - rect.right }
+              : { left: Math.max(8, Math.min(rect.left, window.innerWidth - estWidth - 8)) };
+          } else {
+            const rightEdge = rect.left + estWidth;
+            posH = rightEdge <= window.innerWidth - 8
+              ? { left: rect.left }
+              : { right: window.innerWidth - rect.right };
+          }
+          const portalNode = (
+            <div
+              style={{ position: 'fixed', top: rect.bottom + 4, ...posH, width: inputWidth || 'auto', zIndex: 999999 }}
               className={`w-full ${dropdownWidth} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg flex flex-col animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}
             >
               {dropdownContentBox}
-            </div>,
-            document.body
-          ) : (
+            </div>
+          );
+          return ReactDOM ? ReactDOM.createPortal(portalNode, document.body) : (
             <div className={`absolute top-full mt-1 ${isRtl ? 'right-0' : 'left-0'} w-full ${dropdownWidth} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150`}>
               {dropdownContentBox}
             </div>
-          )
-        )}
+          );
+        })()}
       </div>
     );
   };
@@ -267,7 +275,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, formCode, actionWidth = '120px', groupable = false }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [] }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -330,7 +338,7 @@
 
     const [gridData, setGridData] = useState(data);
     const [columnOrder, setColumnOrder] = useState(columns.map(c => c.field));
-    const [hiddenCols, setHiddenCols] = useState([]);
+    const [hiddenCols, setHiddenCols] = useState(defaultHiddenCols);
     const [pinnedCols, setPinnedCols] = useState([]);
     const [filters, setFilters] = useState({});
     const [localFilters, setLocalFilters] = useState({});
@@ -347,6 +355,9 @@
     
     const colMenuRef = useRef(null);
     const headerMenuRef = useRef(null);
+    const colMenuPortalRef = useRef(null);
+    const [colMenuPosition, setColMenuPosition] = useState(null);
+    const ReactDOM = window.ReactDOM;
     const dragColItem = useRef(); const dragOverColItem = useRef();
     const dragRowItem = useRef(); const dragOverRowItem = useRef();
     const dragGroupItem = useRef(null); const dragOverGroupItem = useRef(null);
@@ -360,7 +371,7 @@
           lastSyncState.current = gridState;
           
           setColumnOrder(gridState.columnOrder || columns.map(c => c.field));
-          setHiddenCols(gridState.hiddenCols || []);
+          setHiddenCols(gridState.hiddenCols || defaultHiddenCols);
           setPinnedCols(gridState.pinnedCols || []);
           setFilters(gridState.filters || {});
           setLocalFilters(gridState.filters || {});
@@ -370,7 +381,7 @@
       } else if (gridState === null && lastSyncState.current !== null) {
         lastSyncState.current = null;
         setColumnOrder(columns.map(c => c.field));
-        setHiddenCols([]);
+        setHiddenCols(defaultHiddenCols);
         setPinnedCols([]);
         setFilters({});
         setLocalFilters({});
@@ -393,7 +404,9 @@
 
     useEffect(() => {
       const handleClickOutside = (e) => { 
-        if (colMenuRef.current && !colMenuRef.current.contains(e.target)) setShowColMenu(false); 
+        const inColBtn = colMenuRef.current && colMenuRef.current.contains(e.target);
+        const inColPortal = colMenuPortalRef.current && colMenuPortalRef.current.contains(e.target);
+        if (!inColBtn && !inColPortal) setShowColMenu(false);
         if (headerMenuRef.current && !headerMenuRef.current.contains(e.target)) setActiveHeaderMenu(null);
       };
       document.addEventListener('mousedown', handleClickOutside);
@@ -582,7 +595,7 @@
          }
          return;
       }
-      const exportCols = [...visibleColumns, ...columns.filter(c => c.exportOnly && !visibleColumns.find(v => v.field === c.field))];
+      const exportCols = columns; // always export ALL defined columns regardless of visibility
       const headers = exportCols.map(c => t(c.header_fa, c.header_en || c.header_fa)).join(',');
       const rows = gridData.map(row => exportCols.map(c => {
         let val = c.exportValue ? c.exportValue(row[c.field], row) : row[c.field];
@@ -712,9 +725,33 @@
             )}
             
             <div className="relative flex items-center h-full" ref={colMenuRef}>
-              <button onClick={() => setShowColMenu(!showColMenu)} title={t('نمایش/مخفی‌سازی ستون‌ها', 'Columns')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><Settings size={16} /></button>
-              {showColMenu && (
-                <div className="absolute top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg p-2 z-50 min-w-[200px] right-0 animate-in zoom-in-95 duration-100">
+              <button
+                onClick={() => {
+                  if (!showColMenu && colMenuRef.current) {
+                    setColMenuPosition(colMenuRef.current.getBoundingClientRect());
+                  }
+                  setShowColMenu(prev => !prev);
+                }}
+                title={t('نمایش/مخفی‌سازی ستون‌ها', 'Columns')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><Settings size={16} /></button>
+            </div>
+            {showColMenu && colMenuPosition && (() => {
+              const menuWidth = 220;
+              // Smart horizontal position: right-align if menu fits on left side of button, else left-align
+              const resultingLeftEdge = colMenuPosition.right - menuWidth;
+              const posH = resultingLeftEdge >= 8
+                ? { right: Math.max(4, window.innerWidth - colMenuPosition.right) }
+                : { left: Math.max(8, Math.min(colMenuPosition.left, window.innerWidth - menuWidth - 8)) };
+              // Smart vertical position
+              const spaceBelow = window.innerHeight - colMenuPosition.bottom;
+              const posV = spaceBelow > 270
+                ? { top: colMenuPosition.bottom + 4 }
+                : { bottom: window.innerHeight - colMenuPosition.top + 4 };
+              const menuNode = (
+                <div
+                  ref={colMenuPortalRef}
+                  style={{ position: 'fixed', zIndex: 999999, ...posH, ...posV }}
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg p-2 min-w-[200px] animate-in zoom-in-95 duration-100"
+                >
                   <div className="text-[12px] font-black text-slate-800 dark:text-slate-100 mb-2 pb-2 border-b border-slate-100 dark:border-slate-700 px-1">{t('نمایش / مخفی‌سازی', 'Show / Hide')}</div>
                   <div className="max-h-[250px] overflow-y-auto custom-scrollbar space-y-0.5">
                     {columns.map(c => (
@@ -725,8 +762,9 @@
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
+              );
+              return ReactDOM ? ReactDOM.createPortal(menuNode, document.body) : menuNode;
+            })()}
             <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
             {onDownloadSample && access.canCreate && (
               <button onClick={onDownloadSample} title={t('دانلود نمونه فایل اکسل', 'Download Excel Sample')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileDown size={16} /></button>
@@ -738,7 +776,7 @@
               </>
             )}
             {!hideExport && access.canPrint && (
-              <button onClick={exportCSV} title={t('خروجی اکسل', 'Export')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileSpreadsheet size={16} /></button>
+              <button onClick={onExport || exportCSV} title={t('خروجی اکسل', 'Export')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileSpreadsheet size={16} /></button>
             )}
           </div>
         </div>}
