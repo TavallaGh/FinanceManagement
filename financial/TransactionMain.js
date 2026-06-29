@@ -585,7 +585,6 @@
 
     const filteredTransactions = useMemo(() => {
         return transactions.filter(tx => {
-            if (filters.my_docs && String(tx.registrar_id) !== String(resolvedUserId)) return false;
             if (filters.status && tx.status !== filters.status) return false;
 
             if (filters.account_id || filters.transaction_action || filters.transaction_group || filters.cost_type_id || filters.income_type_id) {
@@ -655,8 +654,7 @@
         { name: 'transaction_group', label: t('گروه', 'Group'), type: 'select', options: TRANSACTION_GROUPS },
         { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'lov', lovData: lookups.costTypes, lovColumns: costLovColumns, dropdownWidth: 'min-w-[500px]' },
         { name: 'income_type_id', label: t('نوع درآمد', 'Income Type'), type: 'lov', lovData: lookups.incomeTypes, lovColumns: incomeLovColumns, dropdownWidth: 'min-w-[500px]' },
-        { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: STATUS_OPTIONS },
-        { name: 'my_docs', label: t('سندهای من', 'My Documents'), type: 'toggle' }
+        { name: 'status', label: t('وضعیت سند', 'Status'), type: 'select', options: STATUS_OPTIONS }
     ];
 
     const gridActions = [

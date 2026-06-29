@@ -18,6 +18,7 @@
       DataGrid = () => null,
       SelectField = () => null,
       CheckboxField = () => null,
+      ToggleField = () => null,
       Tabs = () => null,
       Badge = () => null
   } = DesignSystem;
@@ -298,7 +299,7 @@
               if (menuId.startsWith('temp_')) return;
 
               const hasActions = data.actions && data.actions.length > 0;
-              const hasScopes = data.scopes && Object.keys(data.scopes).some(k => data.scopes[k]?.length > 0);
+              const hasScopes = data.scopes && (data.scopes.own_data_only === true || Object.keys(data.scopes).some(k => k !== 'own_data_only' && data.scopes[k]?.length > 0));
 
               const systemForm = allSystemForms.find(f => String(f.id) === String(menuId));
               const dbMenuId = systemForm ? systemForm.id : menuId;
@@ -471,6 +472,8 @@
                 } else {
                     updatedActions = [...updatedActions.filter(a => normalizeA(a) !== normalizedKey), normalizedKey];
                 }
+            } else if (type === 'own_data_only') {
+                updatedScopes['own_data_only'] = !current.scopes?.own_data_only;
             } else if (type === 'scope') {
                 let currentScopeArr = updatedScopes[key] || [];
                 if (currentScopeArr.includes(value)) {
@@ -762,12 +765,24 @@
                                                 )}
                                             </div>
 
-                                            {availScopeKeys.length > 0 && (
-                                                <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
-                                                    <div className="text-[12px] font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
-                                                        {t('محدودیت دسترسی به داده‌ها', 'Data Scopes')}
-                                                    </div>
-                                                    
+                                            <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
+                                                <div className="text-[12px] font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-2">
+                                                    {t('محدودیت دسترسی به داده‌ها', 'Data Scopes')}
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <ToggleField
+                                                        checked={!!activeSource.scopes?.own_data_only}
+                                                        onChange={() => !isReadOnly && handleUpdateDirectPermission(currentDetailRow.id, 'own_data_only')}
+                                                        disabled={isReadOnly}
+                                                        isRtl={isRtl}
+                                                        label={t('ایجادکننده باشد', 'Created By Me')}
+                                                    />
+                                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 ps-10">{t('کاربر فقط رکوردهایی را می‌بیند که خودش ایجاد کرده است', 'User can only see records they created')}</div>
+                                                </div>
+
+                                                {availScopeKeys.length > 0 && (
+                                                    <>
                                                     {availScopeKeys.map(scopeKey => {
                                                         const scopeDef = isNewScopeFormatUA ? availScopesRaw[scopeKey] : null;
                                                         const displayLabel = scopeDef
@@ -812,8 +827,9 @@
                                                             </div>
                                                         );
                                                     })}
-                                                </div>
-                                            )}
+                                                    </>
+                                                )}
+                                            </div>
                                         </>
                                     )}
                                 </div>

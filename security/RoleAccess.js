@@ -17,6 +17,7 @@
       Button = () => null, 
       Tree = () => null,
       CheckboxField = () => null,
+      ToggleField = () => null,
       EmptyState = () => null
   } = DesignSystem;
 
@@ -257,7 +258,7 @@
 
           Object.entries(tempPermissions).forEach(([menuId, data]) => {
               const hasActions = data.actions.length > 0;
-              const hasScopes = Object.keys(data.scopes).some(k => data.scopes[k]?.length > 0);
+              const hasScopes = data.scopes?.own_data_only === true || Object.keys(data.scopes).some(k => k !== 'own_data_only' && data.scopes[k]?.length > 0);
               
               if (hasActions || hasScopes) {
                   if (data.id) {
@@ -322,6 +323,23 @@
                     scopes: {
                         ...current.scopes,
                         [scopeKey]: hasVal ? scopeArr.filter(v => v !== valueId) : [...scopeArr, valueId]
+                    }
+                }
+            };
+        });
+    };
+
+    const toggleOwnDataOnly = () => {
+        if (!selectedMenu) return;
+        setTempPermissions(prev => {
+            const current = prev[selectedMenu.id] || { actions: [], scopes: {} };
+            return {
+                ...prev,
+                [selectedMenu.id]: {
+                    ...current,
+                    scopes: {
+                        ...current.scopes,
+                        own_data_only: !current.scopes?.own_data_only
                     }
                 }
             };
@@ -442,12 +460,25 @@
                                     )}
                                 </div>
 
-                                {availScopeKeys.length > 0 && (
+                                {hasReadAccess && (
                                     <div className="space-y-4 pt-2">
                                         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                                             <div className="w-6 h-6 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center"><Lock size={14}/></div>
                                             <span className="text-[12px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">{t('جزئیات دسترسی به داده‌ها', 'Data Scope Details')}</span>
                                         </div>
+
+                                        <div className="flex flex-col gap-0.5">
+                                            <ToggleField
+                                                checked={!!currentMenuPerm.scopes?.own_data_only}
+                                                onChange={toggleOwnDataOnly}
+                                                isRtl={isRtl}
+                                                label={t('ایجادکننده باشد', 'Created By Me')}
+                                            />
+                                            <div className="text-[10px] text-slate-500 dark:text-slate-400 ps-10">{t('کاربر فقط رکوردهایی را می‌بیند که خودش ایجاد کرده است', 'User can only see records they created')}</div>
+                                        </div>
+
+                                        {availScopeKeys.length > 0 && (
+                                            <>
                                         <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-center gap-2 mb-1 animate-in slide-in-from-top-2 shrink-0">
                                             {React.createElement(AlertTriangle, { size: 14, className: 'shrink-0' })}
                                             <span className="text-[12px] font-bold">{t('در صورت عدم انتخاب هیچ گزینه‌ای در یک بخش، کاربر به تمامی داده‌های آن بخش دسترسی خواهد داشت.', 'If no options are selected in a scope, the user will have access to all data in that scope.')}</span>
@@ -499,6 +530,8 @@
                                                 );
                                             })}
                                         </div>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
