@@ -51,10 +51,11 @@
     titleFa:         '',
     titleEn:         '',
     centerKind:      'DEPARTMENT',
+    managerId:       null,
+    managerName:     '',
     isCostCenter:    true,
     isBenefitCenter: false,
     isActive:        true,
-    description:     '',
   };
 
   const CostBenefitCenters = ({ language = 'fa' }) => {
@@ -70,6 +71,7 @@
 
     const [data,       setData]       = useState([]);
     const [offices,    setOffices]    = useState([]);
+    const [managers,   setManagers]   = useState([]);
     const [isLoading,  setIsLoading]  = useState(false);
     const [gridState,  setGridState]  = useState(null);
 
@@ -111,6 +113,31 @@
       },
     };
 
+    /* ── fetch employee managers from parties ── */
+    const fetchManagers = useCallback(async () => {
+      try {
+        if (!supabase) return;
+        const { data: rows, error } = await supabase
+          .from('parties')
+          .select('id, code, first_name, last_name, mobile, email, roles, is_active')
+          .order('last_name', { ascending: true });
+        if (error) throw error;
+        const employees = (rows || []).filter(
+          r => r.is_active === true && Array.isArray(r.roles) && r.roles.includes('employee')
+        );
+        setManagers(employees.map(r => ({
+          id:       r.id,
+          value:    r.id,
+          code:     r.code || '',
+          fullName: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
+          mobile:   r.mobile || '',
+          email:    r.email  || '',
+        })));
+      } catch (err) {
+        console.error('Error fetching managers:', err);
+      }
+    }, [supabase]);
+
     /* ── fetch offices ── */
     const fetchOffices = useCallback(async () => {
       try {
@@ -139,7 +166,7 @@
         if (!supabase) return;
         const { data: rows, error } = await supabase
           .from('fm_cost_benefit_centers')
-          .select('*, office:fm_org_offices(id, title)')
+          .select('*, office:fm_org_offices(id, title), manager:parties(id, first_name, last_name, mobile, email)')
           .order('created_at', { ascending: false });
         if (error) throw error;
         setData((rows || []).map(r => ({
@@ -148,12 +175,13 @@
           titleFa:         r.title_fa,
           titleEn:         r.title_en,
           centerKind:      r.center_kind,
+          managerId:       r.manager_id,
+          managerName:     r.manager ? `${r.manager.first_name || ''} ${r.manager.last_name || ''}`.trim() : '',
           isCostCenter:    r.is_cost_center    ?? false,
           isBenefitCenter: r.is_benefit_center ?? false,
           isActive:        r.is_active         ?? true,
           officeId:        r.office_id,
           officeName:      r.office?.title || '',
-          description:     r.description  || '',
         })));
       } catch (err) {
         console.error('Fetch Error:', err);
@@ -166,7 +194,8 @@
     useEffect(() => {
       fetchData();
       fetchOffices();
-    }, [fetchData, fetchOffices]);
+      fetchManagers();
+    }, [fetchData, fetchOffices, fetchManagers]);
 
     /* ── open add/edit modal ── */
     const handleOpenModal = useCallback(async (record = null) => {
@@ -205,11 +234,11 @@
           title_fa:         formData.titleFa.trim(),
           title_en:         formData.titleEn.trim(),
           center_kind:      formData.centerKind,
+          manager_id:       formData.managerId || null,
           is_cost_center:   formData.isCostCenter,
           is_benefit_center: formData.isBenefitCenter,
           is_active:        formData.isActive,
           office_id:        formData.officeId || null,
-          description:      formData.description?.trim() || null,
         };
 
         if (currentRecord?.id) {
@@ -298,20 +327,21 @@
     /* ── download sample CSV ── */
     const handleDownloadSample = useCallback(() => {
       const headers = isRtl
-        ? 'کد (خالی = اتوماتیک),عنوان فارسی,عنوان لاتین,نوع مرکز (DEPARTMENT|TEAM|PROJECT|OTHER),مرکز هزینه (1/0),مرکز درآمد (1/0),وضعیت (1 فعال / 0 غیرفعال),عنوان دفتر,توضیحات'
-        : 'Code (empty=auto),Persian Title,English Title,Center Kind (DEPARTMENT|TEAM|PROJECT|OTHER),Is Cost Center (1/0),Is Benefit Center (1/0),Status (1 Active / 0 Inactive),Office Title,Description';
+        ? 'کد (خالی = اتوماتیک),عنوان فارسی,عنوان لاتین,گروه مرکز (DEPARTMENT|TEAM|PROJECT|OTHER),مرکز هزینه (1/0),مرکز درآمد (1/0),وضعیت (1 فعال / 0 غیرفعال),عنوان دفتر,کد مسئول مرکز'
+        : 'Code (empty=auto),Persian Title,English Title,Center Group (DEPARTMENT|TEAM|PROJECT|OTHER),Is Cost Center (1/0),Is Benefit Center (1/0),Status (1 Active / 0 Inactive),Office Title,Manager Code';
       const officeSample = offices.length > 0 ? offices[0].label : '';
+      const managerSample = managers.length > 0 ? managers[0].code : '';
       const sampleRows = isRtl
         ? [
-            `,واحد فروش,Sales Unit,DEPARTMENT,1,1,1,${officeSample},فروش و بازاریابی`,
+            `,واحد فروش,Sales Unit,DEPARTMENT,1,1,1,${officeSample},${managerSample}`,
             ',تیم توسعه,Development Team,TEAM,1,0,1,,',
-            ',پروژه ساختمانی,Construction Project,PROJECT,0,1,1,,پروژه ساخت دفتر',
+            ',پروژه ساختمانی,Construction Project,PROJECT,0,1,1,,',
             ',واحد پشتیبانی,Support Unit,OTHER,1,0,1,,',
           ]
         : [
-            `,Sales Unit,واحد فروش,DEPARTMENT,1,1,1,${officeSample},Sales & Marketing`,
+            `,Sales Unit,واحد فروش,DEPARTMENT,1,1,1,${officeSample},${managerSample}`,
             ',Development Team,تیم توسعه,TEAM,1,0,1,,',
-            ',Construction Project,پروژه ساختمانی,PROJECT,0,1,1,,Office construction',
+            ',Construction Project,پروژه ساختمانی,PROJECT,0,1,1,,',
             ',Support Unit,واحد پشتیبانی,OTHER,1,0,1,,',
           ];
       const csv = '\uFEFF' + headers + '\n' + sampleRows.join('\n');
@@ -347,7 +377,7 @@
               isBenefitCenter: String(p[5] ?? '0').trim() !== '0',
               isActive:        String(p[6] ?? '1').trim() !== '0',
               officeTitle:     String(p[7] ?? '').trim(),
-              description:     String(p[8] ?? '').trim(),
+              managerCode:     String(p[8] ?? '').trim(),
             }));
           } else {
             const text = (new TextDecoder('utf-8')).decode(e.target.result).replace(/^\uFEFF/, '');
@@ -364,7 +394,7 @@
                 isBenefitCenter: (p[5] || '0').trim() !== '0',
                 isActive:        (p[6] || '1').trim() !== '0',
                 officeTitle:     (p[7] || '').trim().replace(/^"|"$/g, ''),
-                description:     (p[8] || '').trim().replace(/^"|"$/g, ''),
+                managerCode:     (p[8] || '').trim().replace(/^"|"$/g, ''),
               };
             });
           }
@@ -398,16 +428,20 @@
               if (row.officeTitle && !matchedOffice) {
                 rowErrors.push(`${rowLabel}: دفتر «${row.officeTitle}» یافت نشد، فیلد محل مرکز خالی ماند.`);
               }
+              const matchedManager = row.managerCode ? managers.find(m => m.code.trim() === row.managerCode.trim()) : null;
+              if (row.managerCode && !matchedManager) {
+                rowErrors.push(`${rowLabel}: مسئول با کد «${row.managerCode}» یافت نشد یا کارمند فعال نیست.`);
+              }
               const payload = {
                 code:             finalCode || null,
                 title_fa:         row.titleFa,
                 title_en:         row.titleEn,
                 center_kind:      centerKind,
+                manager_id:       matchedManager ? matchedManager.id : null,
                 is_cost_center:   row.isCostCenter,
                 is_benefit_center: row.isBenefitCenter,
                 is_active:        row.isActive,
                 office_id:        matchedOffice ? matchedOffice.id : null,
-                description:      row.description || null,
                 updated_at:       new Date().toISOString(),
               };
               const existingId = finalCode ? codeToId[finalCode] : null;
@@ -441,7 +475,7 @@
         }
       };
       reader.readAsArrayBuffer(file);
-    }, [data, offices, supabase, fetchData, showToast, isRtl, t]);
+    }, [data, offices, managers, supabase, fetchData, showToast, isRtl, t]);
 
     /* ── grid columns ── */
     const columns = [
@@ -457,8 +491,8 @@
         render: (val) => <span dir="ltr">{val}</span> },
       {
         field: 'centerKind',
-        header_fa: 'نوع مرکز',
-        header_en: 'Kind',
+        header_fa: 'گروه مرکز',
+        header_en: 'Center Group',
         width: '120px',
         render: (val) => <span>{getKindLabel(val)}</span>,
       },
@@ -475,10 +509,10 @@
           </div>
         ),
       },
-      { field: 'officeName', header_fa: 'محل مرکز', header_en: 'Location', width: '150px',
+      { field: 'officeName',   header_fa: 'محل مرکز',    header_en: 'Location', width: '150px',
         render: (val) => <span>{val || '-'}</span> },
-      { field: 'description', header_fa: 'توضیحات', header_en: 'Description', width: '180px',
-        render: (val) => <span className="text-slate-500 dark:text-slate-400">{val || '-'}</span> },
+      { field: 'managerName', header_fa: 'مسئول مرکز', header_en: 'Manager',  width: '160px',
+        render: (val) => <span>{val || '-'}</span> },
       {
         field: 'isActive',
         header_fa: 'وضعیت',
@@ -493,6 +527,14 @@
     const officelovColumns = [
       { field: 'label',   header_fa: 'عنوان دفتر', header_en: 'Office',       width: '200px' },
       { field: 'orgName', header_fa: 'سازمان',     header_en: 'Organization', width: '180px' },
+    ];
+
+    /* ── LOV columns for manager picker ── */
+    const managerLovColumns = [
+      { field: 'code',     header_fa: 'کد',          header_en: 'Code',   width: '100px' },
+      { field: 'fullName', header_fa: 'نام کامل',    header_en: 'Name',   width: '200px' },
+      { field: 'mobile',   header_fa: 'موبایل',      header_en: 'Mobile', width: '130px' },
+      { field: 'email',    header_fa: 'ایمیل',       header_en: 'Email',  width: '200px' },
     ];
 
     return (
@@ -595,10 +637,10 @@
                 formCode={FORM_CODE}
               />
 
-              {/* نوع مرکز */}
+              {/* گروه مرکز */}
               <SelectField
                 size="sm"
-                label={t('نوع مرکز', 'Center Kind')}
+                label={t('گروه مرکز', 'Center Group')}
                 value={formData.centerKind}
                 onChange={e => setFormData(p => ({ ...p, centerKind: e.target.value }))}
                 options={CENTER_KIND_OPTIONS.map(o => ({ value: o.value, label: isRtl ? o.label_fa : o.label_en }))}
@@ -607,21 +649,23 @@
                 formCode={FORM_CODE}
               />
 
-              {/* فعال */}
-              <div className="flex items-end pb-1">
-                <ToggleField
-                  size="sm"
-                  label={t('فعال', 'Active')}
-                  checked={formData.isActive}
-                  onChange={v => setFormData(p => ({ ...p, isActive: v }))}
-                  isRtl={isRtl}
-                  formCode={FORM_CODE}
-                />
-              </div>
+              {/* مسئول مرکز */}
+              <LOVField
+                size="sm"
+                label={t('مسئول مرکز', 'Center Manager')}
+                data={managers}
+                columns={managerLovColumns}
+                dropdownWidth="min-w-[560px]"
+                displayValue={formData.managerName}
+                onChange={r => setFormData(p => ({ ...p, managerId: r?.id ?? null, managerName: r?.fullName ?? '' }))}
+                onClear={() => setFormData(p => ({ ...p, managerId: null, managerName: '' }))}
+                isRtl={isRtl}
+                formCode={FORM_CODE}
+              />
 
               {/* مرکز هزینه / مرکز درآمد */}
-              <div className="md:col-span-2">
-                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">
+              <div>
+                <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   {t('تعیین نوع مرکز', 'Center Role')}
                 </div>
                 <div className="flex items-center gap-6 bg-slate-50 dark:bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-200 dark:border-slate-700">
@@ -645,16 +689,21 @@
                 )}
               </div>
 
-              {/* توضیحات */}
-              <div className="md:col-span-2">
-                <TextField
-                  size="sm"
-                  label={t('توضیحات', 'Description')}
-                  value={formData.description}
-                  onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
-                  isRtl={isRtl}
-                  formCode={FORM_CODE}
-                />
+              {/* فعال */}
+              <div>
+                <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('وضعیت', 'Status')}
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-200 dark:border-slate-700">
+                  <ToggleField
+                    size="sm"
+                    label={t('فعال', 'Active')}
+                    checked={formData.isActive}
+                    onChange={v => setFormData(p => ({ ...p, isActive: v }))}
+                    isRtl={isRtl}
+                    formCode={FORM_CODE}
+                  />
+                </div>
               </div>
             </div>
 
