@@ -378,8 +378,6 @@
         fetchData();
     };
 
-    const isLocked = (tx) => tx.status === 'FINAL' || tx.status === 'APPROVED';
-
     const loadAttachments = async (recordId) => {
         try {
             const { data } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
@@ -480,7 +478,7 @@
     }, [transactions, filters, resolvedUserId]);
 
     /* ── عملیات گروهی و اکسپورت ─ از TransactionActions.js ── */
-    const _txActions = (window.useTransactionActions || (() => ({})))({
+    const _txActions = window.makeTransactionActions ? window.makeTransactionActions({
         transactions, filteredTransactions, filteredRecordId,
         usersMap, deptsMap, lookups,
         deleteConfirm, supabase,
@@ -488,7 +486,7 @@
         isRtl, dateLocale,
         setIsLoading, fetchData, showToast, logAction,
         setDeleteConfirm,
-    });
+    }) : {};
     const executeDelete      = _txActions.executeDelete      || (() => {});
     const bulkActions        = _txActions.bulkActions        || [];
     const handleCustomExport = _txActions.handleCustomExport || (() => {});

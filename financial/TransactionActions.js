@@ -1,14 +1,7 @@
-/* Filename: financial/TransactionActions.js
- * عملیات گروهی تراکنش‌ها و مدیریت اکسپورت
- * این ماژول یک custom hook با نام useTransactionActions صادر می‌کند
- * که توسط TransactionMain.js فراخوانی می‌شود.
- */
+/* Filename: financial/TransactionActions.js */
 (() => {
-  const React = window.React;
-  const { useCallback, useMemo } = React;
-
   const FallbackIcon = ({ size = 16 }) =>
-    React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
+    window.React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
 
   const safeIcon = (moduleObj, iconName) => {
     const icon = moduleObj && moduleObj[iconName];
@@ -35,7 +28,7 @@
   const resolveRates = (ratesMap, currency) => {
     let toUsd = 1;
     if (currency !== 'USD') {
-      const direct  = ratesMap[`${currency}_USD`];
+      const direct = ratesMap[`${currency}_USD`];
       if (direct) {
         toUsd = parseFloat(direct);
       } else {
@@ -51,9 +44,9 @@
   };
 
   /* ════════════════════════════════════════════════════
-     useTransactionActions — Custom Hook
+     makeTransactionActions — Plain factory, no hooks
      ════════════════════════════════════════════════════ */
-  const useTransactionActions = ({
+  const makeTransactionActions = ({
     transactions,
     filteredTransactions,
     filteredRecordId,
@@ -84,7 +77,7 @@
     const RotateCcw   = safeIcon(LucideIcons, 'RotateCcw');
 
     /* ── حذف (تک + گروهی) ─────────────────────────── */
-    const executeDelete = useCallback(async () => {
+    const executeDelete = async () => {
       setIsLoading(true);
       try {
         if (deleteConfirm.type === 'single') {
@@ -135,15 +128,14 @@
       } finally {
         setIsLoading(false);
       }
-    }, [deleteConfirm, transactions, supabase, setIsLoading, showToast, logAction, fetchData, setDeleteConfirm, isRtl]);
+    };
 
     /* ── تغییر وضعیت گروهی ───────────────────────── */
-    const handleBulkStatusChange = useCallback(async (newStatus, ids) => {
+    const handleBulkStatusChange = async (newStatus, ids) => {
       setIsLoading(true);
       try {
         const eligible = transactions.filter(tx => ids.includes(tx.id) && canTransitionTo(tx.status, newStatus));
         const skipped  = ids.length - eligible.length;
-
         if (eligible.length === 0) {
           showToast(t(
             'هیچ‌کدام از رکوردهای انتخابی امکان تغییر به این وضعیت را ندارند.',
@@ -152,37 +144,35 @@
           setIsLoading(false);
           return;
         }
-
         const eligibleIds = eligible.map(tx => tx.id);
         const now = new Date().toISOString();
-
         const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', eligibleIds);
         if (error) throw error;
 
         const actorName = (currentUserId && usersMap[currentUserId]) ? usersMap[currentUserId] : currentUserName;
         const metaPayload = {};
         if (newStatus === 'FINAL') {
-          metaPayload.reviewed_by      = currentUserId || null;
-          metaPayload.reviewed_at      = now;
+          metaPayload.reviewed_by = currentUserId || null;
+          metaPayload.reviewed_at = now;
           metaPayload.reviewed_by_name = actorName;
         } else if (newStatus === 'APPROVED') {
-          metaPayload.approved_by      = currentUserId || null;
-          metaPayload.approved_at      = now;
+          metaPayload.approved_by = currentUserId || null;
+          metaPayload.approved_at = now;
           metaPayload.approved_by_name = actorName;
         } else if (newStatus === 'TEMPORARY') {
-          metaPayload.reviewed_by      = null;
-          metaPayload.reviewed_at      = null;
+          metaPayload.reviewed_by = null;
+          metaPayload.reviewed_at = null;
           metaPayload.reviewed_by_name = null;
         }
         if (Object.keys(metaPayload).length > 0) {
           const { error: metaError } = await supabase.from('fm_transactions').update(metaPayload).in('id', eligibleIds);
           if (metaError) console.warn('متادیتای بررسی/تایید ذخیره نشد:', metaError.message);
         }
-
         const statusLabels = { DRAFT: 'یادداشت', TEMPORARY: 'موقت', FINAL: 'بررسی شده', APPROVED: 'تایید شده' };
         showToast(
           skipped > 0
-            ? t(`وضعیت ${eligible.length} سند تغییر کرد. ${skipped} سند به دلیل ترتیب وضعیت قابل تغییر نبود.`, `${eligible.length} records updated. ${skipped} skipped due to invalid transition.`)
+            ? t(`وضعیت ${eligible.length} سند تغییر کرد. ${skipped} سند به دلیل ترتیب وضعیت قابل تغییر نبود.`,
+                `${eligible.length} records updated. ${skipped} skipped due to invalid transition.`)
             : t('وضعیت با موفقیت تغییر کرد.', 'Status updated.'),
           skipped > 0 ? 'warning' : 'success'
         );
@@ -195,10 +185,10 @@
       } finally {
         setIsLoading(false);
       }
-    }, [transactions, supabase, currentUserId, currentUserName, usersMap, setIsLoading, showToast, logAction, fetchData, isRtl]);
+    };
 
     /* ── بروزرسانی نرخ ارز گروهی ─────────────────── */
-    const handleBulkUpdateRates = useCallback(async (ids) => {
+    const handleBulkUpdateRates = async (ids) => {
       setIsLoading(true);
       try {
         const selectedTxs = transactions.filter(
@@ -212,7 +202,6 @@
           setIsLoading(false);
           return;
         }
-
         const uniqueDates = [...new Set(selectedTxs.map(tx => tx.document_date).filter(Boolean))];
         const ratesByDate = {};
         for (const date of uniqueDates) {
@@ -221,7 +210,6 @@
             .select('base_currency, target_currency, rate, rate_date, created_at')
             .lte('rate_date', formattedDate)
             .order('rate_date', { ascending: false });
-          // مرتب‌سازی ثانویه در کلاینت برای ایمنی در برابر تفاوت نسخه‌های Supabase
           const sorted = (data || []).slice().sort((a, b) => {
             if (a.rate_date > b.rate_date) return -1;
             if (a.rate_date < b.rate_date) return  1;
@@ -235,7 +223,6 @@
           });
           ratesByDate[date] = latestRates;
         }
-
         let updatedCount = 0;
         for (const tx of selectedTxs) {
           const ratesMap = ratesByDate[tx.document_date] || {};
@@ -254,7 +241,6 @@
             if (!error) updatedCount++;
           }
         }
-
         showToast(t(
           `${updatedCount} قلم تراکنش با آخرین نرخ‌های ارز بروز شد.`,
           `${updatedCount} items updated with latest exchange rates.`
@@ -268,10 +254,10 @@
       } finally {
         setIsLoading(false);
       }
-    }, [transactions, supabase, currentUserName, setIsLoading, showToast, logAction, fetchData, isRtl]);
+    };
 
     /* ── اکسپورت CSV ─────────────────────────────── */
-    const handleCustomExport = useCallback(() => {
+    const handleCustomExport = () => {
       const TX_TYPE   = { OPENING: t('افتتاحیه','Opening'), CLOSING: t('اختتامیه','Closing'), GENERAL: t('عمومی','General'), TRANSFER: t('انتقال','Transfer') };
       const TX_STATUS = { DRAFT: t('یادداشت','Draft'), TEMPORARY: t('موقت','Temporary'), FINAL: t('بررسی شده','Final'), APPROVED: t('تایید شده','Approved') };
       const TX_ACTION = { DEPOSIT: t('واریز','Deposit'), WITHDRAWAL: t('برداشت','Withdrawal') };
@@ -298,7 +284,6 @@
         t('واریز','Deposit'), t('برداشت','Withdrawal'),
         t('معادل دلار','Amount USD'), t('معادل ریال','Amount IRR'), t('شرح قلم','Item Desc'),
       ];
-
       const dataToExport = filteredRecordId
         ? filteredTransactions.filter(r => String(r.id) === filteredRecordId)
         : filteredTransactions;
@@ -315,8 +300,8 @@
         });
         const hdr = [
           tx.document_code || '', tx.document_date || '', formatDT(tx.created_at),
-          TX_TYPE[tx.transaction_type]   || tx.transaction_type || '',
-          TX_STATUS[tx.status]           || tx.status           || '',
+          TX_TYPE[tx.transaction_type]   || tx.transaction_type   || '',
+          TX_STATUS[tx.status]           || tx.status             || '',
           usersMap[tx.registrar_id]      || '',
           deptsMap[tx.department_id]     || '',
           tx.description                 || '',
@@ -325,7 +310,6 @@
           txDepUsd > 0 ? txDepUsd.toFixed(2) : '', txWidUsd > 0 ? txWidUsd.toFixed(2) : '',
           txDepIrr > 0 ? txDepIrr.toFixed(0) : '', txWidIrr > 0 ? txWidIrr.toFixed(0) : '',
         ];
-
         const items = tx.fm_transaction_items || [];
         if (items.length === 0) {
           rows.push([...hdr, '', '', '', '', '', '', '', '', '', '', ''].map(esc).join(','));
@@ -339,19 +323,16 @@
               : item.transaction_group === 'INCOME'
               ? (incT  ? (isRtl ? incT.title_fa  : (incT.title_en  || incT.title_fa))  : '')
               : '';
-            const itemRow = [
+            rows.push([...hdr,
               item.row_number || '',
               acc ? acc.displayLabel : (item.account_id || ''),
               TX_ACTION[item.transaction_action] || item.transaction_action || '',
               TX_GROUP[item.transaction_group]   || item.transaction_group  || '',
               subType, item.currency || '',
-              item.deposit_amount    || '0',
-              item.withdrawal_amount || '0',
-              item.amount_usd        || '0',
-              item.amount_irr        || '0',
+              item.deposit_amount    || '0', item.withdrawal_amount || '0',
+              item.amount_usd        || '0', item.amount_irr        || '0',
               item.description       || '',
-            ];
-            rows.push([...hdr, ...itemRow].map(esc).join(','));
+            ].map(esc).join(','));
           });
         }
       });
@@ -365,22 +346,21 @@
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    }, [filteredTransactions, filteredRecordId, usersMap, deptsMap, lookups, isRtl, dateLocale]);
+    };
 
     /* ── آرایه عملیات گروهی ──────────────────────── */
-    const bulkActions = useMemo(() => [
-      { label: t('تغییر به موقت',       'Set Temporary'),           icon: FileText,    variant: 'outline',       requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids) },
-      { label: t('تغییر به یادداشت',    'Set Draft'),               icon: EditIcon,    variant: 'outline',       requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('DRAFT',     ids) },
-      { label: t('تبدیل به بررسی شده', 'Set Final'),               icon: CheckSquare, variant: 'outline',       requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('FINAL',     ids), className: 'text-blue-600 dark:text-blue-400' },
-      { label: t('تبدیل به تایید شده', 'Set Approved'),            icon: CheckCircle, variant: 'outline',       requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('APPROVED',  ids), className: 'text-emerald-600 dark:text-emerald-400' },
-      { label: t('برگشت به موقت',       'Revert to Temporary'),     icon: RotateCcw,   variant: 'outline',       requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids), className: 'text-orange-500 dark:text-orange-400' },
-      { label: t('بروزرسانی نرخ ارز',  'Update Exchange Rates'),   icon: RefreshCw,   variant: 'outline',       requiredAccess: 'edit',   onClick: (ids) => handleBulkUpdateRates(ids),             className: 'text-indigo-600 dark:text-indigo-400' },
-      { label: t('حذف گروهی',           'Bulk Delete'),             icon: Trash2,      variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) },
-    ], [handleBulkStatusChange, handleBulkUpdateRates, setDeleteConfirm, isRtl,
-        FileText, EditIcon, Trash2, RefreshCw, CheckCircle, CheckSquare, RotateCcw]);
+    const bulkActions = [
+      { label: t('تغییر به موقت',       'Set Temporary'),         icon: FileText,    variant: 'outline',        requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids) },
+      { label: t('تغییر به یادداشت',    'Set Draft'),             icon: EditIcon,    variant: 'outline',        requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('DRAFT',     ids) },
+      { label: t('تبدیل به بررسی شده', 'Set Final'),             icon: CheckSquare, variant: 'outline',        requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('FINAL',     ids), className: 'text-blue-600 dark:text-blue-400' },
+      { label: t('تبدیل به تایید شده', 'Set Approved'),          icon: CheckCircle, variant: 'outline',        requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('APPROVED',  ids), className: 'text-emerald-600 dark:text-emerald-400' },
+      { label: t('برگشت به موقت',       'Revert to Temporary'),   icon: RotateCcw,   variant: 'outline',        requiredAccess: 'edit',   onClick: (ids) => handleBulkStatusChange('TEMPORARY', ids), className: 'text-orange-500 dark:text-orange-400' },
+      { label: t('بروزرسانی نرخ ارز',  'Update Exchange Rates'), icon: RefreshCw,   variant: 'outline',        requiredAccess: 'edit',   onClick: (ids) => handleBulkUpdateRates(ids),             className: 'text-indigo-600 dark:text-indigo-400' },
+      { label: t('حذف گروهی',           'Bulk Delete'),           icon: Trash2,      variant: 'danger-outline', requiredAccess: 'delete', onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }) },
+    ];
 
     return { executeDelete, handleBulkStatusChange, handleBulkUpdateRates, handleCustomExport, bulkActions };
   };
 
-  window.useTransactionActions = useTransactionActions;
+  window.makeTransactionActions = makeTransactionActions;
 })();
