@@ -200,13 +200,14 @@
 
     const fetchLookups = useCallback(async () => {
         try {
-            const [accRes, chartRes, costRes, incRes, deptNodesRes, cbcRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, parent_id, chart_id').eq('is_active', true),
+            const [accRes, chartRes, costRes, incRes, deptNodesRes, cbcRes, currRes] = await Promise.all([
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
                 supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
                 supabase.from('fm_org_chart_nodes').select('id, title'),
-                supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)')
+                supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
+                supabase.from('fm_currencies').select('id, code')
             ]);
 
             const costBenefitCenters = (cbcRes.data || []).map(r => ({
@@ -259,8 +260,12 @@
                 });
             };
 
+            const currenciesData = currRes.data || [];
             setLookups({
-                accounts: buildPathsAndFilterLeafs(accRes.data || [], activeCharts),
+                accounts: buildPathsAndFilterLeafs(accRes.data || [], activeCharts).map(acc => ({
+                    ...acc,
+                    currency_code: currenciesData.find(c => c.id === acc.currency_id)?.code || ''
+                })),
                 costTypes: buildPathsAndFilterLeafs(costRes.data || []),
                 incomeTypes: buildPathsAndFilterLeafs(incRes.data || []),
                 costBenefitCenters
@@ -710,12 +715,13 @@
     ], [usersMap, deptsMap, t, dateLocale]);
 
     const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '120px' },
-        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px' },
-        { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (val, row) => React.createElement('div', { className: "flex flex-col" },
+        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '80px' },
+        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '80px' },
+        { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: '240px', render: (val, row) => React.createElement('div', { className: "flex flex-col" },
             React.createElement('span', { className: "font-bold text-slate-800 dark:text-slate-200" }, val),
             row.pathTitle && React.createElement('span', { className: "text-[10px] text-slate-500 truncate", title: row.pathTitle }, row.pathTitle)
-        )}
+        )},
+        { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' }
     ];
 
     const costLovColumns = [
@@ -755,7 +761,7 @@
     ];
 
     const filterFields = [
-        { name: 'account_id', label: t('حساب مرتبط', 'Account'), type: 'lov', lovData: lookups.accounts, lovColumns: accountLovColumns, dropdownWidth: 'min-w-[600px]' },
+        { name: 'account_id', label: t('حساب مرتبط', 'Account'), type: 'lov', lovData: lookups.accounts, lovColumns: accountLovColumns, dropdownWidth: 'min-w-[540px] max-w-[540px]' },
         { name: 'transaction_action', label: t('نوع (واریز/برداشت)', 'Action'), type: 'select', options: TRANSACTION_ACTIONS },
         { name: 'transaction_group', label: t('گروه', 'Group'), type: 'select', options: TRANSACTION_GROUPS },
         { name: 'cost_type_id', label: t('نوع هزینه', 'Cost Type'), type: 'lov', lovData: lookups.costTypes, lovColumns: costLovColumns, dropdownWidth: 'min-w-[500px]' },

@@ -36,6 +36,7 @@
     const [userRoles, setUserRoles] = useState([]);
     const [charts, setCharts] = useState([]);
     const [parties, setParties] = useState([]);
+    const [currencies, setCurrencies] = useState([]);
 
     // Grid & Filter State
     const [filters, setFilters] = useState({});
@@ -72,16 +73,17 @@
     const fetchInitialData = async () => {
       setLoading(true);
       try {
-        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes, partiesRes] = await Promise.all([
+        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes, partiesRes, currenciesRes] = await Promise.all([
           supabase.from('fm_balance_groups')
             .select('*, accounts:fm_balance_group_accounts(id, account_id), access:fm_balance_group_access(grantee_type, grantee_id)')
             .order('created_at', { ascending: false }),
-          supabase.from('fm_coa_accounts').select('id, code, title_fa, parent_id, is_active, chart_id'),
+          supabase.from('fm_coa_accounts').select('id, code, title_fa, currency_id, parent_id, is_active, chart_id'),
           supabase.from('sec_users').select('*'),
           supabase.from('sec_roles').select('id, title, code'),
           supabase.from('sec_user_roles').select('user_id, role_id'),
           supabase.from('fm_coa_charts').select('id, title'),
-          supabase.from('parties').select('id, first_name, last_name, company_name, party_type')
+          supabase.from('parties').select('id, first_name, last_name, company_name, party_type'),
+          supabase.from('fm_currencies').select('id, code')
         ]);
 
         if (groupsRes.error) throw groupsRes.error;
@@ -93,6 +95,7 @@
         setUserRoles(userRolesRes.data || []);
         setCharts(chartsRes.data || []);
         setParties(partiesRes.data || []);
+        setCurrencies(currenciesRes.data || []);
       } catch (error) {
         console.error('Error fetching initial data:', error);
       } finally {
@@ -145,10 +148,11 @@
           ...leaf, 
           fullPath: pathParts.join(' / '),
           structure_name: chartTitle,
-          displayLabel: `${leaf.code} - ${leaf.title_fa}`
+          displayLabel: `${leaf.code} - ${leaf.title_fa}`,
+          currency_code: currencies.find(c => c.id === leaf.currency_id)?.code || ''
         };
       }).sort((a, b) => a.code.localeCompare(b.code));
-    }, [coaAccounts, charts]);
+    }, [coaAccounts, charts, currencies]);
 
     const filteredGroups = useMemo(() => {
       let result = [...groups];
@@ -245,19 +249,20 @@
     };
 
     const lovAccountColumns = [
-      { field: 'structure_name', header_fa: 'نام ساختار', width: '140px' },
-      { field: 'code', header_fa: 'کد حساب', width: '100px' },
+      { field: 'structure_name', header_fa: 'نام ساختار', width: '80px' },
+      { field: 'code', header_fa: 'کد حساب', width: '80px' },
       { 
         field: 'title_fa', 
         header_fa: 'عنوان حساب',
-        width: 'auto',
+        width: '240px',
         render: (val, row) => (
           <div className="flex flex-col my-0 py-0 leading-tight">
              <span className="font-medium text-slate-800 dark:text-slate-200">{val}</span>
              {row.fullPath && <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis" dir="rtl">{row.fullPath}</span>}
           </div>
         )
-      }
+      },
+      { field: 'currency_code', header_fa: 'ارز', width: '60px' }
     ];
 
     const groupColumns = [
@@ -289,7 +294,7 @@
     ];
 
     const filterFields = [
-      { name: 'account_id', label: t('دارای حساب', 'Contains Account'), type: 'lov', lovData: leafAccounts, lovColumns: lovAccountColumns, dropdownWidth: 'min-w-[650px]' },
+      { name: 'account_id', label: t('دارای حساب', 'Contains Account'), type: 'lov', lovData: leafAccounts, lovColumns: lovAccountColumns, dropdownWidth: 'min-w-[470px] max-w-[470px]' },
       { name: 'user_id', label: t('دسترسی کاربر', 'User Access'), type: 'lov', lovData: users, lovColumns: [{field: 'username', header_fa: 'نام کاربری'}, {field: 'full_name', header_fa: 'نام'}] },
       { name: 'role_id', label: t('دسترسی نقش', 'Role Access'), type: 'lov', lovData: roles, lovColumns: [{field: 'code', header_fa: 'کد نقش'}, {field: 'title', header_fa: 'عنوان نقش'}] }
     ];

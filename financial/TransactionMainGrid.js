@@ -192,15 +192,13 @@
     };
 
     const accountLovColumns = [
-        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart Structure', width: '430px' },
-        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '110px' },
-        { field: isRtl ? 'title_fa' : 'title_en', header_fa: 'عنوان حساب', header_en: 'Account Title', width: '210px', render: (val, row) => (
-            <div className="flex flex-col">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{val || row.title_fa}</span>
-                {(isRtl ? row.pathTitle_fa : row.pathTitle_en) && <span className="text-[10px] text-slate-500 truncate" title={isRtl ? row.pathTitle_fa : row.pathTitle_en}>{isRtl ? row.pathTitle_fa : row.pathTitle_en}</span>}
-            </div>
+        { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart Structure', width: '80px' },
+        { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '80px' },
+        { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: '240px', render: (val, row) => React.createElement('div', { className: "flex flex-col" },
+            React.createElement('span', { className: "font-bold text-slate-800 dark:text-slate-200" }, val),
+            row.pathTitle && React.createElement('span', { className: "text-[10px] text-slate-500 truncate", title: row.pathTitle }, row.pathTitle)
         )},
-        { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '70px' }
+        { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' }
     ];
 
     const costLovColumns = [
@@ -253,7 +251,7 @@
                 return (
                     <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[100]">
                         <LOVField 
-                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[830px]"
+                            size="sm" formCode={formCode} data={lookups.leafAccounts} columns={accountLovColumns} dropdownWidth="min-w-[540px] max-w-[540px]"
                             displayValue={inlineItemEdit.data.account_obj ? `${inlineItemEdit.data.account_obj.code} - ${isRtl ? inlineItemEdit.data.account_obj.title_fa : (inlineItemEdit.data.account_obj.title_en || inlineItemEdit.data.account_obj.title_fa)}` : ''}
                             onChange={(r) => {
                                 const currObj = lookups.currencies?.find(c => String(c.id) === String(r?.currency_id));

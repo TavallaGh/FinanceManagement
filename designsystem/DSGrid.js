@@ -95,11 +95,11 @@
     const dropdownContentBox = (
       <div className="max-h-64 overflow-y-auto custom-scrollbar">
         {filteredData.length > 0 ? (
-          <table className="w-full text-start border-collapse">
+          <table className="w-full text-start border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm z-10">
               <tr>
                 {columns.map((col, idx) => (
-                  <th key={idx} className={`p-2.5 text-[12px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 ${isRtl ? 'text-right' : 'text-left'}`} style={{ width: col.width || 'auto' }}>
+                  <th key={idx} className={`p-2.5 text-[12px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 overflow-hidden ${isRtl ? 'text-right' : 'text-left'}`} style={{ width: col.width || 'auto' }}>
                     {t(col.header_fa, col.header_en)}
                   </th>
                 ))}
@@ -113,7 +113,7 @@
                   className="cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors"
                 >
                   {columns.map((col, cIdx) => (
-                    <td key={cIdx} className="p-2.5 text-[12px] text-slate-700 dark:text-slate-300">
+                    <td key={cIdx} className="p-2.5 text-[12px] text-slate-700 dark:text-slate-300 overflow-hidden" style={{ maxWidth: col.width || 'auto', overflow: 'hidden' }}>
                       {col.render ? col.render(row[col.field], row) : (row[col.field] || '-')}
                     </td>
                   ))}

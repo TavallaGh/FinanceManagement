@@ -437,7 +437,7 @@
              return (
                <div onClick={(e)=>e.stopPropagation()}>
                  <LOVField 
-                   size="sm" data={availableAccountsForLov} columns={lovAccountColumns} dropdownWidth="min-w-[650px]"
+                   size="sm" data={availableAccountsForLov} columns={lovAccountColumns} dropdownWidth="min-w-[470px] max-w-[470px]"
                    displayValue={inlineAccountEdit.data.account_obj ? `${inlineAccountEdit.data.account_obj.code} - ${inlineAccountEdit.data.account_obj.title_fa}` : ''}
                    onChange={(r) => setInlineAccountEdit(prev => ({...prev, data: {...prev.data, account_id: r?.id, account_obj: r}}))}
                  />

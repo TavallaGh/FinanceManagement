@@ -188,7 +188,11 @@
             };
 
             const allAccounts = accRes.data || [];
-            const leafAccs = buildPathsAndFilterLeafs(allAccounts, activeCharts);
+            const currenciesData = currRes.data || [];
+            const leafAccs = buildPathsAndFilterLeafs(allAccounts, activeCharts).map(acc => ({
+                ...acc,
+                currency_code: currenciesData.find(c => c.id === acc.currency_id)?.code || ''
+            }));
             const costLeafs = buildPathsAndFilterLeafs(costRes.data || []);
             const incomeLeafs = buildPathsAndFilterLeafs(incRes.data || []);
 

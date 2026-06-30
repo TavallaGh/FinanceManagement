@@ -174,7 +174,8 @@
                 <span className="font-bold text-slate-800 dark:text-slate-200">{val || row.title_fa}</span>
                 {(isRtl ? row.pathTitle_fa : row.pathTitle_en) && <span className="text-[10px] text-slate-500 truncate" title={isRtl ? row.pathTitle_fa : row.pathTitle_en}>{isRtl ? row.pathTitle_fa : row.pathTitle_en}</span>}
             </div>
-        )}
+        )},
+        { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '70px' }
     ];
 
     const costLovColumns = [

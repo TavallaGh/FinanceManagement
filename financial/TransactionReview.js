@@ -184,12 +184,13 @@
 
     const fetchLookups = useCallback(async () => {
         try {
-            const [accRes, chartRes, costRes, incRes, deptNodesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, parent_id, chart_id').eq('is_active', true),
+            const [accRes, chartRes, costRes, incRes, deptNodesRes, currRes] = await Promise.all([
+                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
                 supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
-                supabase.from('fm_org_chart_nodes').select('id, title')
+                supabase.from('fm_org_chart_nodes').select('id, title'),
+                supabase.from('fm_currencies').select('id, code')
             ]);
 
             const dMap = {};
@@ -230,8 +231,12 @@
                 });
             };
 
+            const currenciesData = currRes.data || [];
             setLookups({
-                accounts: buildPathsAndFilterLeafs(accRes.data || [], activeCharts),
+                accounts: buildPathsAndFilterLeafs(accRes.data || [], activeCharts).map(acc => ({
+                    ...acc,
+                    currency_code: currenciesData.find(c => c.id === acc.currency_id)?.code || ''
+                })),
                 costTypes: buildPathsAndFilterLeafs(costRes.data || []),
                 incomeTypes: buildPathsAndFilterLeafs(incRes.data || [])
             });
@@ -541,7 +546,8 @@
         { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: 'auto', render: (val, row) => React.createElement('div', { className: "flex flex-col" },
             React.createElement('span', { className: "font-bold text-slate-800 dark:text-slate-200" }, val),
             row.pathTitle && React.createElement('span', { className: "text-[10px] text-slate-500 truncate", title: row.pathTitle }, row.pathTitle)
-        )}
+        )},
+        { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '70px' }
     ];
 
     const costLovColumns = [
