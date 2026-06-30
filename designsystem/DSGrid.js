@@ -640,7 +640,7 @@
 
     return (
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm flex flex-col font-sans h-full overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
-        {!hideToolbar && <div className="flex flex-wrap items-stretch p-1.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 gap-2 shrink-0 min-h-[46px]">
+        {!hideToolbar && <div className="flex flex-wrap items-stretch p-1.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 gap-2 shrink-0 min-h-[46px]">
           <div className="flex items-center shrink-0">
             {onAdd && access.canCreate && (
               <Button size="sm" variant="primary" icon={Plus} onClick={onAdd} className="h-full px-3.5 text-[12px] shadow-sm">
