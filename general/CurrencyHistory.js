@@ -293,76 +293,6 @@
       return result;
     }, [rates, rateFilters]);
 
-    const handleDownloadSample = useCallback(() => {
-      const headers = ['base_currency', 'target_currency', 'rate', 'rate_date'];
-      const today = getTodayGregorian().replace(/\//g, '-');
-      const csvRows = [headers.join(',')];
-      const manualCurrencies = currencies.filter(c => c.fetch_type === 'manual');
-      if (manualCurrencies.length > 0) {
-        manualCurrencies.forEach(c => {
-          (c.targets || []).forEach(tCode => csvRows.push([c.code, tCode, '', today].join(',')));
-        });
-      } else {
-        csvRows.push(['USD', 'IRR', '42000', today]);
-        csvRows.push(['EUR', 'IRR', '46000', today]);
-      }
-      const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'currency_rates_sample.csv'; a.click();
-      URL.revokeObjectURL(url);
-    }, [currencies]);
-
-    const handleImport = useCallback((file) => {
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const XLSX = window.XLSX;
-          if (!XLSX) { showToast(t('کتابخانه پردازش فایل در دسترس نیست.', 'File processing library not available.'), 'error'); return; }
-          const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-          if (allRows.length < 2) { showToast(t('فایل خالی است یا فرمت صحیح ندارد.', 'File is empty or has invalid format.'), 'error'); return; }
-
-          const knownCodes = new Set(currencies.map(c => c.code.toUpperCase()));
-          const nowStr = new Date().toISOString();
-          const toInsert = [];
-          const errors = [];
-
-          for (let i = 1; i < allRows.length; i++) {
-            const cols = allRows[i].map(c => String(c ?? '').trim());
-            const base = cols[0]?.toUpperCase();
-            const target = cols[1]?.toUpperCase();
-            const rateRaw = cols[2]?.replace(/,/g, '');
-            const rateDate = cols[3]?.replace(/\//g, '-');
-            const rowLabel = t(`ردیف ${i + 1}`, `Row ${i + 1}`);
-
-            if (!base || !target) { errors.push(t(`${rowLabel}: ارز پایه و هدف الزامی است.`, `${rowLabel}: base and target currency are required.`)); continue; }
-            if (!knownCodes.has(base)) { errors.push(t(`${rowLabel}: ارز «${base}» در سیستم تعریف نشده.`, `${rowLabel}: Currency "${base}" not found.`)); continue; }
-            if (!knownCodes.has(target)) { errors.push(t(`${rowLabel}: ارز «${target}» در سیستم تعریف نشده.`, `${rowLabel}: Currency "${target}" not found.`)); continue; }
-            const rateNum = parseFloat(rateRaw);
-            if (!rateRaw || isNaN(rateNum) || rateNum <= 0) { errors.push(t(`${rowLabel}: نرخ معتبر نیست.`, `${rowLabel}: Invalid rate value.`)); continue; }
-            if (!rateDate || isNaN(Date.parse(rateDate))) { errors.push(t(`${rowLabel}: تاریخ معتبر نیست. فرمت مورد انتظار: YYYY-MM-DD`, `${rowLabel}: Invalid date. Expected format: YYYY-MM-DD`)); continue; }
-
-            toInsert.push({ base_currency: base, target_currency: target, rate: rateNum, rate_date: rateDate, created_at: nowStr, source: 'Manual', created_by: currentUser, updated_by: currentUser, updated_at: nowStr });
-          }
-
-          if (errors.length > 0 && toInsert.length === 0) { showToast(errors[0], 'error'); return; }
-          if (toInsert.length === 0) { showToast(t('رکورد معتبری یافت نشد.', 'No valid records found.'), 'error'); return; }
-
-          const { data, error } = await supabase.from('fm_currency_rates').insert(toInsert).select();
-          if (error) throw error;
-          if (data) for (const rate of data) await logAction('fm_currency_rates', rate.id, 'ایجاد', `ایمپورت نرخ: ${rate.base_currency} به ${rate.target_currency} = ${rate.rate}`, null, rate);
-
-          showToast(t(`${toInsert.length} نرخ با موفقیت ایمپورت شد.${errors.length > 0 ? ` (${errors.length} ردیف نادیده گرفته شد)` : ''}`, `${toInsert.length} rates imported successfully.${errors.length > 0 ? ` (${errors.length} rows skipped)` : ''}`));
-          fetchRates();
-        } catch (err) {
-          showToast(t('خطا در پردازش فایل ایمپورت.', 'Error processing import file.'), 'error');
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    }, [currencies, supabase, currentUser, showToast, fetchRates, t]);
-
     const rateOps = [
       { label: t('دریافت اتوماتیک نرخ‌ها', 'Auto Rate Update'), icon: Globe, onClick: handleXeFetch, className: 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300', requiredAccess: 'xe_fetch' },
       { label: t('بروزرسانی دستی نرخ‌ها', 'Manual Rate Update'), icon: Edit, onClick: openManualUpdateModal, className: 'text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300', requiredAccess: 'manual_rate' },
@@ -379,8 +309,6 @@
             <DataGrid 
               data={filteredRates} columns={historyColumns} language={language} formCode={formCode} selectable={true}
               gridState={ratesGridState} onGridStateChange={setRatesGridState} bulkActions={historyBulkActions}
-              onDownloadSample={handleDownloadSample}
-              onImport={access.canCreate ? handleImport : undefined}
               actions={[
                 { id: 'view_log', icon: History, tooltip: t('مشاهده لاگ سیستم', 'View System Log'), onClick: (row) => openLogModal('fm_currency_rates', row.id), className: 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300' },
                 { id: 'edit', icon: Edit, tooltip: t('ویرایش سابقه', 'Edit Record'), onClick: (row) => { setEditingRate({...row}); setIsEditRateModalOpen(true); }, hidden: (row) => !(row.source === 'Manual' && isWithinOneWeek(row.created_at)), className: 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400' },
