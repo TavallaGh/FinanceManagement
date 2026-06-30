@@ -519,6 +519,7 @@
               onGridStateChange={setGridState}
               onDownloadSample={handleDownloadSample}
               onImport={handleImportFile}
+              groupable={true}
               actions={[
                 { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
                 { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-rose-600' }
