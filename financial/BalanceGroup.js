@@ -81,7 +81,7 @@
           supabase.from('sec_users').select('*'),
           supabase.from('sec_roles').select('id, title, code'),
           supabase.from('sec_user_roles').select('user_id, role_id'),
-          supabase.from('fm_coa_charts').select('id, title'),
+          supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
           supabase.from('parties').select('id, first_name, last_name, company_name, party_type'),
           supabase.from('fm_currencies').select('id, code')
         ]);
@@ -125,11 +125,20 @@
 
     const leafAccounts = useMemo(() => {
       if (!coaAccounts.length) return [];
-      const parentIds = new Set(coaAccounts.map(a => a.parent_id).filter(Boolean));
       const accMap = new Map(coaAccounts.map(a => [a.id, a]));
       const chartsMap = new Map(charts.map(c => [String(c.id), c.title]));
-      
-      const leaves = coaAccounts.filter(a => !parentIds.has(a.id));
+      const isEffectivelyActive = (acc) => {
+        if (!acc.is_active) return false;
+        if (!acc.parent_id) return true;
+        const parent = accMap.get(acc.parent_id);
+        return parent ? isEffectivelyActive(parent) : true;
+      };
+      const parentIds = new Set(coaAccounts.map(a => a.parent_id).filter(Boolean));
+      const leaves = coaAccounts.filter(a =>
+        !parentIds.has(a.id) &&
+        chartsMap.has(String(a.chart_id)) &&
+        isEffectivelyActive(a)
+      );
       
       return leaves.map(leaf => {
         let pathParts = [];

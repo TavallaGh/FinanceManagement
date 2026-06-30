@@ -42,12 +42,17 @@
                 try {
                     const formattedDate = record.document_date.replace(/\//g, '-');
                     const { data } = await supabase.from('fm_currency_rates')
-                        .select('base_currency, target_currency, rate, rate_date')
+                        .select('base_currency, target_currency, rate, rate_date, created_at')
                         .lte('rate_date', formattedDate)
                         .order('rate_date', { ascending: false });
-                    
+                    const sorted = (data || []).slice().sort((a, b) => {
+                        if (a.rate_date > b.rate_date) return -1;
+                        if (a.rate_date < b.rate_date) return  1;
+                        const ca = a.created_at || '', cb = b.created_at || '';
+                        return ca > cb ? -1 : ca < cb ? 1 : 0;
+                    });
                     const latestRates = {};
-                    (data || []).forEach(r => {
+                    sorted.forEach(r => {
                         const key = `${r.base_currency}_${r.target_currency}`;
                         if (!latestRates[key]) latestRates[key] = r.rate;
                     });
@@ -58,24 +63,35 @@
         }
     }, [isOpen, record?.document_date, supabase]);
 
-    const getExchangeRates = useCallback((currency) => {
+    const getExchangeRates = useCallback((currency, fallbackToUsd = 0, fallbackUsdToIrr = 0) => {
         let toUsd = 1;
         if (currency !== 'USD') {
-            const direct = currencyRates[`${currency}_USD`];
-            if (direct) {
+            const direct = parseFloat(currencyRates[`${currency}_USD`] || 0);
+            if (direct > 0) {
                 toUsd = direct;
             } else {
-                const inverse = currencyRates[`USD_${currency}`];
-                if (inverse) toUsd = 1 / inverse;
+                const inverse = parseFloat(currencyRates[`USD_${currency}`] || 0);
+                if (inverse > 0) {
+                    toUsd = 1 / inverse;
+                } else if (fallbackToUsd > 0) {
+                    toUsd = fallbackToUsd;  // نرخ ذخیره‌شده در DB توسط بروزرسانی نرخ
+                }
             }
         }
-        
-        // USD to IRR is generally stored as USD_IRR
-        let usdToIrr = currencyRates[`USD_IRR`] || 1;
-        if (!currencyRates[`USD_IRR`] && currencyRates[`IRR_USD`]) {
-             usdToIrr = 1 / currencyRates[`IRR_USD`];
+
+        let usdToIrr = 1;
+        const directIrr = parseFloat(currencyRates['USD_IRR'] || 0);
+        if (directIrr > 0) {
+            usdToIrr = directIrr;
+        } else {
+            const inverseIrr = parseFloat(currencyRates['IRR_USD'] || 0);
+            if (inverseIrr > 0) {
+                usdToIrr = 1 / inverseIrr;
+            } else if (fallbackUsdToIrr > 0) {
+                usdToIrr = fallbackUsdToIrr;  // نرخ ذخیره‌شده در DB
+            }
         }
-        
+
         return { toUsd, usdToIrr };
     }, [currencyRates]);
 
@@ -86,7 +102,9 @@
         const mItems = rawItems.map(item => {
             const isDep = item.transaction_action === 'DEPOSIT';
             const cur = item.currency || 'IRR';
-            const { toUsd, usdToIrr } = getExchangeRates(cur);
+            const storedToUsd    = parseFloat(item.exchange_rate_to_usd     || 0);
+            const storedUsdToIrr = parseFloat(item.exchange_rate_usd_to_irr || 0);
+            const { toUsd, usdToIrr } = getExchangeRates(cur, storedToUsd, storedUsdToIrr);
 
             const rawDep = parseFloat(item.deposit_amount || 0);
             const rawWid = parseFloat(item.withdrawal_amount || 0);

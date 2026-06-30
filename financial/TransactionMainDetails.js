@@ -147,7 +147,7 @@
     const fetchDependencies = useCallback(async () => {
         if (!supabase) return null;
         try {
-            const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes, currRes, cbcRes] = await Promise.all([
+            const [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes, currRes, cbcRes, permsRes, userRolesRes] = await Promise.all([
                 supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
                 supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
                 supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
@@ -156,7 +156,9 @@
                 supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
                 supabase.from('fm_org_chart_nodes').select('id, title'),
                 supabase.from('fm_currencies').select('id, code, title, decimal_places'),
-                supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)')
+                supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
+                supabase.from('fm_coa_permissions').select('account_id, grantee_type, grantee_id, access_level'),
+                supabase.from('sec_user_roles').select('role_id').eq('user_id', currentUserId || '00000000-0000-0000-0000-000000000000')
             ]);
             
             const uMap = {};
@@ -215,13 +217,46 @@
                 });
             };
 
-            const allAccounts = accRes.data || [];
+            const allAccountsRaw = accRes.data || [];
+            const accMapCascade = new Map(allAccountsRaw.map(a => [a.id, a]));
+            const allAccounts = allAccountsRaw.filter(acc => {
+                let cur = acc;
+                const visited = new Set();
+                while (cur && cur.parent_id) {
+                    if (visited.has(cur.id)) return false;
+                    visited.add(cur.id);
+                    cur = accMapCascade.get(cur.parent_id);
+                    if (!cur) return false;
+                }
+                return true;
+            });
             const currenciesData = currRes.data || [];
-            const leafAccs = buildPathsAndFilterLeafs(allAccounts, activeCharts).map(acc => ({
+            const sessionDataParsed = (() => { try { return JSON.parse(sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}'); } catch { return {}; } })();
+            const usernameVal = (sessionDataParsed.username || '').toLowerCase();
+            const userTypeVal = (sessionDataParsed.type || '').toLowerCase();
+            const isAdmin = usernameVal === 'admin' || usernameVal === 'superadmin' || userTypeVal === 'admin' || userTypeVal === 'superadmin';
+            let leafAccs = buildPathsAndFilterLeafs(allAccounts, activeCharts).map(acc => ({
                 ...acc,
                 displayLabel: isRtl ? (acc.title_fa || acc.code || '') : (acc.title_en || acc.title_fa || acc.code || ''),
                 currency_code: currenciesData.find(c => c.id === acc.currency_id)?.code || ''
             }));
+            if (!isAdmin && safeMyUserId) {
+                const perms = permsRes.data || [];
+                const userRoleIds = new Set((userRolesRes.data || []).map(r => String(r.role_id)));
+                const directAllowedIds = new Set();
+                perms.forEach(p => {
+                    if (p.access_level !== 'full') return;
+                    if (p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(safeMyUserId)) directAllowedIds.add(p.account_id);
+                    if (p.grantee_type?.toLowerCase() === 'role' && userRoleIds.has(String(p.grantee_id))) directAllowedIds.add(p.account_id);
+                });
+                const isAccessible = (acc) => {
+                    if (directAllowedIds.has(acc.id)) return true;
+                    if (!acc.parent_id) return false;
+                    const parent = accMapCascade.get(acc.parent_id);
+                    return parent ? isAccessible(parent) : false;
+                };
+                leafAccs = leafAccs.filter(a => isAccessible(a));
+            }
             const costLeafs = buildPathsAndFilterLeafs(costRes.data || []);
             const incomeLeafs = buildPathsAndFilterLeafs(incRes.data || []);
 
@@ -393,12 +428,17 @@
                 try {
                     const formattedDate = headerData.document_date.replace(/\//g, '-');
                     const { data } = await supabase.from('fm_currency_rates')
-                        .select('base_currency, target_currency, rate, rate_date')
+                        .select('base_currency, target_currency, rate, rate_date, created_at')
                         .lte('rate_date', formattedDate)
                         .order('rate_date', { ascending: false });
-                    
+                    const sorted = (data || []).slice().sort((a, b) => {
+                        if (a.rate_date > b.rate_date) return -1;
+                        if (a.rate_date < b.rate_date) return  1;
+                        const ca = a.created_at || '', cb = b.created_at || '';
+                        return ca > cb ? -1 : ca < cb ? 1 : 0;
+                    });
                     const latestRates = {};
-                    (data || []).forEach(r => {
+                    sorted.forEach(r => {
                         const key = `${r.base_currency}_${r.target_currency}`;
                         if (!latestRates[key]) latestRates[key] = r.rate;
                     });
@@ -412,18 +452,22 @@
     const getExchangeRates = useCallback((currency) => {
         let toUsd = 1;
         if (currency !== 'USD') {
-            const direct = currencyRates[`${currency}_USD`];
-            if (direct) {
+            const direct = parseFloat(currencyRates[`${currency}_USD`] || 0);
+            if (direct > 0) {
                 toUsd = direct;
             } else {
-                const inverse = currencyRates[`USD_${currency}`];
-                if (inverse) toUsd = 1 / inverse;
+                const inverse = parseFloat(currencyRates[`USD_${currency}`] || 0);
+                if (inverse > 0) toUsd = 1 / inverse;
             }
         }
         
-        let usdToIrr = currencyRates[`USD_IRR`] || 1;
-        if (!currencyRates[`USD_IRR`] && currencyRates[`IRR_USD`]) {
-             usdToIrr = 1 / currencyRates[`IRR_USD`];
+        let usdToIrr = 1;
+        const directIrr = parseFloat(currencyRates['USD_IRR'] || 0);
+        if (directIrr > 0) {
+            usdToIrr = directIrr;
+        } else {
+            const inverseIrr = parseFloat(currencyRates['IRR_USD'] || 0);
+            if (inverseIrr > 0) usdToIrr = 1 / inverseIrr;
         }
         
         return { toUsd, usdToIrr };

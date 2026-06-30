@@ -95,6 +95,7 @@
       code: '',
       firstName: '',
       lastName: '',
+      latinTitle: '',
       nationalId: '',
       mobile: '',
       email: '',
@@ -132,13 +133,23 @@
 
     const fetchDropdownData = async () => {
         try {
-          const [{ data: coaData }, { data: chartsData }] = await Promise.all([
-            supabase.from('fm_coa_accounts').select('id, parent_id, title_fa, title_en, code, chart_id'),
-            supabase.from('fm_coa_charts').select('id, title').eq('is_active', true)
+          const [{ data: coaData }, { data: chartsData }, { data: currenciesData }] = await Promise.all([
+            supabase.from('fm_coa_accounts').select('id, parent_id, title_fa, title_en, code, currency_id, is_active, chart_id'),
+            supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
+            supabase.from('fm_currencies').select('id, code')
           ]);
           if (coaData && chartsData) {
             const activeChartIds = new Set(chartsData.map(c => c.id));
             const chartsMap = new Map(chartsData.map(c => [c.id, c.title]));
+            const currenciesMap = new Map((currenciesData || []).map(c => [c.id, c.code]));
+
+            const accMap = new Map(coaData.map(a => [a.id, a]));
+            const isEffectivelyActive = (acc) => {
+              if (!acc.is_active) return false;
+              if (!acc.parent_id) return true;
+              const parent = accMap.get(acc.parent_id);
+              return parent ? isEffectivelyActive(parent) : true;
+            };
 
             const buildPath = (node) => {
               let pathFa = node.title_fa || '';
@@ -158,12 +169,16 @@
             // All accounts enriched with path & chart (for parent LOV)
             const allWithPaths = coaData.map(acc => {
               const paths = buildPath(acc);
-              return { ...acc, pathFa: paths.pathFa, pathEn: paths.pathEn, chartName: chartsMap.get(acc.chart_id) || '', isActiveChart: activeChartIds.has(acc.chart_id) };
+              return { ...acc, pathFa: paths.pathFa, pathEn: paths.pathEn, chartName: chartsMap.get(acc.chart_id) || '', isActiveChart: activeChartIds.has(acc.chart_id), currency_code: currenciesMap.get(acc.currency_id) || '' };
             });
             setAllCoaAccounts(allWithPaths);
 
             const parentIds = new Set(coaData.map(c => c.parent_id).filter(Boolean));
-            const leaves = coaData.filter(c => !parentIds.has(c.id) && activeChartIds.has(c.chart_id));
+            const leaves = coaData.filter(c =>
+              !parentIds.has(c.id) &&
+              activeChartIds.has(c.chart_id) &&
+              isEffectivelyActive(c)
+            );
   
             const accOptions = leaves.map(leaf => {
               const paths = buildPath(leaf);
@@ -174,7 +189,8 @@
                 titleEn: leaf.title_en,
                 pathFa: paths.pathFa,
                 pathEn: paths.pathEn,
-                chartName: chartsMap.get(leaf.chart_id) || ''
+                chartName: chartsMap.get(leaf.chart_id) || '',
+                currency_code: currenciesMap.get(leaf.currency_id) || ''
               };
             });
             setAccounts(accOptions);
@@ -321,7 +337,7 @@
 
     const handleSaveQuickParty = async () => {
       const isLegal = quickPartyData.partyType === 'legal';
-      if (!quickPartyData.code || (isLegal && !quickPartyData.companyName) || (!isLegal && (!quickPartyData.firstName || !quickPartyData.lastName))) {
+      if (!quickPartyData.code || !quickPartyData.latinTitle || (isLegal && !quickPartyData.companyName) || (!isLegal && (!quickPartyData.firstName || !quickPartyData.lastName))) {
          alert(t('لطفاً فیلدهای ستاره‌دار را تکمیل کنید.', 'Please fill required fields.'));
          return;
       }
@@ -334,6 +350,7 @@
           first_name: isLegal ? null : quickPartyData.firstName,
           last_name: isLegal ? null : quickPartyData.lastName,
           company_name: isLegal ? quickPartyData.companyName : null,
+          latin_title: quickPartyData.latinTitle,
           national_id: quickPartyData.nationalId,
           mobile: quickPartyData.mobile,
           email: quickPartyData.email,
@@ -374,7 +391,7 @@
         }));
 
         setIsQuickPartyModalOpen(false);
-        setQuickPartyData({ partyType: 'real', companyName: '', code: '', firstName: '', lastName: '', nationalId: '', mobile: '', email: '', roles: ['broker'] });
+        setQuickPartyData({ partyType: 'real', companyName: '', code: '', firstName: '', lastName: '', latinTitle: '', nationalId: '', mobile: '', email: '', roles: ['broker'] });
       } catch (err) {
         console.error('Save Quick Party Error:', err);
         alert(t('خطا در ذخیره اطلاعات شخص.', 'Error saving party.'));
@@ -696,14 +713,15 @@
     ];
 
     const accountLovColumns = [
-      { field: 'chartName', header_fa: 'ساختار حساب', header_en: 'Chart Structure', width: '200px' },
-      { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '110px' },
-      { field: 'titleFa', header_fa: 'عنوان حساب', header_en: 'Title', width: 'auto', render: (val, row) => (
+      { field: 'chartName', header_fa: 'ساختار حساب', header_en: 'Chart Structure', width: '80px' },
+      { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '80px' },
+      { field: 'titleFa', header_fa: 'عنوان حساب', header_en: 'Title', width: '240px', render: (val, row) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
           {row.pathFa && <span className="text-[10px] text-slate-500 truncate" title={row.pathFa}>{row.pathFa}</span>}
         </div>
-      )}
+      )},
+      { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' }
     ];
 
     return (
@@ -787,7 +805,7 @@
                     label={isRtl ? 'حساب مرتبط (آخرین سطح)' : 'Linked Account'}
                     data={accounts}
                     columns={accountLovColumns}
-                    dropdownWidth="min-w-[550px]"
+                    dropdownWidth="min-w-[470px] max-w-[470px]"
                     displayValue={accounts.find(a => String(a.id) === String(formData.accountId))?.titleFa ? `${accounts.find(a => String(a.id) === String(formData.accountId))?.code} - ${accounts.find(a => String(a.id) === String(formData.accountId))?.titleFa}` : ''}
                     onChange={row => setFormData({...formData, accountId: row ? row.id : ''})}
                     isRtl={isRtl}
@@ -846,7 +864,7 @@
                   size="sm" 
                   label={t('نوع شخص', 'Party Type')} 
                   value={quickPartyData.partyType} 
-                  onChange={e => setQuickPartyData({...quickPartyData, partyType: e.target.value, companyName: '', firstName: '', lastName: '', roles: ['broker']})} 
+                  onChange={e => setQuickPartyData({...quickPartyData, partyType: e.target.value, companyName: '', firstName: '', lastName: '', latinTitle: '', roles: ['broker']})} 
                   isRtl={isRtl}
                   options={[
                     { value: 'real', label: t('حقیقی (فرد)', 'Real Person') },
@@ -869,32 +887,32 @@
                   </div>
               )}
 
+              <TextField size="sm" label={t('عنوان لاتین', 'Latin Title')} value={quickPartyData.latinTitle} onChange={e => setQuickPartyData({...quickPartyData, latinTitle: e.target.value})} isRtl={isRtl} required dir="ltr" />
               <TextField size="sm" label={quickPartyData.partyType === 'real' ? t('کد ملی', 'National ID') : t('شناسه ملی / ثبت', 'Registration ID')} value={quickPartyData.nationalId} onChange={e => setQuickPartyData({...quickPartyData, nationalId: e.target.value})} isRtl={isRtl} dir="ltr" />
               <TextField size="sm" label={t('موبایل / تلفن', 'Mobile / Phone')} value={quickPartyData.mobile} onChange={e => setQuickPartyData({...quickPartyData, mobile: e.target.value})} isRtl={isRtl} dir="ltr" />
               <TextField size="sm" label={t('ایمیل', 'Email')} value={quickPartyData.email} onChange={e => setQuickPartyData({...quickPartyData, email: e.target.value})} isRtl={isRtl} dir="ltr" />
-            </div>
-            
-            <div className="mt-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-               <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-3 block">{t('نقش‌های مرتبط', 'Associated Roles')}</label>
-               <div className="flex flex-wrap gap-4 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700/50">
-                 {EXTERNAL_PARTY_ROLES.map(role => (
-                   <CheckboxField 
-                     key={role.id} 
-                     size="sm" 
-                     label={role.label} 
-                     checked={quickPartyData.roles.includes(role.id)} 
-                     disabled={role.id === 'broker'} 
-                     onChange={(checked) => {
-                       if (role.id === 'broker') return;
-                       setQuickPartyData(prev => ({
-                         ...prev,
-                         roles: checked ? [...prev.roles, role.id] : prev.roles.filter(r => r !== role.id)
-                       }));
-                     }} 
-                     isRtl={isRtl} 
-                   />
-                 ))}
-               </div>
+              <div className="md:col-span-2 flex flex-col justify-end">
+                <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-1.5 block">{t('نقش‌های مرتبط', 'Associated Roles')}</label>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                  {EXTERNAL_PARTY_ROLES.map(role => (
+                    <CheckboxField 
+                      key={role.id} 
+                      size="sm" 
+                      label={role.label} 
+                      checked={quickPartyData.roles.includes(role.id)} 
+                      disabled={role.id === 'broker'} 
+                      onChange={(checked) => {
+                        if (role.id === 'broker') return;
+                        setQuickPartyData(prev => ({
+                          ...prev,
+                          roles: checked ? [...prev.roles, role.id] : prev.roles.filter(r => r !== role.id)
+                        }));
+                      }} 
+                      isRtl={isRtl} 
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
@@ -924,22 +942,31 @@
                   label={t('حساب پدر', 'Parent Account')}
                   data={(() => {
                     const parentIdSet = new Set(allCoaAccounts.map(a => a.parent_id).filter(Boolean));
+                    const allCoaMap = new Map(allCoaAccounts.map(a => [a.id, a]));
+                    const checkActive = (acc) => {
+                      if (!acc) return true;
+                      if (!acc.is_active) return false;
+                      if (!acc.parent_id) return true;
+                      return checkActive(allCoaMap.get(acc.parent_id));
+                    };
                     return allCoaAccounts.filter(a =>
                       a.isActiveChart &&
+                      checkActive(a) &&
                       allCoaAccounts.some(c => c.parent_id === a.id && !parentIdSet.has(c.id))
                     );
                   })()}
                   columns={[
-                    { field: 'chartName', header_fa: 'ساختار', header_en: 'Chart', width: '160px' },
-                    { field: 'code', header_fa: 'کد', header_en: 'Code', width: '110px' },
-                    { field: 'title_fa', header_fa: 'عنوان', header_en: 'Title', width: 'auto', render: (val, row) => (
+                    { field: 'chartName', header_fa: 'ساختار', header_en: 'Chart', width: '80px' },
+                    { field: 'code', header_fa: 'کد', header_en: 'Code', width: '80px' },
+                    { field: 'title_fa', header_fa: 'عنوان', header_en: 'Title', width: '200px', render: (val, row) => (
                       <div className="flex flex-col">
                         <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
                         {row.pathFa && <span className="text-[10px] text-slate-500 truncate" title={row.pathFa}>{row.pathFa}</span>}
                       </div>
-                    )}
+                    )},
+                    { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' }
                   ]}
-                  dropdownWidth="min-w-[550px]"
+                  dropdownWidth="min-w-[430px] max-w-[430px]"
                   displayValue={(() => { const a = allCoaAccounts.find(x => x.id === quickAccountData.parentId); return a ? `${a.code} - ${a.title_fa}` : ''; })()}
                   onChange={row => {
                     const suggested = row ? suggestNextCode(row.id) : '';

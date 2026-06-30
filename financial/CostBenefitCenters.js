@@ -31,6 +31,7 @@
   const Edit          = LucideIcons.Edit          || FallbackIcon;
   const Trash2        = LucideIcons.Trash2        || FallbackIcon;
   const Save          = LucideIcons.Save          || FallbackIcon;
+  const Plus          = LucideIcons.Plus          || FallbackIcon;
   const AlertTriangle = LucideIcons.AlertTriangle || FallbackIcon;
 
   const supabase = window.supabase;
@@ -42,6 +43,16 @@
     { value: 'TEAM',       label_fa: 'تیم',      label_en: 'Team'       },
     { value: 'PROJECT',    label_fa: 'پروژه',    label_en: 'Project'    },
     { value: 'OTHER',      label_fa: 'سایر',     label_en: 'Other'      },
+  ];
+
+  const MANAGER_ROLES = [
+    { id: 'system_user', label_fa: 'کاربر سیستم',   label_en: 'System User',      fixed: true },
+    { id: 'employee',    label_fa: 'کارمند / پرسنل', label_en: 'Employee / Staff',  fixed: true },
+    { id: 'customer',    label_fa: 'مشتری',          label_en: 'Customer' },
+    { id: 'vendor',      label_fa: 'تامین‌کننده',    label_en: 'Supplier' },
+    { id: 'shareholder', label_fa: 'سهامدار',        label_en: 'Shareholder' },
+    { id: 'exchange',    label_fa: 'صرافی',          label_en: 'Exchange' },
+    { id: 'broker',      label_fa: 'بروکر',          label_en: 'Broker' },
   ];
 
   const EMPTY_FORM = {
@@ -83,6 +94,14 @@
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
     const [toast,         setToast]         = useState({ isVisible: false, message: '', type: 'success' });
     const [importErrors,  setImportErrors]  = useState({ isOpen: false, errors: [], insertedCount: 0, updatedCount: 0 });
+
+    const [isQuickManagerModalOpen, setIsQuickManagerModalOpen] = useState(false);
+    const [isSavingManager,         setIsSavingManager]         = useState(false);
+    const [quickManagerData,        setQuickManagerData]        = useState({
+      code: '', firstName: '', lastName: '', latinTitle: '',
+      nationalId: '', mobile: '', email: '',
+      roles: ['system_user', 'employee'],
+    });
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -310,6 +329,54 @@
         setIsLoading(false);
       }
     };
+
+    /* ── save quick manager ── */
+    const handleSaveQuickManager = useCallback(async () => {
+      if (!quickManagerData.code || !quickManagerData.firstName || !quickManagerData.lastName || !quickManagerData.latinTitle) {
+        showToast(t('لطفاً فیلدهای ستاره‌دار را تکمیل کنید.', 'Please fill required fields.'), 'error');
+        return;
+      }
+      setIsSavingManager(true);
+      try {
+        const payload = {
+          party_type:  'real',
+          code:        quickManagerData.code,
+          first_name:  quickManagerData.firstName,
+          last_name:   quickManagerData.lastName,
+          latin_title: quickManagerData.latinTitle,
+          national_id: quickManagerData.nationalId,
+          mobile:      quickManagerData.mobile,
+          email:       quickManagerData.email,
+          roles:       Array.from(new Set([...quickManagerData.roles, 'system_user', 'employee'])),
+          is_active:   true,
+          created_at:  new Date().toISOString(),
+        };
+        const { data: newParty, error } = await supabase.from('parties').insert([payload]).select().single();
+        if (error) {
+          if (error.code === '23505') showToast(t('کد شخص یا شناسه ملی تکراری است.', 'Duplicate party code or national ID.'), 'error');
+          else throw error;
+          return;
+        }
+        const newManager = {
+          id:       newParty.id,
+          value:    newParty.id,
+          code:     newParty.code || '',
+          fullName: `${newParty.first_name || ''} ${newParty.last_name || ''}`.trim(),
+          mobile:   newParty.mobile || '',
+          email:    newParty.email  || '',
+        };
+        setManagers(prev => [...prev, newManager]);
+        setFormData(prev => ({ ...prev, managerId: newParty.id, managerName: newManager.fullName }));
+        setIsQuickManagerModalOpen(false);
+        setQuickManagerData({ code: '', firstName: '', lastName: '', latinTitle: '', nationalId: '', mobile: '', email: '', roles: ['system_user', 'employee'] });
+        showToast(t('مسئول جدید با موفقیت تعریف شد', 'New manager created successfully'));
+      } catch (err) {
+        console.error('Save Quick Manager Error:', err);
+        showToast(t('خطا در ذخیره اطلاعات مسئول.', 'Error saving manager.'), 'error');
+      } finally {
+        setIsSavingManager(false);
+      }
+    }, [supabase, quickManagerData, showToast, t]);
 
     /* ── helpers ── */
     const getKindLabel = (val) => {
@@ -650,18 +717,30 @@
               />
 
               {/* مسئول مرکز */}
-              <LOVField
-                size="sm"
-                label={t('مسئول مرکز', 'Center Manager')}
-                data={managers}
-                columns={managerLovColumns}
-                dropdownWidth="min-w-[560px]"
-                displayValue={formData.managerName}
-                onChange={r => setFormData(p => ({ ...p, managerId: r?.id ?? null, managerName: r?.fullName ?? '' }))}
-                onClear={() => setFormData(p => ({ ...p, managerId: null, managerName: '' }))}
-                isRtl={isRtl}
-                formCode={FORM_CODE}
-              />
+              <div className="flex items-end gap-2">
+                <div className="flex-1 min-w-0">
+                  <LOVField
+                    size="sm"
+                    label={t('مسئول مرکز', 'Center Manager')}
+                    data={managers}
+                    columns={managerLovColumns}
+                    dropdownWidth="min-w-[560px]"
+                    displayValue={formData.managerName}
+                    onChange={r => setFormData(p => ({ ...p, managerId: r?.id ?? null, managerName: r?.fullName ?? '' }))}
+                    onClear={() => setFormData(p => ({ ...p, managerId: null, managerName: '' }))}
+                    isRtl={isRtl}
+                    formCode={FORM_CODE}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={Plus}
+                  onClick={() => setIsQuickManagerModalOpen(true)}
+                  className="h-8 w-8 px-0 shrink-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/40 mb-[1px]"
+                  title={t('تعریف مسئول جدید', 'Add New Manager')}
+                />
+              </div>
 
               {/* مرکز هزینه / مرکز درآمد */}
               <div>
@@ -714,6 +793,53 @@
               <Button variant="primary" size="sm" icon={Save} onClick={handleSave} isLoading={isLoading}>
                 {t('ذخیره تغییرات', 'Save Changes')}
               </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* ─── Quick Manager Modal ─── */}
+        <Modal
+          isOpen={isQuickManagerModalOpen}
+          onClose={() => setIsQuickManagerModalOpen(false)}
+          title={t('تعریف مسئول جدید', 'New Manager')}
+          width="max-w-2xl"
+          language={language}
+        >
+          <div className="p-4 flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <TextField size="sm" label={t('کد شخص', 'Person Code')} value={quickManagerData.code} onChange={e => setQuickManagerData(p => ({ ...p, code: e.target.value }))} isRtl={isRtl} required dir="ltr" formCode={FORM_CODE} />
+              <TextField size="sm" label={t('نام', 'First Name')} value={quickManagerData.firstName} onChange={e => setQuickManagerData(p => ({ ...p, firstName: e.target.value }))} isRtl={isRtl} required formCode={FORM_CODE} />
+              <TextField size="sm" label={t('نام خانوادگی', 'Last Name')} value={quickManagerData.lastName} onChange={e => setQuickManagerData(p => ({ ...p, lastName: e.target.value }))} isRtl={isRtl} required formCode={FORM_CODE} />
+              <TextField size="sm" label={t('عنوان لاتین', 'Latin Title')} value={quickManagerData.latinTitle} onChange={e => setQuickManagerData(p => ({ ...p, latinTitle: e.target.value }))} isRtl={isRtl} required dir="ltr" formCode={FORM_CODE} />
+              <TextField size="sm" label={t('کد ملی', 'National ID')} value={quickManagerData.nationalId} onChange={e => setQuickManagerData(p => ({ ...p, nationalId: e.target.value }))} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
+              <TextField size="sm" label={t('موبایل', 'Mobile')} value={quickManagerData.mobile} onChange={e => setQuickManagerData(p => ({ ...p, mobile: e.target.value }))} isRtl={isRtl} dir="ltr" formCode={FORM_CODE} />
+              <TextField size="sm" label={t('ایمیل', 'Email')} value={quickManagerData.email} onChange={e => setQuickManagerData(p => ({ ...p, email: e.target.value }))} isRtl={isRtl} dir="ltr" className="md:col-span-3" formCode={FORM_CODE} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{t('نقش‌های مرتبط', 'Associated Roles')}</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-2 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                {MANAGER_ROLES.map(role => (
+                  <CheckboxField
+                    key={role.id}
+                    size="sm"
+                    label={isRtl ? role.label_fa : role.label_en}
+                    checked={quickManagerData.roles.includes(role.id)}
+                    disabled={!!role.fixed}
+                    onChange={checked => {
+                      if (role.fixed) return;
+                      setQuickManagerData(p => ({
+                        ...p,
+                        roles: checked ? [...p.roles, role.id] : p.roles.filter(r => r !== role.id)
+                      }));
+                    }}
+                    isRtl={isRtl}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+              <Button variant="outline" size="sm" onClick={() => setIsQuickManagerModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
+              <Button variant="primary" size="sm" icon={Save} onClick={handleSaveQuickManager} isLoading={isSavingManager}>{t('ذخیره و انتخاب', 'Save & Select')}</Button>
             </div>
           </div>
         </Modal>

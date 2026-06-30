@@ -137,7 +137,19 @@
         if (validRates.length === 0) return showToast(t('لطفاً حداقل یک نرخ معتبر وارد کنید.', 'Please enter at least one valid rate.'), 'error');
         if (!manualDate || !manualTime) return showToast(t('تاریخ و زمان الزامی است.', 'Date and time are required.'), 'error');
 
-        const formattedDate = manualDate.replace(/\//g, '-');
+        const formattedDate = (() => {
+          const j2g = Core.j2g;
+          const raw = manualDate.replace(/-/g, '/');
+          const parts = raw.split('/');
+          if (parts.length !== 3) return manualDate.replace(/\//g, '-');
+          const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10), d = parseInt(parts[2], 10);
+          // اگر سال در بازه شمسی (1300-1599) باشد، به میلادی تبدیل کن
+          if (j2g && y >= 1300 && y < 1600) {
+            const [gy, gm, gd] = j2g(y, m, d);
+            return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`;
+          }
+          return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        })();
         const dateTimeStr = `${formattedDate}T${manualTime}:00.000Z`;
 
         const payloads = validRates.map(r => ({
