@@ -104,10 +104,10 @@
            const { data, error } = await supabase.from('fm_currency_rates').insert(newRates).select();
            if (error) throw error;
            if (data) for (const rate of data) await logAction('fm_currency_rates', rate.id, 'ایجاد', `دریافت اتوماتیک نرخ: ${rate.base_currency} به ${rate.target_currency} = ${rate.rate}`, null, rate);
-           showToast(t('نرخ‌های روزانه با موفقیت از سرور XE دریافت شد.', 'Rates fetched successfully from XE.'));
+           showToast(t('نرخ‌های روزانه با موفقیت از سرور دریافت شد.', 'Rates fetched successfully from server.'));
            fetchRates();
         }
-      } catch (err) { showToast(t('خطا در ارتباط با سرور XE', 'Error connecting to XE'), 'error'); }
+      } catch (err) { showToast(t('خطا در ارتباط با سرور ', 'Error connecting to server'), 'error'); }
     };
 
     const openManualUpdateModal = () => {
@@ -364,7 +364,7 @@
     }, [currencies, supabase, currentUser, showToast, fetchRates, t]);
 
     const rateOps = [
-      { label: t('گرفتن نرخ ارزها از XE', 'Fetch Rates from XE'), icon: Globe, onClick: handleXeFetch, className: 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300', requiredAccess: 'xe_fetch' },
+      { label: t('دریافت اتوماتیک نرخ‌ها', 'Auto Rate Update'), icon: Globe, onClick: handleXeFetch, className: 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300', requiredAccess: 'xe_fetch' },
       { label: t('بروزرسانی دستی نرخ‌ها', 'Manual Rate Update'), icon: Edit, onClick: openManualUpdateModal, className: 'text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300', requiredAccess: 'manual_rate' },
       { divider: true },
       { label: t('تبدیل‌گر (ماشین حساب)', 'Currency Converter'), icon: Calculator, onClick: openConverter, className: 'text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400', requiredAccess: 'converter' }
