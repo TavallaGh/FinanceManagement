@@ -206,36 +206,30 @@
       if (!convFrom || !convTo || !convDate) return null;
       if (convFrom === convTo) return 1;
       const fd = convDate.replace(/\//g, '-');
-      const d10 = (d) => d ? String(d).substring(0, 10) : null;
 
-      // Step 1: exact match by rate_date
-      const exactPool = rates.filter(r => d10(r.rate_date) === fd);
+      // پیدا کردن آخرین نرخ به ازای هر جفت ارز که rate_date <= تاریخ انتخابی باشد
+      const eligible = rates.filter(r => r.rate_date && String(r.rate_date).substring(0, 10) <= fd);
+      if (!eligible.length) return null;
 
-      // Step 2: fallback — most recently *entered* batch (by created_at) on or before selected date
-      let pool;
-      if (exactPool.length > 0) {
-        pool = exactPool.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      } else {
-        const endOfDay = new Date(`${fd}T23:59:59.999`).getTime();
-        const eligible = rates.filter(r => r.created_at && new Date(r.created_at).getTime() <= endOfDay);
-        if (!eligible.length) return null;
-        const maxTs = eligible.reduce((mx, r) => { const t = new Date(r.created_at).getTime(); return t > mx ? t : mx; }, 0);
-        const maxDay = new Date(maxTs).toISOString().split('T')[0];
-        pool = eligible
-          .filter(r => r.created_at && new Date(r.created_at).toISOString().split('T')[0] === maxDay)
-          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      }
+      // مرتب‌سازی: اول rate_date نزولی، بعد created_at نزولی (تعیین تکلیف در تاریخ‌های مساوی)
+      const sorted = eligible.slice().sort((a, b) => {
+        const da = String(a.rate_date).substring(0, 10);
+        const db = String(b.rate_date).substring(0, 10);
+        if (db > da) return 1;
+        if (db < da) return -1;
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
 
-      // Deduplicate per pair (newest first)
+      // جدیدترین نرخ هر جفت ارز (اولین رکورد بعد از sort)
       const seen = new Set();
       const vr = [];
-      for (const r of pool) {
+      for (const r of sorted) {
         const key = `${r.base_currency}|${r.target_currency}`;
         if (!seen.has(key)) { seen.add(key); vr.push(r); }
       }
       if (!vr.length) return null;
 
-      const find = (b, t) => vr.find(r => r.base_currency === b && r.target_currency === t);
+      const find = (b, tgt) => vr.find(r => r.base_currency === b && r.target_currency === tgt);
       let dir = find(convFrom, convTo); if (dir) return dir.rate;
       let inv = find(convTo, convFrom); if (inv) return 1 / inv.rate;
       for (const c of currencies) {
