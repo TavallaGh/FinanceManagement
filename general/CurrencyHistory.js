@@ -10,7 +10,7 @@
     ArrowRightLeft = FallbackIcon, AlertTriangle = FallbackIcon, Clock = FallbackIcon, Calendar = FallbackIcon, Zap = FallbackIcon, ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, Lock = FallbackIcon, Copy = FallbackIcon, Download = FallbackIcon
   } = LucideIcons;
 
-  const CurrencyHistory = ({ currencies = [], language = 'fa', formCode, access, rateFilters, setRateFilters, ratesGridState, setRatesGridState }) => {
+  const CurrencyHistory = ({ currencies = [], language = 'fa', formCode, access, ratesGridState, setRatesGridState }) => {
     const FallbackComponent = () => null;
     const Core = window.DSCore || window.DesignSystem || {};
     const { Button = FallbackComponent, SelectField = FallbackComponent, Badge = FallbackComponent, CurrencyField = FallbackComponent, DatePicker = FallbackComponent } = Core;
@@ -283,16 +283,6 @@
       }
     ];
 
-    const filteredRates = useMemo(() => {
-      let result = [...rates];
-      if (rateFilters.base) result = result.filter(r => r.base_currency === rateFilters.base);
-      if (rateFilters.target) result = result.filter(r => r.target_currency === rateFilters.target);
-      if (rateFilters.source) result = result.filter(r => r.source === rateFilters.source);
-      if (rateFilters.fromDate) result = result.filter(r => r.rate_date >= rateFilters.fromDate.replace(/\//g, '-'));
-      if (rateFilters.toDate) result = result.filter(r => r.rate_date <= rateFilters.toDate.replace(/\//g, '-'));
-      return result;
-    }, [rates, rateFilters]);
-
     const rateOps = [
       { label: t('دریافت اتوماتیک نرخ‌ها', 'Auto Rate Update'), icon: Globe, onClick: handleXeFetch, className: 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300', requiredAccess: 'xe_fetch' },
       { label: t('بروزرسانی دستی نرخ‌ها', 'Manual Rate Update'), icon: Edit, onClick: openManualUpdateModal, className: 'text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300', requiredAccess: 'manual_rate' },
@@ -307,7 +297,7 @@
         
         <div className="flex-1 min-h-0">
             <DataGrid 
-              data={filteredRates} columns={historyColumns} language={language} formCode={formCode} selectable={true}
+              data={rates} columns={historyColumns} language={language} formCode={formCode} selectable={true}
               gridState={ratesGridState} onGridStateChange={setRatesGridState} bulkActions={historyBulkActions}
               actions={[
                 { id: 'view_log', icon: History, tooltip: t('مشاهده لاگ سیستم', 'View System Log'), onClick: (row) => openLogModal('fm_currency_rates', row.id), className: 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300' },

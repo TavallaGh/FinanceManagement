@@ -45,7 +45,6 @@
     const [selectedIds, setSelectedIds] = useState([]);
     const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
     const [selectedCurrency, setSelectedCurrency] = useState(null);
-    const [currencyFilters, setCurrencyFilters] = useState({});
     const [currenciesGridState, setCurrenciesGridState] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
     
@@ -53,28 +52,23 @@
     const [recordLogs, setRecordLogs] = useState([]);
     const [isLogsLoading, setIsLogsLoading] = useState(false);
 
-    const [rateFilters, setRateFilters] = useState({});
     const [ratesGridState, setRatesGridState] = useState(null);
 
     const viewConfig = useMemo(() => ({
       pageId: 'currency_settings_main',
-      currentState: () => ({ activeTab, currencyFilters, currenciesGridState, rateFilters, ratesGridState }),
+      currentState: () => ({ activeTab, currenciesGridState, ratesGridState }),
       onApplyState: (state) => {
         if (state) {
           if (state.activeTab) setActiveTab(state.activeTab);
-          if (state.currencyFilters) setCurrencyFilters(state.currencyFilters);
           if (state.currenciesGridState) setCurrenciesGridState(state.currenciesGridState);
-          if (state.rateFilters) setRateFilters(state.rateFilters);
           if (state.ratesGridState) setRatesGridState(state.ratesGridState);
         } else {
           setActiveTab('list');
-          setCurrencyFilters({});
           setCurrenciesGridState(null);
-          setRateFilters({});
           setRatesGridState(null);
         }
       }
-    }), [activeTab, currencyFilters, currenciesGridState, rateFilters, ratesGridState, todayStr]);
+    }), [activeTab, currenciesGridState, ratesGridState]);
 
     const supabase = window.supabase;
     const currentUser = window.NavigationSystem?.currentUser?.name || 'مدیر سیستم';
@@ -262,12 +256,6 @@
       { id: 'delete', label: isRtl ? 'حذف گروهی' : 'Delete Selected', icon: Trash2, onClick: (ids) => setDeleteConfirm({ isOpen: true, type: 'bulk', data: ids }), variant: 'danger-outline', className: '!text-red-500 dark:!text-red-400 !border-red-500 dark:!border-red-800 hover:!bg-red-50 dark:hover:!bg-red-900/30' },
     ], [isRtl, handleBulkAction]);
 
-    const filteredCurrencies = useMemo(() => {
-      let result = [...currencies];
-      if (currencyFilters.code) result = result.filter(c => c.code.toLowerCase().includes(currencyFilters.code.toLowerCase()));
-      return result;
-    }, [currencies, currencyFilters]);
-
     const CurrencyHistoryComponent = window.CurrencyHistory;
 
     return (
@@ -287,7 +275,7 @@
             <>
               <div className="flex-1 min-h-0">
                 <DataGrid 
-                  data={filteredCurrencies} columns={currencyColumns} language={language} formCode={formCode}
+                  data={currencies} columns={currencyColumns} language={language} formCode={formCode}
                   gridState={currenciesGridState} onGridStateChange={setCurrenciesGridState}
                   actions={gridActions}
                   selectable={true}
@@ -305,7 +293,7 @@
              <CurrencyHistoryComponent 
                 currencies={currencies} language={language} formCode={formCode} 
                 access={access}
-                rateFilters={rateFilters} setRateFilters={setRateFilters}
+
                 ratesGridState={ratesGridState} setRatesGridState={setRatesGridState}
              />
           ) : activeTab === 'rates' ? (
