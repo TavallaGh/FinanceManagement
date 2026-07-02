@@ -84,6 +84,9 @@
             } else if (Array.isArray(p.actions)) {
                 parsedActions = p.actions;
             }
+            if (!Array.isArray(parsedActions)) {
+              parsedActions = parsedActions === null || parsedActions === undefined ? [] : [parsedActions];
+            }
             
             const normalizedActions = parsedActions.map(a => String(a).toLowerCase().trim());
             merged[code].raw_actions = [...new Set([...merged[code].raw_actions, ...normalizedActions])];
@@ -102,9 +105,26 @@
                 parsedScopes = p.data_scopes;
             }
 
+            const normalizeScopeValues = (value) => {
+              if (Array.isArray(value)) return value;
+              if (value === null || value === undefined) return [];
+              if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (!trimmed) return [];
+                try {
+                  const parsed = JSON.parse(trimmed);
+                  return Array.isArray(parsed) ? parsed : [parsed];
+                } catch (e) {
+                  return [trimmed];
+                }
+              }
+              return [value];
+            };
+
             Object.keys(parsedScopes).forEach(key => {
                 if (!merged[code].data_scope[key]) merged[code].data_scope[key] = [];
-                merged[code].data_scope[key] = [...new Set([...merged[code].data_scope[key], ...parsedScopes[key]])];
+                const nextValues = normalizeScopeValues(parsedScopes[key]);
+                merged[code].data_scope[key] = [...new Set([...merged[code].data_scope[key], ...nextValues])];
             });
           };
 
