@@ -268,7 +268,7 @@
     const partyLovCols = [
       { field: 'code',         header_fa: 'کد',      header_en: 'Code',   width: '90px' },
       { field: 'displayLabel', header_fa: 'نام',     header_en: 'Name',   width: '200px' },
-      { field: 'mobile',       header_fa: 'موبایل',  header_en: 'Mobile', width: '120px', render: (val) => <span dir="ltr" className="font-mono text-[12px]">{val || '-'}</span> },
+      { field: 'mobile',       header_fa: 'موبایل',  header_en: 'Mobile', width: '120px', render: (val) => <span dir="ltr" className="font-sans text-[12px]">{val || '-'}</span> },
     ];
 
     const centerLovCols = [
@@ -369,7 +369,7 @@
             </div>
           );
         }
-        return <span dir="ltr" className="text-[12px] font-mono">{val || '-'}</span>;
+        return <span dir="ltr" className="text-[12px] font-sans">{val || '-'}</span>;
       },
     };
 
@@ -490,7 +490,7 @@
         }
         const party = (lookups.partiesList || []).find(p => String(p.id) === String(val));
         return party
-          ? <div className="flex flex-col"><span className="text-[12px] font-bold truncate">{party.displayLabel}</span><span className="text-[10px] text-slate-400 font-mono">{party.code || ''}</span></div>
+          ? <div className="flex flex-col"><span className="text-[12px] font-bold truncate">{party.displayLabel}</span><span className="text-[10px] text-slate-400 font-sans">{party.code || ''}</span></div>
           : <span className="text-[12px] text-slate-400">-</span>;
       },
     };

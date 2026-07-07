@@ -254,7 +254,7 @@
     const columns = [
       {
         field: 'code', header_fa: 'کد پروژه', header_en: 'Code', width: '120px',
-        render: val => <span className="font-mono font-bold text-slate-700 dark:text-slate-300" dir="ltr">{val}</span>
+        render: val => <span className="font-sans font-bold text-slate-700 dark:text-slate-300" dir="ltr">{val}</span>
       },
       {
         field: 'title', header_fa: 'عنوان پروژه', header_en: 'Title', width: '200px',
@@ -281,7 +281,7 @@
       },
       {
         field: 'estimated_days', header_fa: 'مدت (روز)', header_en: 'Duration', width: '90px',
-        render: val => <span className="font-mono text-[13px]" dir="ltr">{val ?? '-'}</span>
+        render: val => <span className="font-sans text-[13px]" dir="ltr">{val ?? '-'}</span>
       },
       {
         field: 'estimated_end_date', header_fa: 'پایان تخمینی', header_en: 'Est. End', width: '110px',
