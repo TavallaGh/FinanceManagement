@@ -46,13 +46,17 @@
     const [inlineItemEdit, setInlineItemEdit] = useState(null);
 
     useImperativeHandle(ref, () => ({
-        triggerBalanceRow: (diff) => {
+        triggerBalanceRow: ({ diffAmount = 0, currency = 'USD' } = {}) => {
             if (inlineItemEdit) {
                 showToast(t('ابتدا با زدن دکمه Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
                 return;
             }
-            const reqDep = diff < 0 ? Math.abs(diff) : 0;
-            const reqWid = diff > 0 ? diff : 0;
+
+            const decimals = getCurrencyDecimals(currency, lookups.currencies);
+            const factor = 10 ** decimals;
+            const amount = Math.round(Math.abs(parseFloat(diffAmount) || 0) * factor) / factor;
+            const roundedAmount = amount.toFixed(decimals);
+            const isDebit = diffAmount < 0;
 
             setInlineItemEdit({
                 id: 'new',
@@ -60,14 +64,14 @@
                     row_number: itemsData.length + 1,
                     account_id: '',
                     account_obj: null,
-                    transaction_action: diff < 0 ? 'DEPOSIT' : 'WITHDRAWAL',
+                    transaction_action: isDebit ? 'DEPOSIT' : 'WITHDRAWAL',
                     transaction_group: 'BALANCE',
                     cost_type_id: '',
                     income_type_id: '',
                     center_id: '',
-                    currency: itemsData.length > 0 ? itemsData[0].currency : 'IRR',
-                    deposit_amount: String(reqDep),
-                    withdrawal_amount: String(reqWid),
+                    currency: currency,
+                    deposit_amount: isDebit ? roundedAmount : '0',
+                    withdrawal_amount: isDebit ? '0' : roundedAmount,
                     description: t('تراز کردن سند', 'Balance transaction')
                 }
             });

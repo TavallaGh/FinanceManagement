@@ -1,5 +1,5 @@
 /* Filename: requests/RequestManagement.js */
-/* Modal & items grid live in RequestDetails.js which must load first */
+/* Request form & items grid live in RequestDetails.js which must load first */
 (() => {
   const React = window.React;
   const { useState, useEffect, useMemo, useCallback } = React;
@@ -103,11 +103,17 @@
     const [usersMap,         setUsersMap]         = useState({});
     const [deptsMap,         setDeptsMap]         = useState({});
     const [partiesMap,       setPartiesMap]       = useState({});
+    const [partiesList,      setPartiesList]      = useState([]);
+    const [costTypes,        setCostTypes]        = useState([]);
+    const [incomeTypes,      setIncomeTypes]      = useState([]);
+    const [costBenefitCenters, setCostBenefitCenters] = useState([]);
     const [isLoading,        setIsLoading]        = useState(false);
     const [filters,          setFilters]          = useState({});
     const [gridState,        setGridState]        = useState(null);
     const [selectedIds,      setSelectedIds]      = useState([]);
-    const [formModal,        setFormModal]        = useState({ isOpen: false, mode: 'CREATE', record: null });
+    const [currentView,      setCurrentView]      = useState('list');
+    const [formMode,         setFormMode]         = useState('CREATE');
+    const [currentRecord,    setCurrentRecord]    = useState(null);
     const [deleteConfirm,    setDeleteConfirm]    = useState({ isOpen: false, type: null, data: null });
     const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
     const [commentedIds,     setCommentedIds]     = useState(new Set());
@@ -124,21 +130,50 @@
 
     const fetchMeta = useCallback(async () => {
       try {
-        const [uRes, pRes, nRes] = await Promise.all([
+        const [uRes, pRes, nRes, costRes, incRes, cbcRes] = await Promise.all([
           supabase.from('sec_users').select('id, full_name, username'),
-          supabase.from('parties').select('id, first_name, last_name, company_name, party_type'),
+          supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, mobile').eq('is_active', true),
           supabase.from('fm_org_chart_nodes').select('id, title'),
+          supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+          supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+          supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
         ]);
+
+        const buildLeafs = (items) => {
+          const parentIds = new Set((items || []).map(i => i.parent_id).filter(Boolean));
+          return (items || []).filter(i => !parentIds.has(i.id)).map(i => ({
+            ...i,
+            displayLabel: isRtl ? (i.title_fa || '') : (i.title_en || i.title_fa || ''),
+          }));
+        };
+
         const uMap = {}; (uRes.data || []).forEach(u => { uMap[u.id] = u.full_name || u.username || ''; });
         setUsersMap(uMap);
-        const pMap = {}; (pRes.data || []).forEach(p => {
-          pMap[p.id] = p.party_type === 'legal' ? (p.company_name || '') : `${p.first_name || ''} ${p.last_name || ''}`.trim();
+        const pMap = {};
+        const pList = (pRes.data || []).map(p => {
+          const label = p.party_type === 'legal' ? (p.company_name || '') : `${p.first_name || ''} ${p.last_name || ''}`.trim();
+          pMap[p.id] = label;
+          return { ...p, displayLabel: label };
         });
         setPartiesMap(pMap);
+        setPartiesList(pList);
         const dMap = {}; (nRes.data || []).forEach(n => { dMap[n.id] = n.title; });
         setDeptsMap(dMap);
+        setCostTypes(buildLeafs(costRes.data || []));
+        setIncomeTypes(buildLeafs(incRes.data || []));
+        setCostBenefitCenters((cbcRes.data || []).map(r => ({
+          id: r.id,
+          titleFa: r.title_fa || '',
+          titleEn: r.title_en || r.title_fa || '',
+          centerKind: r.center_kind || '',
+          isCostCenter: r.is_cost_center ?? false,
+          isBenefitCenter: r.is_benefit_center ?? false,
+          isActive: r.is_active ?? true,
+          managerName: r.manager ? `${r.manager.first_name || ''} ${r.manager.last_name || ''}`.trim() : '',
+          officeName: r.office?.title || '',
+        })));
       } catch {}
-    }, [supabase]);
+    }, [supabase, isRtl]);
 
     const fetchData = useCallback(async () => {
       setIsLoading(true);
@@ -314,6 +349,17 @@
 
     const openSummary = (record) => setSummaryModal({ isOpen: true, record });
 
+    const handleOpenForm = (mode, record = null) => {
+      setFormMode(mode);
+      setCurrentRecord(record || {});
+      setCurrentView('form');
+    };
+
+    const handleFormSuccess = () => {
+      setCurrentView('list');
+      fetchData();
+    };
+
     const isDeletable = (r) => r.status === 'DRAFT';
 
     const executeDelete = async () => {
@@ -389,17 +435,98 @@
       },
     ], [usersMap, partiesMap, deptsMap, isRtl]);
 
+    const ITEM_ACTIONS = [
+      { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
+      { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') },
+    ];
+    const ITEM_GROUPS = [
+      { value: 'COST', label: t('هزینه', 'Cost') },
+      { value: 'INCOME', label: t('درآمد', 'Income') },
+      { value: 'BALANCE', label: t('بالانس', 'Balance') },
+      { value: 'OTHER', label: t('سایر', 'Other') },
+    ];
+    const CENTER_KIND_LABELS = {
+      DEPARTMENT: { fa: 'دپارتمان', en: 'Department' },
+      TEAM: { fa: 'تیم', en: 'Team' },
+      PROJECT: { fa: 'پروژه', en: 'Project' },
+      OTHER: { fa: 'سایر', en: 'Other' },
+    };
+
+    const mergedSubTypes = useMemo(() => ([
+      ...(costTypes || []).map(x => ({ ...x, subTypeGroup: 'COST', subTypeGroupLabel: t('هزینه', 'Cost') })),
+      ...(incomeTypes || []).map(x => ({ ...x, subTypeGroup: 'INCOME', subTypeGroupLabel: t('درآمد', 'Income') })),
+    ]), [costTypes, incomeTypes, t]);
+
+    const subTypeLovColumns = [
+      { field: 'code', header_fa: 'کد', header_en: 'Code', width: '90px' },
+      { field: 'displayLabel', header_fa: 'عنوان', header_en: 'Title', width: 'auto' },
+      { field: 'subTypeGroupLabel', header_fa: 'گروه', header_en: 'Group', width: '90px' },
+    ];
+    const partyLovColumns = [
+      { field: 'code', header_fa: 'کد', header_en: 'Code', width: '90px' },
+      { field: 'displayLabel', header_fa: 'نام', header_en: 'Name', width: '200px' },
+      { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '120px' },
+    ];
+    const centerLovColumns = [
+      { field: isRtl ? 'titleFa' : 'titleEn', header_fa: 'عنوان مرکز', header_en: 'Center Title', width: '200px' },
+      { field: 'managerName', header_fa: 'مسئول', header_en: 'Manager', width: '140px' },
+      {
+        field: 'centerKind',
+        header_fa: 'گروه مرکز',
+        header_en: 'Center Group',
+        width: '110px',
+        render: (val) => {
+          const lbl = CENTER_KIND_LABELS[val];
+          return <span>{lbl ? (isRtl ? lbl.fa : lbl.en) : val}</span>;
+        },
+      },
+    ];
+
     const filteredData = useMemo(() => requests.filter(r => {
-      if (filters.status       && r.status       !== filters.status)       return false;
-      if (filters.request_type && r.request_type !== filters.request_type) return false;
-      if (filters.my_requests  && String(r.registrar_id) !== String(currentUserId)) return false;
-      return true;
-    }), [requests, filters, currentUserId]);
+      const hasItemFilters =
+        !!filters.transaction_action ||
+        !!filters.transaction_group ||
+        !!filters.sub_type_id ||
+        !!filters.party_id ||
+        !!filters.center_id ||
+        !!String(filters.project_id || '').trim();
+
+      if (!hasItemFilters) return true;
+
+      const hasMatchingItem = (r.req_request_items || []).some(item => {
+        if (filters.transaction_action && item.transaction_action !== filters.transaction_action) return false;
+        if (filters.transaction_group && item.transaction_group !== filters.transaction_group) return false;
+
+        if (filters.sub_type_id) {
+          const selected = filters.sub_type_id;
+          if (selected.subTypeGroup === 'COST') {
+            if (String(item.cost_type_id || '') !== String(selected.id)) return false;
+          } else if (selected.subTypeGroup === 'INCOME') {
+            if (String(item.income_type_id || '') !== String(selected.id)) return false;
+          }
+        }
+
+        if (filters.party_id && String(item.party_id || '') !== String(filters.party_id.id)) return false;
+        if (filters.center_id && String(item.center_id || '') !== String(filters.center_id.id)) return false;
+
+        if (String(filters.project_id || '').trim()) {
+          const q = String(filters.project_id).trim().toLowerCase();
+          if (!String(item.project_id || '').toLowerCase().includes(q)) return false;
+        }
+
+        return true;
+      });
+
+      return hasMatchingItem;
+    }), [requests, filters]);
 
     const filterFields = [
-      { name: 'status',       label: t('وضعیت', 'Status'),           type: 'select', options: STATUS_LIST.map(s => ({ value: s.value, label: isRtl ? s.fa : s.en })) },
-      { name: 'request_type', label: t('نوع درخواست', 'Request Type'), type: 'select', options: REQUEST_TYPES.map(r => ({ value: r.value, label: isRtl ? r.fa : r.en })) },
-      { name: 'my_requests',  label: t('درخواست‌های من', 'My Requests'), type: 'toggle' },
+      { name: 'transaction_action', label: t('نوع', 'Action'), type: 'select', options: ITEM_ACTIONS },
+      { name: 'transaction_group', label: t('گروه', 'Group'), type: 'select', options: ITEM_GROUPS },
+      { name: 'sub_type_id', label: t('نوع هزینه/درآمد', 'Cost/Income Type'), type: 'lov', lovData: mergedSubTypes, lovColumns: subTypeLovColumns, dropdownWidth: 'min-w-[420px]' },
+      { name: 'party_id', label: t('طرف مقابل', 'Party'), type: 'lov', lovData: partiesList, lovColumns: partyLovColumns, dropdownWidth: 'min-w-[520px]' },
+      { name: 'center_id', label: t('مرکز هزینه/درآمد', 'Cost/Income Center'), type: 'lov', lovData: costBenefitCenters, lovColumns: centerLovColumns, dropdownWidth: 'min-w-[580px]' },
+      { name: 'project_id', label: t('پروژه', 'Project'), type: 'text' },
     ];
 
     const viewConfig = useMemo(() => ({
@@ -412,96 +539,101 @@
     }), [filters, gridState]);
 
     return (
-      <div className="flex flex-col h-full p-4 bg-[#f8fafc] dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
-        <PageHeader
-          title={t('مدیریت درخواست‌ها', 'Request Management')}
-          icon={ClipboardList}
-          description={t('ثبت، پیگیری و مدیریت درخواست‌های سازمانی', 'Manage and track organizational requests')}
-          language={language}
-          breadcrumbs={[{ label: t('گردش کار', 'Workflow') }, { label: t('درخواست‌ها', 'Requests') }]}
-          viewConfig={viewConfig}
-        />
-
-        <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">
-          <AdvancedFilter fields={filterFields} initialValues={filters}
-            onFilter={setFilters} onClear={() => setFilters({})} language={language} />
-
-          <div className="flex-1 min-h-0 mt-1">
-            <DataGrid
-              data={filteredData} columns={columns} language={language}
-              formCode={formCode} isLoading={isLoading} hideImport={true}
-              selectable={true} selectedIds={selectedIds} onSelectChange={setSelectedIds}
-              gridState={gridState} onGridStateChange={setGridState}
-              actionWidth="180px"
-              onAdd={access.canCreate ? () => setFormModal({ isOpen: true, mode: 'CREATE', record: null }) : undefined}
-              onRowDoubleClick={row => setFormModal({ isOpen: true, mode: 'EDIT', record: row })}
-              actions={[
-                {
-                  icon: DollarSign,
-                  tooltip: t('خلاصه ارزی', 'Currency Summary'),
-                  onClick: row => openSummary(row),
-                  className: 'text-indigo-500 hover:text-indigo-600',
-                },
-                {
-                  icon: Paperclip,
-                  tooltip: t('پیوست‌ها', 'Attachments'),
-                  onClick: row => openAttachments(row),
-                  className: row => attachmentCounts[String(row.id)] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600',
-                },
-                {
-                  icon: MessageSquare,
-                  tooltip: t('کامنت‌ها', 'Comments'),
-                  onClick: row => setCommentModalState({ isOpen: true, record: row }),
-                  className: row => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600',
-                },
-                {
-                  icon: Copy,
-                  tooltip: t('کپی درخواست', 'Copy Request'),
-                  onClick: row => setFormModal({ isOpen: true, mode: 'COPY', record: row }),
-                  requiredAccess: 'create',
-                  className: 'text-emerald-600 hover:text-emerald-700',
-                },
-                {
-                  icon: Edit, tooltip: t('مشاهده / ویرایش', 'View / Edit'),
-                  onClick: row => setFormModal({ isOpen: true, mode: 'EDIT', record: row }),
-                  className: 'text-slate-400 hover:text-indigo-600',
-                },
-                {
-                  icon: Trash2, tooltip: t('حذف', 'Delete'),
-                  onClick: row => {
-                    if (!isDeletable(row)) { showToast(t('فقط درخواست‌های "یادداشت" قابل حذف هستند.', 'Only Draft requests can be deleted.'), 'warning'); return; }
-                    setDeleteConfirm({ isOpen: true, type: 'single', data: row });
-                  },
-                  className: row => isDeletable(row) ? 'text-slate-400 hover:text-red-600' : '!text-slate-200 dark:!text-slate-700 cursor-not-allowed',
-                },
-              ]}
-              bulkActions={[
-                {
-                  label: t('بروزرسانی نرخ ارز', 'Update Exchange Rates'),
-                  icon: RefreshCw, variant: 'outline',
-                  onClick: ids => handleBulkUpdateRates(ids),
-                  className: 'text-indigo-600 dark:text-indigo-400',
-                },
-                {
-                  label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline',
-                  onClick: ids => {
-                    const ok = requests.filter(r => ids.includes(r.id) && isDeletable(r)).map(r => r.id);
-                    if (!ok.length) { showToast(t('هیچ‌کدام قابل حذف نیستند.', 'None can be deleted.'), 'warning'); return; }
-                    setDeleteConfirm({ isOpen: true, type: 'bulk', data: ok });
-                  },
-                },
-              ]}
+      <div className="h-full flex flex-col" dir={isRtl ? 'rtl' : 'ltr'}>
+        {currentView === 'list' && (
+          <div className="flex-1 flex flex-col h-full p-4 bg-[#f8fafc] dark:bg-slate-900 overflow-hidden">
+            <PageHeader
+              title={t('مدیریت درخواست‌ها', 'Request Management')}
+              icon={ClipboardList}
+              description={t('ثبت، پیگیری و مدیریت درخواست‌های سازمانی', 'Manage and track organizational requests')}
+              language={language}
+              breadcrumbs={[{ label: t('گردش کار', 'Workflow') }, { label: t('درخواست‌ها', 'Requests') }]}
+              viewConfig={viewConfig}
             />
-          </div>
-        </div>
 
-        {formModal.isOpen && (
+            <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">
+              <AdvancedFilter fields={filterFields} initialValues={filters}
+                onFilter={setFilters} onClear={() => setFilters({})} language={language} />
+
+              <div className="flex-1 min-h-0 mt-1">
+                <DataGrid
+                  data={filteredData} columns={columns} language={language}
+                  formCode={formCode} isLoading={isLoading} hideImport={true}
+                  selectable={true} selectedIds={selectedIds} onSelectChange={setSelectedIds}
+                  gridState={gridState} onGridStateChange={setGridState}
+                  actionWidth="180px"
+                  onAdd={access.canCreate ? () => handleOpenForm('CREATE') : undefined}
+                  onRowDoubleClick={row => handleOpenForm('EDIT', row)}
+                  actions={[
+                    {
+                      icon: DollarSign,
+                      tooltip: t('خلاصه ارزی', 'Currency Summary'),
+                      onClick: row => openSummary(row),
+                      className: 'text-indigo-500 hover:text-indigo-600',
+                    },
+                    {
+                      icon: Paperclip,
+                      tooltip: t('پیوست‌ها', 'Attachments'),
+                      onClick: row => openAttachments(row),
+                      className: row => attachmentCounts[String(row.id)] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600',
+                    },
+                    {
+                      icon: MessageSquare,
+                      tooltip: t('کامنت‌ها', 'Comments'),
+                      onClick: row => setCommentModalState({ isOpen: true, record: row }),
+                      className: row => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600',
+                    },
+                    {
+                      icon: Copy,
+                      tooltip: t('کپی درخواست', 'Copy Request'),
+                      onClick: row => handleOpenForm('COPY', row),
+                      requiredAccess: 'create',
+                      className: 'text-emerald-600 hover:text-emerald-700',
+                    },
+                    {
+                      icon: Edit, tooltip: t('مشاهده / ویرایش', 'View / Edit'),
+                      onClick: row => handleOpenForm('EDIT', row),
+                      className: 'text-slate-400 hover:text-indigo-600',
+                    },
+                    {
+                      icon: Trash2, tooltip: t('حذف', 'Delete'),
+                      onClick: row => {
+                        if (!isDeletable(row)) { showToast(t('فقط درخواست‌های "یادداشت" قابل حذف هستند.', 'Only Draft requests can be deleted.'), 'warning'); return; }
+                        setDeleteConfirm({ isOpen: true, type: 'single', data: row });
+                      },
+                      className: row => isDeletable(row) ? 'text-slate-400 hover:text-red-600' : '!text-slate-200 dark:!text-slate-700 cursor-not-allowed',
+                    },
+                  ]}
+                  bulkActions={[
+                    {
+                      label: t('بروزرسانی نرخ ارز', 'Update Exchange Rates'),
+                      icon: RefreshCw, variant: 'outline',
+                      onClick: ids => handleBulkUpdateRates(ids),
+                      className: 'text-indigo-600 dark:text-indigo-400',
+                    },
+                    {
+                      label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline',
+                      onClick: ids => {
+                        const ok = requests.filter(r => ids.includes(r.id) && isDeletable(r)).map(r => r.id);
+                        if (!ok.length) { showToast(t('هیچ‌کدام قابل حذف نیستند.', 'None can be deleted.'), 'warning'); return; }
+                        setDeleteConfirm({ isOpen: true, type: 'bulk', data: ok });
+                      },
+                    },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentView === 'form' && currentRecord && (
           <RequestFormModal
-            isOpen={formModal.isOpen}
-            onClose={() => setFormModal({ isOpen: false, mode: 'CREATE', record: null })}
-            onSuccess={() => { setFormModal({ isOpen: false, mode: 'CREATE', record: null }); fetchData(); }}
-            formMode={formModal.mode}
-            initialRecord={formModal.record}
+            key={`${formMode}-${currentRecord?.id || 'new'}`}
+            isOpen={true}
+            onClose={() => setCurrentView('list')}
+            onSuccess={handleFormSuccess}
+            formMode={formMode}
+            initialRecord={currentRecord}
             language={language}
             formCode={formCode}
           />

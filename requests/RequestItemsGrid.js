@@ -68,8 +68,51 @@
     const isBalanced = TYPES_BALANCED.includes(requestType);
     const isBudget = requestType === 'BUDGET';
 
+    const getCurrencyDecimals = useCallback((currencyCode) => {
+      const currency = (lookups.currencies || []).find(item => item.code === currencyCode);
+      const decimals = currency?.decimal_places;
+      return Number.isFinite(Number(decimals)) ? Number(decimals) : 2;
+    }, [lookups.currencies]);
+
+    const roundToCurrencyDecimals = useCallback((value, currencyCode) => {
+      const decimals = getCurrencyDecimals(currencyCode);
+      const factor = 10 ** decimals;
+      const rounded = Math.round((Number(value) || 0) * factor) / factor;
+      return rounded.toFixed(decimals);
+    }, [getCurrencyDecimals]);
+
     useImperativeHandle(ref, () => ({
       cancelEdit: () => setInlineItemEdit(null),
+      triggerBalanceRow: ({ diffAmount = 0, currency = 'USD' } = {}) => {
+        if (isReadOnly) return;
+        if (inlineItemEdit) {
+          showToast(t('ابتدا با Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
+          return;
+        }
+
+        const amount = Math.abs(parseFloat(diffAmount || 0)) || 0;
+        const isDebit = diffAmount < 0;
+        const suggestedCurrency = currency || 'USD';
+        const roundedAmount = roundToCurrencyDecimals(amount, suggestedCurrency);
+
+        setInlineItemEdit({
+          id: 'new',
+          data: {
+            row_number: itemsData.length + 1,
+            currency: suggestedCurrency,
+            transaction_action: isDebit ? 'DEPOSIT' : 'WITHDRAWAL',
+            party_id: '', party_obj: null,
+            center_id: '',
+            project_id: '',
+            transaction_group: showGroup ? 'BALANCE' : null,
+            cost_type_id: '', income_type_id: '',
+            deposit_amount: isDebit ? roundedAmount : '0',
+            withdrawal_amount: isDebit ? '0' : roundedAmount,
+            approved_amount: '0', remaining_amount: '0',
+            description: t('تراز کردن درخواست', 'Balance request'),
+          },
+        });
+      },
     }));
 
     // ── local option lists ─────────────────────────────────────────────────
@@ -83,6 +126,12 @@
       { value: 'BALANCE', label: t('بالانس', 'Balance') },
       { value: 'OTHER',   label: t('سایر',   'Other')   },
     ];
+    const CENTER_KIND_LABELS = {
+      DEPARTMENT: { fa: 'دپارتمان', en: 'Department' },
+      TEAM: { fa: 'تیم', en: 'Team' },
+      PROJECT: { fa: 'پروژه', en: 'Project' },
+      OTHER: { fa: 'سایر', en: 'Other' },
+    };
 
     // ── handlers ──────────────────────────────────────────────────────────
     const handleAmountChange = (e, field) => {
@@ -102,9 +151,6 @@
         if (lastItem && lastItem.currency) suggestedCurrency = lastItem.currency;
       }
 
-      // دپارتمان پیشفرض برای BUDGET
-      const defaultDepartment = isBudget ? (lookups.currentUserDeptId || '') : '';
-
       setInlineItemEdit({
         id: 'new',
         data: {
@@ -112,7 +158,7 @@
           currency: suggestedCurrency,
           transaction_action: isTransfer ? (itemsData.length % 2 === 0 ? 'WITHDRAWAL' : 'DEPOSIT') : 'DEPOSIT',          
           party_id: '', party_obj: null,
-          department_id: defaultDepartment,
+          center_id: '',
           project_id: '',
           transaction_group: showGroup ? 'COST' : null,
           cost_type_id: '', income_type_id: '',
@@ -126,13 +172,12 @@
     const handleEditItemClick = (row) => {
       if (isReadOnly || inlineItemEdit) return;
       const partyObj = (lookups.partiesList || []).find(p => String(p.id) === String(row.party_id)) || null;
-      const defaultDept = isBudget && !row.department_id ? (lookups.currentUserDeptId || '') : (row.department_id || '');
       setInlineItemEdit({
         id: row._tempId || row.id,
         data: {
           ...row,
           party_obj: partyObj,
-          department_id: defaultDept,
+          center_id: row.center_id || '',
           project_id: row.project_id || '',
           deposit_amount:    row.deposit_amount    != null ? String(row.deposit_amount)    : '0',
           withdrawal_amount: row.withdrawal_amount != null ? String(row.withdrawal_amount) : '0',
@@ -226,9 +271,28 @@
       { field: 'mobile',       header_fa: 'موبایل',  header_en: 'Mobile', width: '120px', render: (val) => <span dir="ltr" className="font-mono text-[12px]">{val || '-'}</span> },
     ];
 
-    const deptLovCols = [
-      { field: 'id',    header_fa: 'شناسه',  header_en: 'ID',    width: '70px' },
-      { field: 'title', header_fa: 'عنوان',  header_en: 'Title', width: 'auto' },
+    const centerLovCols = [
+      {
+        field: isRtl ? 'titleFa' : 'titleEn',
+        header_fa: 'عنوان مرکز',
+        header_en: 'Center Title',
+        width: '200px',
+        render: (val, row) => (
+          <span className="font-bold text-slate-800 dark:text-slate-200">{val || row.titleFa}</span>
+        ),
+      },
+      { field: 'managerName', header_fa: 'مسئول', header_en: 'Manager', width: '150px' },
+      {
+        field: 'centerKind',
+        header_fa: 'گروه مرکز',
+        header_en: 'Center Group',
+        width: '110px',
+        render: (val) => {
+          const lbl = CENTER_KIND_LABELS[val];
+          return <span>{lbl ? (isRtl ? lbl.fa : lbl.en) : val}</span>;
+        },
+      },
+      { field: 'officeName', header_fa: 'محل مرکز', header_en: 'Location', width: '150px' },
     ];
 
     // ── column definitions ────────────────────────────────────────────────
@@ -318,7 +382,7 @@
               <SelectField size="sm" formCode={formCode}
                 options={TX_GROUPS}
                 value={inlineItemEdit.data.transaction_group || 'COST'}
-                onChange={e => setInlineItemEdit(p => ({ ...p, data: { ...p.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: '' } }))}
+                onChange={e => setInlineItemEdit(p => ({ ...p, data: { ...p.data, transaction_group: e.target.value, cost_type_id: '', income_type_id: '', center_id: '' } }))}
                 isRtl={isRtl} wrapperClassName="m-0" disabled={isBudget} />
             </div>;
           }
@@ -446,66 +510,40 @@
       },
     };
 
-    // ── transfer-specific columns ─────────────────────────────────────────
-    const transferDepartmentColumn = {
-      field: 'department_id',
-      header_fa: t('از دپارتمان', 'From Dept') + ' / ' + t('به دپارتمان', 'To Dept'),
-      header_en: 'From Dept / To Dept',
-      width: '150px',
+    const centerColumn = {
+      field: 'center_id',
+      header_fa: t('مرکز هزینه/درآمد', 'Cost/Income Center'),
+      header_en: 'Cost/Income Center',
+      width: '170px',
       render: (val, row) => {
+        const group = isEditingRow(row) ? inlineItemEdit?.data?.transaction_group : row.transaction_group;
+        const isCenterGroup = group === 'COST' || group === 'INCOME';
         if (isEditingRow(row)) {
-          const deptList = Object.keys(lookups.nodesMap || {}).map(id => ({
-            id,
-            title: lookups.nodesMap[id],
-          }));
-          const isWithdrawal = inlineItemEdit.data.transaction_action === 'WITHDRAWAL';
-          const labelFa = isWithdrawal ? 'از دپارتمان' : 'به دپارتمان';
-          const labelEn = isWithdrawal ? 'From Dept' : 'To Dept';
-          
-          return (
-            <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[55]">
-              <LOVField size="sm" formCode={formCode}
-                data={deptList} columns={deptLovCols} dropdownWidth="min-w-[350px]"
-                displayValue={(lookups.nodesMap || {})[inlineItemEdit.data.department_id] || ''}
-                onChange={r => {
-                  setInlineItemEdit(p => ({ ...p, data: { ...p.data, department_id: r ? r.id : '' } }));
-                }}
-                isRtl={isRtl} wrapperClassName="m-0" placeholder={t(labelFa, labelEn)}
-              />
-            </div>
+          if (!isCenterGroup) {
+            return <div className="h-8 w-full bg-slate-100 dark:bg-slate-800 rounded opacity-40" />;
+          }
+          const activeCenters = (lookups.costBenefitCenters || []).filter(c =>
+            c.isActive && (group === 'COST' ? c.isCostCenter : c.isBenefitCenter)
           );
-        }
-        return <span className="text-[12px]">{(lookups.nodesMap || {})[val] || '-'}</span>;
-      },
-    };
+          const selectedCenter = activeCenters.find(c => String(c.id) === String(inlineItemEdit.data.center_id));
+          const displayValue = selectedCenter ? (isRtl ? selectedCenter.titleFa : (selectedCenter.titleEn || selectedCenter.titleFa)) : '';
 
-    // ── general department column (for GENERAL and BUDGET types) ──────────
-    const generalDepartmentColumn = {
-      field: 'department_id',
-      header_fa: t('دپارتمان', 'Department'),
-      header_en: 'Department',
-      width: '150px',
-      render: (val, row) => {
-        if (isEditingRow(row)) {
-          const deptList = Object.keys(lookups.nodesMap || {}).map(id => ({
-            id,
-            title: lookups.nodesMap[id],
-          }));
-          
           return (
             <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[55]">
               <LOVField size="sm" formCode={formCode}
-                data={deptList} columns={deptLovCols} dropdownWidth="min-w-[350px]"
-                displayValue={(lookups.nodesMap || {})[inlineItemEdit.data.department_id] || ''}
+                data={activeCenters} columns={centerLovCols} dropdownWidth="min-w-[580px]"
+                displayValue={displayValue}
                 onChange={r => {
-                  setInlineItemEdit(p => ({ ...p, data: { ...p.data, department_id: r ? r.id : '' } }));
+                  setInlineItemEdit(p => ({ ...p, data: { ...p.data, center_id: r ? r.id : '' } }));
                 }}
-                isRtl={isRtl} wrapperClassName="m-0" placeholder={t('دپارتمان', 'Department')}
+                isRtl={isRtl} wrapperClassName="m-0" placeholder={t('مرکز هزینه/درآمد', 'Cost/Income Center')}
               />
             </div>
           );
         }
-        return <span className="text-[12px]">{(lookups.nodesMap || {})[val] || '-'}</span>;
+        if (!isCenterGroup) return <span className="text-slate-400 dark:text-slate-600 text-[11px]">-</span>;
+        const center = (lookups.costBenefitCenters || []).find(x => String(x.id) === String(val));
+        return <span className="text-[12px] truncate block">{center ? (isRtl ? center.titleFa : (center.titleEn || center.titleFa)) : '-'}</span>;
       },
     };
 
@@ -538,7 +576,7 @@
       ...(showGroup ? [groupColumns[0]] : []), // گروه
       ...(showGroup ? [groupColumns[1]] : []), // نوع هزینه/درآمد
       ...(isExchange || isBudget ? [] : [partyColumn]), // طرف مقابل - مخفی در EXCHANGE و BUDGET
-      ...(isExchange ? [] : (isTransfer ? [transferDepartmentColumn] : [generalDepartmentColumn])), // دپارتمان - مخفی در EXCHANGE
+      ...((isTransfer || isExchange) ? [] : [centerColumn]), // مرکز هزینه/درآمد - مخفی در TRANSFER و EXCHANGE
       ...(isExchange ? [] : [projectColumn]), // پروژه - مخفی در EXCHANGE
       currencyColumn, // ارز
       amountColumns[0], // مبلغ واریز

@@ -62,7 +62,8 @@
       { value: 'GATEWAY_TYPE', label: t('درگاه‌های پرداخت', 'Gateway Types') },
       { value: 'CHART_OF_ACCOUNTS', label: t('ساختار حساب‌ها', 'Chart of Accounts') },
       { value: 'BALANCE_GROUP', label: t('گروه‌های بالانس', 'Balance Groups') },
-      { value: 'BROKER', label: t('بروکرها', 'Brokers') }
+      { value: 'BROKER', label: t('بروکرها', 'Brokers') },
+      { value: 'PROJECT', label: t('پروژه‌ها', 'Projects') }
     ];
 
     const viewConfig = {

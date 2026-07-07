@@ -498,12 +498,26 @@
     }, [itemsData, getExchangeRates]);
 
     const balanceInfo = useMemo(() => {
-        if (headerData.transaction_type !== 'TRANSFER' || itemsData.length === 0 || isReadOnly) return { isUnbalanced: false, diff: 0 };
+        if (headerData.transaction_type !== 'TRANSFER' || itemsData.length === 0 || isReadOnly) return { isUnbalanced: false, diff: 0, diffDisplay: 0, displayCurrency: 'USD', displayDecimals: 2 };
+
+        const currenciesUsed = [...new Set(itemsData.map(i => i.currency || 'IRR'))];
+        const displayCurrency = currenciesUsed.length === 1 ? currenciesUsed[0] : 'USD';
+        const { toUsd: displayToUsd } = getExchangeRates(displayCurrency);
+        const diffDisplay = displayToUsd > 0 ? summaryStats.diffUsd / displayToUsd : summaryStats.diffUsd;
+
+        const currObj = (lookups.currencies || []).find(c => c.code === displayCurrency);
+        const displayDecimals = (currObj && currObj.decimal_places != null) ? parseInt(currObj.decimal_places) : 2;
+        const factor = 10 ** displayDecimals;
+        const diffDisplayRounded = Math.round(diffDisplay * factor) / factor;
+
         return {
             isUnbalanced: summaryStats.isUnbalanced,
-            diff: summaryStats.diffUsd
+            diff: summaryStats.diffUsd,
+            diffDisplay: diffDisplayRounded,
+            displayCurrency,
+            displayDecimals,
         };
-    }, [summaryStats, headerData.transaction_type, isReadOnly, itemsData.length]);
+    }, [summaryStats, headerData.transaction_type, isReadOnly, itemsData, getExchangeRates, lookups.currencies]);
 
     const validateTransactionLogic = (targetStatus) => {
         if (targetStatus === 'DRAFT') return true;
@@ -892,7 +906,11 @@
                 <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800/50">
                     <AlertTriangle size={14} />
                     <span className="text-[12px] font-bold">
-                        {t('اختلاف تراز دلاری:', 'USD Diff:')} <span dir="ltr" className="inline-block px-1 font-black">{formatNumber(Math.abs(balanceInfo.diff))}</span>
+                        {t(
+                            balanceInfo.displayCurrency === 'USD' ? 'اختلاف تراز دلاری:' : `اختلاف تراز ${balanceInfo.displayCurrency}:`,
+                            balanceInfo.displayCurrency === 'USD' ? 'USD Diff:' : `${balanceInfo.displayCurrency} Diff:`
+                        )}
+                        {' '}<span dir="ltr" className="inline-block px-1 font-black">{Math.abs(balanceInfo.diffDisplay).toFixed(balanceInfo.displayDecimals)}</span>
                     </span>
                 </div>
             )}
@@ -902,7 +920,7 @@
     const itemsCardAction = (
         <div className="flex items-center gap-2">
             {balanceInfo.isUnbalanced && !isReadOnly && (
-                <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[12px]" icon={Scale} onClick={(e) => { e.stopPropagation(); gridRef.current?.triggerBalanceRow(balanceInfo.diff); }}>
+                <Button size="sm" variant="outline" className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[12px]" icon={Scale} onClick={(e) => { e.stopPropagation(); gridRef.current?.triggerBalanceRow({ diffAmount: balanceInfo.diffDisplay, currency: balanceInfo.displayCurrency }); }}>
                     {t('تراز کردن ارزی', 'Balance (USD)')}
                 </Button>
             )}

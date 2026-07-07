@@ -42,6 +42,7 @@
   const Save          = safeIcon(LucideIcons, 'Save');
   const Check         = safeIcon(LucideIcons, 'Check');
   const AlertTriangle = safeIcon(LucideIcons, 'AlertTriangle');
+  const Scale         = safeIcon(LucideIcons, 'Scale');
   const Send          = safeIcon(LucideIcons, 'Send');
   const CheckCircle   = safeIcon(LucideIcons, 'CheckCircle');
   const XCircle       = safeIcon(LucideIcons, 'XCircle');
@@ -49,6 +50,8 @@
   const Lock          = safeIcon(LucideIcons, 'Lock');
   const PlayCircle    = safeIcon(LucideIcons, 'PlayCircle');
   const CheckSquare   = safeIcon(LucideIcons, 'CheckSquare');
+  const ChevronRight  = safeIcon(LucideIcons, 'ChevronRight');
+  const ChevronLeft   = safeIcon(LucideIcons, 'ChevronLeft');
 
   // ── Shared constants ───────────────────────────────────────────────────────
   const REQUEST_TYPES = [
@@ -78,6 +81,7 @@
   ];
 
   const lockedStatuses = ['REGISTERED', 'REVIEWED', 'APPROVED', 'IN_PROGRESS', 'DONE', 'REJECTED', 'CLOSED'];
+  const BALANCED_REQUEST_TYPES = ['TRANSFER', 'EXCHANGE'];
   const getStatus = (v) => STATUS_LIST.find(s => s.value === v) || STATUS_LIST[0];
 
   const getSessionUserId = () => {
@@ -125,8 +129,10 @@
     const [copyWarning, setCopyWarning] = useState(null);
     const [header,      setHeader]      = useState({});
     const [items,       setItems]       = useState([]);
+    const [currencyRates, setCurrencyRates] = useState({});
     const [lookups,     setLookups]     = useState({
       leafAccounts: [], allAccounts: [], costTypes: [], incomeTypes: [],
+      costBenefitCenters: [],
       currencies: [], usersMap: {}, usersList: [], partiesMap: {}, partiesList: [],
       nodesMap: {}, currentUserDeptId: null, currentUserDeptTitle: '',
       currentUserPartyId: null, currentUserPartyName: '',
@@ -140,11 +146,108 @@
       [formMode, header.status]
     );
 
+    const parseAmount = useCallback((value) => {
+      return parseFloat(String(value || '0').replace(/,/g, '')) || 0;
+    }, []);
+
+    const getCurrencyDecimals = useCallback((currencyCode) => {
+      const currency = (lookups.currencies || []).find(item => item.code === currencyCode);
+      const decimals = currency?.decimal_places;
+      return Number.isFinite(Number(decimals)) ? Number(decimals) : 2;
+    }, [lookups.currencies]);
+
+    const roundToCurrencyDecimals = useCallback((value, currencyCode) => {
+      const decimals = getCurrencyDecimals(currencyCode);
+      const factor = 10 ** decimals;
+      return Math.round((Number(value) || 0) * factor) / factor;
+    }, [getCurrencyDecimals]);
+
+    const resolveRates = useCallback((ratesMap, currency) => {
+      let toUsd = 1;
+      if (currency !== 'USD') {
+        const direct = ratesMap[`${currency}_USD`];
+        const inverse = ratesMap[`USD_${currency}`];
+        if (direct) toUsd = parseFloat(direct);
+        else if (inverse) toUsd = 1 / parseFloat(inverse);
+      }
+      return { toUsd };
+    }, []);
+
+    const getRatesForDate = useCallback(async (dateRaw) => {
+      const dateKey = (dateRaw || new Date().toISOString()).replace(/\//g, '-').split('T')[0];
+      const { data, error } = await supabase
+        .from('fm_currency_rates')
+        .select('base_currency, target_currency, rate, rate_date')
+        .lte('rate_date', dateKey)
+        .order('rate_date', { ascending: false });
+
+      if (error) throw error;
+
+      const latest = {};
+      (data || []).forEach(rate => {
+        const key = `${rate.base_currency}_${rate.target_currency}`;
+        if (!latest[key]) latest[key] = rate.rate;
+      });
+
+      return latest;
+    }, [supabase]);
+
+    const validateTransferBalance = useCallback(async () => {
+      if (!BALANCED_REQUEST_TYPES.includes(header.request_type) || !items.length) return true;
+
+      const ratesMap = await getRatesForDate(header.need_date || header.created_at || new Date().toISOString());
+      let diffUsd = 0;
+
+      items.forEach(item => {
+        const dep = parseAmount(item.deposit_amount);
+        const wid = parseAmount(item.withdrawal_amount);
+        const cur = item.currency || 'IRR';
+        const { toUsd } = resolveRates(ratesMap, cur);
+        diffUsd += (dep - wid) * toUsd;
+      });
+
+      const tolerance = 0.01;
+      if (Math.abs(diffUsd) > tolerance) {
+        showToast(
+          t(
+            `بالانس درخواست صحیح نیست. اختلاف معادل دلار: ${diffUsd.toFixed(2)}`,
+            `Request balance mismatch. USD difference: ${diffUsd.toFixed(2)}`
+          ),
+          'error'
+        );
+        return false;
+      }
+
+      return true;
+    }, [getRatesForDate, header.created_at, header.need_date, header.request_type, items, parseAmount, resolveRates, showToast, t]);
+
+    useEffect(() => {
+      let cancelled = false;
+
+      const loadCurrencyRates = async () => {
+        if (!BALANCED_REQUEST_TYPES.includes(header.request_type)) {
+          if (!cancelled) setCurrencyRates({});
+          return;
+        }
+
+        try {
+          const ratesMap = await getRatesForDate(header.need_date || header.created_at || new Date().toISOString());
+          if (!cancelled) setCurrencyRates(ratesMap);
+        } catch (e) {
+          console.error('RequestFormModal currency rates error:', e);
+          if (!cancelled) setCurrencyRates({});
+        }
+      };
+
+      loadCurrencyRates();
+      return () => { cancelled = true; };
+    }, [getRatesForDate, header.created_at, header.need_date, header.request_type]);
+
     // ── fetch dependencies ───────────────────────────────────────────────
     const fetchDeps = useCallback(async () => {
       if (!supabase) return null;
       try {
-        const [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, currRes] =
+        const [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, currRes, cbcRes] =
           await Promise.all([
             supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
             supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
@@ -155,6 +258,7 @@
             supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
             supabase.from('fm_org_chart_nodes').select('id, title'),
             supabase.from('fm_currencies').select('id, code, title'),
+            supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
           ]);
 
         const activeCharts   = chartRes.data || [];
@@ -217,6 +321,17 @@
           allAccounts:  accRes.data || [],
           costTypes:    buildLeafs(costRes.data   || []),
           incomeTypes:  buildLeafs(incRes.data    || []),
+          costBenefitCenters: (cbcRes.data || []).map(r => ({
+            id: r.id,
+            titleFa: r.title_fa || '',
+            titleEn: r.title_en || r.title_fa || '',
+            centerKind: r.center_kind || '',
+            isCostCenter: r.is_cost_center ?? false,
+            isBenefitCenter: r.is_benefit_center ?? false,
+            isActive: r.is_active ?? true,
+            managerName: r.manager ? `${r.manager.first_name || ''} ${r.manager.last_name || ''}`.trim() : '',
+            officeName: r.office?.title || '',
+          })),
           currencies:   currRes.data || [],
           usersMap, usersList: usersRes.data || [], partiesMap, partiesList, nodesMap,
           currentUserDeptId: myDeptId, currentUserDeptTitle: myDeptTitle,
@@ -353,6 +468,10 @@
         const actorId   = currentUserId;
         const actorName = actorId ? (lookups.usersMap[actorId] || currentUserName) : currentUserName;
 
+        if (!(await validateTransferBalance())) {
+          return;
+        }
+
         const metaPayload = {};
         if (statusToSave === 'REVIEWED' && header.status !== 'REVIEWED')
           Object.assign(metaPayload, { reviewer_id: actorId, reviewed_at: now, reviewer_name: actorName });
@@ -390,40 +509,8 @@
         }
 
         if (isDirty || !header.id) {
-          // validation بالانس برای انتقال و تبدیل
-          if ((header.request_type === 'TRANSFER' || header.request_type === 'EXCHANGE') && items.length > 0) {
-            const currencies = lookups.currencies || [];
-            const usdCurrency = currencies.find(c => c.code === 'USD');
-            const irrCurrency = currencies.find(c => c.code === 'IRR');
-            
-            let usdBalance = 0, irrBalance = 0;
-            items.forEach(item => {
-              const parse = v => parseFloat(String(v || '0').replace(/,/g, '')) || 0;
-              const dep = parse(item.deposit_amount);
-              const wid = parse(item.withdrawal_amount);
-              const net = dep - wid;
-              
-              if (item.currency === 'USD') usdBalance += net;
-              else if (item.currency === 'IRR') irrBalance += net;
-            });
-            
-            const tolerance = 0.01;
-            if (Math.abs(usdBalance) > tolerance || Math.abs(irrBalance) > tolerance) {
-              showToast(
-                t(
-                  `بالانس درخواست ${header.request_type === 'TRANSFER' ? 'انتقال وجه' : 'تبدیل ارز'} صحیح نیست. دلار: ${usdBalance.toFixed(2)}, ریال: ${irrBalance.toFixed(2)}`,
-                  `${header.request_type === 'TRANSFER' ? 'Transfer' : 'Exchange'} balance mismatch. USD: ${usdBalance.toFixed(2)}, IRR: ${irrBalance.toFixed(2)}`
-                ),
-                'error'
-              );
-              setIsLoading(false);
-              return;
-            }
-          }
-
           await supabase.from('req_request_items').delete().eq('request_id', reqId);
           if (items.length > 0) {
-            const parse = v => parseFloat(String(v || '0').replace(/,/g, '')) || 0;
             const itemsPayload = items.map((item, idx) => ({
               request_id:         reqId,
               row_number:         idx + 1,
@@ -433,12 +520,12 @@
               cost_type_id:       item.cost_type_id       || null,
               income_type_id:     item.income_type_id     || null,
               party_id:           item.party_id           || null,
-              department_id:      item.department_id      || null,
+              center_id:          item.center_id          || null,
               project_id:         item.project_id         || null,
-              deposit_amount:     parse(item.deposit_amount),
-              withdrawal_amount:  parse(item.withdrawal_amount),
-              approved_amount:    parse(item.approved_amount),
-              remaining_amount:   parse(item.remaining_amount),
+              deposit_amount:     parseAmount(item.deposit_amount),
+              withdrawal_amount:  parseAmount(item.withdrawal_amount),
+              approved_amount:    parseAmount(item.approved_amount),
+              remaining_amount:   parseAmount(item.remaining_amount),
               description:        item.description || null,
             }));
             const { data: savedItems, error: iErr } = await supabase.from('req_request_items').insert(itemsPayload).select();
@@ -475,24 +562,29 @@
     
     // ── balance check for TRANSFER and EXCHANGE ───────────────────────────────────
     const balanceInfo = useMemo(() => {
-      if ((header.request_type !== 'TRANSFER' && header.request_type !== 'EXCHANGE') || items.length === 0) return { isUnbalanced: false, diffUsd: 0, diffIrr: 0 };
-      
-      let usdBalance = 0, irrBalance = 0;
+      if (!BALANCED_REQUEST_TYPES.includes(header.request_type) || items.length === 0) return { isUnbalanced: false, diffUsd: 0 };
+
+      let diffUsd = 0;
       items.forEach(item => {
-        const parse = v => parseFloat(String(v || '0').replace(/,/g, '')) || 0;
-        const dep = parse(item.deposit_amount);
-        const wid = parse(item.withdrawal_amount);
-        const net = dep - wid;
-        
-        if (item.currency === 'USD') usdBalance += net;
-        else if (item.currency === 'IRR') irrBalance += net;
+        const dep = parseAmount(item.deposit_amount);
+        const wid = parseAmount(item.withdrawal_amount);
+        const cur = item.currency || 'IRR';
+        const { toUsd } = resolveRates(currencyRates, cur);
+        diffUsd += (dep - wid) * toUsd;
       });
       
       const tolerance = 0.01;
-      const isUnbalanced = Math.abs(usdBalance) > tolerance || Math.abs(irrBalance) > tolerance;
-      
-      return { isUnbalanced, diffUsd: usdBalance, diffIrr: irrBalance };
-    }, [header.request_type, items]);
+      const isUnbalanced = Math.abs(diffUsd) > tolerance;
+
+      const currenciesUsed = [...new Set(items.map(item => item.currency || 'IRR'))];
+      const displayCurrency = currenciesUsed.length === 1 ? currenciesUsed[0] : 'USD';
+      const displayToUsd = resolveRates(currencyRates, displayCurrency).toUsd || 1;
+      const diffDisplayRaw = displayToUsd > 0 ? diffUsd / displayToUsd : diffUsd;
+      const displayDecimals = getCurrencyDecimals(displayCurrency);
+      const diffDisplayAmount = roundToCurrencyDecimals(diffDisplayRaw, displayCurrency);
+
+      return { isUnbalanced, diffUsd, displayCurrency, displayToUsd, diffDisplayAmount, displayDecimals };
+    }, [currencyRates, getCurrencyDecimals, header.request_type, items, parseAmount, roundToCurrencyDecimals, resolveRates]);
     
     if (!isOpen) return null;
 
@@ -575,15 +667,35 @@
     );
 
     return (
-      <Modal isOpen={isOpen} onClose={handleClose}
-        title={
-          formMode === 'CREATE' ? t('ثبت درخواست جدید', 'New Request') :
-          formMode === 'COPY'   ? t('کپی درخواست', 'Copy Request') :
-          t('مشاهده / ویرایش درخواست', 'View / Edit Request')
-        }
-        language={language} width="max-w-6xl">
-        <div className="flex flex-col bg-slate-50/50 dark:bg-slate-900/50 h-[85vh] text-[12px] relative">
-          <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4 pb-20">
+      <div className="flex-1 min-h-0 flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900 text-[12px] animate-in fade-in duration-300" dir={isRtl ? 'rtl' : 'ltr'}>
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between shrink-0 shadow-sm z-30 relative">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" icon={isRtl ? ChevronRight : ChevronLeft} onClick={handleClose}>{t('بازگشت به لیست', 'Back to List')}</Button>
+            <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">
+                {isReadOnly ? t('مشاهده درخواست', 'View Request') : formMode === 'CREATE' ? t('ثبت درخواست جدید', 'New Request') : formMode === 'COPY' ? t('کپی درخواست', 'Copy Request') : t('ویرایش درخواست', 'Edit Request')}
+              </span>
+              {header.request_code && (
+                <>
+                  <span className="text-slate-300 dark:text-slate-600 select-none">·</span>
+                  <span className="text-[12px] font-bold text-indigo-600 dark:text-indigo-400" dir="ltr">{header.request_code}</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" className="!px-5" onClick={handleClose}>{t('انصراف', 'Cancel')}</Button>
+            {!isReadOnly && access.canEdit && (
+              <Button variant="primary" size="sm" className="!px-5" icon={Save}
+                onClick={() => handleSave()} isLoading={isLoading} disabled={!isDirty}>
+                {t('ذخیره', 'Save')}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 flex flex-col gap-4">
 
             {copyWarning && (
               <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-center gap-2 shrink-0 animate-in slide-in-from-top-2">
@@ -668,18 +780,35 @@
                   <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400 bg-orange-100/50 dark:bg-orange-900/30 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800/50">
                     <AlertTriangle size={14} />
                     <span className="text-[12px] font-bold">
-                      {t('مغایرت بالانس:', 'Balance Diff:')}
-                      {Math.abs(balanceInfo.diffUsd) > 0.01 && (
-                        <span dir="ltr" className="inline-block px-1 font-black">USD: {balanceInfo.diffUsd.toFixed(2)}</span>
+                      {t(
+                        balanceInfo.displayCurrency === 'USD' ? 'اختلاف تراز دلاری:' : `اختلاف تراز ${balanceInfo.displayCurrency}:`,
+                        balanceInfo.displayCurrency === 'USD' ? 'USD Diff:' : `${balanceInfo.displayCurrency} Diff:`
                       )}
-                      {Math.abs(balanceInfo.diffIrr) > 0.01 && (
-                        <span dir="ltr" className="inline-block px-1 font-black">IRR: {balanceInfo.diffIrr.toFixed(2)}</span>
-                      )}
+                      <span dir="ltr" className="inline-block px-1 font-black">{balanceInfo.diffDisplayAmount.toFixed(balanceInfo.displayDecimals)}</span>
                     </span>
                   </div>
                 )}
               </div>
             }
+              action={
+                balanceInfo.isUnbalanced && !isReadOnly ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="!text-orange-600 !border-orange-500 hover:!bg-orange-100 dark:hover:!bg-orange-900/40 !h-6 !py-0 !text-[12px]"
+                    icon={Scale}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      gridRef.current?.triggerBalanceRow({
+                        diffAmount: balanceInfo.diffDisplayAmount,
+                        currency: balanceInfo.displayCurrency,
+                      });
+                    }}
+                  >
+                    {t('تراز کردن ارزی', 'Balance (USD)')}
+                  </Button>
+                ) : null
+              }
               isCollapsible={true} noPadding={true}
               className="border border-slate-200 dark:border-slate-700 shadow-sm flex-1 flex flex-col min-h-[320px] relative z-10"
               headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
@@ -699,22 +828,11 @@
               </div>
             </Card>
 
-          </div>
-
-          <div className="absolute bottom-0 left-0 right-0 flex justify-end gap-3 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-50">
-            <Button variant="outline" size="sm" onClick={handleClose}>{t('بستن', 'Close')}</Button>
-            {!isReadOnly && access.canEdit && (
-              <Button variant="primary" size="sm" icon={Save}
-                onClick={() => handleSave()} isLoading={isLoading} disabled={!isDirty}>
-                {t('ذخیره', 'Save')}
-              </Button>
-            )}
-          </div>
         </div>
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type}
           onClose={() => setToast(p => ({ ...p, isVisible: false }))} />
-      </Modal>
+      </div>
     );
   };
 
