@@ -363,7 +363,7 @@
                     </div>
                 );
             }
-            if (!isCenterGroup) return <span className="text-slate-400 dark:text-slate-600 text-[11px]">-</span>;
+            if (!isCenterGroup) return <span className="text-slate-400 dark:text-slate-600 text-[12px]">-</span>;
             const c = (lookups.costBenefitCenters || []).find(x => String(x.id) === String(val));
             return <span className="text-[12px] truncate block">{c ? (isRtl ? c.titleFa : (c.titleEn || c.titleFa)) : ''}</span>;
         }},

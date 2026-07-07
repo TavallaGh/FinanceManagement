@@ -385,7 +385,7 @@
         },
           React.createElement('div', { className: 'flex items-center gap-2 flex-wrap' },
             groupName && React.createElement(Badge, { variant: 'info', size: 'sm' }, groupName),
-            React.createElement('span', { className: 'text-[11px] text-slate-500 dark:text-slate-400' },
+            React.createElement('span', { className: 'text-[12px] text-slate-500 dark:text-slate-400' },
               t(
                 `${accounts.length} حساب  ·  ${dates.length} روز`,
                 `${accounts.length} accounts  ·  ${dates.length} days`
@@ -402,7 +402,7 @@
 
         // ── Scrollable matrix ─────────────────────────────────────────────
         React.createElement('div', { className: 'flex-1 overflow-auto custom-scrollbar' },
-          React.createElement('table', { className: 'border-collapse text-[11px]', style: { minWidth: '100%' } },
+          React.createElement('table', { className: 'border-collapse text-[12px]', style: { minWidth: '100%' } },
 
             // Header row
             React.createElement('thead', null,

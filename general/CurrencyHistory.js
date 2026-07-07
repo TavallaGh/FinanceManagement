@@ -318,7 +318,7 @@
                  </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">{t('نرخ‌های دستی را وارد کنید یا از آخرین نرخ‌های ثبت‌شده کپی بگیرید.', 'Enter rates or copy from last saved values.')}</span>
+                <span className="text-[12px] text-slate-400 dark:text-slate-500">{t('نرخ‌های دستی را وارد کنید یا از آخرین نرخ‌های ثبت‌شده کپی بگیرید.', 'Enter rates or copy from last saved values.')}</span>
                 {!isReadOnly && <Button variant="outline" size="sm" icon={Copy} onClick={handleCopyLastRates} disabled={manualRatesList.length === 0}>{t('کپی از آخرین نرخ‌ها', 'Copy Last Rates')}</Button>}
               </div>
               <div className="flex flex-col max-h-[350px] overflow-y-auto custom-scrollbar pr-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">

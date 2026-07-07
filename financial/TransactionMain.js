@@ -497,16 +497,16 @@
         { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
         { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '90px', type: 'date' },
         { field: 'created_at', header_fa: 'زمان ثبت', header_en: 'Registered At', width: '100px', render: (val) => {
-            if (!val) return React.createElement('span', { className: 'text-slate-400 text-[11px]' }, '-');
+            if (!val) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
             try {
                 const d = new Date(val);
                 const datePart = new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
                 const timePart = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
                 return React.createElement('div', { className: 'flex flex-col leading-tight', dir: 'ltr' },
-                    React.createElement('span', { className: 'text-[11px] font-sans text-slate-700 dark:text-slate-300' }, datePart),
+                    React.createElement('span', { className: 'text-[12px] font-sans text-slate-700 dark:text-slate-300' }, datePart),
                     React.createElement('span', { className: 'text-[10px] font-sans text-slate-400 dark:text-slate-500' }, timePart)
                 );
-            } catch(e) { return React.createElement('span', { className: 'text-[11px]' }, val); }
+            } catch(e) { return React.createElement('span', { className: 'text-[12px]' }, val); }
         }},
         { field: 'transaction_type', header_fa: 'نوع تراکنش', header_en: 'Type', width: '100px', render: (val) => TRANSACTION_TYPES.find(x => x.value === val)?.label || val },
         { field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '95px', render: (val) => {
@@ -524,15 +524,15 @@
         { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: '160px', render: (val) => React.createElement('span', { className: "text-[12px] truncate block max-w-xs", title: val }, val || '-') },
         { field: 'reviewed_by_name', header_fa: 'بررسی‌کننده', header_en: 'Reviewed By', width: '110px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300' }, val || '-') },
         { field: 'reviewed_at', header_fa: 'تاریخ بررسی', header_en: 'Reviewed At', width: '115px', render: (val) => {
-            if (!val) return React.createElement('span', { className: 'text-slate-400 text-[11px]' }, '-');
-            try { return React.createElement('span', { className: 'text-[11px] font-sans block', dir: 'ltr' }, new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(val))); }
-            catch(e) { return React.createElement('span', { className: 'text-[11px]' }, val); }
+            if (!val) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
+            try { return React.createElement('span', { className: 'text-[12px] font-sans block', dir: 'ltr' }, new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(val))); }
+            catch(e) { return React.createElement('span', { className: 'text-[12px]' }, val); }
         }},
         { field: 'approved_by_name', header_fa: 'تاییدکننده', header_en: 'Approved By', width: '110px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300' }, val || '-') },
         { field: 'approved_at', header_fa: 'تاریخ تایید', header_en: 'Approved At', width: '115px', render: (val) => {
-            if (!val) return React.createElement('span', { className: 'text-slate-400 text-[11px]' }, '-');
-            try { return React.createElement('span', { className: 'text-[11px] font-sans block', dir: 'ltr' }, new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(val))); }
-            catch(e) { return React.createElement('span', { className: 'text-[11px]' }, val); }
+            if (!val) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
+            try { return React.createElement('span', { className: 'text-[12px] font-sans block', dir: 'ltr' }, new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(val))); }
+            catch(e) { return React.createElement('span', { className: 'text-[12px]' }, val); }
         }},
         { field: '_total_usd', header_fa: 'جمع (USD)', header_en: 'Total (USD)', width: '110px', render: (_, row) => {
             const items = row.fm_transaction_items || [];
@@ -546,10 +546,10 @@
                 if (item.transaction_action === 'DEPOSIT') depUsd += usd;
                 else widUsd += usd;
             });
-            if (depUsd === 0 && widUsd === 0) return React.createElement('span', { className: 'text-slate-300 dark:text-slate-600 text-[11px]' }, '—');
+            if (depUsd === 0 && widUsd === 0) return React.createElement('span', { className: 'text-slate-300 dark:text-slate-600 text-[12px]' }, '—');
             return React.createElement('div', { className: 'flex flex-col gap-0.5', dir: 'ltr' },
-                depUsd > 0 ? React.createElement('span', { className: 'text-[11px] font-medium text-emerald-600 dark:text-emerald-500' }, formatNumber(depUsd)) : null,
-                widUsd > 0 ? React.createElement('span', { className: 'text-[11px] font-medium text-rose-500 dark:text-rose-400' }, formatNumber(widUsd)) : null
+                depUsd > 0 ? React.createElement('span', { className: 'text-[12px] font-medium text-emerald-600 dark:text-emerald-500' }, formatNumber(depUsd)) : null,
+                widUsd > 0 ? React.createElement('span', { className: 'text-[12px] font-medium text-rose-500 dark:text-rose-400' }, formatNumber(widUsd)) : null
             );
         }},
         { field: '_total_irr', header_fa: 'جمع (IRR)', header_en: 'Total (IRR)', width: '130px', render: (_, row) => {
@@ -565,10 +565,10 @@
                 if (item.transaction_action === 'DEPOSIT') depIrr += irr;
                 else widIrr += irr;
             });
-            if (depIrr === 0 && widIrr === 0) return React.createElement('span', { className: 'text-slate-300 dark:text-slate-600 text-[11px]' }, '—');
+            if (depIrr === 0 && widIrr === 0) return React.createElement('span', { className: 'text-slate-300 dark:text-slate-600 text-[12px]' }, '—');
             return React.createElement('div', { className: 'flex flex-col gap-0.5', dir: 'ltr' },
-                depIrr > 0 ? React.createElement('span', { className: 'text-[11px] font-medium text-emerald-600 dark:text-emerald-500' }, formatNumber(depIrr)) : null,
-                widIrr > 0 ? React.createElement('span', { className: 'text-[11px] font-medium text-rose-500 dark:text-rose-400' }, formatNumber(widIrr)) : null
+                depIrr > 0 ? React.createElement('span', { className: 'text-[12px] font-medium text-emerald-600 dark:text-emerald-500' }, formatNumber(depIrr)) : null,
+                widIrr > 0 ? React.createElement('span', { className: 'text-[12px] font-medium text-rose-500 dark:text-rose-400' }, formatNumber(widIrr)) : null
             );
         }}
     ], [usersMap, deptsMap, t, dateLocale]);

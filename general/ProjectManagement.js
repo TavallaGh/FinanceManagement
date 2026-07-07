@@ -486,7 +486,7 @@
                     }`}
                 >
                   <Badge variant={s.variant} size="sm">{isRtl ? s.fa : s.en}</Badge>
-                  <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                  <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400">
                     {isRtl ? s.en : s.fa}
                   </span>
                 </button>

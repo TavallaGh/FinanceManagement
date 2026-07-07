@@ -332,7 +332,7 @@
             {initialRecord && (
               <div className={`flex items-center ${isRtl ? 'flex-row' : 'flex-row-reverse'} justify-between gap-3 px-4 py-2.5 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50/80 dark:bg-slate-800/40`}>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('وضعیت:', 'Status:')}</span>
+                  <span className="text-[12px] text-slate-500 dark:text-slate-400">{t('وضعیت:', 'Status:')}</span>
                   <Badge variant={statusInfo.variant} size="sm">
                     {isRtl ? statusInfo.fa : statusInfo.en}
                   </Badge>
@@ -342,7 +342,7 @@
                     <Button key={tr.value} variant="outline" size="sm"
                       onClick={() => handleStatusTransition(tr.value)}
                       isLoading={isSaving}
-                      className={`!py-0.5 !h-6 !text-[11px] ${tr.cls}`}>
+                      className={`!py-0.5 !h-6 !text-[12px] ${tr.cls}`}>
                       {isRtl ? tr.fa : tr.en}
                     </Button>
                   ))}
@@ -444,7 +444,7 @@
                   <div className="h-8 flex items-center px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-[12px] text-slate-600 dark:text-slate-400" dir="ltr">
                     {formData.estimated_end_date
                       ? fmtDate(formData.estimated_end_date)
-                      : <span className="text-slate-400 italic text-[11px]">{t('محاسبه خودکار', 'Auto')}</span>}
+                      : <span className="text-slate-400 italic text-[12px]">{t('محاسبه خودکار', 'Auto')}</span>}
                   </div>
                 </div>
 

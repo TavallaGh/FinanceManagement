@@ -259,7 +259,7 @@
           }
           return val
             ? <span className="text-[12px]" dir="ltr">{fmtDate(val)}</span>
-            : <span className="text-slate-400 italic text-[11px]">{t('از شروع پروژه', 'From project start')}</span>;
+            : <span className="text-slate-400 italic text-[12px]">{t('از شروع پروژه', 'From project start')}</span>;
         }
       },
       {
@@ -276,7 +276,7 @@
           }
           return val
             ? <span className="text-[12px]" dir="ltr">{fmtDate(val)}</span>
-            : <span className="text-slate-400 italic text-[11px]">{t('تا پایان پروژه', 'Until project end')}</span>;
+            : <span className="text-slate-400 italic text-[12px]">{t('تا پایان پروژه', 'Until project end')}</span>;
         }
       },
       {

@@ -571,7 +571,7 @@
         render: (_, row) => (
           <div className="flex gap-1 flex-wrap">
             {getCenterTypeBadges(row).map((b, i) => (
-              <span key={i} className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${b.cls}`}>{b.label}</span>
+              <span key={i} className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${b.cls}`}>{b.label}</span>
             ))}
           </div>
         ),
@@ -762,7 +762,7 @@
                   />
                 </div>
                 {!formData.isCostCenter && !formData.isBenefitCenter && (
-                  <p className="text-[11px] text-red-500 mt-1">
+                  <p className="text-[12px] text-red-500 mt-1">
                     {t('حداقل یک گزینه باید انتخاب شود', 'At least one option must be selected')}
                   </p>
                 )}
