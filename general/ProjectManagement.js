@@ -144,6 +144,9 @@
     const getStatusInfo = (value) =>
       PROJECT_STATUSES.find(s => s.value === value) || PROJECT_STATUSES[0];
 
+    const isLockedProject = (row) =>
+      row?.status === 'COMPLETED' || row?.status === 'CANCELLED';
+
     // ── Fetch ──────────────────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
       setIsLoading(true);
@@ -406,11 +409,26 @@
               gridState={gridState}
               onGridStateChange={setGridState}
               hideImport={true}
-              onToggle={(row, field, val) => { if (field === 'is_active') handleToggleActive(row, val); }}
+              onToggle={(row, field, val) => { if (field === 'is_active' && !isLockedProject(row)) handleToggleActive(row, val); }}
               actions={[
-                { icon: Edit,   tooltip: t('ویرایش',       'Edit'),              onClick: (row) => handleOpenModal(row),                                              className: 'text-slate-400 hover:text-indigo-600' },
-                { icon: Users,  tooltip: t('پرسنل مرتبط', 'Related Personnel'), onClick: (row) => openPersonnelModal(row),                                          className: 'text-slate-400 hover:text-teal-600'   },
-                { icon: Trash2, tooltip: t('حذف',          'Delete'),            onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600'    }
+                {
+                  icon: Edit, tooltip: t('ویرایش', 'Edit'),
+                  onClick: (row) => handleOpenModal(row),
+                  className: 'text-slate-400 hover:text-indigo-600'
+                },
+                {
+                  icon: Users, tooltip: t('پرسنل مرتبط', 'Related Personnel'),
+                  onClick: (row) => openPersonnelModal(row),
+                  className: (row) => allProjectPersonnel.some(pp => pp.project_id === row.id)
+                    ? 'text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300'
+                    : 'text-slate-400 hover:text-teal-600'
+                },
+                {
+                  icon: Trash2, tooltip: t('حذف', 'Delete'),
+                  hidden: (row) => isLockedProject(row),
+                  onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }),
+                  className: 'text-slate-400 hover:text-red-600'
+                }
               ]}
               bulkActions={[
                 {
@@ -455,6 +473,7 @@
             onClose:    () => setPersonnelModal({ isOpen: false, project: null }),
             allParties: allParties,
             showToast:  showToast,
+            isReadOnly: personnelModal.project ? isLockedProject(personnelModal.project) : false,
             language:   language
           })
         )}

@@ -310,6 +310,7 @@
     const currentStatus = formData.status || 'PLANNING';
     const statusInfo    = getStatusInfo(currentStatus);
     const transitions   = STATUS_TRANSITIONS[currentStatus] || [];
+    const isLocked      = currentStatus === 'COMPLETED' || currentStatus === 'CANCELLED';
 
     // ── Render ─────────────────────────────────────────────────────────────
     return (
@@ -477,11 +478,13 @@
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
                 <Button variant="outline" size="sm" onClick={onClose}>
-                  {t('انصراف', 'Cancel')}
+                  {t('بستن', 'Close')}
                 </Button>
-                <Button variant="primary" size="sm" icon={Save} onClick={handleSave} isLoading={isSaving}>
-                  {t('ذخیره اطلاعات', 'Save Changes')}
-                </Button>
+                {!isLocked && (
+                  <Button variant="primary" size="sm" icon={Save} onClick={handleSave} isLoading={isSaving}>
+                    {t('ذخیره اطلاعات', 'Save Changes')}
+                  </Button>
+                )}
               </div>
             </div>
           </div>

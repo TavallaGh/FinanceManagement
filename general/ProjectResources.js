@@ -46,8 +46,9 @@
 
   const supabase = window.supabase;
 
-  // ── ROW_HEIGHT × 10 rows + header → fixed min-height to prevent grid shrink
-  const GRID_MIN_HEIGHT = 460; // px — keeps modal stable while editing
+  // ── Fixed height for the grid container – DataGrid uses h-full, so the
+  // parent must have a defined height (not just minHeight) to prevent collapse
+  const GRID_HEIGHT = 440; // px – accommodates ~10 rows; DataGrid scrolls internally
 
   // ════════════════════════════════════════════════════════════════════════════
   // ProjectResources
@@ -58,6 +59,7 @@
     onClose,       // () => void
     allParties,    // full party list (from ProjectManagement fetchData)
     showToast,     // (message, type) => void
+    isReadOnly = false, // true for COMPLETED/CANCELLED projects
     language = 'fa'
   }) => {
     const isRtl = language === 'fa';
@@ -242,7 +244,29 @@
               </div>
             );
           }
-          return <span className="font-bold text-slate-700 dark:text-slate-200">{getPartyName(val)}</span>;
+          return (
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-slate-700 dark:text-slate-200">{getPartyName(val)}</span>
+              {(() => {
+                // Normalize YYYY/MM/DD or YYYY-MM-DD → Date object for correct comparison
+                const parseDate = (s) => {
+                  if (!s) return null;
+                  const norm = String(s).replace(/\//g, '-').split('T')[0];
+                  const d = new Date(norm + 'T00:00:00');
+                  return isNaN(d.getTime()) ? null : d;
+                };
+                const today    = new Date(); today.setHours(0, 0, 0, 0);
+                const startD   = parseDate(row.start_date);
+                const endD     = parseDate(row.end_date);
+                // Not started yet: start_date is in the FUTURE
+                const isNotStarted = startD && startD > today;
+                // Expired: end_date is in the PAST
+                const isExpired    = endD   && endD   < today;
+                if (isNotStarted || isExpired)
+                  return <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-medium">{t('نامعتبر', 'Invalid')}</span>;
+              })()}
+            </div>
+          );
         }
       },
       {
@@ -298,7 +322,7 @@
         }
       },
       {
-        field: 'is_active', header_fa: 'وضعیت', header_en: 'Status', width: '90px',
+        field: 'is_active', header_fa: 'فعال', header_en: 'Active', width: '90px',
         render: (val, row) => {
           if (inlinePersonnelEdit?.id === row.id) {
             return (
@@ -309,10 +333,12 @@
               </div>
             );
           }
-          return null; // DataGrid renders toggle via type:'toggle'
-        },
-        type: 'toggle',
-        onToggle: (row, val) => { if (!inlinePersonnelEdit) handleToggleActive(row, val); }
+          return (
+            <ToggleField size="sm" checked={!!val}
+              onChange={v => handleToggleActive(row, v)}
+              isRtl={isRtl} />
+          );
+        }
       }
     ];
 
@@ -329,29 +355,31 @@
         onClick: () => setInlinePersonnelEdit(null),
         className: '!text-slate-500 hover:!text-slate-700'
       },
-      {
-        icon: Edit, tooltip: t('ویرایش', 'Edit'),
-        hidden: (row) => inlinePersonnelEdit?.id === row.id || !!row._isNew,
-        onClick: (row) => {
-          const emp = employeeParties.find(e => String(e.id) === String(row.party_id));
-          setInlinePersonnelEdit({
-            id: row.id,
-            data: {
-              party_id: row.party_id, party_obj: emp || null,
-              start_date: row.start_date || '', end_date: row.end_date || '',
-              participation_percent: row.participation_percent ?? 100,
-              is_active: row.is_active ?? true
-            }
-          });
+      ...(!isReadOnly ? [
+        {
+          icon: Edit, tooltip: t('ویرایش', 'Edit'),
+          hidden: (row) => inlinePersonnelEdit?.id === row.id || !!row._isNew,
+          onClick: (row) => {
+            const emp = employeeParties.find(e => String(e.id) === String(row.party_id));
+            setInlinePersonnelEdit({
+              id: row.id,
+              data: {
+                party_id: row.party_id, party_obj: emp || null,
+                start_date: row.start_date || '', end_date: row.end_date || '',
+                participation_percent: row.participation_percent ?? 100,
+                is_active: row.is_active ?? true
+              }
+            });
+          },
+          className: 'text-slate-400 hover:text-indigo-500'
         },
-        className: 'text-slate-400 hover:text-indigo-500'
-      },
-      {
-        icon: Trash2, tooltip: t('حذف', 'Delete'),
-        hidden: (row) => inlinePersonnelEdit?.id === row.id || !!row._isNew,
-        onClick: (row) => handleDelete(row.id),
-        className: 'text-slate-400 hover:text-red-500'
-      }
+        {
+          icon: Trash2, tooltip: t('حذف', 'Delete'),
+          hidden: (row) => inlinePersonnelEdit?.id === row.id || !!row._isNew,
+          onClick: (row) => handleDelete(row.id),
+          className: 'text-slate-400 hover:text-red-500'
+        }
+      ] : [])
     ];
 
     // ── Close handler: also cancel any pending edit ────────────────────────
@@ -372,18 +400,20 @@
         language={language}
       >
         <div className="p-4 flex flex-col gap-3">
-          {/* Fixed-height wrapper prevents grid from shrinking in edit mode */}
-          <div style={{ minHeight: `${GRID_MIN_HEIGHT}px` }} className="flex flex-col">
+          {/* Fixed-height wrapper – DataGrid root is h-full, parent must have
+              an explicit height (not just minHeight) or the flex layout collapses */}
+          <div style={{ height: `${GRID_HEIGHT}px` }} className="flex flex-col overflow-hidden">
             <DataGrid
               data={gridData}
               columns={columns}
               language={language}
               isLoading={isLoadingPersonnel}
-              onAdd={handleAdd}
+              onAdd={isReadOnly ? undefined : handleAdd}
               hideImport={true}
+              hideExport={true}
               selectable={false}
               onToggle={(row, field, val) => {
-                if (field === 'is_active' && !inlinePersonnelEdit) handleToggleActive(row, val);
+                // toggle is now handled directly in column render
               }}
               actions={actions}
             />
