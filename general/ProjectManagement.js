@@ -306,13 +306,6 @@
     const filteredData = useMemo(() => {
       let result = [...data];
       if (filters.title)
-        result = result.filter(p => p.title?.includes(filters.title));
-      if (filters.manager?.id)
-        result = result.filter(p => p.manager_party_id === filters.manager.id);
-      if (filters.status)
-        result = result.filter(p => p.status === filters.status);
-      if (filters.isActive)
-        result = result.filter(p => p.is_active === (filters.isActive === 'active'));
       if (filters.personnel?.id)
         result = result.filter(p =>
           allProjectPersonnel.some(pp => pp.project_id === p.id && pp.party_id === filters.personnel.id)
@@ -322,17 +315,6 @@
 
     // ── Filter fields ──────────────────────────────────────────────────────
     const filterFields = [
-      { name: 'title', label: t('عنوان پروژه', 'Project Title'), type: 'text' },
-      {
-        name: 'manager', label: t('مدیر پروژه', 'Project Manager'), type: 'lov',
-        lovData: employeeParties.map(p => ({ ...p, label: `${p.title} (${p.code})` })),
-        lovColumns: [
-          { field: 'code',   header_fa: 'کد',    header_en: 'Code',   width: '100px' },
-          { field: 'title',  header_fa: 'نام',    header_en: 'Name',   width: '200px' },
-          { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '130px' }
-        ],
-        dropdownWidth: 'min-w-[450px]'
-      },
       {
         name: 'personnel', label: t('پرسنل مرتبط', 'Related Personnel'), type: 'lov',
         lovData: employeeParties.map(p => ({ ...p, label: `${p.title} (${p.code})` })),
@@ -342,17 +324,6 @@
           { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '130px' }
         ],
         dropdownWidth: 'min-w-[450px]'
-      },
-      {
-        name: 'status', label: t('وضعیت پروژه', 'Project Status'), type: 'select',
-        options: PROJECT_STATUSES.map(s => ({ value: s.value, label: isRtl ? s.fa : s.en }))
-      },
-      {
-        name: 'isActive', label: t('فعال', 'Active'), type: 'select',
-        options: [
-          { value: 'active',   label: t('فعال',    'Active')   },
-          { value: 'inactive', label: t('غیرفعال', 'Inactive') }
-        ]
       }
     ];
 
