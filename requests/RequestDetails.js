@@ -136,6 +136,7 @@
       currencies: [], usersMap: {}, usersList: [], partiesMap: {}, partiesList: [],
       nodesMap: {}, currentUserDeptId: null, currentUserDeptTitle: '',
       currentUserPartyId: null, currentUserPartyName: '',
+      projects: [],
     });
 
     const gridRef     = useRef(null);
@@ -247,7 +248,7 @@
     const fetchDeps = useCallback(async () => {
       if (!supabase) return null;
       try {
-        const [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, currRes, cbcRes] =
+        const [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, currRes, cbcRes, projectsRes] =
           await Promise.all([
             supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
             supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
@@ -259,6 +260,7 @@
             supabase.from('fm_org_chart_nodes').select('id, title'),
             supabase.from('fm_currencies').select('id, code, title'),
             supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
+            supabase.from('gen_projects').select('id, code, title, status, manager_party_id').eq('is_active', true).order('code'),
           ]);
 
         const activeCharts   = chartRes.data || [];
@@ -336,6 +338,14 @@
           usersMap, usersList: usersRes.data || [], partiesMap, partiesList, nodesMap,
           currentUserDeptId: myDeptId, currentUserDeptTitle: myDeptTitle,
           currentUserPartyId: myPartyId, currentUserPartyName: myPartyName,
+          projects: (projectsRes.data || []).map(p => ({
+            id: p.id,
+            code: p.code || '',
+            title: p.title || '',
+            status: p.status || '',
+            managerName: partiesMap[p.manager_party_id] || '',
+            displayLabel: p.title || '',
+          })),
         };
         setLookups(lk);
         return lk;

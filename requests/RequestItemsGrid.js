@@ -43,6 +43,14 @@
   const TYPES_WITH_EXCHANGE = ['EXCHANGE'];
   const TYPES_BALANCED = ['TRANSFER', 'EXCHANGE'];
 
+  const PROJECT_STATUS_LABELS = {
+    PLANNING:    { fa: 'در دست برنامه‌ریزی', en: 'Planning'    },
+    IN_PROGRESS: { fa: 'در حال اجرا',           en: 'In Progress' },
+    ON_HOLD:     { fa: 'متوقف',                 en: 'On Hold'     },
+    COMPLETED:   { fa: 'تکمیل شده',             en: 'Completed'   },
+    CANCELLED:   { fa: 'لغو شده',               en: 'Cancelled'   },
+  };
+
   const formatNumberSafe = (val, forDisplay = false) => {
     if (val === null || val === undefined || val === '') return forDisplay ? '0' : '';
     const s = String(val).replace(/,/g, '');
@@ -295,6 +303,22 @@
       { field: 'officeName', header_fa: 'محل مرکز', header_en: 'Location', width: '150px' },
     ];
 
+    const projectLovCols = [
+      { field: 'code',        header_fa: 'کد پروژه',    header_en: 'Code',    width: '110px' },
+      { field: 'title',       header_fa: 'عنوان پروژه', header_en: 'Title',   width: 'auto'  },
+      { field: 'managerName', header_fa: 'مدیر پروژه',  header_en: 'Manager', width: '150px' },
+      {
+        field: 'status',
+        header_fa: 'وضعیت',
+        header_en: 'Status',
+        width: '130px',
+        render: (val) => {
+          const lbl = PROJECT_STATUS_LABELS[val];
+          return <span>{lbl ? (isRtl ? lbl.fa : lbl.en) : (val || '-')}</span>;
+        },
+      },
+    ];
+
     // ── column definitions ────────────────────────────────────────────────
     const baseColumns = [
       {
@@ -541,7 +565,7 @@
             </div>
           );
         }
-        if (!isCenterGroup) return <span className="text-slate-400 dark:text-slate-600 text-[11px]">-</span>;
+        if (!isCenterGroup) return <span className="text-slate-400 dark:text-slate-600 text-[12px]">-</span>;
         const center = (lookups.costBenefitCenters || []).find(x => String(x.id) === String(val));
         return <span className="text-[12px] truncate block">{center ? (isRtl ? center.titleFa : (center.titleEn || center.titleFa)) : '-'}</span>;
       },
@@ -552,20 +576,25 @@
       field: 'project_id',
       header_fa: t('پروژه', 'Project'),
       header_en: 'Project',
-      width: '130px',
+      width: '160px',
       render: (val, row) => {
         if (isEditingRow(row)) {
+          const selectedProject = (lookups.projects || []).find(p => String(p.id) === String(inlineItemEdit.data.project_id));
           return (
             <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[50]">
-              <TextField size="sm"
-                value={inlineItemEdit.data.project_id || ''}
-                onChange={e => setInlineItemEdit(p => ({ ...p, data: { ...p.data, project_id: e.target.value } }))}
-                isRtl={isRtl} wrapperClassName="m-0" placeholder={t('پروژه', 'Project')}
+              <LOVField size="sm" formCode={formCode}
+                data={lookups.projects || []} columns={projectLovCols} dropdownWidth="min-w-[580px]"
+                displayValue={selectedProject ? `${selectedProject.code} - ${selectedProject.title}` : ''}
+                onChange={r => setInlineItemEdit(p => ({ ...p, data: { ...p.data, project_id: r ? r.id : '' } }))}
+                isRtl={isRtl} wrapperClassName="m-0" placeholder={t('انتخاب پروژه', 'Select Project')}
               />
             </div>
           );
         }
-        return <span className="text-[12px]">{val || '-'}</span>;
+        const proj = (lookups.projects || []).find(p => String(p.id) === String(val));
+        return proj
+          ? <div className="flex flex-col"><span className="text-[12px] font-bold truncate">{proj.title}</span><span className="text-[10px] text-slate-400 font-sans" dir="ltr">{proj.code}</span></div>
+          : <span className="text-[12px] text-slate-400">-</span>;
       },
     };
 
