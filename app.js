@@ -39,6 +39,12 @@
       }
 
       try {
+        const isReachable = await window.isSupabaseReachable?.();
+        if (isReachable === false) {
+          setError(language === 'fa' ? 'اتصال به سرور دیتابیس برقرار نیست. لطفاً شبکه یا VPN را بررسی کنید.' : 'Database server is not reachable. Check your network or VPN.');
+          return;
+        }
+
         const hashedInput = await hashPassword(loginData.password);
         
         const { data, error: dbError } = await window.supabase

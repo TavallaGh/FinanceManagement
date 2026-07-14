@@ -55,6 +55,12 @@
       
       setIsLoading(true);
       try {
+        const isReachable = await window.isSupabaseReachable?.();
+        if (isReachable === false) {
+          showError(isRtl ? 'اتصال به سرور دیتابیس برقرار نیست. لطفاً شبکه یا VPN را بررسی کنید.' : 'Database server is not reachable. Check your network or VPN.');
+          return;
+        }
+
         const supabase = window.supabase;
         
         const { data: userData, error: userErr } = await supabase
