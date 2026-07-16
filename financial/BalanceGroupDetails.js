@@ -26,8 +26,22 @@
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
 
+    const getUserDisplayName = useCallback((user) => {
+      if (!user) return t('نامشخص', 'Unknown');
+      if (user.full_name) return user.full_name;
+      const firstName = user.first_name || '';
+      const lastName = user.last_name || user.family || '';
+      const fallbackName = `${firstName} ${lastName}`.trim();
+      return fallbackName || user.username || user.email || t('نامشخص', 'Unknown');
+    }, [t]);
+
+    const getGroupDisplayName = useCallback((group) => {
+      if (!group) return t('گروه کاربری', 'User Group');
+      return group.title || group.code || group.name || String(group.id);
+    }, [t]);
+
     const { isOpen, type, group } = config;
-    const { leafAccounts, users, roles, userRoles, lovAccountColumns } = lookups;
+    const { leafAccounts, users, userGroupsMaster = [], userGroupUsers = [], lovAccountColumns } = lookups;
 
     const [modalLoading, setModalLoading] = useState(false);
     const [accessViewMode, setAccessViewMode] = useState('assign');
@@ -300,7 +314,7 @@
 
     const handleAddAccessClick = () => {
       if (inlineAccessEdit) return;
-      setInlineAccessEdit({ id: 'new', data: { grantee_type: 'USER', grantee_id: '', grantee_obj: null } });
+      setInlineAccessEdit({ id: 'new', data: { grantee_type: 'user', grantee_id: '', grantee_obj: null } });
     };
 
     const handleSaveAccessInline = async () => {
@@ -351,33 +365,49 @@
       return users.filter(u => !groupAccesses.some(ga => ga.grantee_type?.toLowerCase() === 'user' && String(ga.grantee_id) === String(u.id)));
     }, [users, groupAccesses]);
 
-    const availableRolesForAccess = useMemo(() => {
-      return roles.filter(r => !groupAccesses.some(ga => ga.grantee_type?.toLowerCase() === 'role' && String(ga.grantee_id) === String(r.id)));
-    }, [roles, groupAccesses]);
+    const availableGroupsForAccess = useMemo(() => {
+      return userGroupsMaster.filter(g => !groupAccesses.some(ga => ga.grantee_type?.toLowerCase() === 'group' && String(ga.grantee_id) === String(g.id)));
+    }, [userGroupsMaster, groupAccesses]);
 
     const aggregatedUsersList = useMemo(() => {
       if (accessViewMode !== 'aggregate') return [];
-      const result = [];
-      users.forEach(user => {
-        const reasons = [];
-        const directPerm = groupAccesses.find(p => p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(user.id));
-        if (directPerm) reasons.push(t('دسترسی مستقیم', 'Direct Access'));
+      const resultByUserId = new Map();
 
-        const userRoleIds = userRoles.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
-        const rolePerms = groupAccesses.filter(p => p.grantee_type?.toLowerCase() === 'role' && userRoleIds.includes(String(p.grantee_id)));
-
-        rolePerms.forEach(rp => {
-          const roleObj = roles.find(r => String(r.id) === String(rp.grantee_id));
-          const rTitle = roleObj ? (roleObj.title || roleObj.code) : t('نقش سیستمی', 'System Role');
-          reasons.push(`${t('ارث‌بری از نقش:', 'Inherited via Role:')} ${rTitle}`);
+      const upsertUser = (user, accessLevel, reason) => {
+        const current = resultByUserId.get(String(user.id));
+        const nextAccessLevel = !current || (current.accessLevel === 'view' && accessLevel === 'full') ? accessLevel : current.accessLevel;
+        const reasons = new Set(current?.reasons || []);
+        if (reason) reasons.add(reason);
+        resultByUserId.set(String(user.id), {
+          id: user.id,
+          username: user.username || user.email || '---',
+          full_name: getUserDisplayName(user),
+          accessLevel: nextAccessLevel,
+          reasons
         });
+      };
 
-        if (reasons.length > 0) {
-          result.push({ id: user.id, username: user.username || user.email || '---', full_name: user.full_name, sources: reasons });
-        }
+      users.forEach(user => {
+        const directPerm = groupAccesses.find(p => p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(user.id));
+        if (directPerm) upsertUser(user, directPerm.access_level || 'view', t('دسترسی مستقیم', 'Direct Access'));
+
+        const userGroupIds = userGroupUsers.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.group_id));
+        const groupPerms = groupAccesses.filter(p => p.grantee_type?.toLowerCase() === 'group' && userGroupIds.includes(String(p.grantee_id)));
+
+        groupPerms.forEach(gp => {
+          const groupObj = userGroupsMaster.find(g => String(g.id) === String(gp.grantee_id));
+          const gTitle = getGroupDisplayName(groupObj);
+          upsertUser(user, gp.access_level || 'view', `${t('ارث‌بری از گروه:', 'Inherited via Group:')} ${gTitle}`);
+        });
       });
-      return result;
-    }, [groupAccesses, accessViewMode, users, roles, userRoles, t]);
+      return Array.from(resultByUserId.values()).map(item => ({
+        id: item.id,
+        username: item.username,
+        full_name: item.full_name,
+        sources: Array.from(item.reasons),
+        accessLevel: item.accessLevel
+      }));
+    }, [accessViewMode, groupAccesses, users, userGroupUsers, userGroupsMaster, getUserDisplayName, getGroupDisplayName, t]);
 
     // ----------------------------------------------------------------------
     // Common Delete
@@ -500,26 +530,26 @@
           if (inlineAccessEdit?.id === row.id) {
              return (
                <div onClick={(e)=>e.stopPropagation()}>
-                 <SelectField size="sm" options={[{value:'USER', label:t('کاربر سیستم', 'User')}, {value:'ROLE', label:t('نقش سیستمی', 'Role')}]}
+                 <SelectField size="sm" options={[{value:'user', label:t('کاربر سیستم', 'User')}, {value:'group', label:t('گروه کاربری', 'User Group')}]}
                    value={inlineAccessEdit.data.grantee_type} 
                    onChange={(e) => setInlineAccessEdit(prev => ({...prev, data: {...prev.data, grantee_type: e.target.value, grantee_id: '', grantee_obj: null}}))} isRtl={isRtl} />
                </div>
              )
           }
           const normVal = val?.toLowerCase();
-          return <Badge variant={normVal === 'user' ? 'indigo' : 'emerald'} size="sm" className="text-[10px]">{normVal === 'user' ? t('کاربر', 'User') : t('نقش', 'Role')}</Badge>;
+          return <Badge variant={normVal === 'user' ? 'indigo' : 'emerald'} size="sm" className="text-[10px">{normVal === 'user' ? t('کاربر', 'User') : t('گروه', 'Group')}</Badge>;
         }
       },
       { 
-        field: 'grantee_id', header_fa: 'شخص / نقش', header_en: 'Grantee', width: 'auto', 
+        field: 'grantee_id', header_fa: 'شخص / گروه', header_en: 'Grantee', width: 'auto', 
         render: (val, row) => {
           if (inlineAccessEdit?.id === row.id) {
             const isUser = inlineAccessEdit.data.grantee_type?.toLowerCase() === 'user';
             return (
               <div onClick={(e)=>e.stopPropagation()}>
-                <LOVField size="sm" data={isUser ? availableUsersForAccess : availableRolesForAccess} 
+                <LOVField size="sm" data={isUser ? availableUsersForAccess : availableGroupsForAccess} 
                   columns={isUser ? [{field:'username',header_fa:'نام کاربری'},{field:'full_name',header_fa:'نام'}] : [{field:'code',header_fa:'کد'},{field:'title',header_fa:'عنوان'}]}
-                  displayValue={inlineAccessEdit.data.grantee_obj ? (isUser ? `${inlineAccessEdit.data.grantee_obj.full_name} (${inlineAccessEdit.data.grantee_obj.username})` : `${inlineAccessEdit.data.grantee_obj.title} (${inlineAccessEdit.data.grantee_obj.code})`) : ''}
+                  displayValue={inlineAccessEdit.data.grantee_obj ? (isUser ? `${inlineAccessEdit.data.grantee_obj.full_name} (${inlineAccessEdit.data.grantee_obj.username})` : `${getGroupDisplayName(inlineAccessEdit.data.grantee_obj)} (${inlineAccessEdit.data.grantee_obj.code})`) : ''}
                   onChange={(r) => setInlineAccessEdit(prev => ({...prev, data: {...prev.data, grantee_id: r?.id, grantee_obj: r}}))}
                 />
               </div>
@@ -527,10 +557,10 @@
           }
           if (row.grantee_type?.toLowerCase() === 'user') {
             const u = users.find(x => String(x.id) === String(val));
-            return u ? `${u.full_name} (${u.username})` : t('نامشخص', 'Unknown');
+            return u ? `${getUserDisplayName(u)} (${u.username})` : t('نامشخص', 'Unknown');
           } else {
-            const r = roles.find(x => String(x.id) === String(val));
-            return r ? `${r.title} (${r.code})` : t('نامشخص', 'Unknown');
+            const g = userGroupsMaster.find(x => String(x.id) === String(val));
+            return g ? `${getGroupDisplayName(g)} (${g.code})` : t('نامشخص', 'Unknown');
           }
         }
       }

@@ -26,7 +26,7 @@
 
   const ChartOfAccountsAccess = ({ 
     selectedNodeId, activeTab, language = 'fa', 
-    lookups = { systemUsers: [], systemRoles: [], userRolesMapping: [], systemParties: [], balanceGroupsMaster: [] }
+    lookups = { systemUsers: [], systemRoles: [], userRolesMapping: [], userGroupsMaster: [], userGroupUsers: [], systemParties: [], balanceGroupsMaster: [] }
   }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
@@ -34,7 +34,7 @@
     const globalMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : 'jalali';
     const formatGlobalDate = window.DSCore?.formatGlobalDate || ((v) => v);
 
-    const { systemUsers, systemRoles, userRolesMapping, systemParties, balanceGroupsMaster } = lookups;
+    const { systemUsers, systemRoles = [], userRolesMapping = [], userGroupsMaster, userGroupUsers, systemParties, balanceGroupsMaster } = lookups;
 
     const [accessViewMode, setAccessViewMode] = useState('assign');
     const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +47,30 @@
     const [accountBalanceGroups, setAccountBalanceGroups] = useState([]);
     const [inlineBgEdit, setInlineBgEdit] = useState(null);
     const [bgAccessModal, setBgAccessModal] = useState({ isOpen: false, groupTitle: '', data: [] });
+
+    const getUserDisplayName = useCallback((user) => {
+      const userParty = systemParties.find(p => String(p.id) === String(user?.party_id || user?.person_id));
+      let fullName = '';
+      if (userParty) {
+        fullName = userParty.party_type === 'legal' && userParty.company_name
+          ? userParty.company_name
+          : `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
+      }
+      if (!fullName) fullName = (user?.first_name || user?.last_name) ? `${user?.first_name || ''} ${user?.last_name || ''}`.trim() : (user?.name || '');
+      return fullName;
+    }, [systemParties]);
+
+    const getGroupDisplayName = useCallback((group) => {
+      if (!group) return '';
+      return group.title || group.code || group.title_fa || group.title_en || String(group.id);
+    }, []);
+
+    const getGroupMembers = useCallback((groupId) => {
+      const memberIds = userGroupUsers
+        .filter(item => String(item.group_id) === String(groupId))
+        .map(item => String(item.user_id));
+      return systemUsers.filter(user => memberIds.includes(String(user.id)));
+    }, [systemUsers, userGroupUsers]);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -188,13 +212,13 @@
               const directPerm = data.find(p => p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(user.id));
               if (directPerm) reasons.push(t('دسترسی مستقیم', 'Direct Access'));
 
-              const uRoleIds = userRolesMapping.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
-              const rolePerms = data.filter(p => p.grantee_type?.toLowerCase() === 'role' && uRoleIds.includes(String(p.grantee_id)));
+          const uGroupIds = userGroupUsers.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.group_id));
+          const groupPerms = data.filter(p => p.grantee_type?.toLowerCase() === 'group' && uGroupIds.includes(String(p.grantee_id)));
 
-              rolePerms.forEach(rp => {
-                  const roleObj = systemRoles.find(r => String(r.id) === String(rp.grantee_id));
-                  const rTitle = roleObj ? (roleObj.title || roleObj.code) : t('نقش سیستمی', 'System Role');
-                  reasons.push(`${t('ارث‌بری از نقش:', 'Inherited via Role:')} ${rTitle}`);
+          groupPerms.forEach(gp => {
+            const groupObj = userGroupsMaster.find(g => String(g.id) === String(gp.grantee_id));
+            const gTitle = groupObj ? getGroupDisplayName(groupObj) : t('گروه کاربری', 'User Group');
+            reasons.push(`${t('ارث‌بری از گروه:', 'Inherited via Group:')} ${gTitle}`);
               });
 
               if (reasons.length > 0) {
@@ -246,41 +270,46 @@
 
     const consolidatedUsersList = useMemo(() => {
       if (!selectedNodeId) return [];
-      const result = [];
-      systemUsers.forEach(user => {
-        let maxAccess = null;
-        const reasons = [];
+      const resultByUserId = new Map();
 
+      const upsertUserResult = (user, accessLevel, reason) => {
+        const current = resultByUserId.get(String(user.id));
+        const nextAccessLevel = !current || (current.accessLevel === 'view' && accessLevel === 'full') ? accessLevel : current.accessLevel;
+        const reasons = new Set(current?.reasons || []);
+        if (reason) reasons.add(reason);
+        resultByUserId.set(String(user.id), {
+          id: user.id,
+          username: user.username || user.name || user.email || '---',
+          fullName: getUserDisplayName(user),
+          accessLevel: nextAccessLevel,
+          reasons
+        });
+      };
+
+      systemUsers.forEach(user => {
         const directPerm = accountPermissions.find(p => p.grantee_type === 'user' && String(p.grantee_id) === String(user.id));
         if (directPerm) {
-          maxAccess = directPerm.access_level;
-          reasons.push(t('دسترسی مستقیم', 'Direct Access'));
+          upsertUserResult(user, directPerm.access_level, t('دسترسی مستقیم', 'Direct Access'));
         }
 
-        const userRoles = userRolesMapping.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.role_id));
-        const rolePerms = accountPermissions.filter(p => p.grantee_type === 'role' && userRoles.includes(String(p.grantee_id)));
+        const userGroupIds = userGroupUsers.filter(m => String(m.user_id) === String(user.id)).map(m => String(m.group_id));
+        const groupPerms = accountPermissions.filter(p => p.grantee_type === 'group' && userGroupIds.includes(String(p.grantee_id)));
 
-        rolePerms.forEach(rp => {
-          const roleObj = systemRoles.find(r => String(r.id) === String(rp.grantee_id));
-          const rTitle = roleObj ? (roleObj.title || roleObj.name) : t('نقش سیستم', 'System Role');
-          reasons.push(`${t('ارث‌بری از نقش:', 'Inherited via Role:')} ${rTitle}`);
-          if (!maxAccess || (maxAccess === 'view' && rp.access_level === 'full')) maxAccess = rp.access_level;
+        groupPerms.forEach(gp => {
+          const groupObj = userGroupsMaster.find(g => String(g.id) === String(gp.grantee_id));
+          const gTitle = getGroupDisplayName(groupObj);
+          const inheritedLabel = `${t('ارث‌بری از گروه:', 'Inherited via Group:')} ${gTitle || gp.grantee_id}`;
+          upsertUserResult(user, gp.access_level, inheritedLabel);
         });
-
-        if (maxAccess) {
-          const userParty = systemParties.find(p => String(p.id) === String(user.party_id || user.person_id));
-          let fNameStr = '';
-          if (userParty) fNameStr = userParty.party_type === 'legal' && userParty.company_name ? userParty.company_name : `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
-          if (!fNameStr) fNameStr = (user.first_name || user.last_name) ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : (user.name || '');
-          
-          result.push({
-            id: user.id, username: user.username || user.name || user.email || '---',
-            fullName: fNameStr, accessLevel: maxAccess, reason: reasons.join(' / ')
-          });
-        }
       });
-      return result;
-    }, [selectedNodeId, systemUsers, accountPermissions, userRolesMapping, systemRoles, systemParties, t]);
+      return Array.from(resultByUserId.values()).map(item => ({
+        id: item.id,
+        username: item.username,
+        fullName: item.fullName,
+        accessLevel: item.accessLevel,
+        reason: Array.from(item.reasons).join(' / ')
+      }));
+    }, [selectedNodeId, systemUsers, accountPermissions, userGroupUsers, userGroupsMaster, getUserDisplayName, getGroupDisplayName, t]);
 
     const permGridData = useMemo(() => {
        const data = [...accountPermissions];
@@ -296,17 +325,13 @@
 
     const availableUsersForAccess = useMemo(() => {
       return systemUsers.filter(u => !accountPermissions.some(p => p.grantee_type === 'user' && String(p.grantee_id) === String(u.id))).map(u => {
-          const userParty = systemParties.find(p => String(p.id) === String(u.party_id || u.person_id));
-          let fNameStr = '';
-          if (userParty) fNameStr = userParty.party_type === 'legal' && userParty.company_name ? userParty.company_name : `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
-          if (!fNameStr) fNameStr = (u.first_name || u.last_name) ? `${u.first_name || ''} ${u.last_name || ''}`.trim() : (u.name || '');
-          return { ...u, fullName: fNameStr };
+          return { ...u, fullName: getUserDisplayName(u) };
       });
-    }, [systemUsers, accountPermissions, systemParties]);
+    }, [systemUsers, accountPermissions, getUserDisplayName]);
 
-    const availableRolesForAccess = useMemo(() => {
-      return systemRoles.filter(r => !accountPermissions.some(p => p.grantee_type === 'role' && String(p.grantee_id) === String(r.id)));
-    }, [systemRoles, accountPermissions]);
+    const availableGroupsForAccess = useMemo(() => {
+      return userGroupsMaster.filter(g => !accountPermissions.some(p => p.grantee_type === 'group' && String(p.grantee_id) === String(g.id)));
+    }, [userGroupsMaster, accountPermissions]);
 
     const availableBalanceGroups = useMemo(() => {
       const assignedIds = accountBalanceGroups.map(g => String(g.group_id));
@@ -320,26 +345,26 @@
           if (inlinePermEdit?.id === row.id) {
              return (
                <div onClick={(e)=>e.stopPropagation()}>
-                 <SelectField size="sm" options={[{value:'user', label:t('کاربر سیستم', 'User')}, {value:'role', label:t('نقش سیستمی', 'Role')}]}
+                 <SelectField size="sm" options={[{value:'user', label:t('کاربر سیستم', 'User')}, {value:'group', label:t('گروه کاربری', 'User Group')}]}
                    value={inlinePermEdit.data.grantee_type} 
                    onChange={(e) => setInlinePermEdit(prev => ({...prev, data: {...prev.data, grantee_type: e.target.value, grantee_id: '', grantee_obj: null}}))} isRtl={isRtl} />
                </div>
              )
           }
-          return <Badge variant="slate" size="sm">{val === 'user' ? t('کاربر', 'User') : t('نقش', 'Role')}</Badge>;
+          return <Badge variant="slate" size="sm">{val === 'user' ? t('کاربر', 'User') : t('گروه', 'Group')}</Badge>;
         }
       },
       {
-        field: 'grantee_id', header_fa: 'نام کاربری / عنوان نقش', width: 'auto',
+        field: 'grantee_id', header_fa: 'نام کاربری / عنوان گروه', width: 'auto',
         render: (val, row) => {
           if (inlinePermEdit?.id === row.id) {
             const isUser = inlinePermEdit.data.grantee_type === 'user';
             return (
               <div onClick={(e)=>e.stopPropagation()}>
-                <LOVField size="sm" data={isUser ? availableUsersForAccess : availableRolesForAccess} 
+                <LOVField size="sm" data={isUser ? availableUsersForAccess : availableGroupsForAccess} 
                   columns={isUser ? [{field:'username',header_fa:'نام کاربری'},{field:'fullName',header_fa:'نام'}] : [{field:'code',header_fa:'کد'},{field:'title',header_fa:'عنوان'}]}
                   dropdownWidth="min-w-[400px]"
-                  displayValue={inlinePermEdit.data.grantee_obj ? (isUser ? `${inlinePermEdit.data.grantee_obj.fullName} (${inlinePermEdit.data.grantee_obj.username})` : `${inlinePermEdit.data.grantee_obj.title} (${inlinePermEdit.data.grantee_obj.code})`) : ''}
+                  displayValue={inlinePermEdit.data.grantee_obj ? (isUser ? `${inlinePermEdit.data.grantee_obj.fullName} (${inlinePermEdit.data.grantee_obj.username})` : `${getGroupDisplayName(inlinePermEdit.data.grantee_obj)} (${inlinePermEdit.data.grantee_obj.code || inlinePermEdit.data.grantee_obj.id})`) : ''}
                   onChange={(r) => setInlinePermEdit(prev => ({...prev, data: {...prev.data, grantee_id: r?.id, grantee_obj: r}}))} />
               </div>
             )
@@ -347,14 +372,11 @@
           if (row.grantee_type === 'user') {
             const u = systemUsers.find(su => String(su.id) === String(val));
             if (!u) return val;
-            const userParty = systemParties.find(p => String(p.id) === String(u.party_id || u.person_id));
-            let fNameStr = '';
-            if (userParty) fNameStr = userParty.party_type === 'legal' && userParty.company_name ? userParty.company_name : `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
-            if (!fNameStr) fNameStr = (u.first_name || u.last_name) ? `${u.first_name || ''} ${u.last_name || ''}`.trim() : (u.name || '');
+            const fNameStr = getUserDisplayName(u);
             return fNameStr ? `${fNameStr} (${u.username || u.email || val})` : (u.username || u.email || val);
           } else {
-            const role = systemRoles.find(r => String(r.id) === String(val));
-            return role ? (role.title || role.name || val) : val;
+            const group = userGroupsMaster.find(g => String(g.id) === String(val));
+            return group ? `${getGroupDisplayName(group)}${group.code ? ` (${group.code})` : ''}` : val;
           }
         }
       },
@@ -383,13 +405,9 @@
           if (row.grantee_type === 'user') {
               const u = systemUsers.find(x => String(x.id) === String(row.grantee_id));
               if (u) {
-                  const userParty = systemParties.find(p => String(p.id) === String(u.party_id || u.person_id));
-                  let fNameStr = '';
-                  if (userParty) fNameStr = userParty.party_type === 'legal' && userParty.company_name ? userParty.company_name : `${userParty.first_name || ''} ${userParty.last_name || ''}`.trim();
-                  if (!fNameStr) fNameStr = (u.first_name || u.last_name) ? `${u.first_name || ''} ${u.last_name || ''}`.trim() : (u.name || '');
-                  granteeObj = { ...u, fullName: fNameStr };
+                  granteeObj = { ...u, fullName: getUserDisplayName(u) };
               }
-          } else { granteeObj = systemRoles.find(r => String(r.id) === String(row.grantee_id)); }
+          } else { granteeObj = userGroupsMaster.find(g => String(g.id) === String(row.grantee_id)); }
           setInlinePermEdit({ id: row.id, data: { grantee_type: row.grantee_type, grantee_id: row.grantee_id, grantee_obj: granteeObj, access_level: row.access_level } });
         }, className: 'text-slate-400 hover:text-indigo-500' },
       { icon: Trash2, tooltip: t('حذف دسترسی', 'Revoke'), hidden: (row) => inlinePermEdit?.id === row.id || row._isNew, onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'permission', data: row }), className: 'text-red-500 hover:text-red-600' }
