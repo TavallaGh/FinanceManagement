@@ -42,6 +42,7 @@
       isActive: true
     });
     const [newAddress, setNewAddress] = useState('');
+    const [logoError, setLogoError] = useState('');
 
     const [gridState, setGridState] = useState(null);
 
@@ -118,6 +119,7 @@
 
     const handleSave = async () => {
       if (!formData.code || !formData.name) return;
+      if (logoError) return;
 
       setIsLoading(true);
       try {
@@ -355,11 +357,28 @@
                         </Button>
                      )}
                   </div>
-                  <input id="logo-upload-input" type="file" className="hidden" accept="image/*" onChange={(e) => {
+                  <input id="logo-upload-input" type="file" className="hidden" accept="image/png,image/jpeg" onChange={(e) => {
+                     setLogoError('');
+                     const f = e.target.files && e.target.files[0];
+                     if(!f) return;
+                     const maxBytes = 1024 * 1024; // 1 MB
+                     const allowed = ['image/png','image/jpeg'];
+                     if(f.size > maxBytes) {
+                       setLogoError(t('حجم فایل نباید بیش از 1 مگابایت باشد', 'File size must not exceed 1 MB'));
+                       return;
+                     }
+                     if(!allowed.includes(f.type)) {
+                       setLogoError(t('فرمت فایل باید png یا jpg باشد', 'File format must be png or jpg'));
+                       return;
+                     }
                      const reader = new FileReader();
                      reader.onload = () => setFormData({...formData, logo: reader.result});
-                     if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+                     reader.readAsDataURL(f);
                   }} />
+                  {logoError && <div className="text-sm text-red-500 mt-2">{logoError}</div>}
+                  <div className="text-[12px] text-slate-500 dark:text-slate-300 mt-2">
+                    {t('راهنما: حداکثر حجم 1 مگابایت. فرمت‌های مجاز: png, jpg.', 'Hint: max size 1 MB. Allowed formats: png, jpg.')}
+                  </div>
                </div>
             </div>
 
