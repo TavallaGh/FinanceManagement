@@ -47,6 +47,8 @@
     const [selectedCurrency, setSelectedCurrency] = useState(null);
     const [currenciesGridState, setCurrenciesGridState] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
+    const [systemRoles, setSystemRoles] = useState({ baseId: '', secondaryId: '' });
+    const [isSavingRoles, setIsSavingRoles] = useState(false);
     
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const [recordLogs, setRecordLogs] = useState([]);
@@ -120,6 +122,12 @@
 
     useEffect(() => { fetchCurrencies(); }, [fetchCurrencies]);
 
+    useEffect(() => {
+      const base = currencies.find(c => c.system_role === 'base');
+      const secondary = currencies.find(c => c.system_role === 'secondary');
+      setSystemRoles({ baseId: base ? String(base.id) : '', secondaryId: secondary ? String(secondary.id) : '' });
+    }, [currencies]);
+
     const handleSaveCurrency = async () => {
       try {
         if (!selectedCurrency.code || !selectedCurrency.title) {
@@ -180,6 +188,45 @@
         showToast(isRtl ? 'خطا در اجرای عملیات گروهی' : 'Error executing bulk action', 'error');
       }
     }, [supabase, currencies, currentUser, showToast, fetchCurrencies, isRtl]);
+
+    const handleSaveSystemRoles = async () => {
+      if (systemRoles.baseId && systemRoles.baseId === systemRoles.secondaryId) {
+        showToast(t('ارز پایه و ارز دوم نمی‌توانند یکسان باشند', 'Base and secondary currencies must be different'), 'error');
+        return;
+      }
+      setIsSavingRoles(true);
+      try {
+        const nowStr = new Date().toISOString();
+        const prevBase = currencies.find(c => c.system_role === 'base');
+        const prevSecondary = currencies.find(c => c.system_role === 'secondary');
+        const newBaseId = systemRoles.baseId ? Number(systemRoles.baseId) : null;
+        const newSecondaryId = systemRoles.secondaryId ? Number(systemRoles.secondaryId) : null;
+        // Clear old roles first (to avoid unique constraint conflict)
+        if (prevBase && prevBase.id !== newBaseId) {
+          await supabase.from('fm_currencies').update({ system_role: null, updated_by: currentUser, updated_at: nowStr }).eq('id', prevBase.id);
+        }
+        if (prevSecondary && prevSecondary.id !== newSecondaryId) {
+          await supabase.from('fm_currencies').update({ system_role: null, updated_by: currentUser, updated_at: nowStr }).eq('id', prevSecondary.id);
+        }
+        // Set new roles
+        if (newBaseId) {
+          await supabase.from('fm_currencies').update({ system_role: 'base', updated_by: currentUser, updated_at: nowStr }).eq('id', newBaseId);
+          const rec = currencies.find(c => c.id === newBaseId);
+          if (rec) await logAction('fm_currencies', newBaseId, 'update', `تعیین به عنوان ارز پایه سیستم`, rec, { ...rec, system_role: 'base' });
+        }
+        if (newSecondaryId) {
+          await supabase.from('fm_currencies').update({ system_role: 'secondary', updated_by: currentUser, updated_at: nowStr }).eq('id', newSecondaryId);
+          const rec = currencies.find(c => c.id === newSecondaryId);
+          if (rec) await logAction('fm_currencies', newSecondaryId, 'update', `تعیین به عنوان ارز دوم سیستم`, rec, { ...rec, system_role: 'secondary' });
+        }
+        showToast(t('تنظیمات ارزهای سیستمی ذخیره شد', 'System currencies saved'));
+        fetchCurrencies();
+      } catch (err) {
+        showToast(t('خطا در ذخیره تنظیمات ارزهای سیستمی', 'Error saving system currencies'), 'error');
+      } finally {
+        setIsSavingRoles(false);
+      }
+    };
 
     const executeDelete = async () => {
       try {
@@ -266,6 +313,29 @@
           breadcrumbs={[{ label: t('تنظیمات پایه', 'Base Setup') }, { label: t('ارزها', 'Currencies') }]}
           viewConfig={viewConfig}
         />
+
+        {!isReadOnly && (
+          <div className="mb-3 flex flex-wrap items-end gap-3 px-3 py-2.5 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl shadow-sm">
+            <div className="flex items-center gap-1.5 self-center">
+              <DollarSign size={14} className="text-slate-400 dark:text-slate-500" />
+            </div>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="w-44">
+                <SelectField formCode={formCode} label={t('ارز پایه سیستم', 'System Base Currency')} value={systemRoles.baseId} onChange={(e) => setSystemRoles(prev => ({ ...prev, baseId: e.target.value }))} isRtl={isRtl} size="sm"
+                  options={[{ value: '', label: t('— انتخاب نشده —', '— None —') }, ...currencies.filter(c => String(c.id) !== systemRoles.secondaryId).map(c => ({ value: String(c.id), label: `${c.title} (${c.code})` }))]}
+                />
+              </div>
+              <div className="w-44">
+                <SelectField formCode={formCode} label={t('ارز دوم سیستم', '  Secondary Currency')} value={systemRoles.secondaryId} onChange={(e) => setSystemRoles(prev => ({ ...prev, secondaryId: e.target.value }))} isRtl={isRtl} size="sm"
+                  options={[{ value: '', label: t('— انتخاب نشده —', '— None —') }, ...currencies.filter(c => String(c.id) !== systemRoles.baseId).map(c => ({ value: String(c.id), label: `${c.title} (${c.code})` }))]}
+                />
+              </div>
+              <Button variant="primary" size="sm" icon={Save} onClick={handleSaveSystemRoles} disabled={isSavingRoles} className="whitespace-nowrap mb-0.5">
+                {isSavingRoles ? t('در حال ذخیره...', 'Saving...') : t('ذخیره', 'Save')}
+              </Button>
+            </div>
+          </div>
+        )}
 
         <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
