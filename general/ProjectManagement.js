@@ -97,6 +97,9 @@
     // all project-personnel assignments (project_id, party_id) – for advanced filter
     const [allProjectPersonnel, setAllProjectPersonnel] = useState([]);
 
+    // cost/benefit centers list (for grid display + passing to definition modal)
+    const [allCostBenefitCenters, setAllCostBenefitCenters] = useState([]);
+
     // ── Derived: employees only ────────────────────────────────────────────
     const employeeParties = useMemo(() =>
       allParties
@@ -147,21 +150,41 @@
     const isLockedProject = (row) =>
       row?.status === 'COMPLETED' || row?.status === 'CANCELLED';
 
+    const getCenterName = useCallback((id) => {
+      if (!id) return '-';
+      const c = allCostBenefitCenters.find(x => x.id === id);
+      if (!c) return '-';
+      return isRtl ? (c.titleFa || '-') : (c.titleEn || c.titleFa || '-');
+    }, [allCostBenefitCenters, isRtl]);
+
     // ── Fetch ──────────────────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
       setIsLoading(true);
       try {
         const [
           { data: projects, error: pErr },
-          { data: parties,  error: ptErr }
+          { data: parties,  error: ptErr },
+          { data: centers,  error: cErr }
         ] = await Promise.all([
           supabase.from('gen_projects').select('*').order('created_at', { ascending: false }),
-          supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, roles, mobile, is_active')
+          supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, roles, mobile, is_active'),
+          supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_active, is_cost_center, is_benefit_center, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)')
         ]);
         if (pErr)  throw pErr;
         if (ptErr) throw ptErr;
         setData(projects || []);
         setAllParties(parties || []);
+        setAllCostBenefitCenters((centers || []).map(r => ({
+          id: r.id,
+          titleFa: r.title_fa || '',
+          titleEn: r.title_en || '',
+          centerKind: r.center_kind || '',
+          isActive: r.is_active ?? true,
+          isCostCenter: r.is_cost_center ?? false,
+          isBenefitCenter: r.is_benefit_center ?? false,
+          managerName: r.manager ? `${r.manager.first_name || ''} ${r.manager.last_name || ''}`.trim() : '',
+          officeName: r.office?.title || ''
+        })));
 
         // lightweight personnel assignments for the advanced filter
         const { data: ppData } = await supabase
@@ -262,6 +285,10 @@
       {
         field: 'title', header_fa: 'عنوان پروژه', header_en: 'Title', width: '200px',
         render: val => <span className="font-bold text-slate-700 dark:text-slate-200">{val}</span>
+      },
+      {
+        field: 'cost_benefit_center_id', header_fa: 'مرکز هزینه/درآمد', header_en: 'Cost/Benefit Center', width: '170px',
+        render: val => <span className="text-[12px] text-slate-600 dark:text-slate-400">{getCenterName(val)}</span>
       },
       {
         field: 'status', header_fa: 'وضعیت پروژه', header_en: 'Project Status', width: '140px',
@@ -426,12 +453,13 @@
             Project Definition Modal (new / edit) – ProjectDefinition.js
         ══════════════════════════════════════════════════════════════════ */}
         {window.ProjectDefinition && React.createElement(window.ProjectDefinition, {
-          isOpen:            modalState.isOpen,
-          onClose:           () => setModalState({ isOpen: false, record: null }),
-          initialRecord:     modalState.record,
-          allParties:        allParties,
-          onProjectUpdated:  fetchData,
-          language:          language
+          isOpen:                  modalState.isOpen,
+          onClose:                 () => setModalState({ isOpen: false, record: null }),
+          initialRecord:           modalState.record,
+          allParties:              allParties,
+          allCostBenefitCenters:   allCostBenefitCenters,
+          onProjectUpdated:        fetchData,
+          language:                language
         })}
 
         {/* ══════════════════════════════════════════════════════════════════

@@ -26,6 +26,7 @@
   const Toast       = safeComp(DSFeedback, 'Toast');
 
   const TextField   = safeComp(DSForms, 'TextField');
+  const SelectField = safeComp(DSForms, 'SelectField');
   const ToggleField = safeComp(DSForms, 'ToggleField');
   const CheckboxField = safeComp(DSForms, 'CheckboxField');
   const DatePicker  = safeComp(DSForms, 'DatePicker');
@@ -77,9 +78,17 @@
     { id: 'shareholder', fa: 'سهامدار',         en: 'Shareholder' }
   ];
 
+  const CENTER_KIND_OPTIONS = [
+    { value: 'DEPARTMENT', fa: 'دپارتمان', en: 'Department' },
+    { value: 'TEAM',       fa: 'تیم',      en: 'Team'       },
+    { value: 'PROJECT',    fa: 'پروژه',    en: 'Project'    },
+    { value: 'OTHER',      fa: 'سایر',     en: 'Other'      },
+  ];
+
   const EMPTY_FORM = {
     code: '', title: '', status: 'PLANNING',
     manager_party_id: '', supervisor_party_id: '',
+    cost_benefit_center_id: '',
     start_date: '', estimated_days: '', estimated_end_date: '',
     actual_end_date: '', is_active: true, description: ''
   };
@@ -88,11 +97,12 @@
   // ProjectDefinition
   // ════════════════════════════════════════════════════════════════════════════
   const ProjectDefinition = ({
-    isOpen,             // boolean
-    onClose,            // () => void
-    initialRecord,      // project object | null
-    allParties,         // party list from parent
-    onProjectUpdated,   // () => void — triggers fetchData in parent
+    isOpen,                  // boolean
+    onClose,                 // () => void
+    initialRecord,           // project object | null
+    allParties,              // party list from parent
+    allCostBenefitCenters,   // cost/benefit centers list from parent
+    onProjectUpdated,        // () => void — triggers fetchData in parent
     language = 'fa'
   }) => {
     const isRtl = language === 'fa';
@@ -117,23 +127,37 @@
       nationalId: '', mobile: '', email: '', roles: ['employee']
     });
 
+    // quick cost/benefit center
+    const [offices, setOffices]                             = useState([]);
+    const [localCenters, setLocalCenters]                   = useState([]);
+    const [isQuickCenterOpen, setIsQuickCenterOpen]         = useState(false);
+    const [isSavingCenter, setIsSavingCenter]               = useState(false);
+    const [quickCenterData, setQuickCenterData]             = useState({
+      code: '', titleFa: '', titleEn: '', centerKind: 'DEPARTMENT',
+      managerId: '', managerName: '', officeId: '',
+      isCostCenter: true, isBenefitCenter: false
+    });
+
     // ── Init on open ───────────────────────────────────────────────────────
     useEffect(() => {
       if (!isOpen) return;
       setLocalParties(allParties || []);
+      setLocalCenters((allCostBenefitCenters || []));
+      fetchOffices();
       if (initialRecord) {
         setFormData({
-          code:                initialRecord.code                || '',
-          title:               initialRecord.title               || '',
-          status:              initialRecord.status              || 'PLANNING',
-          manager_party_id:    initialRecord.manager_party_id    || '',
-          supervisor_party_id: initialRecord.supervisor_party_id || '',
-          start_date:          initialRecord.start_date          || '',
-          estimated_days:      initialRecord.estimated_days      ?? '',
-          estimated_end_date:  initialRecord.estimated_end_date  || '',
-          actual_end_date:     initialRecord.actual_end_date     || '',
-          is_active:           initialRecord.is_active           ?? true,
-          description:         initialRecord.description         || ''
+          code:                    initialRecord.code                    || '',
+          title:                   initialRecord.title                   || '',
+          status:                  initialRecord.status                  || 'PLANNING',
+          manager_party_id:        initialRecord.manager_party_id        || '',
+          supervisor_party_id:     initialRecord.supervisor_party_id     || '',
+          cost_benefit_center_id:  initialRecord.cost_benefit_center_id  || '',
+          start_date:              initialRecord.start_date              || '',
+          estimated_days:          initialRecord.estimated_days          ?? '',
+          estimated_end_date:      initialRecord.estimated_end_date      || '',
+          actual_end_date:         initialRecord.actual_end_date         || '',
+          is_active:               initialRecord.is_active               ?? true,
+          description:             initialRecord.description             || ''
         });
       } else {
         let nextCode = '';
@@ -149,6 +173,14 @@
       setToast({ isVisible: true, message, type });
       setTimeout(() => setToast(p => ({ ...p, isVisible: false })), 3500);
     }, []);
+
+    const fetchOffices = useCallback(async () => {
+      if (!supabase) return;
+      try {
+        const { data } = await supabase.from('fm_org_offices').select('id, title').eq('is_active', true).order('title');
+        setOffices((data || []).map(o => ({ id: o.id, value: o.id, label: o.title })));
+      } catch {}
+    }, [supabase]);
 
     const fmtDate = useCallback((v) => {
       if (!v) return '-';
@@ -196,6 +228,28 @@
       return p ? `${p.title} (${p.code})` : '';
     };
 
+    const activeCenters = useMemo(() =>
+      localCenters.filter(c => c.isActive !== false && c.centerKind === 'PROJECT'),
+    [localCenters]);
+
+    const getCenterDisplay = (id) => {
+      if (!id) return '';
+      const c = localCenters.find(x => x.id === id);
+      return c ? (isRtl ? (c.titleFa || '') : (c.titleEn || c.titleFa || '')) : '';
+    };
+
+    const centerLovColumns = useMemo(() => [
+      { field: isRtl ? 'titleFa' : 'titleEn', header_fa: 'عنوان مرکز', header_en: 'Center Title', width: '200px',
+        render: (val, row) => <span className="font-bold text-slate-800 dark:text-slate-200">{val || row.titleFa}</span> },
+      { field: 'managerName', header_fa: 'مسئول مرکز', header_en: 'Manager', width: '150px' },
+      { field: 'centerKind', header_fa: 'گروه مرکز', header_en: 'Center Group', width: '110px',
+        render: (val) => {
+          const opt = CENTER_KIND_OPTIONS.find(o => o.value === val);
+          return <span>{opt ? (isRtl ? opt.fa : opt.en) : (val || '')}</span>;
+        }},
+      { field: 'officeName', header_fa: 'محل مرکز', header_en: 'Location', width: '150px' }
+    ], [isRtl]);
+
     // ── Save project ───────────────────────────────────────────────────────
     const handleSave = async () => {
       if (!formData.title.trim()) {
@@ -206,18 +260,19 @@
       try {
         const estEnd = calcEstimatedEnd(formData.start_date, formData.estimated_days);
         const payload = {
-          code:                formData.code,
-          title:               formData.title.trim(),
-          status:              formData.status              || 'PLANNING',
-          manager_party_id:    formData.manager_party_id    || null,
-          supervisor_party_id: formData.supervisor_party_id || null,
-          start_date:          formData.start_date          || null,
-          estimated_days:      formData.estimated_days !== '' ? parseInt(formData.estimated_days) : null,
-          estimated_end_date:  estEnd                        || null,
-          actual_end_date:     formData.actual_end_date      || null,
-          is_active:           formData.is_active,
-          description:         formData.description          || null,
-          updated_at:          new Date().toISOString()
+          code:                    formData.code,
+          title:                   formData.title.trim(),
+          status:                  formData.status              || 'PLANNING',
+          manager_party_id:        formData.manager_party_id    || null,
+          supervisor_party_id:     formData.supervisor_party_id || null,
+          cost_benefit_center_id:  formData.cost_benefit_center_id || null,
+          start_date:              formData.start_date          || null,
+          estimated_days:          formData.estimated_days !== '' ? parseInt(formData.estimated_days) : null,
+          estimated_end_date:      estEnd                        || null,
+          actual_end_date:         formData.actual_end_date      || null,
+          is_active:               formData.is_active,
+          description:             formData.description          || null,
+          updated_at:              new Date().toISOString()
         };
 
         if (initialRecord?.id) {
@@ -307,6 +362,78 @@
       }
     };
 
+    // ── Quick Cost/Benefit Center ──────────────────────────────────────
+    const openQuickCenter = () => {
+      setQuickCenterData({
+        code: '', titleFa: '', titleEn: '', centerKind: 'PROJECT',
+        managerId: '', managerName: '', officeId: '',
+        isCostCenter: true, isBenefitCenter: false
+      });
+      (async () => {
+        try {
+          const preview = await window.AutoNumberingService.previewNext('COST_BENEFIT_CENTER');
+          const code = typeof preview === 'string' ? preview : (preview?.formattedCode || '');
+          setQuickCenterData(prev => ({ ...prev, code }));
+        } catch {}
+      })();
+      setIsQuickCenterOpen(true);
+    };
+
+    const handleSaveQuickCenter = async () => {
+      if (!quickCenterData.titleFa.trim() || !quickCenterData.titleEn.trim()) {
+        showToast(t('عنوان فارسی و لاتین الزامی هستند', 'Persian and Latin titles are required'), 'error');
+        return;
+      }
+      if (!quickCenterData.isCostCenter && !quickCenterData.isBenefitCenter) {
+        showToast(t('حداقل یکی از گزینه‌های مرکز هزینه یا مرکز درآمد باید انتخاب شود', 'At least one of Cost Center or Benefit Center must be selected'), 'error');
+        return;
+      }
+      setIsSavingCenter(true);
+      try {
+        const payload = {
+          code:              quickCenterData.code.trim(),
+          title_fa:          quickCenterData.titleFa.trim(),
+          title_en:          quickCenterData.titleEn.trim(),
+          center_kind:       quickCenterData.centerKind,
+          manager_id:        quickCenterData.managerId || null,
+          is_cost_center:    quickCenterData.isCostCenter,
+          is_benefit_center: quickCenterData.isBenefitCenter,
+          is_active:         true,
+          office_id:         quickCenterData.officeId || null,
+          created_at:        new Date().toISOString()
+        };
+        const { data: newCenter, error } = await supabase.from('fm_cost_benefit_centers').insert([payload]).select().single();
+        if (error) throw error;
+        try { await window.AutoNumberingService.consumeNext('COST_BENEFIT_CENTER'); } catch {}
+        const managerDisplay = quickCenterData.managerId
+          ? (employeeParties.find(e => e.id === quickCenterData.managerId)?.title || '')
+          : '';
+        const officeDisplay = quickCenterData.officeId
+          ? (offices.find(o => o.id === quickCenterData.officeId)?.label || '')
+          : '';
+        const newCenterMapped = {
+          id:              newCenter.id,
+          titleFa:         newCenter.title_fa || '',
+          titleEn:         newCenter.title_en || '',
+          centerKind:      newCenter.center_kind || '',
+          isActive:        true,
+          isCostCenter:    newCenter.is_cost_center,
+          isBenefitCenter: newCenter.is_benefit_center,
+          managerName:     managerDisplay,
+          officeName:      officeDisplay
+        };
+        setLocalCenters(prev => [...prev, newCenterMapped]);
+        setFormData(prev => ({ ...prev, cost_benefit_center_id: newCenter.id }));
+        setIsQuickCenterOpen(false);
+        showToast(t('مرکز هزینه/درآمد جدید با موفقیت ثبت شد', 'New cost/benefit center saved'), 'success');
+      } catch (err) {
+        console.error('Quick center error:', err);
+        showToast(t('خطا در ذخیره مرکز هزینه/درآمد', 'Error saving center'), 'error');
+      } finally {
+        setIsSavingCenter(false);
+      }
+    };
+
     const currentStatus = formData.status || 'PLANNING';
     const statusInfo    = getStatusInfo(currentStatus);
     const transitions   = STATUS_TRANSITIONS[currentStatus] || [];
@@ -359,7 +486,7 @@
             <div className="p-4 flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
-                {/* ردیف ۱: کد (1) + عنوان (2) */}
+                {/* ردیف ۱: کد (1) + عنوان (1) + مرکز هزینه/درآمد (1) */}
                 <TextField
                   size="sm" label={t('کد پروژه', 'Project Code')}
                   value={formData.code}
@@ -368,13 +495,25 @@
                   disabled={!!initialRecord}
                   placeholder={t('خودکار', 'Auto')}
                 />
-                <div className="md:col-span-2">
-                  <TextField
-                    size="sm" label={t('عنوان پروژه', 'Project Title')}
-                    value={formData.title}
-                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    isRtl={isRtl} required
-                  />
+                <TextField
+                  size="sm" label={t('عنوان پروژه', 'Project Title')}
+                  value={formData.title}
+                  onChange={e => setFormData({ ...formData, title: e.target.value })}
+                  isRtl={isRtl} required
+                />
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <LOVField size="sm" label={t('مرکز هزینه/درآمد', 'Cost/Benefit Center')}
+                      displayValue={getCenterDisplay(formData.cost_benefit_center_id)}
+                      onChange={row => setFormData(prev => ({ ...prev, cost_benefit_center_id: row ? row.id : '' }))}
+                      data={activeCenters}
+                      columns={centerLovColumns}
+                      isRtl={isRtl} dropdownWidth="min-w-[580px]" />
+                  </div>
+                  <Button variant="outline" size="sm" icon={Plus}
+                    onClick={openQuickCenter}
+                    className="h-8 w-8 px-0 shrink-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/40 mb-[1px]"
+                    title={t('تعریف مرکز هزینه/درآمد جدید', 'Add New Center')} />
                 </div>
 
                 {/* ردیف ۲: مدیر (1) + ناظر (1) + مدت زمان (1) */}
@@ -535,6 +674,64 @@
                 {t('انصراف', 'Cancel')}
               </Button>
               <Button variant="primary" size="sm" icon={Save} onClick={handleSaveQuickParty} isLoading={isSavingParty}>
+                {t('ذخیره و انتخاب', 'Save & Select')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* ══════════════════════════════════════════════════════════════
+            Quick Cost/Benefit Center Modal
+        ══════════════════════════════════════════════════════════════ */}
+        <Modal
+          isOpen={isQuickCenterOpen}
+          onClose={() => setIsQuickCenterOpen(false)}
+          title={t('تعریف سریع مرکز هزینه/درآمد', 'Quick Add Cost/Benefit Center')}
+          width="max-w-2xl"
+          language={language}
+        >
+          <div className="p-4 flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <TextField size="sm" label={t('کد مرکز', 'Code')} value={quickCenterData.code} onChange={e => setQuickCenterData(p => ({ ...p, code: e.target.value }))} isRtl={isRtl} dir="ltr" />
+              <TextField size="sm" label={t('عنوان فارسی', 'Persian Title')} value={quickCenterData.titleFa} onChange={e => setQuickCenterData(p => ({ ...p, titleFa: e.target.value }))} isRtl={isRtl} required />
+              <TextField size="sm" label={t('عنوان لاتین', 'Latin Title')} value={quickCenterData.titleEn} onChange={e => setQuickCenterData(p => ({ ...p, titleEn: e.target.value }))} isRtl={isRtl} dir="ltr" required />
+              <div>
+                <label className="block text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t('گروه مرکز', 'Center Group')}</label>
+                <div className="h-8 flex items-center px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/70 text-[12px] text-slate-500 dark:text-slate-400 cursor-not-allowed select-none">
+                  {t('پروژه', 'Project')}
+                </div>
+              </div>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <LOVField size="sm" label={t('مسئول مرکز', 'Manager')}
+                    displayValue={quickCenterData.managerId ? (employeeParties.find(e => e.id === quickCenterData.managerId)?.title || '') : ''}
+                    onChange={row => setQuickCenterData(p => ({ ...p, managerId: row ? row.id : '', managerName: row ? row.title : '' }))}
+                    data={employeeParties}
+                    columns={[
+                      { field: 'code',   header_fa: 'کد',     header_en: 'Code',   width: '25%' },
+                      { field: 'title',  header_fa: 'نام',     header_en: 'Name',   width: '50%' },
+                      { field: 'mobile', header_fa: 'موبایل', header_en: 'Mobile', width: '25%' }
+                    ]}
+                    isRtl={isRtl} dropdownWidth="min-w-[420px]" />
+                </div>
+              </div>
+              <SelectField
+                size="sm" label={t('محل مرکز', 'Office')}
+                value={quickCenterData.officeId || ''}
+                onChange={e => setQuickCenterData(p => ({ ...p, officeId: e.target.value || '' }))}
+                options={[{ value: '', label: t('-- انتخاب کنید --', '-- Select --') }, ...offices.map(o => ({ value: o.id, label: o.label }))]}
+                isRtl={isRtl}
+              />
+              <div className="md:col-span-3 flex items-center gap-6 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                <CheckboxField size="sm" label={t('مرکز هزینه', 'Cost Center')} checked={quickCenterData.isCostCenter} onChange={v => setQuickCenterData(p => ({ ...p, isCostCenter: v }))} isRtl={isRtl} />
+                <CheckboxField size="sm" label={t('مرکز درآمد', 'Benefit Center')} checked={quickCenterData.isBenefitCenter} onChange={v => setQuickCenterData(p => ({ ...p, isBenefitCenter: v }))} isRtl={isRtl} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+              <Button variant="outline" size="sm" onClick={() => setIsQuickCenterOpen(false)}>
+                {t('انصراف', 'Cancel')}
+              </Button>
+              <Button variant="primary" size="sm" icon={Save} onClick={handleSaveQuickCenter} isLoading={isSavingCenter}>
                 {t('ذخیره و انتخاب', 'Save & Select')}
               </Button>
             </div>
