@@ -93,6 +93,7 @@
     accounts = [],
     allCoaAccounts = [],
     responsiblePartiesDropdown = [],
+    linkedAccountIds = [],
     language = 'fa'
   }) => {
     const isRtl = language === 'fa';
@@ -110,6 +111,8 @@
     // Local copies so quick-add can extend them without touching parent state
     const [localAccounts, setLocalAccounts]           = useState(accounts);
     const [localAllCoa, setLocalAllCoa]               = useState(allCoaAccounts);
+
+    const linkedAccountIdSet = useMemo(() => new Set((linkedAccountIds || []).map(String)), [linkedAccountIds]);
 
     useEffect(() => { setLocalAccounts(accounts); },       [accounts]);
     useEffect(() => { setLocalAllCoa(allCoaAccounts); },   [allCoaAccounts]);
@@ -165,6 +168,14 @@
       }
     }, [isOpen, record]);
 
+    const availableAccounts = useMemo(() => {
+      const currentAccountId = record?.account_id ? String(record.account_id) : '';
+      return localAccounts.filter(acc => {
+        const accountId = String(acc.id);
+        return !linkedAccountIdSet.has(accountId) || accountId === currentAccountId;
+      });
+    }, [localAccounts, linkedAccountIdSet, record?.account_id]);
+
     // ── Log helper ─────────────────────────────────────────────────────────
     const logAction = async (entityType, recordId, action, details = '', oldData = null, newData = null) => {
       try {
@@ -192,6 +203,18 @@
       setIsLoading(true);
       try {
         const isNew = !record?.id;
+        const selectedAccountId = formData.accountId || null;
+        if (selectedAccountId) {
+          let duplicateQuery = supabase.from('fm_payment_sources').select('id').eq('account_id', selectedAccountId);
+          if (!isNew && record?.id) duplicateQuery = duplicateQuery.neq('id', record.id);
+          const { data: duplicateAccount, error: duplicateError } = await duplicateQuery;
+          if (duplicateError) throw duplicateError;
+          if (duplicateAccount && duplicateAccount.length > 0) {
+            alert(t('این حساب قبلاً به یک منبع پرداخت دیگر لینک شده است.', 'This account is already linked to another payment source.'));
+            return;
+          }
+        }
+
         const payload = {
           code:           formData.code          || null,
           title_fa:       formData.titleFa,
@@ -505,7 +528,7 @@
                   <LOVField
                     size="sm"
                     label={t('حساب مرتبط (آخرین سطح)', 'Linked Account')}
-                    data={localAccounts}
+                    data={availableAccounts}
                     columns={accountLovColumns}
                     dropdownWidth="min-w-[470px] max-w-[470px]"
                     displayValue={selectedAccountDisplay}
