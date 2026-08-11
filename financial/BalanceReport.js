@@ -63,6 +63,23 @@
     return dates;
   };
 
+  const formatLocalIsoDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getDefaultFilters = () => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 7);
+    return {
+      date_from: formatLocalIsoDate(start),
+      date_to: formatLocalIsoDate(today)
+    };
+  };
+
   // ══════════════════════════════════════════════════════════════════════════
   const BalanceReport = ({ language = 'fa', formCode = 'FIN_BALANCE_REPORT' }) => {
     const isRtl    = language === 'fa';
@@ -87,7 +104,7 @@
     // ── State ────────────────────────────────────────────────────────────────
     const [initLoading,  setInitLoading]  = useState(true);
     const [generating,   setGenerating]   = useState(false);
-    const [filters,      setFilters]      = useState({});
+    const [filters,      setFilters]      = useState(() => getDefaultFilters());
     const [balanceGroups, setBalanceGroups] = useState([]);
     const [reportData,   setReportData]   = useState(null);
     const [toast,        setToast]        = useState({ isVisible: false, message: '', type: 'success' });
@@ -518,7 +535,7 @@
             fields:        filterFields,
             initialValues: filters,
             onFilter:      setFilters,
-            onClear:       () => { setFilters({}); setReportData(null); },
+            onClear:       () => { setFilters(getDefaultFilters()); setReportData(null); },
             language,
             defaultOpen:   true
           },
