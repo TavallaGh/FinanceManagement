@@ -39,11 +39,6 @@
     const [data, setData] = useState([]);
     const [providers, setProviders] = useState([]);
     const [currencies, setCurrencies] = useState([]);
-    const [accounts, setAccounts] = useState([]);
-    const [allCoaAccounts, setAllCoaAccounts] = useState([]);
-    const [isQuickAccountModalOpen, setIsQuickAccountModalOpen] = useState(false);
-    const [isSavingAccount, setIsSavingAccount] = useState(false);
-    const [quickAccountData, setQuickAccountData] = useState({ parentId: '', code: '', titleFa: '', titleEn: '', isActive: true });
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const showToast = (message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -63,7 +58,6 @@
       title: '', 
       providerId: '', 
       currencyId: '',
-      accountId: '',
       minAmount: '', 
       maxAmount: '', 
       validFrom: '',
@@ -140,66 +134,6 @@
           setCurrencies(currData.map(c => ({ value: c.id, label: `${c.title} (${c.code})` })));
         }
 
-        const [{ data: coaData }, { data: chartsData }] = await Promise.all([
-          supabase.from('fm_coa_accounts').select('id, parent_id, title_fa, title_en, code, currency_id, is_active, chart_id'),
-          supabase.from('fm_coa_charts').select('id, title, is_active').eq('is_active', true)
-        ]);
-        if (coaData && chartsData) {
-          const activeChartIds = new Set(chartsData.map(c => c.id));
-          const chartsMap = new Map(chartsData.map(c => [c.id, c.title]));
-          const currenciesMap = new Map((currData || []).map(c => [c.id, c.code]));
-
-          const accMap = new Map(coaData.map(a => [a.id, a]));
-          const isEffectivelyActive = (acc) => {
-            if (!acc.is_active) return false;
-            if (!acc.parent_id) return true;
-            const parent = accMap.get(acc.parent_id);
-            return parent ? isEffectivelyActive(parent) : true;
-          };
-
-          const buildPath = (node) => {
-            let pathFa = node.title_fa || '';
-            let pathEn = node.title_en || node.title_fa || '';
-            let current = node;
-            while(current.parent_id) {
-              const parent = accMap.get(current.parent_id);
-              if(parent) {
-                pathFa = (parent.title_fa || '') + ' / ' + pathFa;
-                pathEn = (parent.title_en || parent.title_fa || '') + ' / ' + pathEn;
-                current = parent;
-              } else { break; }
-            }
-            return { pathFa, pathEn };
-          };
-
-          const parentIds = new Set(coaData.map(c => c.parent_id).filter(Boolean));
-          const leaves = coaData.filter(c =>
-            !parentIds.has(c.id) &&
-            activeChartIds.has(c.chart_id) &&
-            isEffectivelyActive(c)
-          );
-
-          const accOptions = leaves.map(leaf => {
-            const paths = buildPath(leaf);
-            return {
-              id: leaf.id,
-              code: leaf.code,
-              titleFa: leaf.title_fa,
-              titleEn: leaf.title_en,
-              pathFa: paths.pathFa,
-              pathEn: paths.pathEn,
-              chartName: chartsMap.get(leaf.chart_id) || '',
-              currency_code: currenciesMap.get(leaf.currency_id) || ''
-            };
-          });
-          setAccounts(accOptions);
-
-          const allWithPaths = coaData.map(acc => {
-            const paths = buildPath(acc);
-            return { ...acc, pathFa: paths.pathFa, pathEn: paths.pathEn, chartName: chartsMap.get(acc.chart_id) || '', isActiveChart: activeChartIds.has(acc.chart_id), currency_code: currenciesMap.get(acc.currency_id) || '' };
-          });
-          setAllCoaAccounts(allWithPaths);
-        }
       } catch (err) {
         console.error('Fetch Dropdowns Error:', err);
       }
@@ -213,8 +147,7 @@
           .select(`
             *,
             provider:parties(id, first_name, last_name, company_name, party_type),
-            currency:fm_currencies(id, title, code),
-            account:fm_coa_accounts(id, title_fa, title_en, code)
+            currency:fm_currencies(id, title, code)
           `)
           .order('created_at', { ascending: false });
 
@@ -228,8 +161,6 @@
           providerName: formatPartyName(item.provider),
           currencyId: item.currency_id,
           currencyName: item.currency ? `${item.currency.title} (${item.currency.code})` : '---',
-          accountId: item.account_id,
-          accountName: item.account ? `[${item.account.code}] ${isRtl ? item.account.title_fa : item.account.title_en}` : '---',
           minAmount: item.min_amount,
           maxAmount: item.max_amount,
           validFrom: item.valid_from,
@@ -255,7 +186,6 @@
           title: formData.title,
           provider_id: formData.providerId,
           currency_id: formData.currencyId ? parseInt(formData.currencyId) : null,
-          account_id: formData.accountId || null,
           min_amount: formData.minAmount || 0,
           max_amount: formData.maxAmount || 0,
           valid_from: formData.validFrom || null,
@@ -383,77 +313,6 @@
       }
     };
 
-    const suggestNextCode = (parentId) => {
-      const parent = allCoaAccounts.find(a => a.id === parentId);
-      if (!parent || !parent.code) return '';
-      const parentCode = parent.code;
-      const children = allCoaAccounts.filter(a => a.parent_id === parentId);
-      if (children.length === 0) return parentCode + '01';
-      const nums = children
-        .map(c => { const s = c.code?.startsWith(parentCode) ? c.code.slice(parentCode.length) : c.code; return parseInt(s, 10); })
-        .filter(n => !isNaN(n));
-      const nextNum = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
-      return parentCode + String(nextNum).padStart(2, '0');
-    };
-
-    const openQuickAccountModal = () => {
-      setQuickAccountData({ parentId: '', code: '', titleFa: formData.title || '', titleEn: formData.title || '', isActive: true });
-      setIsQuickAccountModalOpen(true);
-    };
-
-    const handleSaveQuickAccount = async () => {
-      if (!quickAccountData.parentId || !quickAccountData.code || !quickAccountData.titleFa) {
-        showToast(t('حساب پدر، کد و عنوان فارسی الزامی هستند', 'Parent account, code and Persian title are required'), 'error');
-        return;
-      }
-      setIsSavingAccount(true);
-      try {
-        const parentAcc = allCoaAccounts.find(a => a.id === quickAccountData.parentId);
-        const payload = {
-          parent_id: quickAccountData.parentId,
-          chart_id: parentAcc?.chart_id || null,
-          code: quickAccountData.code,
-          title_fa: quickAccountData.titleFa,
-          title_en: quickAccountData.titleEn || quickAccountData.titleFa,
-          is_active: quickAccountData.isActive ?? true,
-          created_at: new Date().toISOString()
-        };
-        const { data: newAcc, error } = await supabase.from('fm_coa_accounts').insert([payload]).select().single();
-        if (error) {
-          if (error.code === '23505') showToast(t('کد حساب تکراری است', 'Account code already exists'), 'error');
-          else throw error;
-          return;
-        }
-        const buildPathLocal = (node, allAccs) => {
-          let parts = [node.title_fa || ''];
-          let cur = allAccs.find(a => a.id === node.parent_id);
-          while (cur) { parts.unshift(cur.title_fa || ''); cur = allAccs.find(a => a.id === cur.parent_id); }
-          return parts.join(' / ');
-        };
-        const updatedAll = [...allCoaAccounts, newAcc];
-        setAllCoaAccounts(updatedAll);
-        const newAccOption = {
-          id: newAcc.id,
-          code: newAcc.code,
-          titleFa: newAcc.title_fa,
-          titleEn: newAcc.title_en,
-          pathFa: buildPathLocal(newAcc, updatedAll),
-          pathEn: buildPathLocal(newAcc, updatedAll),
-          chartName: parentAcc?.chartName || '',
-          currency_code: ''
-        };
-        setAccounts(prev => [...prev, newAccOption]);
-        setFormData(prev => ({ ...prev, accountId: newAcc.id }));
-        setIsQuickAccountModalOpen(false);
-        showToast(t('حساب با موفقیت ایجاد شد', 'Account created successfully'));
-      } catch (err) {
-        console.error('Save Quick Account Error:', err);
-        showToast(t('خطا در ایجاد حساب', 'Error creating account'), 'error');
-      } finally {
-        setIsSavingAccount(false);
-      }
-    };
-
     const handleOpenModal = async (record = null) => {
       let nextCode = '';
       if (!record && window.AutoNumberingService) {
@@ -470,7 +329,7 @@
       }
 
       setFormData(record ? { ...record } : { 
-        code: nextCode, title: '', providerId: '', currencyId: '', accountId: '', minAmount: '', maxAmount: '', 
+        code: nextCode, title: '', providerId: '', currencyId: '', minAmount: '', maxAmount: '', 
         validFrom: '', validTo: '', isActive: true 
       });
       setCurrentRecord(record);
@@ -482,7 +341,6 @@
       { field: 'title', header_fa: 'عنوان درگاه', header_en: 'Title', width: '180px' },
       { field: 'providerName', header_fa: 'تامین‌کننده', header_en: 'Provider', width: '150px' },
       { field: 'currencyName', header_fa: 'ارز', header_en: 'Currency', width: '120px' },
-      { field: 'accountName', header_fa: 'حساب مرتبط', header_en: 'Linked Account', width: '220px' },
       { 
         field: 'minAmount', 
         header_fa: 'کف تراکنش', 
@@ -513,24 +371,12 @@
       { field: 'mobile', header_fa: 'شماره موبایل', header_en: 'Mobile', width: '150px' }
     ];
 
-    const accountLovColumns = [
-      { field: 'chartName', header_fa: 'ساختار حساب', header_en: 'Chart Structure', width: '80px' },
-      { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '80px' },
-      { field: 'titleFa', header_fa: 'عنوان حساب', header_en: 'Title', width: '240px', render: (val, row) => (
-        <div className="flex flex-col">
-          <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-          {row.pathFa && <span className="text-[10px] text-slate-500 truncate" title={row.pathFa}>{row.pathFa}</span>}
-        </div>
-      )},
-      { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' }
-    ];
-
     return (
       <div className="flex flex-col h-full p-4 bg-[#f8fafc] dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <PageHeader 
           title={t('مدیریت درگاه‌های پرداخت', 'Payment Gateways Management')} 
           icon={CreditCard}
-          description={t('مدیریت و تعریف درگاه‌های بانکی، ارزها و حساب‌های مرتبط', 'Manage gateways, currencies, and linked accounts')}
+          description={t('مدیریت و تعریف درگاه‌های بانکی و ارزها', 'Manage gateways and currencies')}
           language={language}
           breadcrumbs={[{ label: t('مدیریت مالی', 'Financial') }, { label: t('درگاه‌های پرداخت', 'Gateways') }]}
           viewConfig={viewConfig}
@@ -613,28 +459,15 @@
                 />
               </div>
 
-              <div className="flex items-end gap-2">
-                <div className="flex-1 min-w-0">
-                  <LOVField 
-                    size="sm" 
-                    label={isRtl ? 'حساب مرتبط (آخرین سطح)' : 'Linked Account'}
-                    data={accounts}
-                    columns={accountLovColumns}
-                    dropdownWidth="min-w-[470px] max-w-[470px]"
-                    displayValue={accounts.find(a => String(a.id) === String(formData.accountId))?.titleFa ? `${accounts.find(a => String(a.id) === String(formData.accountId))?.code} - ${accounts.find(a => String(a.id) === String(formData.accountId))?.titleFa}` : ''}
-                    onChange={row => setFormData({...formData, accountId: row ? row.id : ''})}
-                    isRtl={isRtl} 
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  icon={Plus}
-                  onClick={openQuickAccountModal}
-                  className="h-8 w-8 px-0 shrink-0 border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-900/40 mb-[1px]"
-                  title={t('تعریف حساب جدید', 'Add New Account')}
-                />
-              </div>
+              <SelectField 
+                size="sm" 
+                label={t('نوع ارز', 'Currency')} 
+                value={formData.currencyId} 
+                onChange={e => setFormData({...formData, currencyId: e.target.value})} 
+                options={currencies}
+                isRtl={isRtl} 
+                required
+              />
 
               <CurrencyField 
                 size="sm" 
@@ -668,15 +501,6 @@
                 dir="ltr"
               />
 
-              <SelectField 
-                size="sm" 
-                label={t('نوع ارز', 'Currency')} 
-                value={formData.currencyId} 
-                onChange={e => setFormData({...formData, currencyId: e.target.value})} 
-                options={currencies}
-                isRtl={isRtl} 
-                required
-              />
               <div className="flex items-center mt-6">
                 <ToggleField 
                   size="sm" 
@@ -762,97 +586,6 @@
             <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
               <Button variant="outline" size="sm" onClick={() => setIsPartyModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
               <Button variant="primary" size="sm" icon={Save} onClick={handleSaveQuickParty} isLoading={isPartyLoading}>{t('ذخیره و انتخاب', 'Save & Select')}</Button>
-            </div>
-          </div>
-        </Modal>
-
-        <Modal
-          isOpen={isQuickAccountModalOpen}
-          onClose={() => setIsQuickAccountModalOpen(false)}
-          title={t('تعریف سریع حساب مرتبط', 'Quick Add Account')}
-          width="max-w-2xl"
-          language={language}
-        >
-          <div className="p-4 flex flex-col gap-4">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-3">
-              <p className="text-[12px] text-blue-700 dark:text-blue-300 font-medium leading-relaxed">
-                {t('ابتدا حساب پدر را از طریق LOV انتخاب کنید، سپس کد و عنوان حساب جدید را وارد کنید.', 'First select the parent account via LOV, then enter the code and title for the new account.')}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <LOVField
-                  wrapperClassName="w-full"
-                  size="sm"
-                  label={t('حساب پدر', 'Parent Account')}
-                  data={(() => {
-                    const allCoaMap = new Map(allCoaAccounts.map(a => [a.id, a]));
-                    const checkActive = (acc) => {
-                      if (!acc) return true;
-                      if (!acc.is_active) return false;
-                      if (!acc.parent_id) return true;
-                      return checkActive(allCoaMap.get(acc.parent_id));
-                    };
-                    const parentIdSet = new Set(allCoaAccounts.map(a => a.parent_id).filter(Boolean));
-                    return allCoaAccounts.filter(a =>
-                      a.isActiveChart &&
-                      checkActive(a) &&
-                      allCoaAccounts.some(c => c.parent_id === a.id && !parentIdSet.has(c.id))
-                    );
-                  })()}
-                  columns={[
-                    { field: 'chartName', header_fa: 'ساختار', header_en: 'Chart', width: '80px' },
-                    { field: 'code', header_fa: 'کد', header_en: 'Code', width: '80px' },
-                    { field: 'title_fa', header_fa: 'عنوان', header_en: 'Title', width: '240px', render: (val, row) => (
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
-                        {row.pathFa && <span className="text-[10px] text-slate-500 truncate" title={row.pathFa}>{row.pathFa}</span>}
-                      </div>
-                    )},
-                    { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' }
-                  ]}
-                  dropdownWidth="min-w-[430px] max-w-[430px]"
-                  displayValue={(() => { const a = allCoaAccounts.find(x => x.id === quickAccountData.parentId); return a ? `${a.code} - ${a.title_fa}` : ''; })()}
-                  onChange={row => {
-                    const suggested = row ? suggestNextCode(row.id) : '';
-                    setQuickAccountData(prev => ({ ...prev, parentId: row ? row.id : '', code: suggested }));
-                  }}
-                  isRtl={isRtl}
-                  required
-                />
-              </div>
-              <TextField
-                size="sm"
-                label={t('کد حساب', 'Account Code')}
-                value={quickAccountData.code}
-                onChange={e => setQuickAccountData(prev => ({ ...prev, code: e.target.value }))}
-                isRtl={isRtl}
-                dir="ltr"
-                required
-              />
-              <div className="flex items-end pb-1">
-                <ToggleField size="sm" label={t('حساب فعال است', 'Is Active')} checked={quickAccountData.isActive ?? true} onChange={v => setQuickAccountData(prev => ({ ...prev, isActive: v }))} isRtl={isRtl} />
-              </div>
-              <TextField
-                size="sm"
-                label={t('عنوان فارسی', 'Persian Title')}
-                value={quickAccountData.titleFa}
-                onChange={e => setQuickAccountData(prev => ({ ...prev, titleFa: e.target.value }))}
-                isRtl={isRtl}
-                required
-              />
-              <TextField
-                size="sm"
-                label={t('عنوان انگلیسی', 'English Title')}
-                value={quickAccountData.titleEn}
-                onChange={e => setQuickAccountData(prev => ({ ...prev, titleEn: e.target.value }))}
-                isRtl={isRtl}
-                dir="ltr"
-              />
-            </div>
-            <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-              <Button variant="outline" size="sm" onClick={() => setIsQuickAccountModalOpen(false)}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" icon={Save} onClick={handleSaveQuickAccount} isLoading={isSavingAccount}>{t('ذخیره و انتخاب', 'Save & Select')}</Button>
             </div>
           </div>
         </Modal>

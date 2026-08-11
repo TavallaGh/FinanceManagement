@@ -396,6 +396,19 @@
             return cols.map(c => ({ ...c, header: isRtl ? c.header_fa : c.header_en }));
         };
 
+        const resolveAccountInfo = (item) => {
+            const account = item.fm_coa_accounts || allAccounts.find(a => String(a.id) === String(item.account_id)) || null;
+            const accountCode = account?.code || item.account_code || item.account_id || '';
+            const accountTitle = isRtl
+                ? (account?.title_fa || account?.title_en || item.account_name || item.description || '')
+                : (account?.title_en || account?.title_fa || item.account_name || item.description || '');
+
+            return {
+                accountCode,
+                accountTitle
+            };
+        };
+
         const activeSignaturesList = signatureOptions.filter(opt => printSettings.signatures[opt.key]);
 
         const getPreparedRows = () => {
@@ -470,20 +483,20 @@
                 currentGeneralId = itemGeneralId;
                 currentSubsidiaryId = itemSubsidiaryId;
 
-                const accName = isRtl ? item.fm_coa_accounts?.title_fa : item.fm_coa_accounts?.title_en;
                 const cur = item.currency || item.currency_code || 'IRR';
                 
                 const depositAmt = parseFloat(item.deposit_amount || 0);
                 const withdrawAmt = parseFloat(item.withdrawal_amount || 0);
                 const usdVal = parseFloat(item.amount_usd || 0);
                 const irrVal = parseFloat(item.amount_irr || 0);
+                const accountInfo = resolveAccountInfo(item);
 
                 rows.push({
                     type: 'item',
                     data: {
                         row_number: index + 1,
-                        account_code: item.fm_coa_accounts?.code || '-',
-                        account_name: accName || '-',
+                        account_code: accountInfo.accountCode || '-',
+                        account_name: accountInfo.accountTitle || '-',
                         currency: cur,
                         deposit_amount: depositAmt > 0 ? formatNumberSafe(depositAmt) : '-',
                         withdrawal_amount: withdrawAmt > 0 ? formatNumberSafe(withdrawAmt) : '-',
@@ -526,7 +539,7 @@
                     }
                 } else {
                     const item = r.data;
-                    return `<tr>${cols.map(c => `<td class="${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}" ${c.align === 'right' ? 'dir="ltr"' : ''}>${item[c.field] || '-'}</td>`).join('')}</tr>`;
+                    return `<tr>${cols.map(c => `<td class="${c.align === 'center' ? 'text-center' : c.align === 'right' ? 'text-right' : 'text-left'}" ${c.align === 'right' ? 'dir="ltr"' : ''}>${item[c.field] ?? '-'}</td>`).join('')}</tr>`;
                 }
             }).join('');
 

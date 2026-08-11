@@ -91,6 +91,13 @@
 
     const [gridState, setGridState] = useState(null);
 
+    const linkedAccountIds = useMemo(() => {
+      return data
+        .map(row => row.account_id)
+        .filter(Boolean)
+        .map(String);
+    }, [data]);
+
     const viewConfig = {
       pageId: 'payment_sources_main',
       currentState: () => ({ gridState }),
@@ -335,13 +342,12 @@
         render: (val) => <span className="font-mono font-bold text-indigo-700 dark:text-indigo-400">{val || '---'}</span>
       },
       {
-        field: 'title_fa', header_fa: 'عنوان منبع پرداخت', header_en: 'Payment Source', width: '200px',
-        render: (val, row) => (
-          <div className="flex flex-col">
-            <span className="font-bold text-slate-700 dark:text-slate-200">{val}</span>
-            {row.title_en && row.title_en !== val && <span className="text-[10px] text-slate-400">{row.title_en}</span>}
-          </div>
-        )
+        field: 'title_fa', header_fa: 'عنوان فارسی', header_en: 'Persian Title', width: '180px',
+        render: (val) => <span className="font-bold text-slate-700 dark:text-slate-200">{val}</span>
+      },
+      {
+        field: 'title_en', header_fa: 'عنوان انگلیسی', header_en: 'English Title', width: '180px',
+        render: (val) => <span className="text-slate-500 dark:text-slate-400">{val || '---'}</span>
       },
       {
         field: 'source_type', header_fa: 'نوع', header_en: 'Type', width: '120px',
@@ -462,6 +468,7 @@
               accounts={accounts}
               allCoaAccounts={allCoaAccounts}
               responsiblePartiesDropdown={responsiblePartiesDropdown}
+              linkedAccountIds={linkedAccountIds}
               language={language}
             />
           );
