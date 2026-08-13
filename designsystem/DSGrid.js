@@ -202,7 +202,7 @@
     );
   };
 
-  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, language = 'fa', defaultOpen = false, initialValues, children }) => {
+  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, onSearch, language = 'fa', defaultOpen = false, initialValues, children }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -266,7 +266,10 @@
               </div>
               <div className="flex items-center gap-2 shrink-0 mr-auto">
                 <Button variant="ghost" size="sm" icon={Trash2} onClick={handleClear}>{t('پاک کردن', 'Clear')}</Button>
-                <Button variant="primary" size="sm" icon={Search} onClick={() => onFilter && onFilter(values)}>{t('جستجو', 'Search')}</Button>
+                <Button variant="primary" size="sm" icon={Search} onClick={() => {
+                  if (onSearch) onSearch(values);
+                  else if (onFilter) onFilter(values);
+                }}>{t('جستجو', 'Search')}</Button>
               </div>
             </div>
           </div>
@@ -275,7 +278,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [] }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [], defaultPinnedCols = [], pageSizeOptions = [10, 20, 50, 100], toolbarContent = null }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -339,7 +342,7 @@
     const [gridData, setGridData] = useState(data);
     const [columnOrder, setColumnOrder] = useState(columns.map(c => c.field));
     const [hiddenCols, setHiddenCols] = useState(defaultHiddenCols);
-    const [pinnedCols, setPinnedCols] = useState([]);
+    const [pinnedCols, setPinnedCols] = useState(defaultPinnedCols);
     const [filters, setFilters] = useState({});
     const [localFilters, setLocalFilters] = useState({});
     const [sortConfig, setSortConfig] = useState({ field: null, direction: 'asc' });
@@ -372,7 +375,7 @@
           
           setColumnOrder(gridState.columnOrder || columns.map(c => c.field));
           setHiddenCols(gridState.hiddenCols || defaultHiddenCols);
-          setPinnedCols(gridState.pinnedCols || []);
+          setPinnedCols(gridState.pinnedCols || defaultPinnedCols);
           setFilters(gridState.filters || {});
           setLocalFilters(gridState.filters || {});
           setSortConfig(gridState.sortConfig || { field: null, direction: 'asc' });
@@ -382,13 +385,13 @@
         lastSyncState.current = null;
         setColumnOrder(columns.map(c => c.field));
         setHiddenCols(defaultHiddenCols);
-        setPinnedCols([]);
+        setPinnedCols(defaultPinnedCols);
         setFilters({});
         setLocalFilters({});
         setSortConfig({ field: null, direction: 'asc' });
         setGroupCols([]);
       }
-    }, [gridState, columns]);
+    }, [gridState, columns, defaultPinnedCols]);
 
     useEffect(() => {
       if (onGridStateChange) {
@@ -649,6 +652,14 @@
             )}
           </div>
 
+          {toolbarContent ? (
+            <div className="flex-1 flex items-center gap-2 min-w-0 overflow-hidden">
+              {toolbarContent}
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+
           {selectedRows.length > 0 && filteredBulkActions.length > 0 ? (
             <div className="flex-1 flex items-center gap-3 px-4 py-1 border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/30 rounded-md transition-all animate-in fade-in">
               <span className="text-[12px] font-black text-indigo-800 dark:text-indigo-300">{selectedRows.length} {t('مورد انتخاب شده', 'Items selected')}</span>
@@ -754,7 +765,7 @@
                 >
                   <div className="text-[12px] font-black text-slate-800 dark:text-slate-100 mb-2 pb-2 border-b border-slate-100 dark:border-slate-700 px-1">{t('نمایش / مخفی‌سازی', 'Show / Hide')}</div>
                   <div className="max-h-[250px] overflow-y-auto custom-scrollbar space-y-0.5">
-                    {columns.map(c => (
+                    {columns.filter(c => !c.exportOnly).map(c => (
                       <label key={c.field} className="flex items-center gap-2.5 cursor-pointer p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-md text-[12px] font-bold text-slate-600 dark:text-slate-300 transition-colors">
                         <input type="checkbox" checked={!hiddenCols.includes(c.field)} onChange={() => toggleVisibility(c.field)} className="rounded border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700/40 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 w-3.5 h-3.5" />
                         {t(c.header_fa, c.header_en)}
@@ -991,7 +1002,7 @@
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('تعداد در صفحه:', 'Rows per page:')}</span>
             <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="text-[12px] font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-slate-700 dark:text-slate-200 cursor-pointer">
-              {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+              {pageSizeOptions.map(size => <option key={size} value={size}>{size}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2">

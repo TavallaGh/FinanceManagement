@@ -12,9 +12,6 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     TrendingUp     = FallbackIcon,
-    RefreshCw      = FallbackIcon,
-    FileSpreadsheet = FallbackIcon,
-    Loader2        = FallbackIcon,
   } = LucideIcons;
 
   // ── Design System ─────────────────────────────────────────────────────────
@@ -23,10 +20,10 @@
   const DSGrid    = window.DSGrid        || DS || {};
   const DSFeedback = window.DSFeedback   || DS || {};
 
-  const Button          = Core.Button          || FallbackComponent;
   const PageHeader      = Core.PageHeader      || FallbackComponent;
   const EmptyState      = Core.EmptyState      || FallbackComponent;
   const Badge           = Core.Badge           || FallbackComponent;
+  const DataGrid        = DSGrid.DataGrid      || FallbackComponent;
   const AdvancedFilter  = DSGrid.AdvancedFilter || FallbackComponent;
   const Toast           = DSFeedback.Toast     || FallbackComponent;
 
@@ -70,13 +67,97 @@
     return `${year}-${month}-${day}`;
   };
 
+  const GROUP_LEVEL_OPTIONS = [
+    { value: '',           label_fa: 'بدون گروهبندی', label_en: 'No Grouping' },
+    { value: 'group',      label_fa: 'گروه حساب',   label_en: 'Account Group' },
+    { value: 'general',    label_fa: 'حساب کل',     label_en: 'General Account' },
+    { value: 'subsidiary', label_fa: 'حساب معین',   label_en: 'Subsidiary Account' }
+  ];
+
+  const GROUP_LEVEL_DEPTH = {
+    group: 1,
+    general: 2,
+    subsidiary: 3
+  };
+
+  const buildRateLookup = (rateRows = []) => {
+    const lookup = new Map();
+    (rateRows || []).forEach(rate => {
+      const base = String(rate.base_currency || '').toUpperCase();
+      const target = String(rate.target_currency || '').toUpperCase();
+      if (!base || !target) return;
+      const key = `${base}|${target}`;
+      if (!lookup.has(key)) lookup.set(key, []);
+      lookup.get(key).push({
+        rate: parseFloat(rate.rate || 0),
+        rate_date: String(rate.rate_date || ''),
+        created_at: String(rate.created_at || '')
+      });
+    });
+
+    lookup.forEach(list => {
+      list.sort((a, b) => {
+        const dateCmp = String(b.rate_date || '').localeCompare(String(a.rate_date || ''));
+        if (dateCmp !== 0) return dateCmp;
+        return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+      });
+    });
+
+    return lookup;
+  };
+
+  const getLatestRateForDate = (lookup, fromCode, toCode, dateIso) => {
+    const key = `${String(fromCode || '').toUpperCase()}|${String(toCode || '').toUpperCase()}`;
+    const list = lookup.get(key) || [];
+    for (const entry of list) {
+      if (!entry.rate_date || entry.rate_date <= dateIso) {
+        return entry.rate > 0 ? entry.rate : null;
+      }
+    }
+    return null;
+  };
+
+  const resolveConversionRate = (lookup, fromCode, toCode, dateIso, cache = new Map()) => {
+    const from = String(fromCode || '').toUpperCase();
+    const to = String(toCode || '').toUpperCase();
+    const day = String(dateIso || '');
+    const cacheKey = `${day}|${from}|${to}`;
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+    let rate = 1;
+    if (!from || !to || from === to) {
+      cache.set(cacheKey, rate);
+      return rate;
+    }
+
+    const direct = getLatestRateForDate(lookup, from, to, day);
+    if (direct) {
+      rate = direct;
+    } else {
+      const inverse = getLatestRateForDate(lookup, to, from, day);
+      if (inverse) {
+        rate = 1 / inverse;
+      } else {
+        const viaUsdFrom = from === 'USD' ? 1 : resolveConversionRate(lookup, from, 'USD', day, cache);
+        const viaUsdTo = to === 'USD' ? 1 : resolveConversionRate(lookup, 'USD', to, day, cache);
+        rate = (viaUsdFrom && viaUsdTo) ? (viaUsdFrom * viaUsdTo) : 1;
+      }
+    }
+
+    cache.set(cacheKey, rate || 1);
+    return rate || 1;
+  };
+
   const getDefaultFilters = () => {
     const today = new Date();
     const start = new Date(today);
     start.setDate(start.getDate() - 7);
     return {
       date_from: formatLocalIsoDate(start),
-      date_to: formatLocalIsoDate(today)
+      date_to: formatLocalIsoDate(today),
+      currency: null,
+      grouping_level: '',
+      show_movements: false
     };
   };
 
@@ -106,6 +187,7 @@
     const [generating,   setGenerating]   = useState(false);
     const [filters,      setFilters]      = useState(() => getDefaultFilters());
     const [balanceGroups, setBalanceGroups] = useState([]);
+    const [currencies,   setCurrencies]   = useState([]);
     const [reportData,   setReportData]   = useState(null);
     const [toast,        setToast]        = useState({ isVisible: false, message: '', type: 'success' });
 
@@ -162,11 +244,26 @@
 
     useEffect(() => { loadGroups(); }, [loadGroups]);
 
+    const loadCurrencies = useCallback(async () => {
+      if (!supabase) return;
+      try {
+        const { data } = await supabase
+          .from('fm_currencies')
+          .select('id, code, title, symbol')
+          .order('code');
+        setCurrencies(data || []);
+      } catch (e) {
+        console.error('BalanceReport: error loading currencies', e);
+      }
+    }, []);
+
+    useEffect(() => { loadCurrencies(); }, [loadCurrencies]);
+
     // ── Generate report ─────────────────────────────────────────────────────
-    const handleGenerate = useCallback(async () => {
-      const selGroup  = filters.balance_group;
-      const dateFrom  = filters.date_from;
-      const dateTo    = filters.date_to;
+    const handleGenerate = useCallback(async (formValues = filters) => {
+      const selGroup  = formValues.balance_group;
+      const dateFrom  = formValues.date_from;
+      const dateTo    = formValues.date_to;
 
       if (!selGroup || !dateFrom || !dateTo) {
         showToast(t('لطفاً گروه بالانس و بازه تاریخی را مشخص کنید.', 'Please select balance group and date range.'), 'warning');
@@ -186,29 +283,98 @@
       setReportData(null);
 
       try {
+        const currencyMap = new Map(currencies.map(c => [String(c.id), c]));
+        const selectedCurrencyId = formValues.currency && typeof formValues.currency === 'object'
+          ? String(formValues.currency.id || formValues.currency.value || '')
+          : '';
+        const selectedGroupingLevel = formValues.grouping_level || '';
+        const selectedGroupingDepth = selectedGroupingLevel ? (GROUP_LEVEL_DEPTH[selectedGroupingLevel] || null) : null;
+        const showMovements = !!formValues.show_movements;
+
         // ── 1. Group accounts (is_active = true only) ──────────────────────
         const { data: groupAccs, error: gaErr } = await supabase
           .from('fm_balance_group_accounts')
-          .select('account_id, valid_from, valid_to, fm_coa_accounts(id, code, title_fa, title_en)')
+          .select('account_id, valid_from, valid_to, fm_coa_accounts(id, code, title_fa, title_en, parent_id, currency_id, chart_id)')
           .eq('group_id', groupId)
           .eq('is_active', true);
 
         if (gaErr) throw gaErr;
         if (!groupAccs || groupAccs.length === 0) {
-          setReportData({ dates: [], accounts: [], matrix: {}, groupName: selGroup.title_fa || '' });
+          setReportData({ dates: [], accounts: [], matrix: {}, groupName: selGroup.title_fa || '', groupLevel: selectedGroupingLevel });
           return;
         }
+
+        const chartIds = Array.from(new Set((groupAccs || []).map(ga => ga.fm_coa_accounts?.chart_id).filter(Boolean).map(String)));
+        const { data: chartAccounts } = chartIds.length > 0
+          ? await supabase
+              .from('fm_coa_accounts')
+              .select('id, code, title_fa, title_en, parent_id, currency_id, chart_id, is_active, account_type')
+              .in('chart_id', chartIds)
+              .eq('is_active', true)
+          : { data: [] };
+
+        const accountMap = new Map((chartAccounts || []).map(a => [String(a.id), a]));
+        const chainCache = new Map();
+        const getChain = (accountId) => {
+          const key = String(accountId || '');
+          if (chainCache.has(key)) return chainCache.get(key);
+          const chain = [];
+          let current = accountMap.get(key) || null;
+          let guard = 0;
+          while (current && guard < 20) {
+            chain.unshift(current);
+            current = current.parent_id ? accountMap.get(String(current.parent_id)) || null : null;
+            guard++;
+          }
+          chainCache.set(key, chain);
+          return chain;
+        };
+
+        const getAncestorAtLevel = (accountId, depth) => {
+          const chain = getChain(accountId);
+          if (chain.length === 0) return null;
+          const idx = Math.min(Math.max(depth, 1), chain.length) - 1;
+          return chain[idx] || chain[chain.length - 1] || null;
+        };
 
         // Deduplicate accounts; collect all valid date ranges per account
         const accMap = {};
         (groupAccs || []).forEach(ga => {
           const aid = String(ga.account_id);
+          const baseAcc = accountMap.get(aid) || ga.fm_coa_accounts;
+          if (!baseAcc) return;
+          if (selectedCurrencyId && String(baseAcc.currency_id || '') !== selectedCurrencyId) return;
+
+          const chain = getChain(aid);
+          const groupNode = selectedGroupingDepth ? (getAncestorAtLevel(aid, selectedGroupingDepth) || baseAcc) : baseAcc;
+          const groupCurrency = currencyMap.get(String(groupNode.currency_id || ''));
+          const rowCurrency = currencyMap.get(String(baseAcc.currency_id || ''));
+
           if (!accMap[aid]) {
             accMap[aid] = {
               id:       aid,
-              code:     ga.fm_coa_accounts?.code     || '',
-              title_fa: ga.fm_coa_accounts?.title_fa || '',
-              title_en: ga.fm_coa_accounts?.title_en || '',
+              group_key: String(groupNode.id || aid),
+              group_sort_key: `${groupNode.code || ''}-${groupNode.title_fa || groupNode.title_en || ''}`,
+              group_code: groupNode.code || '',
+              group_title_fa: groupNode.title_fa || '',
+              group_title_en: groupNode.title_en || groupNode.title_fa || '',
+              group_currency_id: groupNode.currency_id || '',
+              group_currency_code: groupCurrency?.code || '',
+              group_currency_title: groupCurrency?.title || '',
+              group_currency_symbol: groupCurrency?.symbol || '',
+              code:     baseAcc.code     || '',
+              title_fa: baseAcc.title_fa || '',
+              title_en: baseAcc.title_en || '',
+              currency_id: baseAcc.currency_id || '',
+              currency_code: rowCurrency?.code || '',
+              currency_title: rowCurrency?.title || '',
+              currency_symbol: rowCurrency?.symbol || '',
+              group_label: `${groupNode.code || ''} - ${isRtl ? (groupNode.title_fa || '') : (groupNode.title_en || groupNode.title_fa || '')}`.trim(),
+              group_currency_code: groupCurrency?.code || '',
+              group_currency_title: groupCurrency?.title || '',
+              group_currency_symbol: groupCurrency?.symbol || '',
+              level_depth: chain.length || 1,
+              level_name: GROUP_LEVEL_OPTIONS.find(l => l.value === selectedGroupingLevel)?.[isRtl ? 'label_fa' : 'label_en'] || '',
               ranges:   []
             };
           }
@@ -218,14 +384,32 @@
           });
         });
 
-        const allAccounts  = Object.values(accMap).sort((a, b) => a.code.localeCompare(b.code));
-        const accountIds   = allAccounts.map(a => a.id);
+        const allAccounts  = Object.values(accMap).sort((a, b) => {
+          const g = String(a.group_sort_key || '').localeCompare(String(b.group_sort_key || ''));
+          if (g !== 0) return g;
+          return String(a.code || '').localeCompare(String(b.code || ''));
+        });
+        const filteredAccounts = selectedCurrencyId
+          ? allAccounts.filter(acc => String(acc.currency_id || '') === selectedCurrencyId)
+          : allAccounts;
+        const accountIds   = filteredAccounts.map(a => a.id);
         const dates        = buildDateRange(isoFrom, isoTo);
 
         if (dates.length === 0) {
-          setReportData({ dates: [], accounts: allAccounts, matrix: {}, groupName: selGroup.title_fa || '' });
+          setReportData({ dates: [], accounts: filteredAccounts, matrix: {}, groupName: selGroup.title_fa || '', groupLevel: selectedGroupingLevel, showMovements });
           return;
         }
+
+        const usesGroupingSummary = !!selectedGroupingDepth;
+        const rateLookup = usesGroupingSummary
+          ? buildRateLookup((await supabase
+              .from('fm_currency_rates')
+              .select('base_currency, target_currency, rate, rate_date, created_at')
+              .lte('rate_date', isoTo)
+              .order('rate_date', { ascending: false })
+              .order('created_at', { ascending: false })).data || [])
+          : new Map();
+        const conversionCache = new Map();
 
         // ── 2. Transactions (TEMPORARY / FINAL / APPROVED) up to dateTo ───
         //    document_date stored as YYYY/MM/DD — compare with slashes
@@ -285,7 +469,7 @@
          *    Balance(X) = Balance(X-1) + Deposits(X) – Withdrawals(X)
          */
         const matrix = {};
-        allAccounts.forEach(acc => {
+        filteredAccounts.forEach(acc => {
           matrix[acc.id] = {};
           const daily     = dailyMap[acc.id] || {};
           const txDates   = Object.keys(daily).sort();
@@ -302,15 +486,100 @@
             txDates.forEach(txD => {
               if (txD <= d) balance += daily[txD].dep - daily[txD].wid;
             });
-            matrix[acc.id][d] = balance;
+            matrix[acc.id][d] = {
+              dep: daily[d]?.dep || 0,
+              wid: daily[d]?.wid || 0,
+              bal: balance
+            };
           });
         });
 
+        let displayRows = filteredAccounts;
+        let displayMatrix = matrix;
+
+        if (usesGroupingSummary) {
+          const groupBuckets = new Map();
+          filteredAccounts.forEach(acc => {
+            const key = String(acc.group_key || acc.group_sort_key || acc.id);
+            if (!groupBuckets.has(key)) {
+              groupBuckets.set(key, {
+                key,
+                sortKey: String(acc.group_sort_key || ''),
+                code: acc.group_code || '',
+                title_fa: acc.group_title_fa || '',
+                title_en: acc.group_title_en || acc.group_title_fa || '',
+                currency_id: acc.group_currency_id || acc.currency_id || '',
+                currency_code: acc.group_currency_code || acc.currency_code || '',
+                currency_title: acc.group_currency_title || acc.currency_title || '',
+                currency_symbol: acc.group_currency_symbol || acc.currency_symbol || '',
+                label: `${acc.group_code || ''} - ${isRtl ? (acc.group_title_fa || '') : (acc.group_title_en || acc.group_title_fa || '')}`.trim(),
+                accounts: []
+              });
+            }
+            groupBuckets.get(key).accounts.push(acc);
+          });
+
+          const groupedRows = [];
+          const groupedMatrix = {};
+
+          [...groupBuckets.values()].sort((a, b) => a.sortKey.localeCompare(b.sortKey)).forEach(group => {
+            const summaryId = `group-${group.key}`;
+            const summaryRow = {
+              id: summaryId,
+              is_group_summary: true,
+              group_key: group.key,
+              group_sort_key: group.sortKey,
+              code: group.code || '',
+              title_fa: group.title_fa || '',
+              title_en: group.title_en || group.title_fa || '',
+              currency_id: group.currency_id || '',
+              currency_code: group.currency_code || '',
+              currency_title: group.currency_title || '',
+              currency_symbol: group.currency_symbol || '',
+              group_label: group.label || ''
+            };
+            groupedRows.push(summaryRow);
+
+            let runningBalance = 0;
+            groupedMatrix[summaryId] = {};
+            dates.forEach(d => {
+              let dep = 0;
+              let wid = 0;
+              group.accounts.forEach(acc => {
+                const day = matrix[acc.id]?.[d];
+                if (!day) return;
+                const rate = resolveConversionRate(
+                  rateLookup,
+                  acc.currency_code || acc.currency_title || '',
+                  group.currency_code || acc.currency_code || '',
+                  d,
+                  conversionCache
+                );
+                dep += (parseFloat(day.dep || 0) || 0) * rate;
+                wid += (parseFloat(day.wid || 0) || 0) * rate;
+              });
+              runningBalance += dep - wid;
+              groupedMatrix[summaryId][d] = { dep, wid, bal: runningBalance };
+            });
+
+            groupedRows.push(...group.accounts);
+            group.accounts.forEach(acc => {
+              groupedMatrix[acc.id] = matrix[acc.id] || {};
+            });
+          });
+
+          displayRows = groupedRows;
+          displayMatrix = groupedMatrix;
+        }
+
         setReportData({
           dates,
-          accounts:  allAccounts,
-          matrix,
-          groupName: (typeof selGroup === 'object') ? (selGroup.title_fa || selGroup.code || '') : ''
+          accounts:  displayRows,
+          matrix:    displayMatrix,
+          groupName: (typeof selGroup === 'object') ? (selGroup.title_fa || selGroup.code || '') : '',
+          groupLevel: selectedGroupingLevel,
+          showMovements,
+          leafCount: filteredAccounts.length
         });
 
       } catch (e) {
@@ -319,39 +588,23 @@
       } finally {
         setGenerating(false);
       }
-    }, [filters, showToast, t]);
-
-    // ── Excel export ────────────────────────────────────────────────────────
-    const handleExport = useCallback(() => {
-      if (!reportData) return;
-      const XLSX = window.XLSX;
-      if (!XLSX) { showToast(t('کتابخانه اکسل در دسترس نیست', 'Excel library not available'), 'error'); return; }
-
-      const { dates, accounts, matrix } = reportData;
-      const header = [
-        t('کد حساب', 'Account Code'),
-        t('عنوان حساب', 'Account Title'),
-        ...dates.map(d => fmtDate(d))
-      ];
-      const rows = accounts.map(acc => [
-        acc.code,
-        isRtl ? acc.title_fa : (acc.title_en || acc.title_fa),
-        ...dates.map(d => {
-          const v = matrix[acc.id]?.[d];
-          return v === null || v === undefined ? '' : v;
-        })
-      ]);
-
-      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, t('بالانس روزانه', 'Daily Balance'));
-      XLSX.writeFile(wb, 'BalanceReport.xlsx');
-    }, [reportData, isRtl, fmtDate, showToast, t]);
+    }, [currencies, filters, showToast, t, isRtl]);
 
     // ── LOV columns for balance group ───────────────────────────────────────
     const groupLovCols = useMemo(() => [
       { field: 'code',     header_fa: 'کد',              header_en: 'Code',         width: '70px'  },
       { field: 'title_fa', header_fa: 'عنوان گروه بالانس', header_en: 'Balance Group', width: '220px' }
+    ], []);
+
+    const currencyLovData = useMemo(() => currencies.map(c => ({
+      ...c,
+      displayLabel: `${c.code || ''} - ${c.title || ''}${c.symbol ? ` (${c.symbol})` : ''}`.trim()
+    })), [currencies]);
+
+    const currencyLovCols = useMemo(() => [
+      { field: 'code',   header_fa: 'کد ارز',   header_en: 'Code',   width: '90px' },
+      { field: 'title',  header_fa: 'عنوان ارز', header_en: 'Title',  width: '180px' },
+      { field: 'symbol', header_fa: 'نماد',     header_en: 'Symbol', width: '70px' }
     ], []);
 
     // ── Filter fields ───────────────────────────────────────────────────────
@@ -364,18 +617,39 @@
         lovColumns:   groupLovCols,
         dropdownWidth:'min-w-[340px]'
       },
+      {
+        name:         'currency',
+        label:        t('ارز', 'Currency'),
+        type:         'lov',
+        lovData:      currencyLovData,
+        lovColumns:   currencyLovCols,
+        dropdownWidth:'min-w-[380px]'
+      },
+      {
+        name:   'grouping_level',
+        label:  t('سطح نمایش', 'Display Level'),
+        type:   'select',
+        options: [{ value: '', label: t('بدون گروهبندی', 'No Grouping') }].concat(GROUP_LEVEL_OPTIONS.filter(o => o.value).map(o => ({
+          value: o.value,
+          label: isRtl ? o.label_fa : o.label_en
+        })))
+      },
       { name: 'date_from', label: t('از تاریخ', 'From Date'), type: 'date' },
-      { name: 'date_to',   label: t('تا تاریخ', 'To Date'),   type: 'date' }
-    ], [t, balanceGroups, groupLovCols]);
+      { name: 'date_to',   label: t('تا تاریخ', 'To Date'),   type: 'date' },
+      {
+        name:   'show_movements',
+        label:  t('نمایش واریز/برداشت', 'Show Deposit/Withdrawal'),
+        type:   'toggle'
+      }
+    ], [t, balanceGroups, groupLovCols, currencyLovData, currencyLovCols, isRtl]);
 
-    // ── Matrix renderer (custom – no DS equivalent) ─────────────────────────
     const renderMatrix = () => {
-      const { dates, accounts, matrix, groupName } = reportData;
+      const { dates, accounts, matrix, groupName, groupLevel, showMovements, leafCount } = reportData;
 
       if (accounts.length === 0) {
         return React.createElement(EmptyState, {
-          title:       t('حسابی در این گروه یافت نشد', 'No accounts found in this group'),
-          description: t('گروه انتخابی هیچ حساب فعالی ندارد.', 'The selected balance group has no active accounts.'),
+          title:       t('هیچ حسابی مطابق فیلترها یافت نشد', 'No accounts matched the filters'),
+          description: t('گروه بالانس یا فیلتر ارز نتیجه‌ای برنگرداند.', 'The selected balance group or currency filter returned no accounts.'),
           language
         });
       }
@@ -388,122 +662,111 @@
         });
       }
 
-      /* Sticky offset for the two frozen columns */
-      const stickyFirst  = isRtl ? { right: 0 }      : { left: 0 };
-      const stickySecond = isRtl ? { right: '70px' }  : { left: '70px' };
-      const cellBase     = 'border border-slate-200 dark:border-slate-700 px-2 py-1.5';
-      const stickyBase   = 'bg-inherit';
+      const gridRows = accounts.map(acc => {
+        const row = { ...acc };
+        dates.forEach(d => {
+          row[d] = matrix[acc.id]?.[d] || {};
+        });
+        return row;
+      });
 
-      return React.createElement('div', { className: 'flex flex-col h-full' },
+      const dayColumns = dates.map((d) => ({
+        field: d,
+        header_fa: fmtDate(d),
+        header_en: fmtDate(d),
+        width: '128px',
+        render: (val) => {
+          const day = val || {};
+          const balance = day.bal;
+          const deposit = day.dep || 0;
+          const withdrawal = day.wid || 0;
 
-        // ── Info bar ──────────────────────────────────────────────────────
-        React.createElement('div', {
-          className: 'flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 shrink-0 flex-wrap gap-2'
+          if (showMovements) {
+            return React.createElement('div', { className: 'flex flex-col gap-0.5 leading-4 whitespace-nowrap' },
+              React.createElement('span', { className: 'font-mono text-emerald-700 dark:text-emerald-400' }, fmt(deposit)),
+              React.createElement('span', { className: 'font-mono text-rose-600 dark:text-rose-400' }, fmt(withdrawal)),
+              React.createElement('span', { className: 'font-mono text-slate-800 dark:text-slate-200' }, fmt(balance))
+            );
+          }
+
+          if (balance === null || balance === undefined) return React.createElement('span', { className: 'text-slate-300 dark:text-slate-600' }, '—');
+          const colorCls = balance === 0
+            ? 'text-slate-400 dark:text-slate-500'
+            : balance > 0
+              ? 'text-emerald-700 dark:text-emerald-400'
+              : 'text-rose-600 dark:text-rose-400';
+          return React.createElement('span', { className: `font-mono ${colorCls} whitespace-nowrap` }, fmt(balance));
+        }
+      }));
+
+      const columns = [
+        {
+          field: 'group_label',
+          header_fa: 'گروه حساب',
+          header_en: 'Account Group',
+          width: '220px',
+          exportOnly: true
         },
-          React.createElement('div', { className: 'flex items-center gap-2 flex-wrap' },
-            groupName && React.createElement(Badge, { variant: 'info', size: 'sm' }, groupName),
-            React.createElement('span', { className: 'text-[12px] text-slate-500 dark:text-slate-400' },
-              t(
-                `${accounts.length} حساب  ·  ${dates.length} روز`,
-                `${accounts.length} accounts  ·  ${dates.length} days`
-              )
-            )
-          ),
-          React.createElement(Button, {
-            variant: 'ghost',
-            size:    'xs',
-            icon:    FileSpreadsheet,
-            onClick: handleExport
-          }, t('خروجی اکسل', 'Export Excel'))
-        ),
+        {
+          field: 'code',
+          header_fa: 'کد حساب',
+          header_en: 'Account Code',
+          width: '90px',
+          render: (val, row) => React.createElement('span', {
+            className: `font-mono whitespace-nowrap ${row.is_group_summary ? 'font-black text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'}`
+          }, val || '—')
+        },
+        {
+          field: isRtl ? 'title_fa' : 'title_en',
+          header_fa: 'عنوان حساب',
+          header_en: 'Account Title',
+          width: '280px',
+          render: (val, row) => React.createElement('div', {
+            className: `whitespace-normal break-words leading-5 ${row.is_group_summary ? 'font-black text-indigo-700 dark:text-indigo-300' : 'font-medium text-slate-800 dark:text-slate-200'}`,
+            title: isRtl ? row.title_fa : (row.title_en || row.title_fa)
+          }, row.is_group_summary
+            ? `${row.currency_code ? `${row.currency_code} - ` : ''}${isRtl ? row.title_fa : (row.title_en || row.title_fa)}`
+            : (isRtl ? row.title_fa : (row.title_en || row.title_fa)))
+        },
+        {
+          field: 'currency_code',
+          header_fa: 'ارز',
+          header_en: 'Currency',
+          width: '110px',
+          render: (val, row) => React.createElement('span', {
+            className: `inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[11px] whitespace-nowrap ${row.is_group_summary ? 'border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`,
+            title: row.currency_title || row.currency_code || ''
+          }, val || '—')
+        },
+        ...dayColumns
+      ];
 
-        // ── Scrollable matrix ─────────────────────────────────────────────
-        React.createElement('div', { className: 'flex-1 overflow-auto custom-scrollbar' },
-          React.createElement('table', { className: 'border-collapse text-[12px]', style: { minWidth: '100%' } },
-
-            // Header row
-            React.createElement('thead', null,
-              React.createElement('tr', null,
-
-                // Code column header
-                React.createElement('th', {
-                  className: `${cellBase} sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 text-right font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap`,
-                  style: { ...stickyFirst, position: 'sticky', minWidth: '70px' }
-                }, t('کد حساب', 'Code')),
-
-                // Title column header
-                React.createElement('th', {
-                  className: `${cellBase} sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 text-right font-bold text-slate-700 dark:text-slate-300`,
-                  style: { ...stickySecond, position: 'sticky', minWidth: '180px' }
-                }, t('عنوان حساب', 'Account Title')),
-
-                // Date column headers
-                ...dates.map(d =>
-                  React.createElement('th', {
-                    key: d,
-                    className: `${cellBase} sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-center font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap`,
-                    style: { minWidth: '110px' }
-                  }, fmtDate(d))
-                )
-              )
-            ),
-
-            // Body rows
-            React.createElement('tbody', null,
-              accounts.map((acc, idx) => {
-                const rowBg = idx % 2 === 0
-                  ? 'bg-white dark:bg-slate-900'
-                  : 'bg-slate-50/60 dark:bg-slate-800/40';
-
-                return React.createElement('tr', {
-                  key: acc.id,
-                  className: `${rowBg} hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors`
-                },
-
-                  // Code cell (sticky)
-                  React.createElement('td', {
-                    className: `${cellBase} ${stickyBase} font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap`,
-                    style: { ...stickyFirst, position: 'sticky' }
-                  }, acc.code),
-
-                  // Title cell (sticky)
-                  React.createElement('td', {
-                    className: `${cellBase} ${stickyBase} font-medium text-slate-800 dark:text-slate-200 truncate`,
-                    style: { ...stickySecond, position: 'sticky', maxWidth: '200px' },
-                    title: isRtl ? acc.title_fa : (acc.title_en || acc.title_fa)
-                  }, isRtl ? acc.title_fa : (acc.title_en || acc.title_fa)),
-
-                  // Value cells
-                  ...dates.map(d => {
-                    const val = matrix[acc.id]?.[d];
-
-                    // Account not valid on this date
-                    if (val === null || val === undefined) {
-                      return React.createElement('td', {
-                        key: d,
-                        className: `${cellBase} text-center text-slate-300 dark:text-slate-600`
-                      }, '—');
-                    }
-
-                    const colorCls = val === 0
-                      ? 'text-slate-400 dark:text-slate-500'
-                      : val > 0
-                        ? 'text-emerald-700 dark:text-emerald-400'
-                        : 'text-rose-600 dark:text-rose-400';
-
-                    return React.createElement('td', {
-                      key: d,
-                      className: `${cellBase} text-center font-mono ${colorCls}`
-                    }, fmt(val));
-                  })
-                );
-              })
-            )
+      const toolbarContent = React.createElement('div', { className: 'flex items-center gap-2 flex-wrap text-[12px] text-slate-500 dark:text-slate-400 overflow-hidden' },
+        React.createElement('span', { className: 'whitespace-nowrap' },
+          t(
+            `${leafCount || accounts.filter(acc => !acc.is_group_summary).length} حساب  ·  ${dates.length} روز`,
+            `${leafCount || accounts.filter(acc => !acc.is_group_summary).length} accounts  ·  ${dates.length} days`
           )
         )
       );
+
+      return React.createElement(DataGrid, {
+        key: `${groupName || 'report'}-${dates.length}-${accounts.length}`,
+        data: gridRows,
+        columns,
+        language,
+        formCode,
+        hideToolbar: false,
+        hideImport: true,
+        defaultPinnedCols: ['code', isRtl ? 'title_fa' : 'title_en', 'currency_code'],
+        gridState: null,
+        groupable: false,
+        pageSizeOptions: [20, 50, 100],
+        toolbarContent
+      });
     };
 
+    // ── Matrix renderer (custom – no DS equivalent) ─────────────────────────
     // ── Main render ─────────────────────────────────────────────────────────
     return React.createElement('div', {
       className: 'h-full flex flex-col font-sans',
@@ -528,29 +791,18 @@
           ]
         }),
 
-        React.createElement('div', { className: 'flex-1 min-h-0 flex flex-col mt-4 overflow-hidden gap-2' },
+        React.createElement('div', { className: 'flex-1 min-h-0 flex flex-col mt-2 overflow-hidden gap-1' },
 
           // Advanced filter
           React.createElement(AdvancedFilter, {
             fields:        filterFields,
             initialValues: filters,
             onFilter:      setFilters,
+            onSearch:      handleGenerate,
             onClear:       () => { setFilters(getDefaultFilters()); setReportData(null); },
             language,
             defaultOpen:   true
-          },
-            // "Generate Report" button placed in the children slot (left side of footer)
-            React.createElement(Button, {
-              variant: 'primary',
-              size:    'sm',
-              icon:    generating ? Loader2 : RefreshCw,
-              onClick: handleGenerate,
-              disabled: generating
-            }, generating
-              ? t('در حال پردازش...', 'Processing...')
-              : t('تولید گزارش', 'Generate Report')
-            )
-          ),
+          }),
 
           // Content area
           generating
@@ -568,18 +820,14 @@
                   React.createElement(EmptyState, {
                     title:       t('گزارشی نمایش داده نشده', 'No report displayed'),
                     description: t(
-                      'گروه بالانس و بازه تاریخی را انتخاب کرده، سپس دکمه «تولید گزارش» را بزنید.',
-                      'Select a balance group and date range, then click Generate Report.'
+                      'گروه بالانس، ارز و بازه تاریخی را انتخاب کرده، سپس دکمه «جستجو» را بزنید.',
+                      'Select a balance group, currency, and date range, then click Search.'
                     ),
                     language
                   })
                 )
 
-              : React.createElement('div', {
-                  className: 'flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col'
-                },
-                  renderMatrix()
-                )
+              : React.createElement('div', { className: 'flex-1 min-h-0 overflow-hidden' }, renderMatrix())
         )
       ),
 

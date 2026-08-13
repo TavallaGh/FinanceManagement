@@ -398,7 +398,7 @@
 
         const resolveAccountInfo = (item) => {
             const account = item.fm_coa_accounts || allAccounts.find(a => String(a.id) === String(item.account_id)) || null;
-            const accountCode = account?.code || item.account_code || item.account_id || '';
+            const accountCode = account?.code;
             const accountTitle = isRtl
                 ? (account?.title_fa || account?.title_en || item.account_name || item.description || '')
                 : (account?.title_en || account?.title_fa || item.account_name || item.description || '');
