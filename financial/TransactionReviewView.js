@@ -300,8 +300,8 @@
           className: 'mb-0'
         }),
 
-        !drillDoc && activeTab === 'items' && selectedDocumentIds.length > 0 && React.createElement('div', { className: 'flex justify-end -mt-1' },
-          React.createElement('span', { className: 'text-[11px] text-slate-500 dark:text-slate-400' }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
+        !drillDoc && activeTab === 'items' && selectedDocumentIds.length > 0 && React.createElement('div', { className: `flex ${isRtl ? 'justify-end' : 'justify-start'} -mt-1` },
+          React.createElement('span', { className: `text-[11px] text-slate-500 dark:text-slate-400 ${isRtl ? 'text-right' : 'text-left'}` }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
         ),
 
         drillDoc && React.createElement('div', { className: 'flex items-center gap-3 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800/50 rounded-lg px-4 py-2 shrink-0' },
