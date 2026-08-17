@@ -12,6 +12,8 @@
   const LucideIcons = window.LucideIcons || {};
   const {
     TrendingUp     = FallbackIcon,
+    ChevronDown    = FallbackIcon,
+    ChevronRight   = FallbackIcon,
   } = LucideIcons;
 
   // ── Design System ─────────────────────────────────────────────────────────
@@ -189,6 +191,7 @@
     const [balanceGroups, setBalanceGroups] = useState([]);
     const [currencies,   setCurrencies]   = useState([]);
     const [reportData,   setReportData]   = useState(null);
+    const [collapsedGroupKeys, setCollapsedGroupKeys] = useState([]);
     const [toast,        setToast]        = useState({ isVisible: false, message: '', type: 'success' });
 
     const showToast = useCallback((msg, type = 'success') => {
@@ -362,6 +365,7 @@
               group_currency_code: groupCurrency?.code || '',
               group_currency_title: groupCurrency?.title || '',
               group_currency_symbol: groupCurrency?.symbol || '',
+              member_count: 0,
               code:     baseAcc.code     || '',
               title_fa: baseAcc.title_fa || '',
               title_en: baseAcc.title_en || '',
@@ -536,7 +540,8 @@
               currency_code: group.currency_code || '',
               currency_title: group.currency_title || '',
               currency_symbol: group.currency_symbol || '',
-              group_label: group.label || ''
+              group_label: group.label || '',
+              member_count: group.accounts.length
             };
             groupedRows.push(summaryRow);
 
@@ -646,6 +651,23 @@
     const renderMatrix = () => {
       const { dates, accounts, matrix, groupName, groupLevel, showMovements, leafCount } = reportData;
 
+      const visibleAccounts = [];
+      accounts.forEach(acc => {
+        if (acc.is_group_summary) {
+          visibleAccounts.push(acc);
+          return;
+        }
+        if (!collapsedGroupKeys.includes(String(acc.group_key || ''))) {
+          visibleAccounts.push(acc);
+        }
+      });
+
+      const toggleGroup = (groupKey) => {
+        const key = String(groupKey || '');
+        if (!key) return;
+        setCollapsedGroupKeys(prev => prev.includes(key) ? prev.filter(item => item !== key) : [...prev, key]);
+      };
+
       if (accounts.length === 0) {
         return React.createElement(EmptyState, {
           title:       t('هیچ حسابی مطابق فیلترها یافت نشد', 'No accounts matched the filters'),
@@ -662,7 +684,7 @@
         });
       }
 
-      const gridRows = accounts.map(acc => {
+      const gridRows = visibleAccounts.map(acc => {
         const row = { ...acc };
         dates.forEach(d => {
           row[d] = matrix[acc.id]?.[d] || {};
@@ -725,7 +747,19 @@
             className: `whitespace-normal break-words leading-5 ${row.is_group_summary ? 'font-black text-indigo-700 dark:text-indigo-300' : 'font-medium text-slate-800 dark:text-slate-200'}`,
             title: isRtl ? row.title_fa : (row.title_en || row.title_fa)
           }, row.is_group_summary
-            ? `${row.currency_code ? `${row.currency_code} - ` : ''}${isRtl ? row.title_fa : (row.title_en || row.title_fa)}`
+            ? React.createElement('button', {
+                type: 'button',
+                onClick: () => toggleGroup(row.group_key),
+                className: 'flex items-center gap-2 text-inherit text-start w-full'
+              },
+                React.createElement('span', { className: 'inline-flex items-center justify-center w-5 h-5 rounded-full border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 shrink-0' },
+                  collapsedGroupKeys.includes(String(row.group_key || ''))
+                    ? React.createElement(ChevronRight, { size: 12 })
+                    : React.createElement(ChevronDown, { size: 12 })
+                ),
+                React.createElement('span', null, `${row.currency_code ? `${row.currency_code} - ` : ''}${isRtl ? row.title_fa : (row.title_en || row.title_fa)}`),
+                React.createElement('span', { className: 'text-[10px] font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.5 rounded-full shrink-0' }, row.member_count || 0)
+              )
             : (isRtl ? row.title_fa : (row.title_en || row.title_fa)))
         },
         {
