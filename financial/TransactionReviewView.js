@@ -300,10 +300,6 @@
           className: 'mb-0'
         }),
 
-        !drillDoc && activeTab === 'items' && selectedDocumentIds.length > 0 && React.createElement('div', { className: `flex ${isRtl ? 'justify-end' : 'justify-start'} -mt-1` },
-          React.createElement('span', { className: `text-[11px] text-slate-500 dark:text-slate-400 ${isRtl ? 'text-right' : 'text-left'}` }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
-        ),
-
         drillDoc && React.createElement('div', { className: 'flex items-center gap-3 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800/50 rounded-lg px-4 py-2 shrink-0' },
           React.createElement(Button, { variant: 'outline', size: 'sm', icon: BackIcon, onClick: () => setDrillDoc(null) }, t('برگشت به لیست اسناد', 'Back to Documents')),
           React.createElement('div', { className: 'h-4 w-px bg-indigo-200 dark:bg-indigo-700' }),
@@ -343,6 +339,12 @@
                     language,
                     formCode,
                     isLoading,
+                    toolbarContent: selectedDocumentIds.length > 0 && React.createElement('div', { className: 'flex-1 flex items-center' },
+                      React.createElement('span', {
+                        className: `text-[11px] text-slate-500 dark:text-slate-400 ${isRtl ? 'text-right' : 'text-left'}`,
+                        dir: isRtl ? 'rtl' : 'ltr',
+                      }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
+                    ),
                   })
                 ),
                 drillDoc && React.createElement(DataGrid, {
