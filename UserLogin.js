@@ -9,7 +9,6 @@
     User = FallbackIcon, Lock = FallbackIcon, Mail = FallbackIcon, Smartphone = FallbackIcon, 
     ArrowRight = FallbackIcon, ArrowLeft = FallbackIcon, KeyRound = FallbackIcon, Building2 = FallbackIcon, 
     CheckCircle2 = FallbackIcon, ShieldCheck = FallbackIcon, Globe = FallbackIcon, Loader2 = FallbackIcon,
-    HelpCircle = FallbackIcon, FileText = FallbackIcon
   } = LucideIcons;
 
   const UserLogin = ({ 
@@ -21,10 +20,8 @@
     const [resetData, setResetData] = useState({ identifier: '', otp: '', newPassword: '', confirmPassword: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [toastState, setToastState] = useState({ isVisible: false, message: '', type: 'success' });
-    const [docModalInfo, setDocModalInfo] = useState({ isOpen: false, type: 'user' });
     
     const { Toast } = window.DSFeedback || {};
-    const NavigationDocsComponent = window.NavigationDocs;
     
     const showToast = (message, type = 'success') => {
       setToastState({ isVisible: true, message, type });
@@ -118,21 +115,6 @@
         </div>
 
         <div className={`absolute top-6 ${isRtl ? 'left-6' : 'right-6'} z-20 flex items-center gap-2`}>
-          <button 
-            onClick={() => setDocModalInfo({ isOpen: true, type: 'user' })} 
-            className="flex items-center justify-center bg-white/60 backdrop-blur-md border border-white/50 w-9 h-9 rounded-full shadow-sm text-indigo-600 hover:bg-white transition-all" 
-            title={isRtl ? 'راهنمای کاربری' : 'User Guide'}
-          >
-            <HelpCircle size={16} />
-          </button>
-          <button 
-            onClick={() => setDocModalInfo({ isOpen: true, type: 'dev' })} 
-            className="flex items-center justify-center bg-white/60 backdrop-blur-md border border-white/50 w-9 h-9 rounded-full shadow-sm text-amber-500 hover:bg-white transition-all" 
-            title={isRtl ? 'مستندات توسعه' : 'Developer Docs'}
-          >
-            <FileText size={16} />
-          </button>
-          <div className="w-px h-5 bg-slate-300 mx-1"></div>
           <button 
             onClick={toggleLanguage}
             className="flex items-center gap-2 bg-white/60 backdrop-blur-md border border-white/50 px-4 py-2 rounded-full shadow-sm text-[12px] font-bold text-slate-700 hover:bg-white transition-all"
@@ -419,18 +401,6 @@
         </div>
 
         {Toast && <Toast isVisible={toastState.isVisible} message={toastState.message} type={toastState.type} onClose={() => setToastState(prev => ({ ...prev, isVisible: false }))} />}
-        
-        {NavigationDocsComponent && (
-          <NavigationDocsComponent
-            isOpen={docModalInfo.isOpen}
-            onClose={() => setDocModalInfo({ ...docModalInfo, isOpen: false })}
-            pageKey="login_page"
-            pageName={isRtl ? 'صفحه ورود به سیستم' : 'Login Page'}
-            docType={docModalInfo.type}
-            isAdmin={true}
-            language={isRtl ? 'fa' : 'en'}
-          />
-        )}
       </div>
     );
   };

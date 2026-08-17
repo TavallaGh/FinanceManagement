@@ -271,7 +271,8 @@
       };
 
       const headerCols = [
-        t('کد تراکنش','Transaction Code'), t('تاریخ سند','Document Date'), t('زمان ثبت','Registered At'),
+        t('کد تراکنش','Transaction Code'), t('کد عطف','Ref Code'), t('شماره روزانه','Daily Number'),
+        t('تاریخ سند','Document Date'), t('زمان ثبت','Registered At'),
         t('نوع تراکنش','Type'), t('وضعیت','Status'), t('ثبت‌کننده','Registrar'), t('دپارتمان','Department'),
         t('شرح سربرگ','Description'), t('بررسی‌کننده','Reviewed By'), t('تاریخ بررسی','Reviewed At'),
         t('تاییدکننده','Approved By'), t('تاریخ تایید','Approved At'),
@@ -281,6 +282,7 @@
       const itemCols = [
         t('ردیف','Row'), t('حساب','Account'), t('نوع عملیات','Action'), t('گروه','Group'),
         t('نوع هزینه/درآمد','Cost/Income Type'), t('ارز','Currency'),
+        t('مرکز هزینه/درآمد','Cost/Income Center'),
         t('واریز','Deposit'), t('برداشت','Withdrawal'),
         t('معادل دلار','Amount USD'), t('معادل ریال','Amount IRR'), t('شرح قلم','Item Desc'),
       ];
@@ -291,6 +293,10 @@
       const rows = [];
       dataToExport.forEach(tx => {
         const txItems = tx.fm_transaction_items || [];
+        const centerTitle = (centerId) => {
+          const center = (lookups.costBenefitCenters || []).find(c => String(c.id) === String(centerId));
+          return center ? (isRtl ? center.titleFa : (center.titleEn || center.titleFa)) : '';
+        };
         let txDepUsd = 0, txWidUsd = 0, txDepIrr = 0, txWidIrr = 0;
         txItems.forEach(item => {
           const usd = parseFloat(item.amount_usd || 0);
@@ -299,7 +305,8 @@
           else                                       { txWidUsd += usd; txWidIrr += irr; }
         });
         const hdr = [
-          tx.document_code || '', tx.document_date || '', formatDT(tx.created_at),
+          tx.document_code || '', tx.reference_code || '', tx.daily_number || '',
+          tx.document_date || '', formatDT(tx.created_at),
           TX_TYPE[tx.transaction_type]   || tx.transaction_type   || '',
           TX_STATUS[tx.status]           || tx.status             || '',
           usersMap[tx.registrar_id]      || '',
@@ -312,7 +319,7 @@
         ];
         const items = tx.fm_transaction_items || [];
         if (items.length === 0) {
-          rows.push([...hdr, '', '', '', '', '', '', '', '', '', '', ''].map(esc).join(','));
+          rows.push([...hdr, '', '', '', '', '', '', '', '', '', '', '', ''].map(esc).join(','));
         } else {
           items.forEach(item => {
             const acc   = (lookups.accounts   || []).find(a => String(a.id) === String(item.account_id));
@@ -329,6 +336,7 @@
               TX_ACTION[item.transaction_action] || item.transaction_action || '',
               TX_GROUP[item.transaction_group]   || item.transaction_group  || '',
               subType, item.currency || '',
+              centerTitle(item.center_id),
               item.deposit_amount    || '0', item.withdrawal_amount || '0',
               item.amount_usd        || '0', item.amount_irr        || '0',
               item.description       || '',
