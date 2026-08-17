@@ -74,6 +74,7 @@
       date_to:             formatLocalIsoDate(today),
       account_filter_type: 'balance_group',
       filter_value:        null,
+      summary_currency:    false,
     };
   };
 
@@ -217,7 +218,7 @@
         ]);
 
         const buildTree = (rows = []) => {
-          const map = new Map(rows.map(row => [String(row.id), row]));
+          const map = new Map((rows || []).map(row => [String(row.id), row]));
           return (rows || []).map(row => {
             const titleFa = row.title_fa || row.title || '';
             const titleEn = row.title_en || row.title_fa || row.title || '';
@@ -227,12 +228,12 @@
             while (current && guard < 20) {
               path.unshift(current.title_fa || current.title_en || current.title || '');
               current = current.parent_id ? map.get(String(current.parent_id)) || null : null;
-              guard++;
+              guard += 1;
             }
             return {
               ...row,
               displayLabel: isRtl ? titleFa : titleEn,
-              pathTitle: path.filter(Boolean).join(' / ')
+              pathTitle: path.filter(Boolean).join(' / '),
             };
           });
         };
@@ -244,7 +245,7 @@
             ...row,
             titleFa: row.title_fa || '',
             titleEn: row.title_en || '',
-          }))
+          })),
         });
       } catch (e) {
         console.error('TransactionReview: error loading lookups', e);
@@ -515,6 +516,11 @@
             ],
             dropdownWidth: 'min-w-[340px]',
           },
+      {
+        name: 'summary_currency',
+        label: t('خلاصه ارزی', 'Currency Summary'),
+        type: 'toggle',
+      },
     ], [t, filterState.account_filter_type, accountLovData, balanceGroups]);
 
     const TX_TYPES = {
@@ -559,17 +565,42 @@
           : null;
 
       const items = [];
+      const balanceByAccount = new Map();
 
       transactions.forEach(tx => {
         (tx.fm_transaction_items || []).forEach(item => {
           if (filterAccountId && item.account_id !== filterAccountId) return;
+          const rawDep = parseFloat(item.deposit_amount || 0);
+          const rawWid = parseFloat(item.withdrawal_amount || 0);
+          const signedAmount = rawDep > 0 ? rawDep : (rawWid > 0 ? -rawWid : 0);
+          const accountKey = String(item.account_id || '');
+          const balanceAfter = (balanceByAccount.get(accountKey) || 0) + signedAmount;
+          balanceByAccount.set(accountKey, balanceAfter);
+
+          const rateToUsd = parseFloat(item.exchange_rate_to_usd || 0);
+          const rateUsdToIrr = parseFloat(item.exchange_rate_usd_to_irr || 0);
+          const amount = rawDep > 0 ? rawDep : rawWid;
+          const resolvedToUsd = rateToUsd > 0 ? rateToUsd : 1;
+          const resolvedUsdToIrr = rateUsdToIrr > 0 ? rateUsdToIrr : 1;
           items.push({
             ...item,
+            deposit_amount: rawDep,
+            withdrawal_amount: rawWid,
+            exchange_rate_to_usd: resolvedToUsd,
+            exchange_rate_usd_to_irr: resolvedUsdToIrr,
+            amount_usd: amount * resolvedToUsd,
+            amount_irr: amount * resolvedToUsd * resolvedUsdToIrr,
+            dep_usd: rawDep * resolvedToUsd,
+            dep_irr: rawDep * resolvedToUsd * resolvedUsdToIrr,
+            wid_usd: rawWid * resolvedToUsd,
+            wid_irr: rawWid * resolvedToUsd * resolvedUsdToIrr,
             _doc_id:   tx.id,
             _doc_code: tx.document_code,
             _doc_date: tx.document_date,
             _tx_type:  tx.transaction_type,
+            _tx_status: tx.status,
             _tx:       tx,
+            _balance_after: balanceAfter,
           });
         });
       });
