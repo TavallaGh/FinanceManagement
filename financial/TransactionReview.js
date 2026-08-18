@@ -670,7 +670,7 @@
       statusLabels: STATUS_LABELS,
     });
   };
-
+ 
   TransactionReview.formCode = 'FIN_TRANSACTION_REVIEW';
   window.TransactionReview = TransactionReview;
 })();

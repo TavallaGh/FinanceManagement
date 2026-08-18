@@ -512,6 +512,6 @@
       })
     );
   };
-
+ 
   window.TransactionReviewView = TransactionReviewView;
 })();
