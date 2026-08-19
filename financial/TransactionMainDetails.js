@@ -694,7 +694,11 @@
                         if (e1) {
                             // Graceful retry without center_id if the column doesn't exist in DB yet
                             console.warn('fm_transaction_items insert failed, retrying without center_id:', e1.message);
-                            const payloadWithoutCenter = itemsPayload.map(({ center_id, ...rest }) => rest);
+                            const payloadWithoutCenter = itemsPayload.map(item => {
+                                const nextItem = { ...item };
+                                delete nextItem.center_id;
+                                return nextItem;
+                            });
                             const { data: d2, error: e2 } = await supabase.from('fm_transaction_items').insert(payloadWithoutCenter).select();
                             if (e2) throw e2;
                             newItems = d2;

@@ -29,12 +29,16 @@
   const buildIndexedLookup = (items = [], getLabels = []) => {
     const map = new Map();
     (items || []).forEach(item => {
+      const itemKey = item?.id ?? item?.value ?? item?.code ?? item?.title ?? JSON.stringify(item);
       getLabels.forEach(getLabel => {
         const label = normalizeImportToken(getLabel(item));
         if (!label) return;
-        const list = map.get(label) || [];
-        list.push(item);
-        map.set(label, list);
+        const entry = map.get(label) || { items: [], seen: new Set() };
+        if (!entry.seen.has(itemKey)) {
+          entry.seen.add(itemKey);
+          entry.items.push(item);
+        }
+        map.set(label, entry);
       });
     });
     return map;
@@ -43,7 +47,8 @@
   const getSingleMatch = (collection, rawValue) => {
     const normalized = normalizeImportToken(rawValue);
     if (!normalized) return { id: null, item: null, label: '' };
-    const matches = collection.get(normalized) || [];
+    const entry = collection.get(normalized);
+    const matches = entry?.items || [];
     if (matches.length === 1) {
       const item = matches[0];
       return { id: item.id ?? item.value ?? null, item, label: pickLocalizedTitle(item, true) || String(rawValue) };
@@ -112,13 +117,18 @@
       }, 0);
     }, []);
 
+    const activeChartAccounts = useMemo(() => {
+      const activeChartId = lookups.activeChartId;
+      const accounts = lookups.accounts || [];
+      if (!activeChartId) return accounts;
+      return accounts.filter(item => String(item.chart_id) === String(activeChartId));
+    }, [lookups.activeChartId, lookups.accounts]);
+
     const lookupByTitle = useMemo(() => ({
-      accounts: buildIndexedLookup(lookups.accounts || [], [
+      accounts: buildIndexedLookup(activeChartAccounts, [
         item => item.displayLabel,
         item => item.titleFa || item.title_fa,
         item => item.titleEn || item.title_en,
-        item => item.pathTitle,
-        item => item.code,
       ]),
       costTypes: buildIndexedLookup(lookups.costTypes || [], [
         item => item.displayLabel,
@@ -138,14 +148,12 @@
         item => item.displayLabel,
         item => item.titleFa || item.title_fa,
         item => item.titleEn || item.title_en,
-        item => item.pathTitle,
-        item => item.code,
       ]),
       departments: buildIndexedLookup(
         Object.entries(deptsMap || {}).map(([id, title]) => ({ id, title })),
         [item => item.title]
       ),
-    }), [deptsMap, lookups.accounts, lookups.costTypes, lookups.costBenefitCenters, lookups.incomeTypes]);
+    }), [activeChartAccounts, deptsMap, lookups.costTypes, lookups.costBenefitCenters, lookups.incomeTypes]);
 
     const enumAliases = useMemo(() => ({
       transactionType: new Map([
@@ -186,7 +194,6 @@
       const firstDeptTitle = Object.values(deptsMap || {}).find(Boolean) || '';
 
       const headers = [
-        t('کلید سند', 'Document Key'),
         t('کد سند', 'Document Code'),
         t('تاریخ سند', 'Document Date'),
         t('نوع سند', 'Transaction Type'),
@@ -209,13 +216,13 @@
       ];
 
       const sampleRows = isRtl ? [
-        ['DOC-001', '', '2026-08-01', 'عمومی', 'یادداشت', firstDeptTitle, 'نمونه سند هزینه', 1, pickLocalizedTitle(firstAccount, isRtl) || 'صندوق', 'واریز', 'هزینه', pickLocalizedTitle(firstCostType, isRtl) || 'هزینه اداری', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 1000000, '', 'پرداخت هزینه نمونه', '', ''],
-        ['DOC-001', '', '2026-08-01', 'عمومی', 'یادداشت', firstDeptTitle, 'نمونه سند هزینه', 2, pickLocalizedTitle(firstAccount, isRtl) || 'بانک', 'برداشت', 'هزینه', pickLocalizedTitle(firstCostType, isRtl) || 'هزینه اداری', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', '', 1000000, 'ردیف دوم', '', ''],
-        ['DOC-002', '', '2026-08-02', 'انتقال', 'موقت', firstDeptTitle, 'نمونه سند انتقال', 1, pickLocalizedTitle(firstAccount, isRtl) || 'صندوق', 'واریز', 'بالانس', '', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 500000, '', 'ردیف انتقال', '', ''],
+        ['DOC-001', '2026-08-01', 'عمومی', 'یادداشت', firstDeptTitle, 'نمونه سند هزینه', 1, pickLocalizedTitle(firstAccount, isRtl) || 'صندوق', 'واریز', 'هزینه', pickLocalizedTitle(firstCostType, isRtl) || 'هزینه اداری', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 1000000, '', 'پرداخت هزینه نمونه', '', ''],
+        ['DOC-001', '2026-08-01', 'عمومی', 'یادداشت', firstDeptTitle, 'نمونه سند هزینه', 2, pickLocalizedTitle(firstAccount, isRtl) || 'بانک', 'برداشت', 'هزینه', pickLocalizedTitle(firstCostType, isRtl) || 'هزینه اداری', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', '', 1000000, 'ردیف دوم', '', ''],
+        ['DOC-002', '2026-08-02', 'انتقال', 'موقت', firstDeptTitle, 'نمونه سند انتقال', 1, pickLocalizedTitle(firstAccount, isRtl) || 'صندوق', 'واریز', 'بالانس', '', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 500000, '', 'ردیف انتقال', '', ''],
       ] : [
-        ['DOC-001', '', '2026-08-01', 'General', 'Draft', firstDeptTitle, 'Sample cost document', 1, pickLocalizedTitle(firstAccount, isRtl) || 'Cash', 'Deposit', 'Cost', pickLocalizedTitle(firstCostType, isRtl) || 'Administrative Expense', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 1000000, '', 'Sample item', '', ''],
-        ['DOC-001', '', '2026-08-01', 'General', 'Draft', firstDeptTitle, 'Sample cost document', 2, pickLocalizedTitle(firstAccount, isRtl) || 'Bank', 'Withdrawal', 'Cost', pickLocalizedTitle(firstCostType, isRtl) || 'Administrative Expense', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', '', 1000000, 'Second row', '', ''],
-        ['DOC-002', '', '2026-08-02', 'Transfer', 'Temporary', firstDeptTitle, 'Sample transfer document', 1, pickLocalizedTitle(firstAccount, isRtl) || 'Cash', 'Deposit', 'Balance', '', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 500000, '', 'Transfer row', '', ''],
+        ['DOC-001', '2026-08-01', 'General', 'Draft', firstDeptTitle, 'Sample cost document', 1, pickLocalizedTitle(firstAccount, isRtl) || 'Cash', 'Deposit', 'Cost', pickLocalizedTitle(firstCostType, isRtl) || 'Administrative Expense', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 1000000, '', 'Sample item', '', ''],
+        ['DOC-001', '2026-08-01', 'General', 'Draft', firstDeptTitle, 'Sample cost document', 2, pickLocalizedTitle(firstAccount, isRtl) || 'Bank', 'Withdrawal', 'Cost', pickLocalizedTitle(firstCostType, isRtl) || 'Administrative Expense', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', '', 1000000, 'Second row', '', ''],
+        ['DOC-002', '2026-08-02', 'Transfer', 'Temporary', firstDeptTitle, 'Sample transfer document', 1, pickLocalizedTitle(firstAccount, isRtl) || 'Cash', 'Deposit', 'Balance', '', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 500000, '', 'Transfer row', '', ''],
       ];
 
       const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
@@ -251,26 +258,25 @@
 
           const rows = rawRows.slice(1).map((cols, index) => ({
             sheetRow: index + 2,
-            documentKey: String(cols[0] ?? '').trim(),
-            documentCode: String(cols[1] ?? '').trim(),
-            documentDate: String(cols[2] ?? '').trim(),
-            transactionType: String(cols[3] ?? '').trim(),
-            status: String(cols[4] ?? '').trim(),
-            departmentTitle: String(cols[5] ?? '').trim(),
-            description: String(cols[6] ?? '').trim(),
-            rowNumber: String(cols[7] ?? '').trim(),
-            accountTitle: String(cols[8] ?? '').trim(),
-            transactionAction: String(cols[9] ?? '').trim(),
-            transactionGroup: String(cols[10] ?? '').trim(),
-            costTypeTitle: String(cols[11] ?? '').trim(),
-            incomeTypeTitle: String(cols[12] ?? '').trim(),
-            centerTitle: String(cols[13] ?? '').trim(),
-            currencyCode: String(cols[14] ?? '').trim().toUpperCase(),
-            depositAmount: String(cols[15] ?? '').trim(),
-            withdrawalAmount: String(cols[16] ?? '').trim(),
-            itemDescription: String(cols[17] ?? '').trim(),
-            exchangeRateToUsd: String(cols[18] ?? '').trim(),
-            exchangeRateUsdToIrr: String(cols[19] ?? '').trim(),
+            documentCode: String(cols[0] ?? '').trim(),
+            documentDate: String(cols[1] ?? '').trim(),
+            transactionType: String(cols[2] ?? '').trim(),
+            status: String(cols[3] ?? '').trim(),
+            departmentTitle: String(cols[4] ?? '').trim(),
+            description: String(cols[5] ?? '').trim(),
+            rowNumber: String(cols[6] ?? '').trim(),
+            accountTitle: String(cols[7] ?? '').trim(),
+            transactionAction: String(cols[8] ?? '').trim(),
+            transactionGroup: String(cols[9] ?? '').trim(),
+            costTypeTitle: String(cols[10] ?? '').trim(),
+            incomeTypeTitle: String(cols[11] ?? '').trim(),
+            centerTitle: String(cols[12] ?? '').trim(),
+            currencyCode: String(cols[13] ?? '').trim().toUpperCase(),
+            depositAmount: String(cols[14] ?? '').trim(),
+            withdrawalAmount: String(cols[15] ?? '').trim(),
+            itemDescription: String(cols[16] ?? '').trim(),
+            exchangeRateToUsd: String(cols[17] ?? '').trim(),
+            exchangeRateUsdToIrr: String(cols[18] ?? '').trim(),
           })).filter(row => Object.values(row).some(value => String(value ?? '').trim() !== ''));
 
           if (rows.length === 0) {
@@ -281,9 +287,9 @@
           const docGroups = new Map();
           const errors = [];
           rows.forEach(row => {
-            const groupKey = normalizeImportToken(row.documentKey || row.documentCode);
+            const groupKey = normalizeImportToken(row.documentCode);
             if (!groupKey) {
-              errors.push(`${t('ردیف', 'Row')} ${row.sheetRow}: ${t('کلید سند یا کد سند الزامی است.', 'Document Key or Document Code is required.')}`);
+              errors.push(`${t('ردیف', 'Row')} ${row.sheetRow}: ${t('کد سند الزامی است.', 'Document Code is required.')}`);
               return;
             }
             const groupRows = docGroups.get(groupKey) || [];
@@ -330,6 +336,7 @@
             const docDepartment = masterRow.departmentTitle ? getSingleMatch(lookupByTitle.departments, masterRow.departmentTitle) : { id: null };
             const masterErrors = [];
 
+            if (!masterRow.documentCode) masterErrors.push(t('کد سند الزامی است.', 'Document code is required.'));
             if (!masterRow.documentDate) masterErrors.push(t('تاریخ سند الزامی است.', 'Document date is required.'));
             if (!masterRow.description) masterErrors.push(t('شرح سند الزامی است.', 'Document description is required.'));
             if (docTypeRaw && !docType) masterErrors.push(t('نوع سند نامعتبر است.', 'Transaction type is invalid.'));
@@ -349,7 +356,6 @@
                 ['status', t('وضعیت', 'Status')],
                 ['departmentTitle', t('دپارتمان', 'Department')],
                 ['description', t('شرح سند', 'Document description')],
-                ['documentCode', t('کد سند', 'Document code')],
               ];
               masterFieldChecks.forEach(([field, label]) => {
                 const currentValue = String(row[field] ?? '').trim();
@@ -476,7 +482,7 @@
             }
 
             if (masterErrors.length > 0 || finalItems.length === 0) {
-              const docLabel = masterRow.documentCode || masterRow.documentKey || groupKey;
+              const docLabel = masterRow.documentCode || groupKey;
               (masterErrors.length > 0 ? masterErrors : [t('این سند هیچ قلم معتبری ندارد.', 'This document has no valid items.')]).forEach(msg => {
                 errors.push(`${t('سند', 'Document')} ${docLabel}: ${msg}`);
               });
@@ -501,20 +507,7 @@
           let insertedCount = 0;
           let updatedCount = 0;
           for (const doc of docsToSave) {
-            let documentCode = doc.masterRow.documentCode || '';
-            if (!documentCode) {
-              if (window.AutoNumberingService) {
-                try {
-                  const preview = await window.AutoNumberingService.previewNext('TRANSACTIONS');
-                  documentCode = preview && preview.formattedCode ? preview.formattedCode : (typeof preview === 'string' ? preview : '');
-                } catch (err) {
-                  console.error('AutoNumbering preview error:', err);
-                }
-              }
-              if (!documentCode) {
-                documentCode = `DOC-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-              }
-            }
+            const documentCode = doc.masterRow.documentCode;
 
             const txPayload = {
               document_code: documentCode,
@@ -561,8 +554,17 @@
               amount_irr: item.amount_irr,
               description: item.description || null,
             }));
-            const { error: itemError } = await supabase.from('fm_transaction_items').insert(itemsPayload);
-            if (itemError) throw itemError;
+            let itemInsertResult = await supabase.from('fm_transaction_items').insert(itemsPayload);
+            if (itemInsertResult.error) {
+              console.warn('fm_transaction_items insert failed, retrying without center_id:', itemInsertResult.error.message);
+              const payloadWithoutCenter = itemsPayload.map(item => {
+                const nextItem = { ...item };
+                delete nextItem.center_id;
+                return nextItem;
+              });
+              itemInsertResult = await supabase.from('fm_transaction_items').insert(payloadWithoutCenter);
+            }
+            if (itemInsertResult.error) throw itemInsertResult.error;
 
             await logAction(existingTx ? 'import_transaction_update' : 'import_transaction_create', txId, `Import ${documentCode}`);
           }

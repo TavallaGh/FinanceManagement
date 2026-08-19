@@ -195,6 +195,7 @@
                 setDeptsMap(dMap);
 
                 const activeCharts = chartRes.data || [];
+                const activeChartId = activeCharts[0]?.id || null;
                 const activeChartIds = new Set(activeCharts.map(c => c.id));
                 const buildPathsAndFilterLeafs = (items, charts = null) => {
                     const parentIds = new Set(items.map(i => i.parent_id).filter(Boolean));
@@ -264,6 +265,7 @@
                     incomeTypes: buildPathsAndFilterLeafs(incRes.data || []),
                     costBenefitCenters,
                     currencies: currRes.data || [],
+                    activeChartId,
                 });
             } catch (error) {
                 console.error('fetchLookups error:', error);
@@ -274,19 +276,56 @@
             setIsLoading(true);
             try {
                 const [{ data: txData, error: txError }, { data: attData }] = await Promise.all([
-                    supabase.from('fm_transactions').select('*, fm_transaction_items(*)').order('created_at', { ascending: false }),
+                    supabase.from('fm_transactions').select('*').order('created_at', { ascending: false }),
                     supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'TRANSACTION')
                 ]);
 
                 if (txError) throw txError;
-                setTransactions(txData || []);
+
+                const transactionsWithItems = (txData || []).map(tx => ({ ...tx, fm_transaction_items: [] }));
+                const txIds = transactionsWithItems.map(tx => String(tx.id));
+
+                if (txIds.length > 0) {
+                    let itemRows = [];
+                    let itemError = null;
+
+                    const loadItems = async (columns) => {
+                        return supabase
+                            .from('fm_transaction_items')
+                            .select(columns)
+                            .in('transaction_id', txIds)
+                            .order('transaction_id', { ascending: true })
+                            .order('row_number', { ascending: true });
+                    };
+
+                    ({ data: itemRows, error: itemError } = await loadItems('*'));
+                    if (itemError && /center_id|schema cache/i.test(itemError.message || '')) {
+                        const fallbackColumns = 'id, transaction_id, row_number, account_id, transaction_action, transaction_group, cost_type_id, income_type_id, currency, deposit_amount, withdrawal_amount, exchange_rate_to_usd, exchange_rate_usd_to_irr, amount_usd, amount_irr, description, created_at';
+                        ({ data: itemRows, error: itemError } = await loadItems(fallbackColumns));
+                    }
+
+                    if (!itemError && itemRows) {
+                        const itemsByTransaction = new Map();
+                        itemRows.forEach(item => {
+                            const key = String(item.transaction_id);
+                            if (!itemsByTransaction.has(key)) itemsByTransaction.set(key, []);
+                            itemsByTransaction.get(key).push(item);
+                        });
+                        transactionsWithItems.forEach(tx => {
+                            tx.fm_transaction_items = itemsByTransaction.get(String(tx.id)) || [];
+                        });
+                    } else if (itemError) {
+                        console.warn('Unable to load fm_transaction_items separately:', itemError.message);
+                    }
+                }
+
+                setTransactions(transactionsWithItems);
 
                 const counts = {};
                 (attData || []).forEach(att => { counts[att.entity_id] = (counts[att.entity_id] || 0) + 1; });
                 setAttachmentCounts(counts);
 
-                if ((txData || []).length > 0) {
-                    const txIds = txData.map(r => String(r.id));
+                if (txIds.length > 0) {
                     const { data: commentRows } = await supabase.from('sys_comments').select('entity_id').eq('entity_type', 'fm_transactions').in('entity_id', txIds);
                     if (commentRows) setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
                 }

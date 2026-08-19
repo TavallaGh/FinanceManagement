@@ -662,12 +662,12 @@
               {toolbarContent}
             </div>
           ) : (
-            <div className="flex-1" />
+            <div className="hidden" />
           )}
 
           {selectedRows.length > 0 && filteredBulkActions.length > 0 ? (
-            <div className="flex-1 flex items-center gap-3 px-4 py-1 border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/30 rounded-md transition-all animate-in fade-in">
-              <span className="text-[12px] font-black text-indigo-800 dark:text-indigo-300">{selectedRows.length} {t('مورد انتخاب شده', 'Items selected')}</span>
+            <div className="flex-1 min-w-0 flex items-center gap-3 px-4 py-1 border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/30 rounded-md transition-all animate-in fade-in overflow-hidden">
+              <span className="text-[12px] font-black text-indigo-800 dark:text-indigo-300 whitespace-nowrap shrink-0">{selectedRows.length} {t('مورد انتخاب شده', 'Items selected')}</span>
               <div className="w-px h-4 bg-indigo-200 dark:bg-indigo-800/50 mx-1"></div>
               {filteredBulkActions.map((act, i) => (
                 <Button key={i} size="sm" variant={act.variant || 'outline'} icon={act.icon} onClick={() => {act.onClick(selectedRows); setSelectedRows([]);}} className={`!h-7 text-[10px] ${act.className || ''}`}>
@@ -676,7 +676,7 @@
               ))}
             </div>
           ) : groupable ? (
-            <div className={`flex-1 flex items-center gap-2 px-3 py-1 border border-dashed rounded-md transition-colors overflow-x-auto custom-scrollbar ${groupCols.length > 0 ? 'bg-indigo-50/30 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'}`} onDragOver={(e) => e.preventDefault()} onDrop={handleGroupDrop}>
+            <div className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-1 border border-dashed rounded-md transition-colors overflow-x-auto custom-scrollbar ${groupCols.length > 0 ? 'bg-indigo-50/30 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'}`} onDragOver={(e) => e.preventDefault()} onDrop={handleGroupDrop}>
               <Layers size={14} className={groupCols.length > 0 ? 'text-indigo-500 dark:text-indigo-400 shrink-0' : 'text-slate-400 dark:text-slate-500 shrink-0'} />
               {groupCols.length === 0 ? (
                 <span className="text-[12px] text-slate-400 dark:text-slate-500 font-medium whitespace-nowrap">{t('هدر ستون را برای گروه‌بندی اینجا رها کنید', 'Drop column header here to group')}</span>
