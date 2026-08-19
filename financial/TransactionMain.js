@@ -22,321 +22,288 @@
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
+    const DSGrid = window.DSGrid || DS || {};
+    const Feedback = window.DSFeedback || window.DSOverlays || DS || {};
+    const LucideIcons = window.LucideIcons || {};
   const Button = safeComp(Core, 'Button');
   const PageHeader = safeComp(Core, 'PageHeader');
-  const EmptyState = safeComp(Core, 'EmptyState');
-  const Badge = safeComp(Core, 'Badge');
-  const Card = safeComp(Core, 'Card');
+    const AdvancedFilter = safeComp(DSGrid, 'AdvancedFilter');
+    const DataGrid = safeComp(DSGrid, 'DataGrid');
+    const EmptyState = safeComp(Core, 'EmptyState');
+    const Badge = safeComp(Core, 'Badge');
+    const Modal = safeComp(Feedback, 'Modal');
+    const Toast = safeComp(Feedback, 'Toast');
+    const AttachmentManager = safeComp(window, 'AttachmentManager');
+    const FileText = safeIcon(LucideIcons, 'FileText');
+    const AlertTriangle = safeIcon(LucideIcons, 'AlertTriangle');
+    const MessageSquare = safeIcon(LucideIcons, 'MessageSquare');
+    const Printer = safeIcon(LucideIcons, 'Printer');
+    const DollarSign = safeIcon(LucideIcons, 'DollarSign');
+    const Paperclip = safeIcon(LucideIcons, 'Paperclip');
+    const Copy = safeIcon(LucideIcons, 'Copy');
+    const Edit = safeIcon(LucideIcons, 'Edit');
+    const Trash2 = safeIcon(LucideIcons, 'Trash2');
 
-  const DSGrid = window.DSGrid || DS || {};
-  const DataGrid = safeComp(DSGrid, 'DataGrid');
-  const AdvancedFilter = safeComp(DSGrid, 'AdvancedFilter');
+    const formatNumber = (num) => {
+            if (!num && num !== 0) return '0';
+            const parts = parseFloat(num).toFixed(2).toString().split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            return parts[1] === '00' ? parts[0] : parts.join('.');
+    };
 
-  const Forms = window.DSForms || DS || {};
-  const AttachmentManager = safeComp(Forms, 'AttachmentManager');
+    const TransactionMain = ({ language = 'fa', formCode = 'FIN_TRANSACTION_MAIN' }) => {
+        const isRtl = language === 'fa';
+        const t = useCallback((fa, en) => (isRtl ? fa : en), [isRtl]);
+        const calendarMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : (isRtl ? 'jalali' : 'gregorian');
+        const dateLocale = calendarMode === 'jalali' ? 'fa-IR-u-nu-latn' : 'en-US';
+        const supabase = window.supabase;
 
-  const Feedback = window.DSFeedback || window.DSOverlays || DS || {};
-  const Modal = safeComp(Feedback, 'Modal');
-  const Toast = safeComp(Feedback, 'Toast');
-
-  const LucideIcons = window.LucideIcons || {};
-  const FileText = safeIcon(LucideIcons, 'FileText');
-  const FileSpreadsheet = safeIcon(LucideIcons, 'FileSpreadsheet');
-  const Edit = safeIcon(LucideIcons, 'Edit');
-  const Trash2 = safeIcon(LucideIcons, 'Trash2');
-  const Copy = safeIcon(LucideIcons, 'Copy');
-  const AlertTriangle = safeIcon(LucideIcons, 'AlertTriangle');
-  const Paperclip = safeIcon(LucideIcons, 'Paperclip');
-  const DollarSign = safeIcon(LucideIcons, 'DollarSign');
-  const Printer = safeIcon(LucideIcons, 'Printer');
-  const RefreshCw = safeIcon(LucideIcons, 'RefreshCw');
-  const MessageSquare = safeIcon(LucideIcons, 'MessageSquare');
-
-  const formatNumber = (num) => {
-      if (!num && num !== 0) return '0';
-      const parts = parseFloat(num).toFixed(2).toString().split('.');
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      return parts[1] === '00' ? parts[0] : parts.join('.');
-  };
-
-  const TransactionMain = ({ language = 'fa', formCode = 'FIN_TRANSACTION_MAIN' }) => {
-    const isRtl = language === 'fa';
-    const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
-    const calendarMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : (isRtl ? 'jalali' : 'gregorian');
-    const dateLocale = calendarMode === 'jalali' ? 'fa-IR-u-nu-latn' : 'en-US';
-
-    const supabase = window.supabase;
-
-    // read current user from session (same source used across the app)
-    const sessionUserId = (() => {
-      try {
-        const s = sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}';
-        return JSON.parse(s).id || null;
-      } catch(e) { return null; }
-    })();
-
-    const currentUserObj = window.NavigationSystem?.currentUser || {};
-    const currentUserId = sessionUserId || currentUserObj.id || null;
-    const currentUserName = currentUserObj.name || currentUserObj.username || 'مدیر سیستم';
-
-    const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
-    const access = useMemo(() => {
-      const rawActions = securityCtx ? securityCtx.getActions(formCode) : null;
-      return rawActions || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
-    }, [securityCtx, formCode]);
-
-    const TRANSACTION_TYPES = [
-        { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
-        { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
-        { value: 'GENERAL', label: t('عمومی', 'General') },
-        { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
-    ];
-
-    const TRANSACTION_ACTIONS = [
-        { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
-        { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') }
-    ];
-
-    const TRANSACTION_GROUPS = [
-        { value: 'COST', label: t('هزینه', 'Cost') },
-        { value: 'INCOME', label: t('درآمد', 'Income') },
-        { value: 'BALANCE', label: t('بالانس', 'Balance') },
-        { value: 'OTHER', label: t('سایر', 'Other') }
-    ];
-
-    const STATUS_OPTIONS = [
-        { value: 'DRAFT', label: t('یادداشت', 'Draft') },
-        { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
-        { value: 'FINAL', label: t('بررسی شده', 'Final') },
-        { value: 'APPROVED', label: t('تایید شده', 'Approved') }
-    ];
-
-    // ترتیب مجاز تغییر وضعیت — در TransactionActions.js تعریف شده
-    const isLocked = (tx) => tx.status === 'FINAL' || tx.status === 'APPROVED';
-
-    const [toast,         setToast]         = useState({ isVisible: false, message: '', type: 'success' });
-    const [isLoading, setIsLoading] = useState(false);
-    
-    const [transactions, setTransactions] = useState([]);
-    const [attachmentCounts, setAttachmentCounts] = useState({});
-    const [gridState, setGridState] = useState(null);
-    const [filters, setFilters] = useState({});
-    const [usersMap, setUsersMap] = useState({});
-    const [deptsMap, setDeptsMap] = useState({});
-    const [lookups, setLookups] = useState({ accounts: [], costTypes: [], incomeTypes: [], costBenefitCenters: [] });
-    const [resolvedUserId, setResolvedUserId] = useState(currentUserId);
-    const [userDepartmentId, setUserDepartmentId] = useState(null);
-    
-    const [currentView, setCurrentView] = useState('list');
-    const [formMode, setFormMode] = useState('CREATE');
-    const [currentRecord, setCurrentRecord] = useState(null);
-    
-    const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
-    const [commentedIds, setCommentedIds] = useState(new Set());
-    const [filteredRecordId, setFilteredRecordId] = useState(null);
-    
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
-    const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
-    const [summaryModal, setSummaryModal] = useState({ isOpen: false, record: null });
-    const [printModal, setPrintModal] = useState({ isOpen: false, transactionId: null });
-    const [isUploading, setIsUploading] = useState(false);
-
-    const showToast = useCallback((message, type = 'success') => {
-      setToast({ isVisible: true, message, type });
-      setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
-    }, []);
-
-    const logAction = useCallback(async (action, recordId, details = '') => {
-      try {
-        if (!supabase) return;
-        await supabase.from('fm_record_logs').insert([{
-          entity_type: 'تراکنش‌ها',
-          record_id: String(recordId || 'SYSTEM'),
-          action: action,
-          user_name: currentUserName,
-          details: details
-        }]);
-      } catch (err) {}
-    }, [supabase, currentUserName]);
-
-    const fetchUsersAndResolveDepartment = useCallback(async () => {
-        try {
-            const { data: userData } = await supabase.from('sec_users').select('id, full_name, username, party_id');
-            const uMap = {};
-            (userData || []).forEach(u => {
-                uMap[u.id] = `${u.full_name || u.username || ''}`.trim();
-            });
-            setUsersMap(uMap);
-
-            // use session-based ID directly — no username fallback that could match wrong user
-            const myId = currentUserId;
-            setResolvedUserId(myId);
-
-            const activeUserRecord = myId ? (userData || []).find(u => u.id === myId) : null;
-            if (activeUserRecord && activeUserRecord.party_id) {
-                const { data: personnelData } = await supabase
-                    .from('fm_org_chart_personnel')
-                    .select('node_id')
-                    .eq('person_id', activeUserRecord.party_id)
-                    .maybeSingle();
-                
-                if (personnelData && personnelData.node_id) {
-                    setUserDepartmentId(personnelData.node_id);
-                }
+        const sessionUserId = (() => {
+            try {
+                const stored = sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}';
+                return JSON.parse(stored).id || null;
+            } catch (error) {
+                return null;
             }
-        } catch (error) {
-            console.error("Error in fetching user department relation:", error);
-        }
-    }, [supabase, currentUserId, currentUserObj.username, currentUserName]);
+        })();
 
-    const fetchLookups = useCallback(async () => {
-        try {
-            const [accRes, chartRes, costRes, incRes, deptNodesRes, cbcRes, currRes, permsRes, userRolesRes] = await Promise.all([
-                supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
-                supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
-                supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
-                supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
-                supabase.from('fm_org_chart_nodes').select('id, title'),
-                supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
-                supabase.from('fm_currencies').select('id, code'),
-                supabase.from('fm_coa_permissions').select('account_id, grantee_type, grantee_id, access_level'),
-                supabase.from('sec_user_roles').select('role_id').eq('user_id', currentUserId || '00000000-0000-0000-0000-000000000000')
-            ]);
+        const currentUserObj = window.NavigationSystem?.currentUser || {};
+        const currentUserId = sessionUserId || currentUserObj.id || null;
+        const currentUserName = currentUserObj.name || currentUserObj.username || 'مدیر سیستم';
 
-            const costBenefitCenters = (cbcRes.data || []).map(r => ({
-                id: r.id,
-                titleFa: r.title_fa || '',
-                titleEn: r.title_en || '',
-                centerKind: r.center_kind || '',
-                isCostCenter: r.is_cost_center ?? false,
-                isBenefitCenter: r.is_benefit_center ?? false,
-                isActive: r.is_active ?? true,
-                managerName: r.manager ? `${r.manager.first_name || ''} ${r.manager.last_name || ''}`.trim() : '',
-                officeName: r.office?.title || ''
-            }));
+        const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
+        const access = useMemo(() => {
+            const rawActions = securityCtx ? securityCtx.getActions(formCode) : null;
+            return rawActions || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
+        }, [securityCtx, formCode]);
 
-            const dMap = {};
-            (deptNodesRes.data || []).forEach(d => {
-                dMap[d.id] = d.title;
-            });
-            setDeptsMap(dMap);
+        const TRANSACTION_TYPES = [
+            { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
+            { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
+            { value: 'GENERAL', label: t('عمومی', 'General') },
+            { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
+        ];
 
-            const activeCharts = chartRes.data || [];
-            const activeChartIds = new Set(activeCharts.map(c => c.id));
+        const TRANSACTION_ACTIONS = [
+            { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
+            { value: 'WITHDRAWAL', label: t('برداشت', 'Withdrawal') }
+        ];
 
-            const buildPathsAndFilterLeafs = (items, charts = null) => {
-                const parentIds = new Set(items.map(i => i.parent_id).filter(Boolean));
-                return items.filter(i => {
-                    if (parentIds.has(i.id)) return false; 
-                    if (charts && !activeChartIds.has(i.chart_id)) return false; 
-                    return true;
-                }).map(i => {
-                    const titleFa = i.title_fa || i.title;
-                    const titleEn = i.title_en || i.title_fa || i.title;
-                    let pathArr = [isRtl ? titleFa : titleEn]; 
-                    let curr = i;
-                    while (curr && curr.parent_id) {
-                        const parent = items.find(p => p.id === curr.parent_id);
-                        if (parent) {
-                            const pTitleFa = parent.title_fa || parent.title;
-                            const pTitleEn = parent.title_en || parent.title_fa || parent.title;
-                            pathArr.unshift(isRtl ? pTitleFa : pTitleEn);
-                            curr = parent;
-                        } else break;
-                    }
-                    return {
-                        ...i,
-                        displayLabel: isRtl ? titleFa : titleEn,
-                        pathTitle: pathArr.join(' / '),
-                        chart_name: charts ? (charts.find(c => c.id === i.chart_id)?.title || '') : ''
-                    };
-                });
-            };
+        const TRANSACTION_GROUPS = [
+            { value: 'COST', label: t('هزینه', 'Cost') },
+            { value: 'INCOME', label: t('درآمد', 'Income') },
+            { value: 'BALANCE', label: t('بالانس', 'Balance') },
+            { value: 'OTHER', label: t('سایر', 'Other') }
+        ];
 
-            const rawAccounts = accRes.data || [];
-            const accMapCascade = new Map(rawAccounts.map(a => [a.id, a]));
-            const cascadeActiveAccounts = rawAccounts.filter(acc => {
-                let cur = acc;
-                const visited = new Set();
-                while (cur && cur.parent_id) {
-                    if (visited.has(cur.id)) return false;
-                    visited.add(cur.id);
-                    cur = accMapCascade.get(cur.parent_id);
-                    if (!cur) return false;
+        const STATUS_OPTIONS = [
+            { value: 'DRAFT', label: t('یادداشت', 'Draft') },
+            { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
+            { value: 'FINAL', label: t('بررسی شده', 'Final') },
+            { value: 'APPROVED', label: t('تایید شده', 'Approved') }
+        ];
+
+        const isLocked = (tx) => tx.status === 'FINAL' || tx.status === 'APPROVED';
+
+        const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
+        const [isLoading, setIsLoading] = useState(false);
+        const [transactions, setTransactions] = useState([]);
+        const [attachmentCounts, setAttachmentCounts] = useState({});
+        const [gridState, setGridState] = useState(null);
+        const [filters, setFilters] = useState({});
+        const [usersMap, setUsersMap] = useState({});
+        const [deptsMap, setDeptsMap] = useState({});
+        const [lookups, setLookups] = useState({ accounts: [], costTypes: [], incomeTypes: [], costBenefitCenters: [], currencies: [] });
+        const [resolvedUserId, setResolvedUserId] = useState(currentUserId);
+        const [userDepartmentId, setUserDepartmentId] = useState(null);
+        const [currentView, setCurrentView] = useState('list');
+        const [formMode, setFormMode] = useState('CREATE');
+        const [currentRecord, setCurrentRecord] = useState(null);
+        const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
+        const [commentedIds, setCommentedIds] = useState(new Set());
+        const [filteredRecordId, setFilteredRecordId] = useState(null);
+        const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
+        const [attachModal, setAttachModal] = useState({ isOpen: false, record: null, files: [] });
+        const [summaryModal, setSummaryModal] = useState({ isOpen: false, record: null });
+        const [printModal, setPrintModal] = useState({ isOpen: false, transactionId: null });
+        const [isUploading, setIsUploading] = useState(false);
+
+        const showToast = useCallback((message, type = 'success') => {
+            setToast({ isVisible: true, message, type });
+            setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000);
+        }, []);
+
+        const logAction = useCallback(async (action, recordId, details = '') => {
+            try {
+                if (!supabase) return;
+                await supabase.from('fm_record_logs').insert([{
+                    entity_type: 'تراکنش‌ها',
+                    record_id: String(recordId || 'SYSTEM'),
+                    action,
+                    user_name: currentUserName,
+                    details,
+                }]);
+            } catch (error) {}
+        }, [supabase, currentUserName]);
+
+        const fetchUsersAndResolveDepartment = useCallback(async () => {
+            try {
+                const { data: userData } = await supabase.from('sec_users').select('id, full_name, username, party_id');
+                const uMap = {};
+                (userData || []).forEach(u => { uMap[u.id] = `${u.full_name || u.username || ''}`.trim(); });
+                setUsersMap(uMap);
+
+                const activeUserRecord = currentUserId ? (userData || []).find(u => u.id === currentUserId) : null;
+                if (activeUserRecord && activeUserRecord.party_id) {
+                    const { data: personnelData } = await supabase.from('fm_org_chart_personnel').select('node_id').eq('person_id', activeUserRecord.party_id).maybeSingle();
+                    if (personnelData && personnelData.node_id) setUserDepartmentId(personnelData.node_id);
                 }
-                return true;
-            });
-            const sessionDataParsed = (() => { try { return JSON.parse(sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}'); } catch { return {}; } })();
-            const usernameVal = (sessionDataParsed.username || '').toLowerCase();
-            const userTypeVal = (sessionDataParsed.type || '').toLowerCase();
-            const isAdmin = usernameVal === 'admin' || usernameVal === 'superadmin' || userTypeVal === 'admin' || userTypeVal === 'superadmin';
-            const currenciesData = currRes.data || [];
-            let accountsList = buildPathsAndFilterLeafs(cascadeActiveAccounts, activeCharts).map(acc => ({
-                ...acc,
-                currency_code: currenciesData.find(c => c.id === acc.currency_id)?.code || ''
-            }));
-            if (!isAdmin && currentUserId) {
-                const perms = permsRes.data || [];
-                const userRoleIds = new Set((userRolesRes.data || []).map(r => String(r.role_id)));
-                const directAllowedIds = new Set();
-                perms.forEach(p => {
-                    if (p.access_level !== 'full' && p.access_level !== 'view') return;
-                    if (p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(currentUserId)) directAllowedIds.add(p.account_id);
-                    if (p.grantee_type?.toLowerCase() === 'role' && userRoleIds.has(String(p.grantee_id))) directAllowedIds.add(p.account_id);
-                });
-                const isAccessible = (acc) => {
-                    if (directAllowedIds.has(acc.id)) return true;
-                    if (!acc.parent_id) return false;
-                    const parent = accMapCascade.get(acc.parent_id);
-                    return parent ? isAccessible(parent) : false;
+            } catch (error) {
+                console.error('Error in fetching user department relation:', error);
+            }
+        }, [supabase, currentUserId]);
+
+        const fetchLookups = useCallback(async () => {
+            try {
+                const [accRes, chartRes, costRes, incRes, deptNodesRes, cbcRes, currRes, permsRes, userRolesRes] = await Promise.all([
+                    supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
+                    supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
+                    supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+                    supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+                    supabase.from('fm_org_chart_nodes').select('id, title'),
+                    supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
+                    supabase.from('fm_currencies').select('id, code, decimal_places'),
+                    supabase.from('fm_coa_permissions').select('account_id, grantee_type, grantee_id, access_level'),
+                    supabase.from('sec_user_roles').select('role_id').eq('user_id', currentUserId || '00000000-0000-0000-0000-000000000000')
+                ]);
+
+                const costBenefitCenters = (cbcRes.data || []).map(r => ({
+                    id: r.id,
+                    titleFa: r.title_fa || '',
+                    titleEn: r.title_en || '',
+                    displayLabel: r.title_fa || r.title_en || '',
+                    centerKind: r.center_kind || '',
+                    isCostCenter: r.is_cost_center ?? false,
+                    isBenefitCenter: r.is_benefit_center ?? false,
+                    isActive: r.is_active ?? true,
+                    managerName: r.manager ? `${r.manager.first_name || ''} ${r.manager.last_name || ''}`.trim() : '',
+                    officeName: r.office?.title || ''
+                }));
+
+                const dMap = {};
+                (deptNodesRes.data || []).forEach(d => { dMap[d.id] = d.title; });
+                setDeptsMap(dMap);
+
+                const activeCharts = chartRes.data || [];
+                const activeChartIds = new Set(activeCharts.map(c => c.id));
+                const buildPathsAndFilterLeafs = (items, charts = null) => {
+                    const parentIds = new Set(items.map(i => i.parent_id).filter(Boolean));
+                    return items.filter(i => {
+                        if (parentIds.has(i.id)) return false;
+                        if (charts && !activeChartIds.has(i.chart_id)) return false;
+                        return true;
+                    }).map(i => {
+                        const titleFa = i.title_fa || i.title;
+                        const titleEn = i.title_en || i.title_fa || i.title;
+                        let pathArr = [isRtl ? titleFa : titleEn];
+                        let curr = i;
+                        while (curr && curr.parent_id) {
+                            const parent = items.find(p => p.id === curr.parent_id);
+                            if (parent) {
+                                const pTitleFa = parent.title_fa || parent.title;
+                                const pTitleEn = parent.title_en || parent.title_fa || parent.title;
+                                pathArr.unshift(isRtl ? pTitleFa : pTitleEn);
+                                curr = parent;
+                            } else break;
+                        }
+                        return { ...i, displayLabel: isRtl ? titleFa : titleEn, pathTitle: pathArr.join(' / '), chart_name: charts ? (charts.find(c => c.id === i.chart_id)?.title || '') : '' };
+                    });
                 };
-                accountsList = accountsList.filter(a => isAccessible(a));
-            }
-            setLookups({
-                accounts: accountsList,
-                costTypes: buildPathsAndFilterLeafs(costRes.data || []),
-                incomeTypes: buildPathsAndFilterLeafs(incRes.data || []),
-                costBenefitCenters
-            });
-        } catch (err) { console.error('fetchLookups error:', err); }
-    }, [supabase, isRtl, currentUserId]);
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const [{ data: txData, error: txError }, { data: attData }] = await Promise.all([
-                supabase.from('fm_transactions').select('*, fm_transaction_items(*)').order('created_at', { ascending: false }),
-                supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'TRANSACTION')
-            ]);
-            
-            if (txError) throw txError;
-            setTransactions(txData || []);
+                const rawAccounts = accRes.data || [];
+                const accMapCascade = new Map(rawAccounts.map(a => [a.id, a]));
+                const cascadeActiveAccounts = rawAccounts.filter(acc => {
+                    let cur = acc;
+                    const visited = new Set();
+                    while (cur && cur.parent_id) {
+                        if (visited.has(cur.id)) return false;
+                        visited.add(cur.id);
+                        cur = accMapCascade.get(cur.parent_id);
+                        if (!cur) return false;
+                    }
+                    return true;
+                });
 
-            const counts = {};
-            (attData || []).forEach(att => {
-                counts[att.entity_id] = (counts[att.entity_id] || 0) + 1;
-            });
-            setAttachmentCounts(counts);
-
-            // fetch which transactions have at least one comment
-            if ((txData || []).length > 0) {
-                const txIds = txData.map(r => String(r.id));
-                const { data: commentRows } = await supabase
-                    .from('sys_comments')
-                    .select('entity_id')
-                    .eq('entity_type', 'fm_transactions')
-                    .in('entity_id', txIds);
-                if (commentRows) {
-                    setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
+                const sessionDataParsed = (() => { try { return JSON.parse(sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}'); } catch { return {}; } })();
+                const usernameVal = (sessionDataParsed.username || '').toLowerCase();
+                const userTypeVal = (sessionDataParsed.type || '').toLowerCase();
+                const isAdmin = usernameVal === 'admin' || usernameVal === 'superadmin' || userTypeVal === 'admin' || userTypeVal === 'superadmin';
+                const currenciesData = currRes.data || [];
+                let accountsList = buildPathsAndFilterLeafs(cascadeActiveAccounts, activeCharts).map(acc => ({ ...acc, currency_code: currenciesData.find(c => c.id === acc.currency_id)?.code || '' }));
+                if (!isAdmin && currentUserId) {
+                    const perms = permsRes.data || [];
+                    const userRoleIds = new Set((userRolesRes.data || []).map(r => String(r.role_id)));
+                    const directAllowedIds = new Set();
+                    perms.forEach(p => {
+                        if (p.access_level !== 'full' && p.access_level !== 'view') return;
+                        if (p.grantee_type?.toLowerCase() === 'user' && String(p.grantee_id) === String(currentUserId)) directAllowedIds.add(p.account_id);
+                        if (p.grantee_type?.toLowerCase() === 'role' && userRoleIds.has(String(p.grantee_id))) directAllowedIds.add(p.account_id);
+                    });
+                    const isAccessible = (acc) => {
+                        if (directAllowedIds.has(acc.id)) return true;
+                        if (!acc.parent_id) return false;
+                        const parent = accMapCascade.get(acc.parent_id);
+                        return parent ? isAccessible(parent) : false;
+                    };
+                    accountsList = accountsList.filter(a => isAccessible(a));
                 }
-            }
 
-        } catch (error) {
-            showToast(t('خطا در دریافت لیست تراکنش‌ها', 'Error fetching transactions'), 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [supabase, showToast, t]);
+                setLookups({
+                    accounts: accountsList,
+                    costTypes: buildPathsAndFilterLeafs(costRes.data || []),
+                    incomeTypes: buildPathsAndFilterLeafs(incRes.data || []),
+                    costBenefitCenters,
+                    currencies: currRes.data || [],
+                });
+            } catch (error) {
+                console.error('fetchLookups error:', error);
+            }
+        }, [supabase, isRtl, currentUserId]);
+
+        const fetchData = useCallback(async () => {
+            setIsLoading(true);
+            try {
+                const [{ data: txData, error: txError }, { data: attData }] = await Promise.all([
+                    supabase.from('fm_transactions').select('*, fm_transaction_items(*)').order('created_at', { ascending: false }),
+                    supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'TRANSACTION')
+                ]);
+
+                if (txError) throw txError;
+                setTransactions(txData || []);
+
+                const counts = {};
+                (attData || []).forEach(att => { counts[att.entity_id] = (counts[att.entity_id] || 0) + 1; });
+                setAttachmentCounts(counts);
+
+                if ((txData || []).length > 0) {
+                    const txIds = txData.map(r => String(r.id));
+                    const { data: commentRows } = await supabase.from('sys_comments').select('entity_id').eq('entity_type', 'fm_transactions').in('entity_id', txIds);
+                    if (commentRows) setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
+                }
+            } catch (error) {
+                showToast(t('خطا در دریافت لیست تراکنش‌ها', 'Error fetching transactions'), 'error');
+            } finally {
+                setIsLoading(false);
+            }
+        }, [supabase, showToast, t]);
+
+        useEffect(() => {
+                if (access.canView) {
+                        fetchUsersAndResolveDepartment();
+                        fetchLookups();
+                        fetchData();
+                }
+        }, [fetchUsersAndResolveDepartment, fetchLookups, fetchData, access.canView]);
 
     useEffect(() => {
         if (access.canView) {
@@ -477,6 +444,24 @@
         });
     }, [transactions, filters, resolvedUserId]);
 
+    const transactionExcel = window.TransactionMainExcel?.useTransactionMainExcel
+        ? window.TransactionMainExcel.useTransactionMainExcel({
+            isRtl,
+            t,
+            supabase,
+            showToast,
+            deptsMap,
+            lookups,
+            filteredTransactions,
+            usersMap,
+            currentUserId,
+            currentUserName,
+            dateLocale,
+            fetchData,
+            logAction,
+        })
+        : { handleDownloadSample: null, handleImportTransactions: null, onExport: null, importErrorsModal: null };
+
     /* ── عملیات گروهی و اکسپورت ─ از TransactionActions.js ── */
     const _txActions = window.makeTransactionActions ? window.makeTransactionActions({
         transactions, filteredTransactions, filteredRecordId,
@@ -489,7 +474,9 @@
     }) : {};
     const executeDelete      = _txActions.executeDelete      || (() => {});
     const bulkActions        = _txActions.bulkActions        || [];
-    const handleCustomExport = _txActions.handleCustomExport || (() => {});
+    const handleDownloadSample = transactionExcel.handleDownloadSample || (() => {});
+    const handleImportTransactions = transactionExcel.handleImportTransactions || (() => {});
+    const handleCustomExport = transactionExcel.onExport || _txActions.handleCustomExport || (() => {});
 
     const columns = useMemo(() => [
         { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-300" }, val || '-') },
@@ -712,6 +699,8 @@
                         actions: gridActions,
                         bulkActions: bulkActions,
                         isLoading: isLoading,
+                        onDownloadSample: access.canCreate ? handleDownloadSample : undefined,
+                        onImport: access.canCreate ? handleImportTransactions : undefined,
                         onExport: handleCustomExport,
                         defaultHiddenCols: ['reference_code', 'daily_number', 'department_id', 'reviewed_by_name', 'reviewed_at', 'approved_by_name', 'approved_at'],
                         actionWidth: '220px'
@@ -748,6 +737,8 @@
                 )
             })
         ),
+
+        transactionExcel.importErrorsModal,
 
         React.createElement(Modal, {
             isOpen: attachModal.isOpen,
