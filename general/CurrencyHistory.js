@@ -7,7 +7,7 @@
   const LucideIcons = window.LucideIcons || {};
   const { 
     Edit = FallbackIcon, Trash2 = FallbackIcon, History = FallbackIcon, Calculator = FallbackIcon, Save = FallbackIcon, Globe = FallbackIcon, 
-    ArrowRightLeft = FallbackIcon, AlertTriangle = FallbackIcon, Clock = FallbackIcon, Calendar = FallbackIcon, Zap = FallbackIcon, ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, Lock = FallbackIcon, Copy = FallbackIcon, Download = FallbackIcon
+    ArrowRightLeft = FallbackIcon, AlertTriangle = FallbackIcon, Clock = FallbackIcon, Calendar = FallbackIcon, Zap = FallbackIcon, ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, Lock = FallbackIcon, Copy = FallbackIcon
   } = LucideIcons;
 
   const CurrencyHistory = ({ currencies = [], language = 'fa', formCode, access, ratesGridState, setRatesGridState }) => {
@@ -54,6 +54,17 @@
     const currentUser = window.NavigationSystem?.currentUser?.name || 'مدیر سیستم';
 
     const showToast = useCallback((message, type = 'success') => { setToast({ isVisible: true, message, type }); setTimeout(() => setToast(prev => ({ ...prev, isVisible: false })), 3000); }, []);
+
+    const triggerBlobDownload = useCallback((blob, filename) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, []);
 
     const logAction = async (entityType, recordId, action, details = '', oldData = null, newData = null) => {
       try {
@@ -119,6 +130,198 @@
       const now = new Date(); setManualTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
       setIsManualModalOpen(true);
     };
+
+    const handleDownloadSample = useCallback(() => {
+      const XLSX = window.XLSX;
+      if (!XLSX) {
+        showToast(t('کتابخانه ساخت فایل اکسل در دسترس نیست.', 'Excel library is not available.'), 'error');
+        return;
+      }
+
+      const sampleBaseCurrency = currencies[0]?.code || 'USD';
+      const sampleTargetCurrency = currencies.find(c => c.code !== sampleBaseCurrency)?.code || 'EUR';
+      const today = new Date();
+      const sampleDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      const headers = [
+        t('ارز پایه', 'Base Currency'),
+        t('ارز هدف', 'Target Currency'),
+        t('نرخ', 'Rate'),
+        t('تاریخ نرخ (YYYY-MM-DD)', 'Rate Date (YYYY-MM-DD)'),
+        t('منبع', 'Source'),
+      ];
+
+      const sampleRows = [
+        [sampleBaseCurrency, sampleTargetCurrency, 12345.67, sampleDate, 'Manual'],
+        [sampleTargetCurrency, sampleBaseCurrency, 0.000081, sampleDate, 'Manual'],
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'CurrencyRates');
+      const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      triggerBlobDownload(blob, `Currency_Rates_Sample_${new Date().getTime()}.xlsx`);
+    }, [currencies, showToast, t, triggerBlobDownload]);
+
+    const handleExportRates = useCallback(() => {
+      const XLSX = window.XLSX;
+      if (!XLSX) {
+        showToast(t('کتابخانه خروجی اکسل در دسترس نیست.', 'Excel export library is not available.'), 'error');
+        return;
+      }
+
+      const headers = [
+        t('تاریخ و زمان', 'Date & Time'),
+        t('ارز پایه', 'Base Currency'),
+        t('ارز هدف', 'Target Currency'),
+        t('نرخ', 'Rate'),
+        t('تاریخ نرخ', 'Rate Date'),
+        t('منبع', 'Source'),
+        t('ایجاد شده توسط', 'Created By'),
+        t('بروزرسانی شده توسط', 'Updated By'),
+      ];
+
+      const rows = rates.map((rate) => [
+        rate.created_at || '',
+        rate.base_currency || '',
+        rate.target_currency || '',
+        rate.rate ?? '',
+        rate.rate_date || '',
+        rate.source || '',
+        rate.created_by || '',
+        rate.updated_by || '',
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'CurrencyRates');
+      const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      triggerBlobDownload(blob, `Currency_Rates_Export_${new Date().getTime()}.xlsx`);
+    }, [rates, showToast, t, triggerBlobDownload]);
+
+    const parseImportedDate = useCallback((dateValue) => {
+      if (!dateValue) return '';
+      const value = String(dateValue).trim();
+      if (!value) return '';
+      if (value.includes('/')) {
+        const parts = value.split('/').map(Number);
+        if (parts.length === 3 && parts.every(n => !Number.isNaN(n))) {
+          const [y, m, d] = parts;
+          if (Core.j2g && y >= 1300 && y < 1600) {
+            const [gy, gm, gd] = Core.j2g(y, m, d);
+            return `${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`;
+          }
+          return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+      }
+      return value.substring(0, 10).replace(/\//g, '-');
+    }, [Core.j2g]);
+
+    const handleImportRates = useCallback((file) => {
+      if (!file) return;
+      const XLSX = window.XLSX;
+      if (!XLSX) {
+        showToast(t('کتابخانه پردازش فایل در دسترس نیست.', 'File processing library is not available.'), 'error');
+        return;
+      }
+
+      const chunkArray = (items, size) => {
+        const chunks = [];
+        for (let index = 0; index < items.length; index += size) {
+          chunks.push(items.slice(index, index + size));
+        }
+        return chunks;
+      };
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const ext = (file.name.split('.').pop() || '').toLowerCase();
+          const workbook = ext === 'csv'
+            ? XLSX.read(new TextDecoder('utf-8').decode(e.target.result).replace(/^\uFEFF/, ''), { type: 'string', cellDates: true })
+            : XLSX.read(e.target.result, { type: 'array', cellDates: true });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', raw: false });
+
+          if (rawRows.length < 2) {
+            showToast(t('فایل خالی یا نامعتبر است.', 'File is empty or invalid.'), 'error');
+            return;
+          }
+
+          const currencyCodes = new Set(currencies.map(c => String(c.code || '').trim()).filter(Boolean));
+          const payloads = [];
+          const errors = [];
+
+          for (let i = 1; i < rawRows.length; i++) {
+            const cols = rawRows[i].map(col => String(col ?? '').trim());
+            const baseCurrency = cols[0] || '';
+            const targetCurrency = cols[1] || '';
+            const rateValue = parseFloat(String(cols[2] || '').replace(/,/g, ''));
+            const rateDate = parseImportedDate(cols[3]) || getTodayGregorian().replace(/\//g, '-');
+            const source = cols[4] || 'Manual';
+            const rowLabel = t(`ردیف ${i + 1}`, `Row ${i + 1}`);
+
+            if (!baseCurrency || !targetCurrency) {
+              errors.push(t(`${rowLabel}: ارز پایه و ارز هدف الزامی هستند.`, `${rowLabel}: Base and target currencies are required.`));
+              continue;
+            }
+            if (currencyCodes.size > 0 && (!currencyCodes.has(baseCurrency) || !currencyCodes.has(targetCurrency))) {
+              errors.push(t(`${rowLabel}: یکی از کدهای ارز در سیستم یافت نشد.`, `${rowLabel}: One of the currency codes was not found in the system.`));
+              continue;
+            }
+            if (Number.isNaN(rateValue) || rateValue <= 0) {
+              errors.push(t(`${rowLabel}: نرخ معتبر نیست.`, `${rowLabel}: Rate is invalid.`));
+              continue;
+            }
+            if (!rateDate) {
+              errors.push(t(`${rowLabel}: تاریخ نرخ الزامی است.`, `${rowLabel}: Rate date is required.`));
+              continue;
+            }
+
+            const createdAt = `${rateDate}T00:00:00.000Z`;
+            payloads.push({
+              base_currency: baseCurrency,
+              target_currency: targetCurrency,
+              rate: rateValue,
+              rate_date: rateDate,
+              created_at: createdAt,
+              source,
+              created_by: currentUser,
+              updated_by: currentUser,
+              updated_at: createdAt,
+            });
+          }
+
+          if (errors.length > 0) showToast(errors[0], 'warning');
+          if (payloads.length === 0) return;
+
+          const batchSize = 200;
+          const batches = chunkArray(payloads, batchSize);
+          const insertedRates = [];
+
+          for (const batch of batches) {
+            const { data, error } = await supabase.from('fm_currency_rates').insert(batch).select();
+            if (error) throw error;
+            if (data?.length) insertedRates.push(...data);
+          }
+
+          for (const rate of insertedRates) {
+            await logAction('fm_currency_rates', rate.id, 'ایجاد', `ایمپورت نرخ: ${rate.base_currency} به ${rate.target_currency}`, null, rate);
+          }
+
+          showToast(t('فایل نرخ ارز با موفقیت ایمپورت شد.', 'Currency rates imported successfully.'));
+          await fetchRates();
+        } catch (err) {
+          console.error('Import rates error:', err);
+          showToast(t('خطا در ایمپورت فایل نرخ ارز.', 'Error importing currency rates file.'), 'error');
+        } finally {
+          if (importInputRef.current) importInputRef.current.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }, [currencies, currentUser, fetchRates, getTodayGregorian, logAction, parseImportedDate, showToast, supabase, t]);
 
     const handleCopyLastRates = useCallback(() => {
       const filled = manualRatesList.map(item => {
@@ -294,11 +497,13 @@
 
     return (
       <>
-        
         <div className="flex-1 min-h-0">
             <DataGrid 
               data={rates} columns={historyColumns} language={language} formCode={formCode} selectable={true}
               gridState={ratesGridState} onGridStateChange={setRatesGridState} bulkActions={historyBulkActions}
+              onDownloadSample={handleDownloadSample}
+              onImport={handleImportRates}
+              onExport={handleExportRates}
               actions={[
                 { id: 'view_log', icon: History, tooltip: t('مشاهده لاگ سیستم', 'View System Log'), onClick: (row) => openLogModal('fm_currency_rates', row.id), className: 'text-indigo-400 dark:text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300' },
                 { id: 'edit', icon: Edit, tooltip: t('ویرایش سابقه', 'Edit Record'), onClick: (row) => { setEditingRate({...row}); setIsEditRateModalOpen(true); }, hidden: (row) => !(row.source === 'Manual' && isWithinOneWeek(row.created_at)), className: 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400' },
