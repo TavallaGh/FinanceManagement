@@ -31,87 +31,23 @@
   const TransactionSummary = ({ isOpen, onClose, record, lookups, language = 'fa', formCode = 'TRANSACTIONS' }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
-    const supabase = window.supabase;
 
     const [showGrid, setShowGrid] = useState(false);
-    const [currencyRates, setCurrencyRates] = useState({});
-
-    useEffect(() => {
-        if (isOpen && record?.document_date && supabase) {
-            const fetchRates = async () => {
-                try {
-                    const formattedDate = record.document_date.replace(/\//g, '-');
-                    const { data } = await supabase.from('fm_currency_rates')
-                        .select('base_currency, target_currency, rate, rate_date, created_at')
-                        .lte('rate_date', formattedDate)
-                        .order('rate_date', { ascending: false });
-                    const sorted = (data || []).slice().sort((a, b) => {
-                        if (a.rate_date > b.rate_date) return -1;
-                        if (a.rate_date < b.rate_date) return  1;
-                        const ca = a.created_at || '', cb = b.created_at || '';
-                        return ca > cb ? -1 : ca < cb ? 1 : 0;
-                    });
-                    const latestRates = {};
-                    sorted.forEach(r => {
-                        const key = `${r.base_currency}_${r.target_currency}`;
-                        if (!latestRates[key]) latestRates[key] = r.rate;
-                    });
-                    setCurrencyRates(latestRates);
-                } catch (e) {}
-            };
-            fetchRates();
-        }
-    }, [isOpen, record?.document_date, supabase]);
-
-    const getExchangeRates = useCallback((currency, fallbackToUsd = 0, fallbackUsdToIrr = 0) => {
-        let toUsd = 1;
-        if (currency !== 'USD') {
-            const direct = parseFloat(currencyRates[`${currency}_USD`] || 0);
-            if (direct > 0) {
-                toUsd = direct;
-            } else {
-                const inverse = parseFloat(currencyRates[`USD_${currency}`] || 0);
-                if (inverse > 0) {
-                    toUsd = 1 / inverse;
-                } else if (fallbackToUsd > 0) {
-                    toUsd = fallbackToUsd;  // نرخ ذخیره‌شده در DB توسط بروزرسانی نرخ
-                }
-            }
-        }
-
-        let usdToIrr = 1;
-        const directIrr = parseFloat(currencyRates['USD_IRR'] || 0);
-        if (directIrr > 0) {
-            usdToIrr = directIrr;
-        } else {
-            const inverseIrr = parseFloat(currencyRates['IRR_USD'] || 0);
-            if (inverseIrr > 0) {
-                usdToIrr = 1 / inverseIrr;
-            } else if (fallbackUsdToIrr > 0) {
-                usdToIrr = fallbackUsdToIrr;  // نرخ ذخیره‌شده در DB
-            }
-        }
-
-        return { toUsd, usdToIrr };
-    }, [currencyRates]);
 
     const { mappedItems, depUsd, widUsd, depIrr, widIrr } = useMemo(() => {
         const rawItems = record?.fm_transaction_items || [];
         let dUsd = 0, wUsd = 0, dIrr = 0, wIrr = 0;
         
         const mItems = rawItems.map(item => {
-            const isDep = item.transaction_action === 'DEPOSIT';
-            const cur = item.currency || 'IRR';
-            const storedToUsd    = parseFloat(item.exchange_rate_to_usd     || 0);
-            const storedUsdToIrr = parseFloat(item.exchange_rate_usd_to_irr || 0);
-            const { toUsd, usdToIrr } = getExchangeRates(cur, storedToUsd, storedUsdToIrr);
-
             const rawDep = parseFloat(item.deposit_amount || 0);
             const rawWid = parseFloat(item.withdrawal_amount || 0);
             const val = rawDep > 0 ? rawDep : rawWid;
-
-            let usd = val * toUsd;
-            let irr = usd * usdToIrr;
+            const storedToUsd = parseFloat(item.exchange_rate_to_usd || 0);
+            const storedUsdToIrr = parseFloat(item.exchange_rate_usd_to_irr || 0);
+            const hasStoredRates = storedToUsd > 0 && storedUsdToIrr > 0;
+            const usd = hasStoredRates ? val * storedToUsd : 0;
+            const irr = hasStoredRates ? usd * storedUsdToIrr : 0;
+            const isDep = item.transaction_action === 'DEPOSIT';
 
             if (isDep) {
                 dUsd += usd;
@@ -125,19 +61,20 @@
                 ...item,
                 deposit_amount: rawDep,
                 withdrawal_amount: rawWid,
-                exchange_rate_to_usd: toUsd,
-                exchange_rate_usd_to_irr: usdToIrr,
+                exchange_rate_to_usd: storedToUsd,
+                exchange_rate_usd_to_irr: storedUsdToIrr,
                 amount_usd: usd,
                 amount_irr: irr,
-                dep_usd: rawDep * toUsd,
-                dep_irr: rawDep * toUsd * usdToIrr,
-                wid_usd: rawWid * toUsd,
-                wid_irr: rawWid * toUsd * usdToIrr,
+                dep_usd: hasStoredRates ? rawDep * storedToUsd : 0,
+                dep_irr: hasStoredRates ? rawDep * storedToUsd * storedUsdToIrr : 0,
+                wid_usd: hasStoredRates ? rawWid * storedToUsd : 0,
+                wid_irr: hasStoredRates ? rawWid * storedToUsd * storedUsdToIrr : 0,
+                hasStoredRates,
             };
         });
 
         return { mappedItems: mItems, depUsd: dUsd, widUsd: wUsd, depIrr: dIrr, widIrr: wIrr };
-    }, [record, getExchangeRates]);
+    }, [record]);
 
     if (!isOpen || !record) return null;
     
@@ -159,7 +96,7 @@
     };
 
     // ── AmountCell: original amount + ≈$ + ≈﷼ stacked (same format as RequestSummary) ──
-    const AmountCell = ({ amount, usd, irr, cur, isDeposit }) => {
+    const AmountCell = ({ amount, usd, irr, cur, isDeposit, hasRates }) => {
         if (!amount) return <span className="text-slate-300 dark:text-slate-600 text-[12px]" dir="ltr">—</span>;
         const mainColor = isDeposit ? 'text-emerald-600 dark:text-emerald-500' : 'text-rose-500 dark:text-rose-400';
         return (
@@ -167,8 +104,8 @@
                 <span className={`font-bold text-[12px] ${mainColor}`}>
                     {formatNumber(amount)}&nbsp;<span className="text-[10px] font-semibold">{cur}</span>
                 </span>
-                <span className="text-[10px] text-slate-400">≈&nbsp;$&nbsp;{formatNumber(usd)}</span>
-                <span className="text-[10px] text-slate-400">≈&nbsp;﷼&nbsp;{formatNumber(irr)}</span>
+                {hasRates ? <span className="text-[10px] text-slate-400">≈&nbsp;$&nbsp;{formatNumber(usd)}</span> : null}
+                {hasRates ? <span className="text-[10px] text-slate-400">≈&nbsp;﷼&nbsp;{formatNumber(irr)}</span> : null}
             </div>
         );
     };
@@ -203,22 +140,22 @@
             field: 'exchange_rate_to_usd', header_fa: 'نرخ تبدیل', header_en: 'Rates', width: '90px',
             render: (val, row) => (
                 <div className="flex flex-col gap-[2px]" dir="ltr">
-                    <span className="text-[10px] text-slate-500">
+                    {row.hasStoredRates ? <span className="text-[10px] text-slate-500">
                         1 {row.currency} = <span className="font-bold text-slate-700 dark:text-slate-300">{formatNumber(val)}</span> $
-                    </span>
-                    <span className="text-[10px] text-slate-500">
+                    </span> : <span className="text-slate-300 dark:text-slate-600 text-[12px]">—</span>}
+                    {row.hasStoredRates ? <span className="text-[10px] text-slate-500">
                         1 $ = <span className="font-bold text-slate-700 dark:text-slate-300">{formatNumber(row.exchange_rate_usd_to_irr)}</span> ﷼
-                    </span>
+                    </span> : null}
                 </div>
             ),
         },
         {
             field: 'deposit_amount', header_fa: 'واریز', header_en: 'Deposit', width: '110px',
-            render: (val, row) => <AmountCell amount={val} usd={row.dep_usd} irr={row.dep_irr} cur={row.currency} isDeposit={true} />,
+            render: (val, row) => <AmountCell amount={val} usd={row.dep_usd} irr={row.dep_irr} cur={row.currency} isDeposit={true} hasRates={row.hasStoredRates} />,
         },
         {
             field: 'withdrawal_amount', header_fa: 'برداشت', header_en: 'Withdrawal', width: '110px',
-            render: (val, row) => <AmountCell amount={val} usd={row.wid_usd} irr={row.wid_irr} cur={row.currency} isDeposit={false} />,
+            render: (val, row) => <AmountCell amount={val} usd={row.wid_usd} irr={row.wid_irr} cur={row.currency} isDeposit={false} hasRates={row.hasStoredRates} />,
         },
         {
             field: 'description', header_fa: 'شرح', header_en: 'Description', width: '120px',
