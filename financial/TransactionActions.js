@@ -25,22 +25,57 @@
   };
 
   /* ── محاسبه نرخ ارز ──────────────────────────────── */
-  const resolveRates = (ratesMap, currency) => {
-    let toUsd = 1;
-    if (currency !== 'USD') {
-      const direct = ratesMap[`${currency}_USD`];
-      if (direct) {
-        toUsd = parseFloat(direct);
-      } else {
-        const inverse = ratesMap[`USD_${currency}`];
-        if (inverse) toUsd = 1 / parseFloat(inverse);
+  const toPositiveRate = (value) => {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const resolveRateBetween = (ratesMap, fromCurrency, toCurrency) => {
+    const from = String(fromCurrency || '').trim().toUpperCase();
+    const to = String(toCurrency || '').trim().toUpperCase();
+    if (!from || !to) return 1;
+    if (from === to) return 1;
+
+    const graph = new Map();
+    Object.entries(ratesMap || {}).forEach(([key, rawRate]) => {
+      const rate = toPositiveRate(rawRate);
+      if (!rate) return;
+      const [base, target] = String(key || '').split('_');
+      const baseCurrency = String(base || '').trim().toUpperCase();
+      const targetCurrency = String(target || '').trim().toUpperCase();
+      if (!baseCurrency || !targetCurrency) return;
+      if (!graph.has(baseCurrency)) graph.set(baseCurrency, new Map());
+      if (!graph.has(targetCurrency)) graph.set(targetCurrency, new Map());
+      graph.get(baseCurrency).set(targetCurrency, rate);
+      graph.get(targetCurrency).set(baseCurrency, 1 / rate);
+    });
+
+    const direct = graph.get(from)?.get(to);
+    if (direct) return direct;
+
+    const walk = (currentCurrency, accumulatedRate, visited = new Set()) => {
+      if (currentCurrency === to) return accumulatedRate;
+      const nextVisited = new Set(visited);
+      nextVisited.add(currentCurrency);
+      const neighbors = graph.get(currentCurrency);
+      if (!neighbors) return null;
+      for (const [nextCurrency, edgeRate] of neighbors.entries()) {
+        if (nextVisited.has(nextCurrency)) continue;
+        const resolved = walk(nextCurrency, accumulatedRate * edgeRate, nextVisited);
+        if (resolved) return resolved;
       }
-    }
-    let usdToIrr = parseFloat(ratesMap['USD_IRR'] || 1);
-    if (!ratesMap['USD_IRR'] && ratesMap['IRR_USD']) {
-      usdToIrr = 1 / parseFloat(ratesMap['IRR_USD']);
-    }
-    return { toUsd, usdToIrr };
+      return null;
+    };
+
+    return walk(from, 1) || 1;
+  };
+
+  const resolveRates = (ratesMap, currency) => {
+    const normalizedCurrency = String(currency || 'USD').trim().toUpperCase() || 'USD';
+    return {
+      toUsd: resolveRateBetween(ratesMap, normalizedCurrency, 'USD'),
+      usdToIrr: resolveRateBetween(ratesMap, 'USD', 'IRR'),
+    };
   };
 
   /* ════════════════════════════════════════════════════

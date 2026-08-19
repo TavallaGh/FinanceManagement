@@ -12,6 +12,62 @@
   const Modal = Feedback.Modal || FallbackComponent;
 
   const normalizeImportToken = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s\-_\/|]+/g, ' ').replace(/\s+/g, ' ');
+  const normalizeLooseMatchToken = (value) => normalizeImportToken(value).replace(/\s+/g, '');
+  const formatDateToYmd = (date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseImportedDate = (value) => {
+    if (value === null || value === undefined || value === '') return '';
+    if (value instanceof Date) return formatDateToYmd(value);
+
+    const text = String(value).trim();
+    if (!text) return '';
+
+    const numericValue = Number(text);
+    if (Number.isFinite(numericValue) && numericValue > 0 && Number.isInteger(numericValue)) {
+      const parsed = window.XLSX?.SSF?.parse_date_code ? window.XLSX.SSF.parse_date_code(numericValue) : null;
+      if (parsed && parsed.y && parsed.m && parsed.d) {
+        return `${String(parsed.y).padStart(4, '0')}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`;
+      }
+    }
+
+    const normalized = text.replace(/\./g, '/').replace(/-/g, '/');
+    const parts = normalized.split('/').map(part => part.trim()).filter(Boolean);
+    if (parts.length !== 3) return '';
+
+    const [first, second, third] = parts;
+    let year = null;
+    let month = null;
+    let day = null;
+
+    if (third.length === 4) {
+      year = Number(third);
+      const firstNum = Number(first);
+      const secondNum = Number(second);
+      if (firstNum > 12 && secondNum <= 12) {
+        day = firstNum;
+        month = secondNum;
+      } else {
+        month = firstNum;
+        day = secondNum;
+      }
+    } else if (first.length === 4) {
+      year = Number(first);
+      month = Number(second);
+      day = Number(third);
+    }
+
+    if (!year || !month || !day) return '';
+    const parsedDate = new Date(year, month - 1, day);
+    if (Number.isNaN(parsedDate.getTime())) return '';
+    return formatDateToYmd(parsedDate);
+  };
+
   const formatNumber = (num) => {
     if (num === null || num === undefined || num === '') return '';
     const v = parseFloat(String(num).replace(/,/g, ''));
@@ -53,28 +109,108 @@
       const item = matches[0];
       return { id: item.id ?? item.value ?? null, item, label: pickLocalizedTitle(item, true) || String(rawValue) };
     }
-    if (matches.length === 0) return { error: String(rawValue) };
+    if (matches.length === 0) {
+      const queryLoose = normalizeLooseMatchToken(rawValue);
+      const fuzzyMatches = [];
+      const seenIds = new Set();
+      for (const [label, bucket] of collection.entries()) {
+        if (!label) continue;
+        const labelLoose = normalizeLooseMatchToken(label);
+        if (!labelLoose) continue;
+        if (labelLoose === queryLoose || labelLoose.includes(queryLoose) || queryLoose.includes(labelLoose)) {
+          (bucket.items || []).forEach(item => {
+            const itemId = item.id ?? item.value ?? item.code ?? item.title ?? JSON.stringify(item);
+            if (seenIds.has(itemId)) return;
+            seenIds.add(itemId);
+            fuzzyMatches.push(item);
+          });
+        }
+      }
+      if (fuzzyMatches.length === 1) {
+        const item = fuzzyMatches[0];
+        return { id: item.id ?? item.value ?? null, item, label: pickLocalizedTitle(item, true) || String(rawValue), fuzzy: true };
+      }
+      if (fuzzyMatches.length > 1) return { error: String(rawValue), ambiguous: true };
+      return { error: String(rawValue) };
+    }
     return { error: String(rawValue), ambiguous: true };
   };
 
-  const resolveRates = (ratesMap, currency) => {
-    let toUsd = 1;
-    if (currency !== 'USD') {
-      const direct = ratesMap[`${currency}_USD`];
-      if (direct) {
-        toUsd = parseFloat(direct);
-      } else {
-        const inverse = ratesMap[`USD_${currency}`];
-        if (inverse) toUsd = 1 / parseFloat(inverse);
+  const collectLookupDebugCandidates = (collection, rawValue, maxItems = 5) => {
+    const normalized = normalizeImportToken(rawValue);
+    const looseNormalized = normalizeLooseMatchToken(rawValue);
+    const seen = new Set();
+    const candidates = [];
+
+    for (const entry of collection.values()) {
+      for (const item of (entry?.items || [])) {
+        const label = pickLocalizedTitle(item, true) || item?.titleFa || item?.title_fa || item?.titleEn || item?.title_en || item?.code || '';
+        const labelNormalized = normalizeImportToken(label);
+        const labelLoose = normalizeLooseMatchToken(label);
+        if (!labelNormalized || !labelLoose) continue;
+        if (normalized && labelNormalized === normalized) continue;
+        if (!looseNormalized) continue;
+        if (!(labelLoose.includes(looseNormalized) || looseNormalized.includes(labelLoose))) continue;
+
+        const itemKey = item?.id ?? item?.value ?? item?.code ?? labelNormalized;
+        if (seen.has(itemKey)) continue;
+        seen.add(itemKey);
+        candidates.push(label);
+        if (candidates.length >= maxItems) return candidates;
       }
     }
 
-    let usdToIrr = parseFloat(ratesMap['USD_IRR'] || 1);
-    if (!ratesMap['USD_IRR'] && ratesMap['IRR_USD']) {
-      usdToIrr = 1 / parseFloat(ratesMap['IRR_USD']);
+    return candidates;
+  };
+
+  const collectLookupSampleTitles = (collection, maxItems = 5) => {
+    const samples = [];
+    const seen = new Set();
+    for (const entry of collection.values()) {
+      for (const item of (entry?.items || [])) {
+        const label = pickLocalizedTitle(item, true) || item?.titleFa || item?.title_fa || item?.titleEn || item?.title_en || item?.code || '';
+        if (!label) continue;
+        const normalized = normalizeImportToken(label);
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        samples.push(label);
+        if (samples.length >= maxItems) return samples;
+      }
+    }
+    return samples;
+  };
+
+  const collectLookupDebugEntries = (collection, rawValue, maxItems = 5) => {
+    const normalized = normalizeImportToken(rawValue);
+    const looseNormalized = normalizeLooseMatchToken(rawValue);
+    const seen = new Set();
+    const candidates = [];
+
+    for (const entry of collection.values()) {
+      for (const item of (entry?.items || [])) {
+        const label = pickLocalizedTitle(item, true) || item?.titleFa || item?.title_fa || item?.titleEn || item?.title_en || item?.code || '';
+        const labelNormalized = normalizeImportToken(label);
+        const labelLoose = normalizeLooseMatchToken(label);
+        if (!labelNormalized || !labelLoose) continue;
+        if (normalized && labelNormalized === normalized) continue;
+        if (!looseNormalized) continue;
+        if (!(labelLoose.includes(looseNormalized) || looseNormalized.includes(labelLoose))) continue;
+
+        const itemKey = item?.id ?? item?.value ?? item?.code ?? labelNormalized;
+        if (seen.has(itemKey)) continue;
+        seen.add(itemKey);
+
+        const parts = [label];
+        if (item?.code) parts.push(`code=${item.code}`);
+        if (item?.id !== undefined && item?.id !== null) parts.push(`id=${item.id}`);
+        if (item?.pathTitle) parts.push(`path=${item.pathTitle}`);
+        if (item?.chart_name) parts.push(`chart=${item.chart_name}`);
+        candidates.push(parts.join(' | '));
+        if (candidates.length >= maxItems) return candidates;
+      }
     }
 
-    return { toUsd, usdToIrr };
+    return candidates;
   };
 
   const useTransactionMainExcel = ({
@@ -130,14 +266,20 @@
         item => item.titleFa || item.title_fa,
         item => item.titleEn || item.title_en,
       ]),
-      costTypes: buildIndexedLookup(lookups.costTypes || [], [
+      costTypes: buildIndexedLookup([
+        ...(lookups.costTypesAll || []),
+        ...(lookups.costTypes || []),
+      ], [
         item => item.displayLabel,
         item => item.titleFa || item.title_fa,
         item => item.titleEn || item.title_en,
         item => item.pathTitle,
         item => item.code,
       ]),
-      incomeTypes: buildIndexedLookup(lookups.incomeTypes || [], [
+      incomeTypes: buildIndexedLookup([
+        ...(lookups.incomeTypesAll || []),
+        ...(lookups.incomeTypes || []),
+      ], [
         item => item.displayLabel,
         item => item.titleFa || item.title_fa,
         item => item.titleEn || item.title_en,
@@ -153,7 +295,7 @@
         Object.entries(deptsMap || {}).map(([id, title]) => ({ id, title })),
         [item => item.title]
       ),
-    }), [activeChartAccounts, deptsMap, lookups.costTypes, lookups.costBenefitCenters, lookups.incomeTypes]);
+    }), [activeChartAccounts, deptsMap, lookups.costBenefitCenters, lookups.costTypes, lookups.costTypesAll, lookups.incomeTypes, lookups.incomeTypesAll]);
 
     const enumAliases = useMemo(() => ({
       transactionType: new Map([
@@ -211,18 +353,16 @@
         t('واریز', 'Deposit'),
         t('برداشت', 'Withdrawal'),
         t('شرح قلم', 'Item Description'),
-        t('نرخ USD', 'Exchange Rate to USD'),
-        t('نرخ IRR', 'Exchange Rate to IRR'),
       ];
 
       const sampleRows = isRtl ? [
-        ['DOC-001', '2026-08-01', 'عمومی', 'یادداشت', firstDeptTitle, 'نمونه سند هزینه', 1, pickLocalizedTitle(firstAccount, isRtl) || 'صندوق', 'واریز', 'هزینه', pickLocalizedTitle(firstCostType, isRtl) || 'هزینه اداری', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 1000000, '', 'پرداخت هزینه نمونه', '', ''],
-        ['DOC-001', '2026-08-01', 'عمومی', 'یادداشت', firstDeptTitle, 'نمونه سند هزینه', 2, pickLocalizedTitle(firstAccount, isRtl) || 'بانک', 'برداشت', 'هزینه', pickLocalizedTitle(firstCostType, isRtl) || 'هزینه اداری', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', '', 1000000, 'ردیف دوم', '', ''],
-        ['DOC-002', '2026-08-02', 'انتقال', 'موقت', firstDeptTitle, 'نمونه سند انتقال', 1, pickLocalizedTitle(firstAccount, isRtl) || 'صندوق', 'واریز', 'بالانس', '', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 500000, '', 'ردیف انتقال', '', ''],
+        ['DOC-001', '2026-08-01', 'عمومی', 'یادداشت', firstDeptTitle, 'نمونه سند هزینه', 1, pickLocalizedTitle(firstAccount, isRtl) || 'صندوق', 'واریز', 'هزینه', pickLocalizedTitle(firstCostType, isRtl) || 'هزینه اداری', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 1000000, '', 'پرداخت هزینه نمونه'],
+        ['DOC-001', '2026-08-01', 'عمومی', 'یادداشت', firstDeptTitle, 'نمونه سند هزینه', 2, pickLocalizedTitle(firstAccount, isRtl) || 'بانک', 'برداشت', 'هزینه', pickLocalizedTitle(firstCostType, isRtl) || 'هزینه اداری', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', '', 1000000, 'ردیف دوم'],
+        ['DOC-002', '2026-08-02', 'انتقال', 'موقت', firstDeptTitle, 'نمونه سند انتقال', 1, pickLocalizedTitle(firstAccount, isRtl) || 'صندوق', 'واریز', 'بالانس', '', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 500000, '', 'ردیف انتقال'],
       ] : [
-        ['DOC-001', '2026-08-01', 'General', 'Draft', firstDeptTitle, 'Sample cost document', 1, pickLocalizedTitle(firstAccount, isRtl) || 'Cash', 'Deposit', 'Cost', pickLocalizedTitle(firstCostType, isRtl) || 'Administrative Expense', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 1000000, '', 'Sample item', '', ''],
-        ['DOC-001', '2026-08-01', 'General', 'Draft', firstDeptTitle, 'Sample cost document', 2, pickLocalizedTitle(firstAccount, isRtl) || 'Bank', 'Withdrawal', 'Cost', pickLocalizedTitle(firstCostType, isRtl) || 'Administrative Expense', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', '', 1000000, 'Second row', '', ''],
-        ['DOC-002', '2026-08-02', 'Transfer', 'Temporary', firstDeptTitle, 'Sample transfer document', 1, pickLocalizedTitle(firstAccount, isRtl) || 'Cash', 'Deposit', 'Balance', '', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 500000, '', 'Transfer row', '', ''],
+        ['DOC-001', '2026-08-01', 'General', 'Draft', firstDeptTitle, 'Sample cost document', 1, pickLocalizedTitle(firstAccount, isRtl) || 'Cash', 'Deposit', 'Cost', pickLocalizedTitle(firstCostType, isRtl) || 'Administrative Expense', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 1000000, '', 'Sample item'],
+        ['DOC-001', '2026-08-01', 'General', 'Draft', firstDeptTitle, 'Sample cost document', 2, pickLocalizedTitle(firstAccount, isRtl) || 'Bank', 'Withdrawal', 'Cost', pickLocalizedTitle(firstCostType, isRtl) || 'Administrative Expense', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', '', 1000000, 'Second row'],
+        ['DOC-002', '2026-08-02', 'Transfer', 'Temporary', firstDeptTitle, 'Sample transfer document', 1, pickLocalizedTitle(firstAccount, isRtl) || 'Cash', 'Deposit', 'Balance', '', '', pickLocalizedTitle(firstCenter, isRtl), 'IRR', 500000, '', 'Transfer row'],
       ];
 
       const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
@@ -259,7 +399,7 @@
           const rows = rawRows.slice(1).map((cols, index) => ({
             sheetRow: index + 2,
             documentCode: String(cols[0] ?? '').trim(),
-            documentDate: String(cols[1] ?? '').trim(),
+            documentDate: parseImportedDate(cols[1]),
             transactionType: String(cols[2] ?? '').trim(),
             status: String(cols[3] ?? '').trim(),
             departmentTitle: String(cols[4] ?? '').trim(),
@@ -275,8 +415,6 @@
             depositAmount: String(cols[14] ?? '').trim(),
             withdrawalAmount: String(cols[15] ?? '').trim(),
             itemDescription: String(cols[16] ?? '').trim(),
-            exchangeRateToUsd: String(cols[17] ?? '').trim(),
-            exchangeRateUsdToIrr: String(cols[18] ?? '').trim(),
           })).filter(row => Object.values(row).some(value => String(value ?? '').trim() !== ''));
 
           if (rows.length === 0) {
@@ -301,30 +439,6 @@
             setImportErrors({ isOpen: true, errors });
             return;
           }
-
-          const rateCache = {};
-          const getRatesForDate = async (dateValue) => {
-            const normalizedDate = String(dateValue || '').replace(/\//g, '-').substring(0, 10);
-            if (!normalizedDate) return {};
-            if (rateCache[normalizedDate]) return rateCache[normalizedDate];
-            const { data } = await supabase
-              .from('fm_currency_rates')
-              .select('base_currency, target_currency, rate, rate_date, created_at')
-              .lte('rate_date', normalizedDate)
-              .order('rate_date', { ascending: false });
-            const sorted = (data || []).slice().sort((a, b) => {
-              if (a.rate_date > b.rate_date) return -1;
-              if (a.rate_date < b.rate_date) return 1;
-              return (a.created_at || '') > (b.created_at || '') ? -1 : 1;
-            });
-            const latest = {};
-            sorted.forEach(r => {
-              const key = `${r.base_currency}_${r.target_currency}`;
-              if (!latest[key]) latest[key] = r.rate;
-            });
-            rateCache[normalizedDate] = latest;
-            return latest;
-          };
 
           const docsToSave = [];
           for (const [groupKey, groupRows] of docGroups.entries()) {
@@ -355,7 +469,6 @@
                 ['transactionType', t('نوع سند', 'Transaction type')],
                 ['status', t('وضعیت', 'Status')],
                 ['departmentTitle', t('دپارتمان', 'Department')],
-                ['description', t('شرح سند', 'Document description')],
               ];
               masterFieldChecks.forEach(([field, label]) => {
                 const currentValue = String(row[field] ?? '').trim();
@@ -369,12 +482,14 @@
               const amountWid = parseFloat(String(row.withdrawalAmount || '0').replace(/,/g, '')) || 0;
               const amountCount = (amountDep > 0 ? 1 : 0) + (amountWid > 0 ? 1 : 0);
               if (amountCount !== 1) {
-                rowErrors.push(`${rowLabel}: ${t('فقط یکی از مبلغ واریز یا برداشت باید بزرگتر از صفر باشد.', 'Exactly one of deposit or withdrawal must be greater than zero.')}`);
+                rowErrors.push(`${rowLabel}: ${t('فقط یکی از مبلغ واریز یا برداشت باید بزرگتر از صفر باشد.', 'Exactly one of deposit or withdrawal must be greater than zero.')} | ${t('واریز', 'Deposit')}: raw="${row.depositAmount || ''}" parsed=${amountDep} | ${t('برداشت', 'Withdrawal')}: raw="${row.withdrawalAmount || ''}" parsed=${amountWid}`);
               }
 
               const accountMatch = getSingleMatch(lookupByTitle.accounts, row.accountTitle);
               if (accountMatch.error) {
-                rowErrors.push(`${rowLabel}: ${t('حساب', 'Account')} «${row.accountTitle}» ${accountMatch.ambiguous ? t('مبهم است', 'is ambiguous') : t('یافت نشد', 'was not found')}`);
+                const candidates = collectLookupDebugEntries(lookupByTitle.accounts, row.accountTitle).join(' | ');
+                const samples = collectLookupSampleTitles(lookupByTitle.accounts).join(' | ');
+                rowErrors.push(`${rowLabel}: ${t('حساب', 'Account')} «${row.accountTitle}» ${accountMatch.ambiguous ? t('مبهم است', 'is ambiguous') : t('یافت نشد', 'was not found')}${candidates ? ` | ${t('نزدیک‌ها', 'Near matches')}: ${candidates}` : ''} | ${t('نمونه‌های موجود', 'Stored samples')}: ${samples || '-'} | ${t('کل حساب‌های قابل‌استفاده', 'Available accounts')}: ${lookupByTitle.accounts?.length || 0}`);
               }
 
               const actionValue = enumAliases.action.get(normalizeImportToken(row.transactionAction)) || (amountDep > 0 ? 'DEPOSIT' : amountWid > 0 ? 'WITHDRAWAL' : null);
@@ -402,10 +517,14 @@
                 rowErrors.push(`${rowLabel}: ${t('برای گروه درآمد، عنوان درآمد الزامی است.', 'Income type title is required for INCOME group.')}`);
               }
               if (row.costTypeTitle && costMatch.error) {
-                rowErrors.push(`${rowLabel}: ${t('نوع هزینه', 'Cost type')} «${row.costTypeTitle}» ${costMatch.ambiguous ? t('مبهم است', 'is ambiguous') : t('یافت نشد', 'was not found')}`);
+                const candidates = collectLookupDebugCandidates(lookupByTitle.costTypes, row.costTypeTitle).join(' | ');
+                const samples = collectLookupSampleTitles(lookupByTitle.costTypes).join(' | ');
+                rowErrors.push(`${rowLabel}: ${t('نوع هزینه', 'Cost type')} «${row.costTypeTitle}» ${costMatch.ambiguous ? t('مبهم است', 'is ambiguous') : t('یافت نشد', 'was not found')}${candidates ? ` | ${t('نزدیک‌ها', 'Near matches')}: ${candidates}` : ''} | ${t('عنوان نرمال‌شده', 'Normalized title')}: ${normalizeImportToken(row.costTypeTitle) || '-'} | ${t('نمونه‌های موجود', 'Stored samples')}: ${samples || '-'} | ${t('کل', 'Total')}: ${lookupByTitle.costTypesAll?.length || 0} | ${t('فعال', 'Active')}: ${lookupByTitle.costTypes?.length || 0}`);
               }
               if (row.incomeTypeTitle && incomeMatch.error) {
-                rowErrors.push(`${rowLabel}: ${t('نوع درآمد', 'Income type')} «${row.incomeTypeTitle}» ${incomeMatch.ambiguous ? t('مبهم است', 'is ambiguous') : t('یافت نشد', 'was not found')}`);
+                const candidates = collectLookupDebugCandidates(lookupByTitle.incomeTypes, row.incomeTypeTitle).join(' | ');
+                const samples = collectLookupSampleTitles(lookupByTitle.incomeTypes).join(' | ');
+                rowErrors.push(`${rowLabel}: ${t('نوع درآمد', 'Income type')} «${row.incomeTypeTitle}» ${incomeMatch.ambiguous ? t('مبهم است', 'is ambiguous') : t('یافت نشد', 'was not found')}${candidates ? ` | ${t('نزدیک‌ها', 'Near matches')}: ${candidates}` : ''} | ${t('عنوان نرمال‌شده', 'Normalized title')}: ${normalizeImportToken(row.incomeTypeTitle) || '-'} | ${t('نمونه‌های موجود', 'Stored samples')}: ${samples || '-'} | ${t('کل', 'Total')}: ${lookupByTitle.incomeTypesAll?.length || 0} | ${t('فعال', 'Active')}: ${lookupByTitle.incomeTypes?.length || 0}`);
               }
               if (row.centerTitle && centerMatch.error) {
                 rowErrors.push(`${rowLabel}: ${t('مرکز', 'Center')} «${row.centerTitle}» ${centerMatch.ambiguous ? t('مبهم است', 'is ambiguous') : t('یافت نشد', 'was not found')}`);
@@ -431,15 +550,6 @@
                 rowErrors.push(`${rowLabel}: ${t('کد ارز نامعتبر است.', 'Currency code is invalid.')}`);
               }
 
-              const rateToUsdRaw = parseFloat(String(row.exchangeRateToUsd || '').replace(/,/g, ''));
-              const rateUsdToIrrRaw = parseFloat(String(row.exchangeRateUsdToIrr || '').replace(/,/g, ''));
-              if (row.exchangeRateToUsd && (!rateToUsdRaw || rateToUsdRaw <= 0)) {
-                rowErrors.push(`${rowLabel}: ${t('نرخ تبدیل به دلار نامعتبر است.', 'Exchange rate to USD is invalid.')}`);
-              }
-              if (row.exchangeRateUsdToIrr && (!rateUsdToIrrRaw || rateUsdToIrrRaw <= 0)) {
-                rowErrors.push(`${rowLabel}: ${t('نرخ تبدیل به ریال نامعتبر است.', 'Exchange rate to IRR is invalid.')}`);
-              }
-
               const isTransferRow = normalizeImportToken(masterRow.transactionType) === 'transfer' || docType === 'TRANSFER';
               if (rowErrors.length === 0) {
                 mappedItems.push({
@@ -454,32 +564,15 @@
                   deposit_amount: amountDep,
                   withdrawal_amount: amountWid,
                   description: row.itemDescription,
-                  rate_to_usd: !isNaN(rateToUsdRaw) && rateToUsdRaw > 0 ? rateToUsdRaw : null,
-                  rate_usd_to_irr: !isNaN(rateUsdToIrrRaw) && rateUsdToIrrRaw > 0 ? rateUsdToIrrRaw : null,
                 });
               }
 
               rowErrors.forEach(msg => masterErrors.push(msg));
             }
 
-            const ratesMap = await getRatesForDate(masterRow.documentDate);
-            let totalDepositUsd = 0;
-            let totalWithdrawalUsd = 0;
-            const finalItems = mappedItems.map(item => {
-              const rates = resolveRates(ratesMap, item.currency || 'IRR');
-              const toUsd = item.rate_to_usd || rates.toUsd || 1;
-              const usdToIrr = item.rate_usd_to_irr || rates.usdToIrr || 1;
-              const amount = item.deposit_amount > 0 ? item.deposit_amount : item.withdrawal_amount;
-              const amountUsd = amount * toUsd;
-              const amountIrr = amountUsd * usdToIrr;
-              if (item.transaction_action === 'DEPOSIT') totalDepositUsd += amountUsd;
-              else totalWithdrawalUsd += amountUsd;
-              return { ...item, exchange_rate_to_usd: toUsd, exchange_rate_usd_to_irr: usdToIrr, amount_usd: amountUsd, amount_irr: amountIrr };
-            });
-
-            if ((docType || normalizeImportToken(masterRow.transactionType) === 'transfer') && Math.abs(totalDepositUsd - totalWithdrawalUsd) > 0.0001) {
-              masterErrors.push(t('سند انتقال باید از نظر ارزی متعادل باشد.', 'Transfer transactions must be balanced.'));
-            }
+            const finalItems = mappedItems.map(item => ({
+              ...item,
+            }));
 
             if (masterErrors.length > 0 || finalItems.length === 0) {
               const docLabel = masterRow.documentCode || groupKey;
@@ -511,7 +604,7 @@
 
             const txPayload = {
               document_code: documentCode,
-              document_date: doc.masterRow.documentDate.replace(/\//g, '-'),
+              document_date: doc.masterRow.documentDate,
               registrar_id: currentUserId || null,
               transaction_type: doc.documentType || 'GENERAL',
               department_id: doc.departmentId || null,
@@ -548,10 +641,6 @@
               currency: item.currency,
               deposit_amount: item.deposit_amount,
               withdrawal_amount: item.withdrawal_amount,
-              exchange_rate_to_usd: item.exchange_rate_to_usd,
-              exchange_rate_usd_to_irr: item.exchange_rate_usd_to_irr,
-              amount_usd: item.amount_usd,
-              amount_irr: item.amount_irr,
               description: item.description || null,
             }));
             let itemInsertResult = await supabase.from('fm_transaction_items').insert(itemsPayload);
@@ -614,24 +703,14 @@
         t('نوع تراکنش', 'Type'), t('وضعیت', 'Status'), t('ثبت‌کننده', 'Registrar'), t('دپارتمان', 'Department'),
         t('شرح سربرگ', 'Description'), t('بررسی‌کننده', 'Reviewed By'), t('تاریخ بررسی', 'Reviewed At'),
         t('تاییدکننده', 'Approved By'), t('تاریخ تایید', 'Approved At'),
-        t('جمع واریز (USD)', 'Total Deposit (USD)'), t('جمع برداشت (USD)', 'Total Withdrawal (USD)'),
-        t('جمع واریز (IRR)', 'Total Deposit (IRR)'), t('جمع برداشت (IRR)', 'Total Withdrawal (IRR)'),
         t('ردیف', 'Row'), t('حساب', 'Account'), t('نوع عملیات', 'Action'), t('گروه', 'Group'),
         t('نوع هزینه/درآمد', 'Cost/Income Type'), t('ارز', 'Currency'), t('مرکز هزینه/درآمد', 'Cost/Income Center'),
-        t('واریز', 'Deposit'), t('برداشت', 'Withdrawal'), t('معادل دلار', 'Amount USD'), t('معادل ریال', 'Amount IRR'), t('شرح قلم', 'Item Desc'),
+        t('واریز', 'Deposit'), t('برداشت', 'Withdrawal'), t('شرح قلم', 'Item Desc'),
       ];
 
       const rows = [];
       dataToExport.forEach(tx => {
         const txItems = tx.fm_transaction_items || [];
-        let txDepUsd = 0, txWidUsd = 0, txDepIrr = 0, txWidIrr = 0;
-        txItems.forEach(item => {
-          const usd = parseFloat(item.amount_usd || 0);
-          const irr = parseFloat(item.amount_irr || 0);
-          if (item.transaction_action === 'DEPOSIT') { txDepUsd += usd; txDepIrr += irr; }
-          else { txWidUsd += usd; txWidIrr += irr; }
-        });
-
         const hdr = [
           tx.document_code || '', tx.reference_code || '', tx.daily_number || '',
           tx.document_date || '', formatDT(tx.created_at),
@@ -642,12 +721,10 @@
           tx.description || '',
           tx.reviewed_by_name || '', formatDT(tx.reviewed_at),
           tx.approved_by_name || '', formatDT(tx.approved_at),
-          txDepUsd > 0 ? txDepUsd.toFixed(2) : '', txWidUsd > 0 ? txWidUsd.toFixed(2) : '',
-          txDepIrr > 0 ? txDepIrr.toFixed(0) : '', txWidIrr > 0 ? txWidIrr.toFixed(0) : '',
         ];
 
         if (txItems.length === 0) {
-          rows.push([...hdr, '', '', '', '', '', '', '', '', '', '', '', '']);
+          rows.push([...hdr, '', '', '', '', '', '', '', '', '', '', '']);
         } else {
           txItems.forEach(item => {
             const acc = (lookups.accounts || []).find(a => String(a.id) === String(item.account_id));
@@ -670,8 +747,6 @@
               center ? pickLocalizedTitle(center, isRtl) : '',
               item.deposit_amount || '0',
               item.withdrawal_amount || '0',
-              item.amount_usd || '0',
-              item.amount_irr || '0',
               item.description || '',
             ]);
           });

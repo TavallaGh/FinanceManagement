@@ -78,10 +78,10 @@
         }, [securityCtx, formCode]);
 
         const TRANSACTION_TYPES = [
-            { value: 'OPENING', label: t('سند افتتاحیه', 'Opening') },
-            { value: 'CLOSING', label: t('سند اختتامیه', 'Closing') },
+            { value: 'OPENING', label: t('تراکنش افتتاحیه', 'Opening') },
+            { value: 'CLOSING', label: t('تراکنش اختتامیه', 'Closing') },
             { value: 'GENERAL', label: t('عمومی', 'General') },
-            { value: 'TRANSFER', label: t('سند انتقال', 'Transfer') }
+            { value: 'TRANSFER', label: t('تراکنش انتقال', 'Transfer') }
         ];
 
         const TRANSACTION_ACTIONS = [
@@ -113,7 +113,7 @@
         const [filters, setFilters] = useState({});
         const [usersMap, setUsersMap] = useState({});
         const [deptsMap, setDeptsMap] = useState({});
-        const [lookups, setLookups] = useState({ accounts: [], costTypes: [], incomeTypes: [], costBenefitCenters: [], currencies: [] });
+        const [lookups, setLookups] = useState({ accounts: [], costTypes: [], incomeTypes: [], costTypesAll: [], incomeTypesAll: [], costBenefitCenters: [], currencies: [] });
         const [resolvedUserId, setResolvedUserId] = useState(currentUserId);
         const [userDepartmentId, setUserDepartmentId] = useState(null);
         const [currentView, setCurrentView] = useState('list');
@@ -165,11 +165,13 @@
 
         const fetchLookups = useCallback(async () => {
             try {
-                const [accRes, chartRes, costRes, incRes, deptNodesRes, cbcRes, currRes, permsRes, userRolesRes] = await Promise.all([
+                const [accRes, chartRes, costRes, incRes, costAllRes, incAllRes, deptNodesRes, cbcRes, currRes, permsRes, userRolesRes] = await Promise.all([
                     supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
                     supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
                     supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
                     supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
+                    supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id'),
+                    supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id'),
                     supabase.from('fm_org_chart_nodes').select('id, title'),
                     supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
                     supabase.from('fm_currencies').select('id, code, decimal_places'),
@@ -263,6 +265,8 @@
                     accounts: accountsList,
                     costTypes: buildPathsAndFilterLeafs(costRes.data || []),
                     incomeTypes: buildPathsAndFilterLeafs(incRes.data || []),
+                    costTypesAll: costAllRes.data || [],
+                    incomeTypesAll: incAllRes.data || [],
                     costBenefitCenters,
                     currencies: currRes.data || [],
                     activeChartId,
@@ -519,9 +523,9 @@
 
     const columns = useMemo(() => [
         { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-300" }, val || '-') },
-        { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: "text-indigo-600 dark:text-indigo-400 font-bold" }, val) },
+        { field: 'document_code', header_fa: 'کد تراکنش', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: "text-indigo-600 dark:text-indigo-400 font-bold" }, val) },
         { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
-        { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '90px', type: 'date' },
+        { field: 'document_date', header_fa: 'تاریخ تراکنش', header_en: 'Date', width: '90px', type: 'date' },
         { field: 'created_at', header_fa: 'زمان ثبت', header_en: 'Registered At', width: '100px', render: (val) => {
             if (!val) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
             try {
@@ -671,16 +675,16 @@
         { 
             id: 'print', 
             icon: Printer, 
-            tooltip: t('چاپ سند', 'Print Document'), 
+            tooltip: t('چاپ تراکنش', 'Print Document'), 
             onClick: (row) => setPrintModal({ isOpen: true, transactionId: row.id }), 
             requiredAccess: 'view', 
             className: 'text-blue-500 hover:text-blue-600' 
         },
         { id: 'summary', icon: DollarSign, tooltip: t('خلاصه ارزی', 'Currency Summary'), onClick: (row) => openSummary(row), className: 'text-indigo-500 hover:text-indigo-600' },
         { id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: (row) => (attachmentCounts[row.id] > 0 ? '!text-indigo-600 hover:!text-indigo-700' : '!text-slate-400 hover:!text-slate-600') },
-        { id: 'copy', icon: Copy, tooltip: t('کپی سند', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
-        { id: 'update', icon: Edit, tooltip: (row) => isLocked(row) ? t('مشاهده سند', 'View Document') : t('مشاهده/ویرایش', 'View/Edit'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'view' },
-        { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => { if (isLocked(row)) { showToast(t('سندهای بررسی شده یا تایید شده قابل حذف نیستند.', 'Locked documents cannot be deleted.'), 'warning'); return; } setDeleteConfirm({ isOpen: true, type: 'single', data: row }); }, requiredAccess: 'delete', className: (row) => isLocked(row) ? '!text-slate-300 dark:!text-slate-600 cursor-not-allowed' : 'text-red-500 hover:text-red-600' }
+        { id: 'copy', icon: Copy, tooltip: t('کپی تراکنش', 'Duplicate Document'), onClick: (row) => handleOpenForm('COPY', row), requiredAccess: 'create', className: 'text-emerald-600 hover:text-emerald-700' },
+        { id: 'update', icon: Edit, tooltip: (row) => isLocked(row) ? t('مشاهده تراکنش', 'View Document') : t('مشاهده/ویرایش', 'View/Edit'), onClick: (row) => handleOpenForm('EDIT', row), requiredAccess: 'view' },
+        { id: 'delete', icon: Trash2, tooltip: t('حذف', 'Delete Document'), onClick: (row) => { if (isLocked(row)) { showToast(t('تراکنش‌های بررسی شده یا تایید شده قابل حذف نیستند.', 'Locked documents cannot be deleted.'), 'warning'); return; } setDeleteConfirm({ isOpen: true, type: 'single', data: row }); }, requiredAccess: 'delete', className: (row) => isLocked(row) ? '!text-slate-300 dark:!text-slate-600 cursor-not-allowed' : 'text-red-500 hover:text-red-600' }
     ];
 
     const viewConfig = useMemo(() => ({
@@ -769,7 +773,7 @@
             React.createElement(EmptyState, {
                 icon: AlertTriangle,
                 title: t('هشدار', 'Warning'),
-                description: deleteConfirm.type === 'bulk' ? t(`آیا از حذف ${deleteConfirm.data?.length} سند اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} documents?`) : t(`آیا از حذف این سند اطمینان دارید؟`, `Delete this document?`),
+                description: deleteConfirm.type === 'bulk' ? t(`آیا از حذف ${deleteConfirm.data?.length} تراکنش اطمینان دارید؟`, `Delete ${deleteConfirm.data?.length} documents?`) : t(`آیا از حذف این تراکنش اطمینان دارید؟`, `Delete this document?`),
                 action: React.createElement('div', { className: "flex gap-2 w-full mt-4 px-4" },
                     React.createElement(Button, { variant: "outline", size: "sm", className: "flex-1", onClick: () => setDeleteConfirm({ isOpen: false, type: null, data: null }) }, t('انصراف', 'Cancel')),
                     React.createElement(Button, { variant: "danger", size: "sm", onClick: executeDelete, isLoading: isLoading, className: "flex-1" }, t('تایید حذف', 'Confirm'))
@@ -782,7 +786,7 @@
         React.createElement(Modal, {
             isOpen: attachModal.isOpen,
             onClose: () => setAttachModal({ isOpen: false, record: null, files: [] }),
-            title: t('پیوست‌های سند', 'Document Attachments'),
+            title: t('پیوست‌ها', 'Document Attachments'),
             language: language,
             width: "max-w-xl"
         },

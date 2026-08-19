@@ -344,13 +344,17 @@
             const group = inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId) ? inlineItemEdit.data.transaction_group : row.transaction_group;
             const isCenterGroup = group === 'COST' || group === 'INCOME';
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
-                if (!isCenterGroup) {
-                    return <div className="h-[32px] w-full bg-slate-100 dark:bg-slate-800 rounded opacity-50"></div>;
-                }
                 const activeCenters = (lookups.costBenefitCenters || []).filter(c =>
-                    c.isActive && (group === 'COST' ? c.isCostCenter : c.isBenefitCenter)
+                    c.isActive && (
+                        group === 'COST'
+                            ? c.isCostCenter
+                            : group === 'INCOME'
+                                ? c.isBenefitCenter
+                                : true
+                    )
                 );
-                const selectedCenter = activeCenters.find(c => String(c.id) === String(inlineItemEdit.data.center_id));
+                const selectedCenter = activeCenters.find(c => String(c.id) === String(inlineItemEdit.data.center_id))
+                    || (lookups.costBenefitCenters || []).find(c => String(c.id) === String(inlineItemEdit.data.center_id));
                 const displayVal = selectedCenter ? (isRtl ? selectedCenter.titleFa : (selectedCenter.titleEn || selectedCenter.titleFa)) : '';
                 return (
                     <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="relative z-[60]">
@@ -363,9 +367,9 @@
                     </div>
                 );
             }
-            if (!isCenterGroup) return <span className="text-slate-400 dark:text-slate-600 text-[12px]">-</span>;
             const c = (lookups.costBenefitCenters || []).find(x => String(x.id) === String(val));
-            return <span className="text-[12px] truncate block">{c ? (isRtl ? c.titleFa : (c.titleEn || c.titleFa)) : ''}</span>;
+            if (!c) return <span className="text-slate-400 dark:text-slate-600 text-[12px]">-</span>;
+            return <span className="text-[12px] truncate block">{isRtl ? c.titleFa : (c.titleEn || c.titleFa)}</span>;
         }},
         { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '50px', render: (val, row) => {
             if (inlineItemEdit && (inlineItemEdit.id === row.id || inlineItemEdit.id === row._tempId)) {
