@@ -427,11 +427,21 @@
             const fetchRates = async () => {
                 try {
                     const formattedDate = headerData.document_date.replace(/\//g, '-');
-                    const { data } = await supabase.from('fm_currency_rates')
-                        .select('base_currency, target_currency, rate, rate_date, created_at')
-                        .lte('rate_date', formattedDate)
-                        .order('rate_date', { ascending: false });
-                    const sorted = (data || []).slice().sort((a, b) => {
+                    const batchSize = 1000;
+                    const allRates = [];
+                    for (let offset = 0; ; offset += batchSize) {
+                        const { data, error } = await supabase
+                            .from('fm_currency_rates')
+                            .select('base_currency, target_currency, rate, rate_date, created_at')
+                            .lte('rate_date', formattedDate)
+                            .order('rate_date', { ascending: false })
+                            .order('created_at', { ascending: false })
+                            .range(offset, offset + batchSize - 1);
+                        if (error) throw error;
+                        if (data && data.length) allRates.push(...data);
+                        if (!data || data.length < batchSize) break;
+                    }
+                    const sorted = (allRates || []).slice().sort((a, b) => {
                         if (a.rate_date > b.rate_date) return -1;
                         if (a.rate_date < b.rate_date) return  1;
                         const ca = a.created_at || '', cb = b.created_at || '';

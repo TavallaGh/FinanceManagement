@@ -405,13 +405,25 @@
         }
 
         const usesGroupingSummary = !!selectedGroupingDepth;
-        const rateLookup = usesGroupingSummary
-          ? buildRateLookup((await supabase
+        const fetchAllCurrencyRatesUpToDate = async (formattedDate) => {
+          const batchSize = 1000;
+          const allRates = [];
+          for (let offset = 0; ; offset += batchSize) {
+            const { data, error } = await supabase
               .from('fm_currency_rates')
               .select('base_currency, target_currency, rate, rate_date, created_at')
-              .lte('rate_date', isoTo)
+              .lte('rate_date', formattedDate)
               .order('rate_date', { ascending: false })
-              .order('created_at', { ascending: false })).data || [])
+              .order('created_at', { ascending: false })
+              .range(offset, offset + batchSize - 1);
+            if (error) throw error;
+            if (data && data.length) allRates.push(...data);
+            if (!data || data.length < batchSize) break;
+          }
+          return allRates;
+        };
+        const rateLookup = usesGroupingSummary
+          ? buildRateLookup(await fetchAllCurrencyRatesUpToDate(isoTo))
           : new Map();
         const conversionCache = new Map();
 

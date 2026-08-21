@@ -78,6 +78,24 @@
     };
   };
 
+  const fetchAllCurrencyRatesUpToDate = async (supabase, formattedDate) => {
+    const batchSize = 1000;
+    const allRates = [];
+    for (let offset = 0; ; offset += batchSize) {
+      const { data, error } = await supabase
+        .from('fm_currency_rates')
+        .select('base_currency, target_currency, rate, rate_date, created_at')
+        .lte('rate_date', formattedDate)
+        .order('rate_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + batchSize - 1);
+      if (error) throw error;
+      if (data && data.length) allRates.push(...data);
+      if (!data || data.length < batchSize) break;
+    }
+    return allRates;
+  };
+
   /* ════════════════════════════════════════════════════
      makeTransactionActions — Plain factory, no hooks
      ════════════════════════════════════════════════════ */
@@ -241,10 +259,7 @@
         const ratesByDate = {};
         for (const date of uniqueDates) {
           const formattedDate = date.replace(/\//g, '-');
-          const { data } = await supabase.from('fm_currency_rates')
-            .select('base_currency, target_currency, rate, rate_date, created_at')
-            .lte('rate_date', formattedDate)
-            .order('rate_date', { ascending: false });
+          const data = await fetchAllCurrencyRatesUpToDate(supabase, formattedDate);
           const sorted = (data || []).slice().sort((a, b) => {
             if (a.rate_date > b.rate_date) return -1;
             if (a.rate_date < b.rate_date) return  1;

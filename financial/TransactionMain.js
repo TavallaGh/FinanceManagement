@@ -290,22 +290,46 @@
                 const txIds = transactionsWithItems.map(tx => String(tx.id));
 
                 if (txIds.length > 0) {
+                    const chunkArray = (values, size) => {
+                        const chunks = [];
+                        for (let index = 0; index < values.length; index += size) {
+                            chunks.push(values.slice(index, index + size));
+                        }
+                        return chunks;
+                    };
+
+                    const loadInBatches = async (table, selectColumns, filterColumn, values, extraBuilder = null) => {
+                        const batches = chunkArray(values, 100);
+                        const rows = [];
+                        for (const batch of batches) {
+                            let query = supabase.from(table).select(selectColumns).in(filterColumn, batch);
+                            if (extraBuilder) query = extraBuilder(query);
+                            const { data, error } = await query;
+                            if (error) return { data: rows, error };
+                            if (data && data.length) rows.push(...data);
+                        }
+                        return { data: rows, error: null };
+                    };
+
                     let itemRows = [];
                     let itemError = null;
 
-                    const loadItems = async (columns) => {
-                        return supabase
-                            .from('fm_transaction_items')
-                            .select(columns)
-                            .in('transaction_id', txIds)
-                            .order('transaction_id', { ascending: true })
-                            .order('row_number', { ascending: true });
-                    };
-
-                    ({ data: itemRows, error: itemError } = await loadItems('*'));
+                    ({ data: itemRows, error: itemError } = await loadInBatches(
+                        'fm_transaction_items',
+                        '*',
+                        'transaction_id',
+                        txIds,
+                        (query) => query.order('transaction_id', { ascending: true }).order('row_number', { ascending: true })
+                    ));
                     if (itemError && /center_id|schema cache/i.test(itemError.message || '')) {
                         const fallbackColumns = 'id, transaction_id, row_number, account_id, transaction_action, transaction_group, cost_type_id, income_type_id, currency, deposit_amount, withdrawal_amount, exchange_rate_to_usd, exchange_rate_usd_to_irr, amount_usd, amount_irr, description, created_at';
-                        ({ data: itemRows, error: itemError } = await loadItems(fallbackColumns));
+                        ({ data: itemRows, error: itemError } = await loadInBatches(
+                            'fm_transaction_items',
+                            fallbackColumns,
+                            'transaction_id',
+                            txIds,
+                            (query) => query.order('transaction_id', { ascending: true }).order('row_number', { ascending: true })
+                        ));
                     }
 
                     if (!itemError && itemRows) {
@@ -330,7 +354,16 @@
                 setAttachmentCounts(counts);
 
                 if (txIds.length > 0) {
-                    const { data: commentRows } = await supabase.from('sys_comments').select('entity_id').eq('entity_type', 'fm_transactions').in('entity_id', txIds);
+                    const commentRows = [];
+                    const commentBatches = chunkArray(txIds, 100);
+                    for (const batch of commentBatches) {
+                        const { data } = await supabase
+                            .from('sys_comments')
+                            .select('entity_id')
+                            .eq('entity_type', 'fm_transactions')
+                            .in('entity_id', batch);
+                        if (data && data.length) commentRows.push(...data);
+                    }
                     if (commentRows) setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
                 }
             } catch (error) {

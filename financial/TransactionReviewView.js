@@ -226,6 +226,8 @@
         : (item.displayLabel || item.titleEn || item.title_en || item.titleFa || item.title_fa || item.code || fallback);
     };
 
+    const getRemainedAmount = (row) => row?.remained_amount ?? row?._balance_after;
+
     const itemsColumns = useMemo(() => [
       { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px]' }, val || '-') },
       { field: '_tx_type', header_fa: 'نوع سند', header_en: 'Doc Type', width: '90px', render: (val) => React.createElement('span', { className: 'text-[12px]' }, txTypes[val] || val || '-') },
@@ -257,7 +259,7 @@
       }},
       { field: 'deposit_amount', header_fa: 'واریز', header_en: 'Deposit', width: '110px', exportValue: (val) => fmt(val), render: (val, row) => React.createElement(AmountCell, { amount: val, usd: row.dep_usd, irr: row.dep_irr, cur: row.currency, isDeposit: true }) },
       { field: 'withdrawal_amount', header_fa: 'برداشت', header_en: 'Withdrawal', width: '110px', exportValue: (val) => fmt(val), render: (val, row) => React.createElement(AmountCell, { amount: val, usd: row.wid_usd, irr: row.wid_irr, cur: row.currency, isDeposit: false }) },
-      { field: '_balance_after', header_fa: 'مانده حساب', header_en: 'Account Balance', width: '120px', exportValue: (val) => fmt(val), render: (val) => React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300', dir: 'ltr' }, fmt(val))},      
+      { field: 'remained_amount', header_fa: 'مانده حساب', header_en: 'Account Balance', width: '120px', exportValue: (_, row) => fmt(getRemainedAmount(row)), render: (_, row) => React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300', dir: 'ltr' }, fmt(getRemainedAmount(row)))},      
       { field: 'deposit_amount_usd', header_fa: 'واریز به دلار', header_en: 'Deposit (USD)', width: '95px', exportOnly: true, exportValue: (_, row) => fmt(row.dep_usd) },
       { field: 'withdrawal_amount_usd', header_fa: 'برداشت به دلار', header_en: 'Withdrawal (USD)', width: '95px', exportOnly: true, exportValue: (_, row) => fmt(row.wid_usd) },
       { field: 'exchange_rate_usd_to_irr', header_fa: 'نرخ تبدیل', header_en: 'Exchange Rate to IRR', width: '95px', exportOnly: true, exportValue: (val) => fmt(val) },
@@ -292,7 +294,7 @@
         { header: t('ارز', 'Currency'), value: row => row.currency || '-' },
         { header: t('واریز', 'Deposit'), value: row => fmt(row.deposit_amount) },
         { header: t('برداشت', 'Withdrawal'), value: row => fmt(row.withdrawal_amount) },
-        { header: t('مانده حساب', 'Account Balance'), value: row => fmt(row._balance_after) },
+        { header: t('مانده حساب', 'Account Balance'), value: row => fmt(getRemainedAmount(row)) },
         { header: t('نرخ تبدیل به دلار', 'Exchange Rate to USD'), value: row => fmt(row.exchange_rate_to_usd) },
         { header: t('واریز به دلار', 'Deposit (USD)'), value: row => fmt(row.dep_usd) },
         { header: t('برداشت به دلار', 'Withdrawal (USD)'), value: row => fmt(row.wid_usd) },
@@ -369,7 +371,7 @@
         }
         return React.createElement(AmountCell, { amount: val, usd: row.wid_usd, irr: row.wid_irr, cur: row.currency, isDeposit: false });
       }},
-      { field: '_balance_after', header_fa: 'مانده حساب', header_en: 'Account Balance', width: '120px', exportValue: (val) => fmt(val), render: (val) => React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300', dir: 'ltr' }, fmt(val))},
+      { field: 'remained_amount', header_fa: 'مانده حساب', header_en: 'Account Balance', width: '120px', exportValue: (_, row) => fmt(getRemainedAmount(row)), render: (_, row) => React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300', dir: 'ltr' }, fmt(getRemainedAmount(row)))},
       { field: 'description', header_fa: 'شرح قلم', header_en: 'Item Desc.', width: '220px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block max-w-sm', title: val }, val || '-') },      
     ], [accountsMap, isRtl, txActions, txGroups, COST_TYPE_LOOKUP, INCOME_TYPE_LOOKUP, CENTER_LOOKUP, showCurrencySummary]);
 

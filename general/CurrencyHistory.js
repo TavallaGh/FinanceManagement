@@ -92,9 +92,19 @@
     const fetchRates = useCallback(async () => {
       try {
         if (!supabase) return;
-        const { data, error } = await supabase.from('fm_currency_rates').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        setRates(data || []);
+        const batchSize = 1000;
+        const allRates = [];
+        for (let offset = 0; ; offset += batchSize) {
+          const { data, error } = await supabase
+            .from('fm_currency_rates')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .range(offset, offset + batchSize - 1);
+          if (error) throw error;
+          if (data && data.length) allRates.push(...data);
+          if (!data || data.length < batchSize) break;
+        }
+        setRates(allRates);
       } catch (err) { console.error("Fetch rates error:", err); }
     }, [supabase]);
 

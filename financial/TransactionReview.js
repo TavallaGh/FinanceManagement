@@ -594,6 +594,7 @@
             dep_irr: rawDep * resolvedToUsd * resolvedUsdToIrr,
             wid_usd: rawWid * resolvedToUsd,
             wid_irr: rawWid * resolvedToUsd * resolvedUsdToIrr,
+            remained_amount: item.remained_amount != null ? parseFloat(item.remained_amount) : balanceAfter,
             _doc_id:   tx.id,
             _doc_code: tx.document_code,
             _doc_date: tx.document_date,
