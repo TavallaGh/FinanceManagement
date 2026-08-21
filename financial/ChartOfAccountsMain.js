@@ -51,12 +51,14 @@
     const [isCreatingNode, setIsCreatingNode] = useState(false);
     const [nodeFormData, setNodeFormData] = useState({});
     const [nodeDepth, setNodeDepth] = useState(1);
+    const [currencyRates, setCurrencyRates] = useState([]);
+    const [nodeBalanceSnapshot, setNodeBalanceSnapshot] = useState({ balance: 0, usd: 0, balanceDate: '' });
 
     const [lookups, setLookups] = useState({
       currencies: [],
       systemUsers: [],
-      userGroupsMaster: [],
-      userGroupUsers: [],
+      systemRoles: [],
+      userRolesMapping: [],
       systemParties: [],
       balanceGroupsMaster: []
     });
@@ -90,14 +92,89 @@
       }
     };
 
+    const buildRateLookup = (rateRows = []) => {
+      const lookup = new Map();
+      (rateRows || []).forEach(rate => {
+        const base = String(rate.base_currency || '').toUpperCase();
+        const target = String(rate.target_currency || '').toUpperCase();
+        if (!base || !target) return;
+        const key = `${base}|${target}`;
+        if (!lookup.has(key)) lookup.set(key, []);
+        lookup.get(key).push({
+          rate: parseFloat(rate.rate || 0),
+          rate_date: String(rate.rate_date || ''),
+          created_at: String(rate.created_at || '')
+        });
+      });
+
+      lookup.forEach(list => {
+        list.sort((a, b) => {
+          const dateCmp = String(b.rate_date || '').localeCompare(String(a.rate_date || ''));
+          if (dateCmp !== 0) return dateCmp;
+          return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+        });
+      });
+
+      return lookup;
+    };
+
+    const getLatestRateForDate = (lookup, fromCode, toCode, dateIso) => {
+      const key = `${String(fromCode || '').toUpperCase()}|${String(toCode || '').toUpperCase()}`;
+      const list = lookup.get(key) || [];
+      for (const entry of list) {
+        if (!entry.rate_date || entry.rate_date <= dateIso) {
+          return entry.rate > 0 ? entry.rate : null;
+        }
+      }
+      return null;
+    };
+
+    const resolveConversionRate = (lookup, fromCode, toCode, dateIso, cache = new Map()) => {
+      const from = String(fromCode || '').toUpperCase();
+      const to = String(toCode || '').toUpperCase();
+      const day = String(dateIso || '9999-12-31');
+      const cacheKey = `${day}|${from}|${to}`;
+      if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+      let rate = 1;
+      if (!from || !to || from === to) {
+        cache.set(cacheKey, rate);
+        return rate;
+      }
+
+      const direct = getLatestRateForDate(lookup, from, to, day);
+      if (direct) {
+        rate = direct;
+      } else {
+        const inverse = getLatestRateForDate(lookup, to, from, day);
+        if (inverse) {
+          rate = 1 / inverse;
+        } else {
+          const viaUsdFrom = from === 'USD' ? 1 : resolveConversionRate(lookup, from, 'USD', day, cache);
+          const viaUsdTo = to === 'USD' ? 1 : resolveConversionRate(lookup, 'USD', to, day, cache);
+          rate = (viaUsdFrom && viaUsdTo) ? (viaUsdFrom * viaUsdTo) : 1;
+        }
+      }
+
+      cache.set(cacheKey, rate || 1);
+      return rate || 1;
+    };
+
+    const formatAmount = (num) => {
+      if (num === null || num === undefined) return '—';
+      const v = parseFloat(num);
+      if (isNaN(v)) return '—';
+      return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
     const fetchLookups = useCallback(async () => {
       try {
         if (!supabase) return;
-        const [currRes, userRes, groupRes, groupUsersRes, partyRes, bgRes] = await Promise.all([
+        const [currRes, userRes, roleRes, userRoleMapRes, partyRes, bgRes] = await Promise.all([
           safeFetch(supabase.from('fm_currencies').select('*')),
           safeFetch(supabase.from('sec_users').select('*')),
-          safeFetch(supabase.from('sec_user_groups').select('*')),
-          safeFetch(supabase.from('sec_user_group_users').select('group_id, user_id')),
+          safeFetch(supabase.from('sec_roles').select('*')),
+          safeFetch(supabase.from('sec_user_roles').select('*')),
           safeFetch(supabase.from('parties').select('id, first_name, last_name, company_name, party_type')),
           safeFetch(supabase.from('fm_balance_groups').select('id, code, title_fa, title_en, is_active').eq('is_active', true))
         ]);
@@ -105,13 +182,28 @@
         setLookups({
           currencies: currRes.data || [],
           systemUsers: (userRes.data || []).filter(u => u.is_active !== false),
-          userGroupsMaster: groupRes.data || [],
-          userGroupUsers: groupUsersRes.data || [],
+          systemRoles: roleRes.data || [],
+          userRolesMapping: userRoleMapRes.data || [],
           systemParties: partyRes.data || [],
           balanceGroupsMaster: bgRes.data || []
         });
       } catch (err) {
         console.error('Error fetching lookups:', err);
+      }
+    }, [supabase]);
+
+    const loadCurrencyRates = useCallback(async () => {
+      try {
+        if (!supabase) return;
+        const { data, error } = await supabase
+          .from('fm_currency_rates')
+          .select('base_currency, target_currency, rate, rate_date, created_at')
+          .order('rate_date', { ascending: false })
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        setCurrencyRates(data || []);
+      } catch (err) {
+        console.error('Error loading currency rates:', err);
       }
     }, [supabase]);
 
@@ -231,6 +323,10 @@
         fetchDesignerData();
       }
     }, [fetchLookups, fetchDesignerData, access.canView]);
+
+    useEffect(() => {
+      loadCurrencyRates();
+    }, [loadCurrencyRates]);
 
     const handleSelectTreeNode = (node) => {
       setSelectedNodeId(node.id);
@@ -590,6 +686,92 @@
       return isRtl ? (c.title_fa || c.title || c.code) : (c.title_en || c.title || c.code);
     };
 
+    const selectedNodeRecord = useMemo(() => {
+      if (!selectedNodeId) return null;
+      return rawAccounts.find(node => String(node.id) === String(selectedNodeId)) || null;
+    }, [rawAccounts, selectedNodeId]);
+
+    const getSelectedNodeCurrencyCode = useCallback(() => {
+      const currency = lookups.currencies.find(x => String(x.id) === String(selectedNodeRecord?.currencyId || ''));
+      return currency ? (currency.code || 'IRR') : 'IRR';
+    }, [lookups.currencies, selectedNodeRecord]);
+
+    const getSelectedNodeCurrencyName = useCallback(() => {
+      const currency = lookups.currencies.find(x => String(x.id) === String(selectedNodeRecord?.currencyId || ''));
+      if (!currency) return isRtl ? 'ریال' : 'IRR';
+      return isRtl ? (currency.title_fa || currency.title || currency.code) : (currency.title_en || currency.title || currency.code);
+    }, [isRtl, lookups.currencies, selectedNodeRecord]);
+
+    const loadNodeBalanceSnapshot = useCallback(async (node) => {
+      if (!supabase || !node?.id) {
+        setNodeBalanceSnapshot({ balance: 0, usd: 0, balanceDate: '' });
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('fm_transaction_items')
+          .select('id, remained_amount, deposit_amount, withdrawal_amount, row_number, created_at, transaction_id, fm_transactions(id, document_date, created_at)')
+          .eq('account_id', node.id);
+        if (error) throw error;
+
+        const sortedItems = (data || [])
+          .map(item => {
+            const tx = Array.isArray(item.fm_transactions) ? item.fm_transactions[0] : item.fm_transactions;
+            return {
+              ...item,
+              _tx_date: String(tx?.document_date || '').replace(/\//g, '-'),
+              _tx_created_at: String(tx?.created_at || item.created_at || ''),
+            };
+          })
+          .sort((a, b) => {
+            const dateCmp = String(a._tx_date || '').localeCompare(String(b._tx_date || ''));
+            if (dateCmp !== 0) return dateCmp;
+            const createdCmp = String(a._tx_created_at || '').localeCompare(String(b._tx_created_at || ''));
+            if (createdCmp !== 0) return createdCmp;
+            const rowCmp = (parseInt(a.row_number || 0, 10) || 0) - (parseInt(b.row_number || 0, 10) || 0);
+            if (rowCmp !== 0) return rowCmp;
+            return String(a.id || '').localeCompare(String(b.id || ''));
+          });
+
+        let computedBalance = 0;
+        let lastKnownBalance = 0;
+        let lastKnownDate = '';
+
+        sortedItems.forEach(item => {
+          const dep = parseFloat(item.deposit_amount || 0) || 0;
+          const wid = parseFloat(item.withdrawal_amount || 0) || 0;
+          computedBalance += dep > 0 ? dep : -wid;
+          const persistedBalance = item.remained_amount !== null && item.remained_amount !== undefined && item.remained_amount !== ''
+            ? parseFloat(item.remained_amount)
+            : null;
+          lastKnownBalance = !isNaN(persistedBalance) && persistedBalance !== null ? persistedBalance : computedBalance;
+          if (item._tx_date) lastKnownDate = item._tx_date;
+        });
+
+        const currencyCode = getSelectedNodeCurrencyCode();
+        const usdRate = resolveConversionRate(buildRateLookup(currencyRates), currencyCode, 'USD', '9999-12-31');
+
+        setNodeBalanceSnapshot({
+          balance: lastKnownBalance || 0,
+          usd: (lastKnownBalance || 0) * (usdRate || 1),
+          balanceDate: lastKnownDate,
+        });
+      } catch (err) {
+        console.error('Error loading node balance snapshot:', err);
+        setNodeBalanceSnapshot({ balance: 0, usd: 0, balanceDate: '' });
+      }
+    }, [currencyRates, getSelectedNodeCurrencyCode, supabase]);
+
+    useEffect(() => {
+      if (!selectedNodeId || isCreatingNode) {
+        setNodeBalanceSnapshot({ balance: 0, usd: 0, balanceDate: '' });
+        return;
+      }
+      if (!selectedNodeRecord) return;
+      loadNodeBalanceSnapshot(selectedNodeRecord);
+    }, [isCreatingNode, loadNodeBalanceSnapshot, selectedNodeId, selectedNodeRecord]);
+
     const tabOptions = [
       { id: 'details', label: t('مشخصات حساب', 'Account Parameters') },
       ...(!isCreatingNode ? [
@@ -632,11 +814,11 @@
           if (!hasBg) matches = false;
         }
         if (matches && userId) {
-          const userGroupIds = lookups.userGroupUsers.filter(m => String(m.user_id) === String(userId)).map(m => String(m.group_id));
+          const userRoleIds = lookups.userRolesMapping.filter(m => String(m.user_id) === String(userId)).map(m => String(m.role_id));
           const hasAccess = allPermissions.some(p =>
             String(p.account_id) === String(acc.id) && (
               (p.grantee_type === 'user' && String(p.grantee_id) === String(userId)) ||
-              (p.grantee_type === 'group' && userGroupIds.includes(String(p.grantee_id)))
+              (p.grantee_type === 'role' && userRoleIds.includes(String(p.grantee_id)))
             )
           );
           if (!hasAccess) matches = false;
@@ -753,16 +935,21 @@
                             {!isCreatingNode && (
                               <div className="lg:col-span-2 flex items-center justify-between gap-4 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl h-full shadow-sm">
                                 <div className="flex flex-col justify-center flex-1">
-                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 truncate">{t(`بالانس در لحظه (به ${getNodeCurrencyName()})`, `Real-time Balance (${getNodeCurrencyName()})`)}</span>
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 truncate">{t(`بالانس در لحظه (به ${getSelectedNodeCurrencyName()})`, `Real-time Balance (${getSelectedNodeCurrencyName()})`)}</span>
                                     <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right truncate">
-                                      0.00 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">{getNodeCurrencyCode()}</span>
+                                      {formatAmount(nodeBalanceSnapshot.balance)} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">{getSelectedNodeCurrencyCode()}</span>
                                     </div>
+                                    {nodeBalanceSnapshot.balanceDate && (
+                                      <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+                                        {t(`آخرین تراکنش: ${nodeBalanceSnapshot.balanceDate}`, `Latest transaction: ${nodeBalanceSnapshot.balanceDate}`)}
+                                      </span>
+                                    )}
                                 </div>
                                 <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 hidden sm:block shrink-0"></div>
                                 <div className="flex-col justify-center hidden sm:flex flex-1">
                                     <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 truncate">{t('معادل ارزی پایه (دلار)', 'Base Currency Eq (USD)')}</span>
                                     <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right truncate">
-                                      0.00 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">USD</span>
+                                      {formatAmount(nodeBalanceSnapshot.usd)} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">USD</span>
                                     </div>
                                 </div>
                               </div>
