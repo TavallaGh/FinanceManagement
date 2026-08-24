@@ -66,6 +66,12 @@
           onClick: () => openCurrencyCellDrill(row, dateIso, day.bal),
           title: t('کلیک کنید تا اقلام این روز و این ارز نمایش داده شود', 'Click to view items for this day and currency')
         }, content);
+      }, (val) => {
+        const day = val || {};
+        if (showMovements) {
+          return `dep: ${fmt(day.dep || 0)} | wid: ${fmt(day.wid || 0)} | bal: ${fmt(day.bal || 0)}`;
+        }
+        return fmt(day.bal || 0);
       });
 
       const columns = [
@@ -163,6 +169,9 @@
           React.createElement('span', { className: 'font-sans tabular-nums text-sky-700 dark:text-sky-400' }, `USD: ${fmtDecimal(usd, 6)}`),
           React.createElement('span', { className: 'font-sans tabular-nums text-amber-700 dark:text-amber-400' }, `IRR: ${fmtDecimal(irr, 6)}`)
         );
+      }, (val) => {
+        const day = val || {};
+        return `USD: ${fmtDecimal(day.usd, 6)} | IRR: ${fmtDecimal(day.irr, 6)}`;
       });
 
       const columns = [
@@ -287,6 +296,9 @@
           React.createElement('span', { className: 'font-sans tabular-nums text-sky-700 dark:text-sky-400' }, `USD: ${fmtDecimal(day.usd, 6)}`),
           React.createElement('span', { className: 'font-sans tabular-nums text-amber-700 dark:text-amber-400' }, `IRR: ${fmtDecimal(day.irr, 6)}`)
         );
+      }, (val) => {
+        const day = val || {};
+        return `USD: ${fmtDecimal(day.usd, 6)} | IRR: ${fmtDecimal(day.irr, 6)}`;
       });
 
       const columns = [

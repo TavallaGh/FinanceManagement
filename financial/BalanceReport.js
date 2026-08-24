@@ -906,7 +906,7 @@
       }
     ], [t, balanceGroups, groupLovCols, currencyLovData, currencyLovCols, isRtl]);
 
-    const buildDayColumns = useCallback((showMovements, cellRenderer = null) => (
+    const buildDayColumns = useCallback((showMovements, cellRenderer = null, exportValueResolver = null) => (
       reportData?.dates?.map((d) => ({
         field: d,
         header_fa: fmtDate(d),
@@ -919,6 +919,7 @@
         },
         exportValue: (val) => {
           if (!val) return '';
+          if (exportValueResolver) return exportValueResolver(val, d, showMovements);
           const day = val || {};
           if (showMovements) {
             return `dep: ${fmt(day.dep || 0)} | wid: ${fmt(day.wid || 0)} | bal: ${fmt(day.bal || 0)}`;
