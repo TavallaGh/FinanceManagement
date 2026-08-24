@@ -51,6 +51,26 @@
 
   const asText = (value) => (value === null || value === undefined || value === '' ? '-' : String(value));
 
+  const getDefaultReviewFilters = () => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 7);
+    const formatLocalIsoDate = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+    return {
+      date_type: 'registered_at',
+      date_from: formatLocalIsoDate(start),
+      date_to: formatLocalIsoDate(today),
+      account_filter_type: 'balance_group',
+      filter_value: null,
+      summary_currency: false,
+    };
+  };
+
     const TransactionReviewView = ({
       language = 'fa',
       formCode = 'FIN_TRANSACTION_REVIEW',
@@ -98,6 +118,7 @@
     }) => {
     const BackIcon = isRtl ? ChevronRight : ChevronLeft;
     const showCurrencySummary = !!filterState.summary_currency;
+    const [documentsGridState, setDocumentsGridState] = useState(null);
     const [itemsGridState, setItemsGridState] = useState(() => ({
       hiddenCols: ['_doc_id', '_tx', 'exchange_rate_to_usd', 'cost_type_id', 'income_type_id', 'center_id'],
     }));
@@ -110,6 +131,29 @@
         return { ...(prev || {}), hiddenCols: Array.from(hidden) };
       });
     }, [showCurrencySummary]);
+
+    const viewConfig = useMemo(() => ({
+      pageId: 'transaction_review',
+      currentState: () => ({
+        filterState,
+        activeTab,
+        documentsGridState,
+        itemsGridState,
+      }),
+      onApplyState: (state) => {
+        if (!state) {
+          setFilterState(getDefaultReviewFilters());
+          setActiveTab('documents');
+          setDocumentsGridState(null);
+          setItemsGridState({ hiddenCols: ['_doc_id', '_tx', 'exchange_rate_to_usd', 'cost_type_id', 'income_type_id', 'center_id'] });
+          return;
+        }
+        if (state.filterState) setFilterState(state.filterState);
+        if (state.activeTab) setActiveTab(state.activeTab);
+        if (state.documentsGridState) setDocumentsGridState(state.documentsGridState);
+        if (state.itemsGridState) setItemsGridState(state.itemsGridState);
+      },
+    }), [activeTab, filterState, itemsGridState, documentsGridState, setActiveTab, setFilterState]);
 
     const COST_TYPE_LOOKUP = useMemo(() => new Map((lookups.costTypes || []).map(item => [String(item.id), item])), [lookups.costTypes]);
     const INCOME_TYPE_LOOKUP = useMemo(() => new Map((lookups.incomeTypes || []).map(item => [String(item.id), item])), [lookups.incomeTypes]);
@@ -391,6 +435,7 @@
         title: t('مرور تراکنش‌ها', 'Transaction Review'),
         icon: Eye,
         language,
+          viewConfig,
       }),
 
       React.createElement('div', { className: 'flex-1 min-h-0 flex flex-col mt-2 overflow-hidden gap-2' },
@@ -442,6 +487,8 @@
                     hideImport: true,
                     selectable: true,
                     defaultHiddenCols: documentsDefaultHiddenCols,
+                    gridState: documentsGridState,
+                    onGridStateChange: setDocumentsGridState,
                     actions: [{ id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: 'text-indigo-500 hover:text-indigo-600' }],
                     onRowDoubleClick: (row) => setDrillDoc(row),
                     onSelectionChange: (ids) => setSelectedDocumentIds((ids || []).map(String)),

@@ -267,8 +267,9 @@
               <div className="flex items-center gap-2 shrink-0 mr-auto">
                 <Button variant="ghost" size="sm" icon={Trash2} onClick={handleClear}>{t('پاک کردن', 'Clear')}</Button>
                 <Button variant="primary" size="sm" icon={Search} onClick={() => {
-                  if (onSearch) onSearch(values);
-                  else if (onFilter) onFilter(values);
+                  const latestValues = lastSyncValues.current || values;
+                  if (onSearch) onSearch(latestValues);
+                  else if (onFilter) onFilter(latestValues);
                 }}>{t('جستجو', 'Search')}</Button>
               </div>
             </div>
@@ -278,7 +279,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [], defaultPinnedCols = [], pageSizeOptions = [10, 20, 50, 100], toolbarContent = null, onSelectionChange = null }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [], defaultPinnedCols = [], pageSizeOptions = [10, 20, 50, 100], toolbarContent = null, onSelectionChange = null, minVisibleRows = 0 }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -350,7 +351,7 @@
     const [collapsedGroups, setCollapsedGroups] = useState([]);
     
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(20);
+    const [pageSize, setPageSize] = useState(() => gridState?.pageSize || 20);
     const [showColMenu, setShowColMenu] = useState(false);
     const [activeHeaderMenu, setActiveHeaderMenu] = useState(null);
     const [selectedRows, setSelectedRows] = useState([]);
@@ -377,6 +378,7 @@
           setColumnOrder(gridState.columnOrder || columns.map(c => c.field));
           setHiddenCols(gridState.hiddenCols || defaultHiddenCols);
           setPinnedCols(gridState.pinnedCols || defaultPinnedCols);
+          setPageSize(gridState.pageSize || 20);
           setFilters(gridState.filters || {});
           setLocalFilters(gridState.filters || {});
           setSortConfig(gridState.sortConfig || { field: null, direction: 'asc' });
@@ -387,6 +389,7 @@
         setColumnOrder(columns.map(c => c.field));
         setHiddenCols(defaultHiddenCols);
         setPinnedCols(defaultPinnedCols);
+        setPageSize(20);
         setFilters({});
         setLocalFilters({});
         setSortConfig({ field: null, direction: 'asc' });
@@ -396,7 +399,7 @@
 
     useEffect(() => {
       if (onGridStateChange) {
-        const currentState = { columnOrder, hiddenCols, pinnedCols, filters, sortConfig, groupCols };
+        const currentState = { columnOrder, hiddenCols, pinnedCols, filters, sortConfig, groupCols, pageSize };
         const stateStr = JSON.stringify(currentState);
         
         if (stateStr !== JSON.stringify(lastSyncState.current || {})) {
@@ -404,7 +407,7 @@
           onGridStateChange(currentState);
         }
       }
-    }, [columnOrder, hiddenCols, pinnedCols, filters, sortConfig, groupCols, onGridStateChange]);
+    }, [columnOrder, hiddenCols, pinnedCols, filters, sortConfig, groupCols, pageSize, onGridStateChange]);
 
     useEffect(() => {
       const handleClickOutside = (e) => { 
@@ -486,6 +489,9 @@
       const start = (page - 1) * pageSize;
       return processedData.slice(start, start + pageSize);
     }, [processedData, page, pageSize]);
+
+    const visibleRowCount = useMemo(() => paginatedData.filter(row => !row.isGroupHeader).length, [paginatedData]);
+    const spacerRows = Math.max(0, (Number(minVisibleRows) || 0) - visibleRowCount);
 
     const summaryData = useMemo(() => {
       if (!showSummaryRow) return null;
@@ -977,6 +983,15 @@
                 <tr className="h-full">
                   <td colSpan={visibleColumns.length + (filteredActions.length > 0 ? 1 : 0) + (selectable ? 1 : 0) + (rowReorderable ? 1 : 0)} className="border-0 bg-transparent p-0"></td>
                 </tr>
+              )}
+              {spacerRows > 0 && (
+                <>
+                  {Array.from({ length: spacerRows }).map((_, idx) => (
+                    <tr key={`spacer-${idx}`} aria-hidden="true" className="pointer-events-none select-none">
+                      <td colSpan={visibleColumns.length + (filteredActions.length > 0 ? 1 : 0) + (selectable ? 1 : 0) + (rowReorderable ? 1 : 0)} className="border-0 bg-transparent p-0" style={{ height: '34px' }}></td>
+                    </tr>
+                  ))}
+                </>
               )}
             </tbody>
             
