@@ -258,7 +258,10 @@
     const [reportData,   setReportData]   = useState(null);
     const [activeTab,    setActiveTab]    = useState('details');
     const [reportGridStates, setReportGridStates] = useState({ details: null, currency: null, rates: null, baseAmounts: null });
-    const [cellDrillGridState, setCellDrillGridState] = useState({ pageSize: 5 });
+    const [cellDrillGridStates, setCellDrillGridStates] = useState({
+      account: { pageSize: 5 },
+      currency: { pageSize: 5 },
+    });
     const [txLookups, setTxLookups] = useState({ costTypes: [], incomeTypes: [], costBenefitCenters: [] });
     const [cellDrillModal, setCellDrillModal] = useState({ isOpen: false, kind: 'account', accountId: '', accountLabel: '', currencyCode: '', currencyLabel: '', date: '', balance: null, items: [] });
     const [toast,        setToast]        = useState({ isVisible: false, message: '', type: 'success' });
@@ -594,7 +597,7 @@
         const accountById = new Map(filteredAccounts.map(acc => [String(acc.id), acc]));
 
         if (dates.length === 0) {
-          setReportData({ dates: [], accounts: filteredAccounts, leafAccounts: filteredAccounts, detailItems: detailedItems, matrix: {}, currencyAccounts: [], currencyMatrix: {}, currencyRateMatrix: {}, groupName: selGroup.title_fa || '', showMovements, leafCount: filteredAccounts.length });
+          setReportData({ dates: [], dateFrom: isoFrom, dateTo: isoTo, accounts: filteredAccounts, leafAccounts: filteredAccounts, detailItems: detailedItems, matrix: {}, currencyAccounts: [], currencyMatrix: {}, currencyRateMatrix: {}, openingBalances: {}, groupName: selGroup.title_fa || '', showMovements, leafCount: filteredAccounts.length });
           return;
         }
 
@@ -735,16 +738,28 @@
 
         // ── 5. Compute running balance (cumulative from inception) ─────────
         /*
-         *  Balance(account, dayX) = Σ (deposit - withdrawal)  for all tx dates ≤ dayX
+         *  Balance(account, dayX) = OpeningBalance(before report start)
+         *                         + Σ (deposit - withdrawal) for tx dates within the report range up to dayX
          *
-         *  This is the standard running/cumulative balance formula:
-         *    Balance(X) = Balance(X-1) + Deposits(X) – Withdrawals(X)
+         *  OpeningBalance(before report start) = Σ (deposit - withdrawal) for tx dates < report start
          */
+        const openingBalances = {};
+        filteredAccounts.forEach(acc => {
+          const daily = dailyMap[acc.id] || {};
+          const txDates = Object.keys(daily).sort();
+          let openingBalance = 0;
+          txDates.forEach(txD => {
+            if (txD < isoFrom) openingBalance += (daily[txD].dep || 0) - (daily[txD].wid || 0);
+          });
+          openingBalances[acc.id] = openingBalance;
+        });
+
         const matrix = {};
         filteredAccounts.forEach(acc => {
           matrix[acc.id] = {};
           const daily     = dailyMap[acc.id] || {};
           const txDates   = Object.keys(daily).sort();
+          const openingBalance = openingBalances[acc.id] || 0;
 
           dates.forEach(d => {
             // Account is shown for date d only if it was active in the group on that day
@@ -753,10 +768,10 @@
               matrix[acc.id][d] = null;
               return;
             }
-            // Cumulative balance up to (and including) d
-            let balance = 0;
+            // Cumulative balance from report start through day d
+            let balance = openingBalance;
             txDates.forEach(txD => {
-              if (txD <= d) balance += daily[txD].dep - daily[txD].wid;
+              if (txD >= isoFrom && txD <= d) balance += daily[txD].dep - daily[txD].wid;
             });
             matrix[acc.id][d] = {
               dep: daily[d]?.dep || 0,
@@ -841,6 +856,8 @@
 
         setReportData({
           dates,
+          dateFrom: isoFrom,
+          dateTo: isoTo,
           accounts:  displayRows,
           leafAccounts: filteredAccounts,
           matrix:    displayMatrix,
@@ -849,6 +866,7 @@
           currencyMatrix,
             currencyRateMatrix,
             rateLookup,
+          openingBalances,
           groupName: (typeof selGroup === 'object') ? (selGroup.title_fa || selGroup.code || '') : '',
           showMovements,
           leafCount: filteredAccounts.length
@@ -1030,14 +1048,18 @@
       isOpen: cellDrillModal.isOpen,
       onClose: () => setCellDrillModal({ isOpen: false, kind: 'account', accountId: '', accountLabel: '', currencyCode: '', currencyLabel: '', date: '', items: [] }),
       language,
+      activeTab,
       t,
       isRtl,
       fmtDecimal,
       fmtDate,
       reportData,
       cellDrillModal,
-      cellDrillGridState,
-      setCellDrillGridState,
+      cellDrillGridState: cellDrillGridStates[cellDrillModal.kind === 'currency' ? 'currency' : 'account'],
+      setCellDrillGridState: (state) => setCellDrillGridStates(prev => ({
+        ...prev,
+        [cellDrillModal.kind === 'currency' ? 'currency' : 'account']: state,
+      })),
       reportAccountLookup,
       txTypes,
       txActions,
@@ -1089,7 +1111,7 @@
             initialValues: filters,
             onFilter:      setFilters,
             onSearch:      handleGenerate,
-            onClear:       () => { setFilters(getDefaultFilters()); setReportData(null); setActiveTab('details'); setReportGridStates({ details: null, currency: null, rates: null, baseAmounts: null }); setCellDrillModal({ isOpen: false, kind: 'account', accountId: '', accountLabel: '', currencyCode: '', currencyLabel: '', date: '', items: [] }); },
+            onClear:       () => { setFilters(getDefaultFilters()); setReportData(null); setActiveTab('details'); setReportGridStates({ details: null, currency: null, rates: null, baseAmounts: null }); setCellDrillGridStates({ account: { pageSize: 5 }, currency: { pageSize: 5 } }); setCellDrillModal({ isOpen: false, kind: 'account', accountId: '', accountLabel: '', currencyCode: '', currencyLabel: '', date: '', items: [] }); },
             language,
             defaultOpen:   true
           }),

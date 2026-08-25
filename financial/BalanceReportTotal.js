@@ -357,6 +357,7 @@
     language = 'fa',
     t = (fa, en) => fa,
     isRtl = false,
+    activeTab = 'details',
     fmtDecimal = (value) => String(value),
     fmtDate = (value) => value,
     reportData = null,
@@ -435,16 +436,16 @@
     const balanceIrr = (cellBalance === null || cellBalance === undefined) ? null : (parseFloat(cellBalance || 0) || 0) * balanceToIrrRate;
 
     const modalColumns = [
+      { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px]' }, val || '-') },
+      { field: '_tx_status', header_fa: 'وضعیت سند', header_en: 'Document Status', width: '95px', render: (val) => React.createElement(Badge, { variant: statusColors[val] || 'gray', size: 'sm' }, statusLabels[val] || val || '-') },
+      { field: '_tx_type', header_fa: 'نوع سند', header_en: 'Document Type', width: '100px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block', title: val }, txTypes[val] || val || '-') },
+      { field: '_registrar_name', header_fa: 'نام ثبت‌کننده', header_en: 'Registrar', width: '140px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300', title: val }, val || '-') },
+      { field: '_tx_description', header_fa: 'شرح سربرگ', header_en: 'Header Description', width: '180px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block max-w-xs', title: val }, val || '-') },
       { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px', render: (_, __, rowIndex) => React.createElement('span', { className: 'text-[12px] font-medium text-slate-600 dark:text-slate-400' }, rowIndex + 1) },
       ...(drillKind === 'currency' ? [
         { field: '_account_code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px', render: (val) => React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300', dir: 'ltr' }, val || '-') },
         { field: '_account_title', header_fa: 'عنوان حساب', header_en: 'Account Title', width: '220px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300', title: val }, val || '-') },
       ] : []),
-      { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px]' }, val || '-') },
-      { field: '_tx_status', header_fa: 'وضعیت سند', header_en: 'Document Status', width: '95px', render: (val) => React.createElement(Badge, { variant: statusColors[val] || 'gray', size: 'sm' }, statusLabels[val] || val || '-') },
-      { field: '_registrar_name', header_fa: 'نام ثبت‌کننده', header_en: 'Registrar', width: '140px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300', title: val }, val || '-') },
-      { field: '_tx_type', header_fa: 'نوع سند', header_en: 'Document Type', width: '100px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block', title: val }, txTypes[val] || val || '-') },
-      { field: '_tx_description', header_fa: 'شرح سربرگ', header_en: 'Header Description', width: '180px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block max-w-xs', title: val }, val || '-') },
       { field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '90px', render: (val) => {
         const color = val === 'DEPOSIT' ? 'text-emerald-600 dark:text-emerald-500' : 'text-rose-500 dark:text-rose-400';
         return React.createElement('span', { className: `text-[12px] font-medium ${color}` }, txActions[val] || val || '-');
@@ -522,7 +523,7 @@
             })
           : React.createElement('div', { className: 'flex-1 min-h-[360px] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800' },
               React.createElement(DataGrid, {
-                key: `cell-drill-${cellDrillModal.accountId || 'account'}-${cellDrillModal.date || 'date'}`,
+                key: `cell-drill-${drillKind}-${cellDrillModal.accountId || 'account'}-${cellDrillModal.date || 'date'}`,
                 data: selectedItems,
                 columns: modalColumns,
                 language,
@@ -535,7 +536,7 @@
                 defaultPinnedCols: ['_doc_code', '_tx_status'],
                 pageSizeOptions: [5, 10, 20, 50],
                 minVisibleRows: 5,
-                toolbarContent: React.createElement('div', { className: 'text-[12px] text-slate-500 dark:text-slate-400' }, t('کلیک روی سلول روز در تب اول این پنجره را باز می‌کند.', 'Clicking a day cell in the first tab opens this window.'))
+                toolbarContent: React.createElement('div', { className: 'text-[12px] text-slate-500 dark:text-slate-400' }, t('مرور اقلام اسناد مرتبط.', 'Review Related Transaction Items'))
               })
             )
       )
