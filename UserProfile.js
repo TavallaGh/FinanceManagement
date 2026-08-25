@@ -5,14 +5,15 @@
   
   const { 
     Button, PageHeader, 
-    TextField, SelectField, 
-    Toast, Alert
+    TextField, SelectField,
   } = window.DesignSystem || window.DSCore || window.DSForms || {};
+
+  const Toast = window.DSFeedback?.Toast;
   
   const { 
     User, Settings, Shield, CreditCard, Save, 
     Key, Building2, Fingerprint, Camera, Loader2,
-    Sun, Moon, Monitor, Calendar, Globe
+    Sun, Moon, Monitor, Calendar, Globe, RefreshCw, Copy
   } = window.LucideIcons || {};
   
   const supabase = window.supabase;
@@ -20,67 +21,10 @@
   // ─── Read-Only display field ─────────────────────────────────────────────────
   const ReadOnlyField = ({ label, value, ltr = false }) => (
     <div className="flex flex-col gap-1">
-      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{label}</label>
-      <div className={`min-h-[36px] px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded flex items-center text-[12px] font-bold text-slate-800 dark:text-slate-200 ${ltr ? 'dir-ltr justify-end' : ''}`}>
+      <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{label}</label>
+      <div className={`min-h-[36px] px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center text-[12px] font-bold text-slate-800 dark:text-slate-200 ${ltr ? 'dir-ltr justify-end' : ''}`}>
         {value}
       </div>
-    </div>
-  );
-
-  // ─── Language toggle switch ──────────────────────────────────────────────────
-  const LangToggle = ({ value, onChange }) => {
-    const isEn = value === 'en';
-    return (
-      <div className="flex items-center gap-3">
-        <span className={`text-[12px] font-bold transition-colors select-none ${!isEn ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
-          فارسی
-        </span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={isEn}
-          onClick={() => onChange(isEn ? 'fa' : 'en')}
-          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 ${
-            isEn ? 'bg-indigo-600 dark:bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-              isEn ? 'translate-x-6' : 'translate-x-1'
-            }`}
-          />
-        </button>
-        <span className={`text-[12px] font-bold transition-colors select-none ${isEn ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
-          English
-        </span>
-      </div>
-    );
-  };
-
-  // ─── Theme segmented control ─────────────────────────────────────────────────
-  const THEME_OPTIONS = [
-    { value: 'light',  fa: 'روشن',   en: 'Light',  Icon: Sun     },
-    { value: 'dark',   fa: 'تاریک',  en: 'Dark',   Icon: Moon    },
-    { value: 'system', fa: 'خودکار', en: 'System', Icon: Monitor },
-  ];
-
-  const ThemeSegment = ({ value, onChange, isRtl }) => (
-    <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/50 shadow-sm">
-      {THEME_OPTIONS.map(({ value: v, fa, en, Icon }) => (
-        <button
-          key={v}
-          type="button"
-          onClick={() => onChange(v)}
-          className={`flex items-center gap-1.5 px-4 py-2 text-[12px] font-bold transition-all border-0 ${
-            value === v
-              ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-inner'
-              : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Icon size={13} strokeWidth={2} />
-          {isRtl ? fa : en}
-        </button>
-      ))}
     </div>
   );
 
@@ -165,6 +109,7 @@
     });
 
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+    const [generatedPassword, setGeneratedPassword] = useState('');
     const [costTypes, setCostTypes] = useState([]);
     const fileInputRef = useRef(null);
 
@@ -287,10 +232,8 @@
 
           if (!userRolesRes.error && userRolesRes.data) {
             accessRoles = userRolesRes.data
-              .map(r => r.sec_roles?.title)
+              .map(r => (Array.isArray(r.sec_roles) ? r.sec_roles[0] : r.sec_roles)?.title)
               .filter(Boolean);
-          } else if (userRolesRes.error) {
-            // silent fail
           }
         } else {
           // اگر party_id نداشت، فقط نقش‌های دسترسی رو بگیر
@@ -300,12 +243,11 @@
             .eq('user_id', userId);
           if (!userRolesRes.error && userRolesRes.data) {
             accessRoles = userRolesRes.data
-              .map(r => r.sec_roles?.title)
+              .map(r => (Array.isArray(r.sec_roles) ? r.sec_roles[0] : r.sec_roles)?.title)
               .filter(Boolean);
           }
         }
 
-        console.log = console.log; // no-op line removed
         setProfileInfo({
           fullName:    fullName || username || t('بدون نام', 'No name'),
           username,
@@ -338,15 +280,26 @@
             defaultCostTypeId: data.default_cost_type_id ?? '',
           });
           if (data.photo_url) {
-            setProfileInfo(prev => ({ ...prev, avatarUrl: data.photo_url }));
-            try {
-              const stored = JSON.parse(sessionStorage.getItem('fm_user_session') || '{}');
-              if (!stored.photo_url) {
-                stored.photo_url = data.photo_url;
+            const rawPath = data.photo_url;
+            // handle both bare paths and legacy full URLs (extract path then get signed URL)
+            const legacyMatch = rawPath.startsWith('http')
+              ? rawPath.match(/\/object\/(?:public\/)?attachments\/(.+?)(?:\?|$)/)
+              : null;
+            const filePath = legacyMatch ? legacyMatch[1] : (!rawPath.startsWith('http') ? rawPath : null);
+            let displayUrl = null;
+            if (filePath) {
+              const { data: sd } = await supabase.storage.from('attachments').createSignedUrl(filePath, 3600);
+              displayUrl = sd?.signedUrl || null;
+            }
+            if (displayUrl) {
+              setProfileInfo(prev => ({ ...prev, avatarUrl: displayUrl }));
+              try {
+                const stored = JSON.parse(sessionStorage.getItem('fm_user_session') || '{}');
+                stored.photo_url = rawPath;
                 sessionStorage.setItem('fm_user_session', JSON.stringify(stored));
-                window.dispatchEvent(new CustomEvent('fm_avatar_change', { detail: data.photo_url }));
-              }
-            } catch (_) {}
+                window.dispatchEvent(new CustomEvent('fm_avatar_change', { detail: displayUrl }));
+              } catch (_) {}
+            }
           }
         }
       } catch (_) {}
@@ -390,27 +343,26 @@
           .upload(filePath, file, { upsert: true, contentType: file.type });
         if (uploadErr) throw uploadErr;
 
-        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-        const publicUrl = urlData?.publicUrl;
-        if (!publicUrl) throw new Error(t('خطا در دریافت آدرس عکس.', 'Could not retrieve public URL.'));
-
         const { error: updateErr } = await supabase
           .from('fm_user_preferences')
           .upsert(
-            { user_id: currentUserId, photo_url: publicUrl },
+            { user_id: currentUserId, photo_url: filePath },
             { onConflict: 'user_id' }
           );
         if (updateErr) throw updateErr;
 
-        // آپدیت در session و اطلاع به NavigationSystem
+        // bucket is private — create a signed URL for display
+        const { data: sd } = await supabase.storage.from(BUCKET).createSignedUrl(filePath, 3600);
+        const displayUrl = sd?.signedUrl || null;
+
         try {
           const stored = JSON.parse(sessionStorage.getItem('fm_user_session') || '{}');
-          stored.photo_url = publicUrl;
+          stored.photo_url = filePath;
           sessionStorage.setItem('fm_user_session', JSON.stringify(stored));
-          window.dispatchEvent(new CustomEvent('fm_avatar_change', { detail: publicUrl }));
+          if (displayUrl) window.dispatchEvent(new CustomEvent('fm_avatar_change', { detail: displayUrl }));
         } catch (_) {}
 
-        setProfileInfo(prev => ({ ...prev, avatarUrl: publicUrl }));
+        setProfileInfo(prev => ({ ...prev, avatarUrl: displayUrl }));
         showToast(t('تصویر پروفایل بروزرسانی شد.', 'Profile picture updated successfully.'));
       } catch (err) {
         showToast(err.message || t('خطا در بارگذاری تصویر.', 'Error uploading image.'), 'error');
@@ -472,10 +424,22 @@
       }
     };
 
+    const generatePassword = useCallback(() => {
+      const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const lower = 'abcdefghijklmnopqrstuvwxyz';
+      const digits = '0123456789';
+      const symbols = '@#$!%&*';
+      const all = upper + lower + digits + symbols;
+      const rand = (str) => str[Math.floor(Math.random() * str.length)];
+      let pwd = rand(upper) + rand(lower) + rand(digits) + rand(symbols);
+      for (let i = 4; i < 10; i++) pwd += rand(all);
+      return pwd.split('').sort(() => Math.random() - 0.5).join('');
+    }, []);
+
     const tabs = [
       { id: 'personal',    label: t('اطلاعات کاربری', 'User Info'),        icon: User       },
       { id: 'preferences', label: t('تنظیمات پایه',   'Basic Preferences'), icon: Settings   },
-      { id: 'financial',   label: t('تنظیمات مالی',   'Financial Prefs'),   icon: CreditCard },
+      { id: 'financial',   label: t('مقادیر پیشفرض', 'Default Values'),     icon: CreditCard },
       { id: 'security',    label: t('امنیت و رمز',    'Security'),          icon: Shield     },
     ];
 
@@ -577,10 +541,10 @@
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                         <Fingerprint size={12} /> {t('نقش‌های شخص', 'Party Roles')}
                       </label>
-                      <div className="min-h-[36px] p-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded flex flex-wrap gap-1 items-center">
+                      <div className="min-h-[36px] p-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-wrap gap-1 items-center">
                         {profileInfo.partyRoles.length > 0
                           ? profileInfo.partyRoles.map((role, idx) => (
                               <span key={idx} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded">
@@ -592,10 +556,10 @@
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <label className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                         <Shield size={12} /> {t('نقش‌های دسترسی', 'Access Roles')}
                       </label>
-                      <div className="min-h-[36px] p-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded flex flex-wrap gap-1 items-center">
+                      <div className="min-h-[36px] p-1.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-wrap gap-1 items-center">
                         {profileInfo.accessRoles.length > 0
                           ? profileInfo.accessRoles.map((role, idx) => (
                               <span key={idx} className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold rounded">
@@ -606,161 +570,115 @@
                         }
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                        <Globe size={12} /> {t('منطقه زمانی', 'Timezone')}
-                      </label>
-                      <SelectField
-                        size="sm"
-                        value={preferences.timezone}
-                        onChange={e => setPreferences(p => ({ ...p, timezone: e.target.value }))}
-                        options={COMMON_TIMEZONES.map(tz => ({ value: tz.value, label: tz.label }))}
-                        isRtl={isRtl}
-                      />
-                    </div>
                   </div>
                 </div>
               )}
 
               {/* Tab: Basic Preferences */}
               {activeTab === 'preferences' && (
-                <div className="flex flex-col gap-5">
+                <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
 
-                  {/* ── Theme ── */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <Sun size={12} className="text-slate-500 dark:text-slate-400" />
-                      <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('تم رنگی', 'Color Theme')}</span>
+                  {/* Theme */}
+                  <div className="flex items-center justify-between py-3 gap-4">
+                    <div className="shrink-0">
+                      <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{t('تم رنگی', 'Color Theme')}</div>
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{t('ظاهر محیط کاربری', 'UI appearance')}</div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="flex gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg shrink-0">
                       {[
-                        { value: 'light',  fa: 'روشن',   en: 'Light',  Icon: Sun     },
-                        { value: 'dark',   fa: 'تاریک',  en: 'Dark',   Icon: Moon    },
-                        { value: 'system', fa: 'خودکار', en: 'System', Icon: Monitor },
+                        { value: 'light',  fa: 'روشن',   en: 'Light', Icon: Sun     },
+                        { value: 'dark',   fa: 'تاریک',  en: 'Dark',  Icon: Moon    },
+                        { value: 'system', fa: 'خودکار', en: 'Auto',  Icon: Monitor },
                       ].map(({ value: v, fa, en, Icon }) => {
                         const sel = preferences.theme === v;
                         return (
-                          <button key={v} type="button"
-                            onClick={() => {
-                              setPreferences(p => ({ ...p, theme: v }));
-                              if (v === 'system') {
-                                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                                window.DSCore?.setGlobalTheme?.(isDark ? 'dark' : 'light');
-                              } else {
-                                window.DSCore?.setGlobalTheme?.(v);
-                              }
-                            }}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border outline-none transition-all duration-150 ${
-                              sel
-                                ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-600'
-                            }`}>
-                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
-                              sel ? 'bg-indigo-500 dark:bg-indigo-400 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
-                            }`}>
-                              <Icon size={12} strokeWidth={2} />
-                            </div>
-                            <span className={`text-[12px] font-bold ${
-                              sel ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'
-                            }`}>{isRtl ? fa : en}</span>
-                            {sel && <span className="ms-auto text-indigo-400 text-[10px] font-black">✓</span>}
+                          <button key={v} type="button" onClick={() => {
+                            setPreferences(p => ({ ...p, theme: v }));
+                            const r = v === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : v;
+                            window.DSCore?.setGlobalTheme?.(r);
+                          }} className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold transition-all outline-none ${
+                            sel ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}>
+                            <Icon size={12} strokeWidth={2} />{isRtl ? fa : en}
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* ── Language ── */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <Globe size={12} className="text-slate-500 dark:text-slate-400" />
-                      <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('زبان سیستم', 'System Language')}</span>
+                  {/* Language */}
+                  <div className="flex items-center justify-between py-3 gap-4">
+                    <div className="shrink-0">
+                      <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{t('زبان سیستم', 'Language')}</div>
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{t('زبان نمایش رابط کاربری', 'Interface language')}</div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="flex gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg shrink-0">
                       {[
-                        { value: 'fa', label: 'فارسی',   sublabel: 'Persian', flag: '🇮🇷' },
-                        { value: 'en', label: 'English', sublabel: 'انگلیسی',   flag: '🇬🇧' },
-                      ].map(({ value: v, label, sublabel, flag }) => {
+                        { value: 'fa', label: 'فارسی', flag: '🇮🇷' },
+                        { value: 'en', label: 'EN',    flag: '🇬🇧' },
+                      ].map(({ value: v, label, flag }) => {
                         const sel = preferences.language === v;
                         return (
-                          <button key={v} type="button"
-                            onClick={() => {
-                              setPreferences(p => ({ ...p, language: v }));
-                              window.DSCore?.setGlobalLanguage?.(v);
-                            }}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border outline-none transition-all duration-150 ${
-                              sel
-                                ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-600'
+                          <button key={v} type="button" onClick={() => { setPreferences(p => ({ ...p, language: v })); window.DSCore?.setGlobalLanguage?.(v); }}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-all outline-none ${
+                              sel ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                             }`}>
-                            <span className="text-lg select-none leading-none">{flag}</span>
-                            <div className="flex flex-col items-start">
-                              <span className={`text-[12px] font-bold ${
-                                sel ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'
-                              }`}>{label}</span>
-                              <span className="text-[9px] text-slate-400">{sublabel}</span>
-                            </div>
-                            {sel && <span className="ms-auto text-indigo-400 text-[10px] font-black">✓</span>}
+                            <span className="text-sm leading-none">{flag}</span>{label}
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* ── Calendar ── */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <Calendar size={12} className="text-slate-500 dark:text-slate-400" />
-                      <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('نوع تقویم', 'Calendar Type')}</span>
+                  {/* Calendar */}
+                  <div className="flex items-center justify-between py-3 gap-4">
+                    <div className="shrink-0">
+                      <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{t('نوع تقویم', 'Calendar')}</div>
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{t('تقویم پیش‌فرض سیستم', 'Default calendar system')}</div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="flex gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg shrink-0">
                       {[
-                        { value: 'jalali',    fa: 'شمسی (جلالی)', en: 'Jalali',    abbrFa: 'ج', abbrEn: 'Ja' },
-                        { value: 'gregorian', fa: 'میلادی',        en: 'Gregorian', abbrFa: 'م', abbrEn: 'Gr' },
-                      ].map(({ value: v, fa, en, abbrFa, abbrEn }) => {
+                        { value: 'jalali',    fa: 'شمسی',   en: 'Jalali'    },
+                        { value: 'gregorian', fa: 'میلادی',  en: 'Gregorian' },
+                      ].map(({ value: v, fa, en }) => {
                         const sel = preferences.calendarType === v;
                         return (
-                          <button key={v} type="button"
-                            onClick={() => {
-                              setPreferences(p => ({ ...p, calendarType: v }));
-                              window.DSCore?.setGlobalCalendarMode?.(v);
-                            }}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border outline-none transition-all duration-150 ${
-                              sel
-                                ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-600'
+                          <button key={v} type="button" onClick={() => { setPreferences(p => ({ ...p, calendarType: v })); window.DSCore?.setGlobalCalendarMode?.(v); }}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all outline-none ${
+                              sel ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                             }`}>
-                            <div className={`w-6 h-6 rounded-md flex flex-col items-center justify-center shrink-0 ${
-                              sel ? 'bg-indigo-500 dark:bg-indigo-400 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
-                            }`}>
-                              <span className="text-[9px] font-black leading-none">{isRtl ? abbrFa : abbrEn}</span>
-                            </div>
-                            <span className={`text-[12px] font-bold ${
-                              sel ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'
-                            }`}>{isRtl ? fa : en}</span>
-                            {sel && <span className="ms-auto text-indigo-400 text-[10px] font-black">✓</span>}
+                            {isRtl ? fa : en}
                           </button>
                         );
                       })}
+                    </div>
+                  </div>
+
+                  {/* Timezone */}
+                  <div className="flex items-center justify-between py-3 gap-4">
+                    <div className="shrink-0">
+                      <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{t('منطقه زمانی', 'Timezone')}</div>
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{t('برای نمایش تاریخ و ساعت', 'For date and time display')}</div>
+                    </div>
+                    <div className="w-52 shrink-0">
+                      <SelectField size="sm" value={preferences.timezone} onChange={e => setPreferences(p => ({ ...p, timezone: e.target.value }))} options={COMMON_TIMEZONES.map(tz => ({ value: tz.value, label: tz.label }))} isRtl={isRtl} />
                     </div>
                   </div>
 
                 </div>
               )}
 
-              {/* Tab: Financial Preferences */}
+              {/* Tab: Default Values */}
               {activeTab === 'financial' && (
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <SelectField
-                      size="sm"
-                      label={t('نوع هزینه پیش‌فرض', 'Default Cost Type')}
-                      value={preferences.defaultCostTypeId}
-                      onChange={e => setPreferences(p => ({ ...p, defaultCostTypeId: e.target.value }))}
-                      options={[{ value: '', label: '---' }, ...costTypes]}
-                      isRtl={isRtl}
-                    />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <SelectField
+                    size="sm"
+                    label={t('نوع هزینه پیش‌فرض', 'Default Cost Type')}
+                    value={preferences.defaultCostTypeId}
+                    onChange={e => setPreferences(p => ({ ...p, defaultCostTypeId: e.target.value }))}
+                    options={[{ value: '', label: '---' }, ...costTypes]}
+                    isRtl={isRtl}
+                  />
                 </div>
               )}
 
@@ -780,6 +698,29 @@
                     </p>
                   </div>
 
+                  <div className="flex items-center justify-between gap-3 px-0.5">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{t('تولید رمز پیشنهادی و پر کردن فیلدهای جدید و تکرار', 'Auto-fill new and confirm fields with a strong password')}</span>
+                    <Button variant="secondary" size="sm" icon={RefreshCw}
+                      onClick={() => { const pwd = generatePassword(); setPasswords(p => ({ ...p, new: pwd, confirm: pwd })); setGeneratedPassword(pwd); }}>
+                      {t('تولید رمز', 'Suggest')}
+                    </Button>
+                  </div>
+
+                  {generatedPassword && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-0.5">{t('رمز تولید شده — یادداشت کنید:', 'Generated password — note it down:')}</div>
+                        <span className="text-[13px] font-mono text-slate-800 dark:text-slate-200 select-all tracking-wider dir-ltr">{generatedPassword}</span>
+                      </div>
+                      <button type="button"
+                        onClick={() => navigator.clipboard?.writeText(generatedPassword).then(() => showToast(t('رمز کپی شد.', 'Password copied.'), 'success'))}
+                        className="p-1.5 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-all shrink-0"
+                        title={t('کپی', 'Copy')}>
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                  )}
+
                   <TextField
                     size="sm" type="password"
                     label={t('رمز عبور فعلی', 'Current Password')}
@@ -791,7 +732,7 @@
                     size="sm" type="password"
                     label={t('رمز عبور جدید', 'New Password')}
                     value={passwords.new}
-                    onChange={e => setPasswords(p => ({ ...p, new: e.target.value }))}
+                    onChange={e => { setPasswords(p => ({ ...p, new: e.target.value })); setGeneratedPassword(''); }}
                     isRtl={isRtl} dir="ltr" autoComplete="new-password"
                   />
                   <TextField
@@ -807,11 +748,6 @@
 
             {/* Panel footer */}
             <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end items-center shrink-0 rounded-b-xl gap-2 h-12">
-              {activeTab === 'personal' && (
-                <Button variant="primary" size="sm" icon={Save} onClick={handleSavePreferences} isLoading={isLoading}>
-                  {t('ذخیره تغییرات', 'Save Changes')}
-                </Button>
-              )}
               {(activeTab === 'preferences' || activeTab === 'financial') && (
                 <Button variant="primary" size="sm" icon={Save} onClick={handleSavePreferences} isLoading={isLoading}>
                   {t('ذخیره تغییرات', 'Save Changes')}
