@@ -98,14 +98,6 @@
         .map(String);
     }, [data]);
 
-    const viewConfig = {
-      pageId: 'payment_sources_main',
-      currentState: () => ({ gridState }),
-      onApplyState: (state) => {
-        if (state) { if (state.gridState) setGridState(state.gridState); }
-        else setGridState(null);
-      }
-    };
 
     // ── Derived: responsible parties (real persons) for cash box ───────────
     const responsiblePartiesDropdown = useMemo(() =>
@@ -424,7 +416,6 @@
           description={t('تعریف و مدیریت منابع پرداخت: صندوق‌های نقدی، حساب‌های بانکی و کیف پول‌ها', 'Manage payment sources: cash boxes, bank accounts, and wallets')}
           language={language}
           breadcrumbs={[{ label: t('مالی', 'Financial') }, { label: t('منابع پرداخت', 'Payment sources') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">

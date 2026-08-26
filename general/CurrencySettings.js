@@ -56,22 +56,6 @@
 
     const [ratesGridState, setRatesGridState] = useState(null);
 
-    const viewConfig = useMemo(() => ({
-      pageId: 'currency_settings_main',
-      currentState: () => ({ activeTab, currenciesGridState, ratesGridState }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.activeTab) setActiveTab(state.activeTab);
-          if (state.currenciesGridState) setCurrenciesGridState(state.currenciesGridState);
-          if (state.ratesGridState) setRatesGridState(state.ratesGridState);
-        } else {
-          setActiveTab('list');
-          setCurrenciesGridState(null);
-          setRatesGridState(null);
-        }
-      }
-    }), [activeTab, currenciesGridState, ratesGridState]);
-
     const supabase = window.supabase;
     const currentUser = window.NavigationSystem?.currentUser?.name || 'مدیر سیستم';
 
@@ -311,7 +295,6 @@
           title={t('تنظیمات و مدیریت نرخ ارزها', 'Currency & Exchange Management')}
           icon={DollarSign} language={language}
           breadcrumbs={[{ label: t('تنظیمات پایه', 'Base Setup') }, { label: t('ارزها', 'Currencies') }]}
-          viewConfig={viewConfig}
         />
 
         {!isReadOnly && (

@@ -108,18 +108,6 @@
 
     const [gridState, setGridState] = useState(null);
 
-    const viewConfig = {
-      pageId: 'brokers_main',
-      currentState: () => ({ gridState }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.gridState) setGridState(state.gridState);
-        } else {
-          setGridState(null);
-        }
-      }
-    };
-
     useEffect(() => {
       fetchDropdownData();
       fetchData();
@@ -573,7 +561,6 @@
           description={t('تعریف بروکرها و سوابق قرارداد', 'Manage brokers and contract histories')}
           language={language}
           breadcrumbs={[{ label: t('مالی', 'Financial') }, { label: t('بروکرها', 'Brokers') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">

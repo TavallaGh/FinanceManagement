@@ -94,18 +94,6 @@
        return p.party_type === 'legal' ? p.company_name : `${p.first_name || ''} ${p.last_name || ''}`.trim();
     };
 
-    const viewConfig = {
-      pageId: 'gateway_types_main',
-      currentState: () => ({ gridState }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.gridState) setGridState(state.gridState);
-        } else {
-          setGridState(null);
-        }
-      }
-    };
-
     useEffect(() => {
       fetchDropdownData();
       fetchData();
@@ -379,7 +367,6 @@
           description={t('مدیریت و تعریف درگاه‌های بانکی و ارزها', 'Manage gateways and currencies')}
           language={language}
           breadcrumbs={[{ label: t('مدیریت مالی', 'Financial') }, { label: t('درگاه‌های پرداخت', 'Gateways') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-4 animate-in fade-in duration-300">

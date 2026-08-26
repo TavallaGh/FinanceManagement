@@ -52,20 +52,6 @@
     // Current Group
     const [currentGroup, setCurrentGroup] = useState({ id: null, code: '', title_fa: '', title_en: '', description: '', is_active: true });
 
-    const viewConfig = {
-      pageId: 'balance_group_main',
-      currentState: () => ({ gridState, filters }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.gridState) setGridState(state.gridState);
-          if (state.filters) setFilters(state.filters);
-        } else {
-          setGridState(null);
-          setFilters({});
-        }
-      }
-    };
-
     useEffect(() => {
       fetchInitialData();
     }, []);
@@ -316,7 +302,6 @@
           description={t('تعریف و مدیریت گروه‌های بالانس و دسترسی‌ها', 'Manage balance groups and their associated access permissions')}
           language={language}
           breadcrumbs={[{ label: t('ماژول مالی', 'Financial Module') }, { label: t('گروه‌های بالانس', 'Balance Groups') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">

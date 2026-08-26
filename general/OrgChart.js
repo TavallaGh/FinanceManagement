@@ -228,15 +228,6 @@
       }
     };
 
-    const viewConfig = useMemo(() => ({
-      pageId: 'org_chart_main',
-      currentState: () => ({ chartsGridState }),
-      onApplyState: (state) => {
-        if (state && state.chartsGridState) setChartsGridState(state.chartsGridState);
-        else setChartsGridState(null);
-      }
-    }), [chartsGridState]);
-
     const chartColumns = [
       { field: 'code', header_fa: 'کد چارت', header_en: 'Code', width: '100px' },
       {
@@ -285,7 +276,6 @@
           title={t('مدیریت چارت سازمانی', 'Organization Chart Management')}
           icon={Network} language={language}
           breadcrumbs={[{ label: t('تنظیمات پایه', 'Base Setup') }, { label: t('ساختار سازمانی', 'Organizational Structure') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 min-h-0 flex flex-col gap-3 animate-in fade-in duration-500">

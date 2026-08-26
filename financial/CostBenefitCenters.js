@@ -123,15 +123,6 @@
       }
     }, [supabase, currentUser]);
 
-    const viewConfig = {
-      pageId: 'cost_benefit_centers_main',
-      currentState: () => ({ gridState }),
-      onApplyState: (state) => {
-        if (state) { if (state.gridState) setGridState(state.gridState); }
-        else        { setGridState(null); }
-      },
-    };
-
     /* ── fetch employee managers from parties ── */
     const fetchManagers = useCallback(async () => {
       try {
@@ -643,7 +634,6 @@
             { label: t('مالی', 'Financial') },
             { label: t('مراکز هزینه / درآمد', 'Cost & Benefit Centers') },
           ]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-4 animate-in fade-in duration-300">

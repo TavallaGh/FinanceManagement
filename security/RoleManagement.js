@@ -77,20 +77,6 @@
       end_date: ''
     });
 
-    const viewConfig = {
-      pageId: 'roles_main',
-      currentState: () => ({ filters, gridState }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.filters) setFilters(state.filters);
-          if (state.gridState) setGridState(state.gridState);
-        } else {
-          setFilters({});
-          setGridState(null);
-        }
-      }
-    };
-
     useEffect(() => {
       fetchInitialData();
     }, []);
@@ -498,7 +484,6 @@
           description={t('تعریف نقش‌ها و تخصیص دسترسی‌های ۳ سطحی به فرم‌ها، عملیات و داده‌ها', 'Define roles and assign 3-level permissions to forms, actions, and data scopes')}
           language={language}
           breadcrumbs={[{ label: t('امنیت', 'Security') }, { label: t('نقش‌ها', 'Roles') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-3 animate-in fade-in duration-300">
