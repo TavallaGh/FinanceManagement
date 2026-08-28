@@ -32,8 +32,8 @@
     const [groups, setGroups] = useState([]);
     const [coaAccounts, setCoaAccounts] = useState([]);
     const [rawUsers, setRawUsers] = useState([]);
-    const [roles, setRoles] = useState([]);
-    const [userRoles, setUserRoles] = useState([]);
+    const [userGroups, setUserGroups] = useState([]);
+    const [userGroupsMap, setUserGroupsMap] = useState([]);
     const [charts, setCharts] = useState([]);
     const [parties, setParties] = useState([]);
     const [currencies, setCurrencies] = useState([]);
@@ -59,14 +59,14 @@
     const fetchInitialData = async () => {
       setLoading(true);
       try {
-        const [groupsRes, accountsRes, usersRes, rolesRes, userRolesRes, chartsRes, partiesRes, currenciesRes] = await Promise.all([
+        const [groupsRes, accountsRes, usersRes, userGroupsRes, userGroupsMapRes, chartsRes, partiesRes, currenciesRes] = await Promise.all([
           supabase.from('fm_balance_groups')
             .select('*, accounts:fm_balance_group_accounts(id, account_id), access:fm_balance_group_access(grantee_type, grantee_id)')
             .order('created_at', { ascending: false }),
           supabase.from('fm_coa_accounts').select('id, code, title_fa, currency_id, parent_id, is_active, chart_id'),
           supabase.from('sec_users').select('*'),
-          supabase.from('sec_roles').select('id, title, code'),
-          supabase.from('sec_user_roles').select('user_id, role_id'),
+          supabase.from('sec_user_groups').select('id, code, title, is_active'),
+          supabase.from('sec_user_group_users').select('user_id, group_id'),
           supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
           supabase.from('parties').select('id, first_name, last_name, company_name, party_type'),
           supabase.from('fm_currencies').select('id, code')
@@ -77,8 +77,8 @@
         setGroups(groupsRes.data || []);
         setCoaAccounts(accountsRes.data || []);
         setRawUsers(usersRes.data || []);
-        setRoles(rolesRes.data || []);
-        setUserRoles(userRolesRes.data || []);
+        setUserGroups((userGroupsRes.data || []).filter(g => g.is_active !== false));
+        setUserGroupsMap(userGroupsMapRes.data || []);
         setCharts(chartsRes.data || []);
         setParties(partiesRes.data || []);
         setCurrencies(currenciesRes.data || []);
@@ -157,8 +157,11 @@
       if (filters.user_id && filters.user_id.id) {
         result = result.filter(g => g.access?.some(a => a.grantee_type?.toLowerCase() === 'user' && a.grantee_id === filters.user_id.id));
       }
-      if (filters.role_id && filters.role_id.id) {
-        result = result.filter(g => g.access?.some(a => a.grantee_type?.toLowerCase() === 'role' && a.grantee_id === filters.role_id.id));
+      if (filters.user_group_id && filters.user_group_id.id) {
+        result = result.filter(g => g.access?.some(a => {
+          const type = (a.grantee_type || '').toLowerCase();
+          return (type === 'user_group' || type === 'group' || type === 'role') && a.grantee_id === filters.user_group_id.id;
+        }));
       }
       return result;
     }, [groups, filters]);
@@ -291,7 +294,7 @@
     const filterFields = [
       { name: 'account_id', label: t('دارای حساب', 'Contains Account'), type: 'lov', lovData: leafAccounts, lovColumns: lovAccountColumns, dropdownWidth: 'min-w-[470px] max-w-[470px]' },
       { name: 'user_id', label: t('دسترسی کاربر', 'User Access'), type: 'lov', lovData: users, lovColumns: [{field: 'username', header_fa: 'نام کاربری'}, {field: 'full_name', header_fa: 'نام'}] },
-      { name: 'role_id', label: t('دسترسی نقش', 'Role Access'), type: 'lov', lovData: roles, lovColumns: [{field: 'code', header_fa: 'کد نقش'}, {field: 'title', header_fa: 'عنوان نقش'}] }
+      { name: 'user_group_id', label: t('دسترسی گروه کاربری', 'User Group Access'), type: 'lov', lovData: userGroups, lovColumns: [{field: 'code', header_fa: 'کد گروه'}, {field: 'title', header_fa: 'عنوان گروه'}] }
     ];
 
     return (
@@ -372,7 +375,7 @@
                 setDetailsConfig({ isOpen: false, type: null, group: null });
                 fetchInitialData();
              }}
-             lookups={{ leafAccounts, users, roles, userRoles, lovAccountColumns }}
+             lookups={{ leafAccounts, users, userGroups, userGroupsMap, lovAccountColumns }}
              language={language}
           />
         )}

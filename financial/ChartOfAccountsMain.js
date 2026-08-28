@@ -57,8 +57,8 @@
     const [lookups, setLookups] = useState({
       currencies: [],
       systemUsers: [],
-      systemRoles: [],
-      userRolesMapping: [],
+      systemUserGroups: [],
+      userGroupsMapping: [],
       systemParties: [],
       balanceGroupsMaster: []
     });
@@ -170,11 +170,11 @@
     const fetchLookups = useCallback(async () => {
       try {
         if (!supabase) return;
-        const [currRes, userRes, roleRes, userRoleMapRes, partyRes, bgRes] = await Promise.all([
+        const [currRes, userRes, userGroupRes, userGroupMapRes, partyRes, bgRes] = await Promise.all([
           safeFetch(supabase.from('fm_currencies').select('*')),
           safeFetch(supabase.from('sec_users').select('*')),
-          safeFetch(supabase.from('sec_roles').select('*')),
-          safeFetch(supabase.from('sec_user_roles').select('*')),
+          safeFetch(supabase.from('sec_user_groups').select('id, code, title, is_active')),
+          safeFetch(supabase.from('sec_user_group_users').select('user_id, group_id')),
           safeFetch(supabase.from('parties').select('id, first_name, last_name, company_name, party_type')),
           safeFetch(supabase.from('fm_balance_groups').select('id, code, title_fa, title_en, is_active').eq('is_active', true))
         ]);
@@ -182,8 +182,8 @@
         setLookups({
           currencies: currRes.data || [],
           systemUsers: (userRes.data || []).filter(u => u.is_active !== false),
-          systemRoles: roleRes.data || [],
-          userRolesMapping: userRoleMapRes.data || [],
+          systemUserGroups: (userGroupRes.data || []).filter(g => g.is_active !== false),
+          userGroupsMapping: userGroupMapRes.data || [],
           systemParties: partyRes.data || [],
           balanceGroupsMaster: bgRes.data || []
         });
@@ -814,11 +814,11 @@
           if (!hasBg) matches = false;
         }
         if (matches && userId) {
-          const userRoleIds = lookups.userRolesMapping.filter(m => String(m.user_id) === String(userId)).map(m => String(m.role_id));
+          const userGroupIds = lookups.userGroupsMapping.filter(m => String(m.user_id) === String(userId)).map(m => String(m.group_id));
           const hasAccess = allPermissions.some(p =>
             String(p.account_id) === String(acc.id) && (
               (p.grantee_type === 'user' && String(p.grantee_id) === String(userId)) ||
-              (p.grantee_type === 'role' && userRoleIds.includes(String(p.grantee_id)))
+              ((p.grantee_type === 'user_group' || p.grantee_type === 'group' || p.grantee_type === 'role') && userGroupIds.includes(String(p.grantee_id)))
             )
           );
           if (!hasAccess) matches = false;
