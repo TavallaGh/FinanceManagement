@@ -54,17 +54,18 @@
       try {
         const isReachable = await window.isSupabaseReachable?.();
         if (isReachable === false) {
-          showError(isRtl ? 'اتصال به سرور دیتابیس برقرار نیست. لطفاً شبکه یا VPN را بررسی کنید.' : 'Database server is not reachable. Check your network or VPN.');
-          return;
+          console.warn('Supabase reachability check failed. Continuing with reset flow query.');
         }
 
         const supabase = window.supabase;
         
-        const { data: userData, error: userErr } = await supabase
-          .from('sec_users')
-          .select('id')
-          .ilike('username', resetData.identifier.trim())
-          .single();
+        const { data: userData, error: userErr } = await window.supabaseWithRetry(
+          () => supabase
+            .from('sec_users')
+            .select('id')
+            .ilike('username', resetData.identifier.trim())
+            .single()
+        );
           
         if (userErr || !userData) {
            showError(isRtl ? 'نام کاربری در سیستم یافت نشد.' : 'Username not found.');
@@ -74,10 +75,12 @@
 
         const hashedPassword = await hashPassword(resetData.newPassword);
         
-        const { error: resetErr } = await supabase.rpc('reset_user_password', {
-           p_user_id: userData.id,
-           p_new_password: hashedPassword
-        });
+          const { error: resetErr } = await window.supabaseWithRetry(
+           () => supabase.rpc('reset_user_password', {
+             p_user_id: userData.id,
+             p_new_password: hashedPassword
+           })
+          );
         
         if (resetErr) {
            showError(isRtl ? 'خطا در تغییر رمز عبور. با مدیر سیستم تماس بگیرید.' : 'Error resetting password.');
@@ -88,7 +91,12 @@
         }
       } catch(err) {
          console.error(err);
-         showError(isRtl ? 'خطای ارتباط با سرور' : 'Server error');
+        if (window.isLikelyNetworkError?.(err)) {
+          showError(isRtl ? 'اتصال به سرور دیتابیس برقرار نیست. لطفاً شبکه یا VPN را بررسی کنید.' : 'Database server is not reachable. Check your network or VPN.');
+          return;
+        }
+
+        showError(isRtl ? 'خطای ارتباط با سرور' : 'Server error');
       } finally {
          setIsLoading(false);
       }
