@@ -29,7 +29,7 @@
   
   const { Button } = window.DSCore || window.DesignSystem || {};
 
-  const Modal = ({ isOpen, onClose, title, children, showMaximize = true, width = 'max-w-2xl', language = 'fa' }) => {
+  const Modal = ({ isOpen, onClose, title, children, showMaximize = true, width = 'max-w-2xl', language = 'fa', headerActions = null }) => {
     const isRtl = language === 'fa';
     const [isMaximized, setIsMaximized] = useState(false);
 
@@ -49,6 +49,7 @@
             <div className="h-11 px-4 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/80 shrink-0 rounded-t-2xl">
               <h3 className="font-black text-slate-700 dark:text-slate-200 text-[14px] tracking-tight">{title}</h3>
               <div className="flex items-center gap-1">
+                {headerActions}
                 {showMaximize && (
                   <button onClick={() => setIsMaximized(!isMaximized)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all active:scale-95">
                     {isMaximized ? <Minimize2 size={14} strokeWidth={2.5} /> : <Maximize2 size={14} strokeWidth={2.5} />}

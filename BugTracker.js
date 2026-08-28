@@ -889,6 +889,18 @@
       loadAttachments(row.id);
     }, [loadAttachments]);
 
+    const openCurrentBugAttachments = useCallback(() => {
+      if (!bugForm.id) {
+        showToast(t('برای افزودن پیوست، ابتدا باگ را ذخیره کنید.', 'Save the bug first to add attachments.'), 'warning');
+        return;
+      }
+      const currentRow = {
+        id: bugForm.id,
+        title: bugForm.title || '-'
+      };
+      openAttachments(currentRow);
+    }, [bugForm.id, bugForm.title, openAttachments, showToast, t]);
+
     const handleFileUpload = useCallback(async (files) => {
       if (!files || !files.length || !attachModal.bug) return;
 
@@ -1298,6 +1310,22 @@
           onClose={closeBugModal}
           title={bugModal.mode === 'EDIT' ? t('ویرایش باگ', 'Edit Bug') : t('ثبت باگ جدید', 'New Bug')}
           width="max-w-5xl"
+          headerActions={
+            <button
+              type="button"
+              onClick={openCurrentBugAttachments}
+              title={t('پیوست‌های باگ', 'Bug attachments')}
+              className={`relative p-1.5 rounded-lg transition-all active:scale-95 ${bugForm.id ? 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-700' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
+              disabled={!bugForm.id}
+            >
+              <Paperclip size={14} strokeWidth={2.5} />
+              {bugForm.id && (attachmentCounts[String(bugForm.id)] || 0) > 0 ? (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-indigo-600 text-white text-[9px] font-black leading-4 text-center">
+                  {attachmentCounts[String(bugForm.id)]}
+                </span>
+              ) : null}
+            </button>
+          }
           language={language}
         >
           <div className="p-3 max-h-[72vh] overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900">
