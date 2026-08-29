@@ -516,9 +516,13 @@
                 });
                 if (!hasMatchingItem) return false;
             }
+            if (filters.without_attachments) {
+                const attachmentCount = attachmentCounts[tx.id] || 0;
+                if (attachmentCount > 0) return false;
+            }
             return true;
         });
-    }, [transactions, filters, resolvedUserId]);
+    }, [transactions, filters, attachmentCounts, resolvedUserId]);
 
     const transactionExcel = window.TransactionMainExcel?.useTransactionMainExcel
         ? window.TransactionMainExcel.useTransactionMainExcel({
@@ -694,7 +698,8 @@
             { value: 'created_at', label: t('تاریخ ثبت', 'Registration Date') }
         ]},
         { name: 'date_from', label: t('از تاریخ', 'From Date'), type: 'date' },
-        { name: 'date_to', label: t('تا تاریخ', 'To Date'), type: 'date' }
+        { name: 'date_to', label: t('تا تاریخ', 'To Date'), type: 'date' },
+        { name: 'without_attachments', label: t('اسناد بدون پیوست', 'Documents Without Attachment'), type: 'toggle' }
     ];
 
     const gridActions = [
