@@ -22,6 +22,7 @@
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
+        const Forms = window.DSForms || DS || {};
     const DSGrid = window.DSGrid || DS || {};
     const Feedback = window.DSFeedback || window.DSOverlays || DS || {};
     const LucideIcons = window.LucideIcons || {};
@@ -33,7 +34,9 @@
     const Badge = safeComp(Core, 'Badge');
     const Modal = safeComp(Feedback, 'Modal');
     const Toast = safeComp(Feedback, 'Toast');
-    const AttachmentManager = safeComp(window, 'AttachmentManager');
+    const AttachmentManager = safeComp(Forms, 'AttachmentManager') !== FallbackComponent
+        ? safeComp(Forms, 'AttachmentManager')
+        : safeComp(window, 'AttachmentManager');
     const FileText = safeIcon(LucideIcons, 'FileText');
     const AlertTriangle = safeIcon(LucideIcons, 'AlertTriangle');
     const MessageSquare = safeIcon(LucideIcons, 'MessageSquare');
@@ -481,9 +484,9 @@
         }
     };
 
-    const handleDeleteAttachment = async (file) => {
+    const handleDeleteAttachment = async (fileId) => {
         try {
-            const { error } = await supabase.from('fm_attachments').delete().eq('id', file.id);
+            const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
             if (error) throw error;
             showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
             loadAttachments(attachModal.record.id);
@@ -824,7 +827,7 @@
         React.createElement(Modal, {
             isOpen: attachModal.isOpen,
             onClose: () => setAttachModal({ isOpen: false, record: null, files: [] }),
-            title: t('پیوست‌ها', 'Document Attachments'),
+            title: t('پیوست‌های سند', 'Attachments'),
             language: language,
             width: "max-w-xl"
         },
@@ -837,7 +840,7 @@
                     React.createElement(AttachmentManager, {
                         files: attachModal.files,
                         onUpload: handleFileUpload,
-                        onDelete: handleDeleteAttachment,
+                        onDelete: (f) => handleDeleteAttachment(f.id),
                         onDownload: (f) => window.open(f.file_url, '_blank'),
                         readOnly: isAttachReadOnly,
                         isUploading: isUploading,
