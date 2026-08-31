@@ -20,6 +20,7 @@
     Save = FallbackIcon,
     X = FallbackIcon,
     AlertTriangle = FallbackIcon,
+    MessageSquare = FallbackIcon,
     Settings = FallbackIcon,
     ChevronDown = FallbackIcon,
     Check = FallbackIcon,
@@ -277,6 +278,9 @@
     const [bugModal, setBugModal] = useState({ isOpen: false, mode: 'CREATE' });
     const [bugForm, setBugForm] = useState(getInitialBugForm());
     const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
+    const [commentedIds, setCommentedIds] = useState(new Set());
+    const [filteredRecordId, setFilteredRecordId] = useState(null);
 
     const [attachModal, setAttachModal] = useState({ isOpen: false, bug: null, files: [] });
     const [isUploading, setIsUploading] = useState(false);
@@ -372,15 +376,17 @@
         if (!loadedBugs.length) {
           setBugs([]);
           setAttachmentCounts({});
+          setCommentedIds(new Set());
           return;
         }
 
         const bugIds = loadedBugs.map(b => b.id);
 
-        const [bugAssignRes, tasksRes, attachRes] = await Promise.all([
+        const [bugAssignRes, tasksRes, attachRes, commentsRes] = await Promise.all([
           supabase.from(BUG_ASSIGN_TABLE).select('bug_id, specialist_id').in('bug_id', bugIds),
           supabase.from(TASK_TABLE).select('id, bug_id, title, is_done, sort_order').in('bug_id', bugIds),
-          supabase.from('fm_attachments').select('entity_id').eq('entity_type', ATTACHMENT_ENTITY).in('entity_id', bugIds.map(id => String(id)))
+          supabase.from('fm_attachments').select('entity_id').eq('entity_type', ATTACHMENT_ENTITY).in('entity_id', bugIds.map(id => String(id))),
+          supabase.from('sys_comments').select('entity_id').eq('entity_type', BUGS_TABLE).in('entity_id', bugIds.map(id => String(id)))
         ]);
 
         const taskIds = (tasksRes.data || []).map(x => x.id);
@@ -423,6 +429,7 @@
           attachCounts[a.entity_id] = (attachCounts[a.entity_id] || 0) + 1;
         });
         setAttachmentCounts(attachCounts);
+        setCommentedIds(new Set((commentsRes.data || []).map(c => String(c.entity_id))));
 
         const merged = loadedBugs.map(bug => {
           const checklist = (tasksByBug[bug.id] || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -449,6 +456,16 @@
     useEffect(() => {
       if (access.canView) fetchAllData();
     }, [fetchAllData, access.canView]);
+
+    useEffect(() => {
+      const handleFilterToRecord = (e) => {
+        if (e.detail && e.detail.form_component === 'BugTracker') {
+          setFilteredRecordId(String(e.detail.entity_id));
+        }
+      };
+      window.addEventListener('filterToRecord', handleFilterToRecord);
+      return () => window.removeEventListener('filterToRecord', handleFilterToRecord);
+    }, []);
 
     const openBugModal = useCallback((mode, row) => {
       if (mode === 'EDIT' && row) {
@@ -1166,6 +1183,8 @@
       { field: 'is_active', header_fa: 'فعال', header_en: 'Active', width: '90px', type: 'toggle' }
     ], []);
 
+    const { CommentModal } = window.DSComments || {};
+
     if (!access.canView) {
       return (
         <div className="h-full p-4" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -1187,6 +1206,7 @@
             description={t('ثبت، تخصیص، کنترل و بستن/بازگشایی مشکلات فرم‌ها', 'Track, assign, control, close/reopen form issues')}
             language={language}
             breadcrumbs={[{ label: t('امکانات عمومی سیستم', 'System Utilities') }, { label: t('رهگیری مشکلات', 'Bug Tracker') }]}
+            notifFilter={filteredRecordId ? { isActive: true, onClear: () => setFilteredRecordId(null) } : null}
           />
 
           <div className="mt-2 flex-1 min-h-0 flex flex-col gap-3">
@@ -1200,7 +1220,7 @@
 
             <div className="flex-1 min-h-0">
               <DataGrid
-                data={filteredBugs}
+                data={filteredRecordId ? filteredBugs.filter(row => String(row.id) === filteredRecordId) : filteredBugs}
                 columns={bugColumns}
                 language={language}
                 formCode={formCode}
@@ -1209,7 +1229,7 @@
                 reserveMiddleSpace={false}
                 gridState={gridState}
                 onGridStateChange={setGridState}
-                actionWidth="190px"
+                actionWidth="220px"
                 hideImport={true}
                 onAdd={access.canCreate ? () => openBugModal('CREATE') : undefined}
                 toolbarContent={
@@ -1265,6 +1285,12 @@
                 }
                 onRowDoubleClick={row => openBugModal('EDIT', row)}
                 actions={[
+                  {
+                    icon: MessageSquare,
+                    tooltip: t('کامنت‌ها', 'Comments'),
+                    onClick: row => setCommentModalState({ isOpen: true, record: row }),
+                    className: row => commentedIds.has(String(row.id)) ? 'text-blue-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-600'
+                  },
                   {
                     icon: Paperclip,
                     tooltip: t('پیوست‌ها', 'Attachments'),
@@ -1725,6 +1751,19 @@
               ? t(`این ${deleteConfirm.data?.length || 0} باگ انتخاب‌شده حذف می‌شود. ادامه می‌دهید؟`, `Delete ${deleteConfirm.data?.length || 0} selected bugs and their checklists?`)
               : t('این باگ و چک‌لیست‌های آن حذف می‌شود. ادامه می‌دهید؟', 'This bug and its checklist will be deleted. Continue?')}
         </Dialog>
+
+        {CommentModal && commentModalState.isOpen ? (
+          <CommentModal
+            isOpen={commentModalState.isOpen}
+            onClose={() => { setCommentModalState({ isOpen: false, record: null }); fetchAllData(); }}
+            entityType={BUGS_TABLE}
+            entityId={commentModalState.record ? String(commentModalState.record.id) : ''}
+            entityTitle={commentModalState.record ? `${t('عنوان:', 'Title:')} ${commentModalState.record.title || '-'}  |  ${t('فرم:', 'Form:')} ${commentModalState.record.form_name || '-'}` : ''}
+            formTitle={t('رهگیری مشکلات', 'Bug Tracker')}
+            formComponent="BugTracker"
+            language={language}
+          />
+        ) : null}
 
         <Toast
           isVisible={toast.isVisible}
