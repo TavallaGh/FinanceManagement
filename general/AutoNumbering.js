@@ -29,6 +29,7 @@
   const Toast = DSFeedback.Toast || DS.Toast || (() => null);
 
   const supabase = window.supabase;
+  const AUTO_NUMBERING_TABLE = 'fm_auto_numbering';
 
   const AutoNumbering = ({ language = 'fa' }) => {
     const isRtl = language === 'fa';
@@ -51,8 +52,9 @@
       title_en: '',
       prefix: '',
       suffix: '',
-      current_number: 0,
       number_length: 4,
+      start_number: 1,
+      current_number: 0,
       is_active: true
     });
 
@@ -63,8 +65,21 @@
       { value: 'CHART_OF_ACCOUNTS', label: t('ساختار حساب‌ها', 'Chart of Accounts') },
       { value: 'BALANCE_GROUP', label: t('گروه‌های بالانس', 'Balance Groups') },
       { value: 'BROKER', label: t('بروکرها', 'Brokers') },
-      { value: 'PROJECT', label: t('پروژه‌ها', 'Projects') }
+      { value: 'PAYMENT_SOURCE', label: t('منابع پرداخت', 'Payment Sources') },
+      { value: 'BUG_TRACKER', label: t('رهگیری مشکلات', 'Bug Tracker') }
     ];
+
+    const viewConfig = {
+      pageId: 'auto_numbering_main',
+      currentState: () => ({ gridState }),
+      onApplyState: (state) => {
+        if (state) {
+          if (state.gridState) setGridState(state.gridState);
+        } else {
+          setGridState(null);
+        }
+      }
+    };
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -80,7 +95,7 @@
       try {
         if (!supabase) return;
         const { data: res, error } = await supabase
-          .from('fm_auto_numbering')
+          .from(AUTO_NUMBERING_TABLE)
           .select('*')
           .order('entity_code', { ascending: true });
 
@@ -102,26 +117,28 @@
 
       setIsLoading(true);
       try {
+        const selectedEntity = ENTITY_OPTIONS.find(x => x.value === formData.entity_code);
         const payload = {
           entity_code: formData.entity_code,
-          title_fa: formData.title_fa || null,
-          title_en: formData.title_en || null,
+          title_fa: (formData.title_fa || selectedEntity?.label || '').trim() || null,
+          title_en: (formData.title_en || '').trim() || null,
           prefix: formData.prefix || null,
           suffix: formData.suffix || null,
-          current_number: parseInt(formData.current_number) || 0,
           number_length: parseInt(formData.number_length) || 4,
+          start_number: parseInt(formData.start_number) || 1,
+          current_number: parseInt(formData.current_number) || 0,
           is_active: formData.is_active
         };
 
         if (currentRecord?.id) {
-          const { error } = await supabase.from('fm_auto_numbering').update(payload).eq('id', currentRecord.id);
+          const { error } = await supabase.from(AUTO_NUMBERING_TABLE).update(payload).eq('id', currentRecord.id);
           if (error) {
             if (error.code === '23505') showToast(t('تنظیمات این موجودیت قبلاً ثبت شده است', 'Configuration for this entity already exists'), 'error');
             else throw error;
             return;
           }
         } else {
-          const { error } = await supabase.from('fm_auto_numbering').insert([payload]);
+          const { error } = await supabase.from(AUTO_NUMBERING_TABLE).insert([payload]);
           if (error) {
             if (error.code === '23505') showToast(t('تنظیمات این موجودیت قبلاً ثبت شده است', 'Configuration for this entity already exists'), 'error');
             else throw error;
@@ -143,7 +160,7 @@
     const handleToggleActive = async (row, newValue) => {
       try {
         const { error } = await supabase
-          .from('fm_auto_numbering')
+          .from(AUTO_NUMBERING_TABLE)
           .update({ is_active: newValue })
           .eq('id', row.id);
         
@@ -159,10 +176,10 @@
       setIsLoading(true);
       try {
         if (deleteConfirm.type === 'single') {
-          const { error } = await supabase.from('fm_auto_numbering').delete().eq('id', deleteConfirm.data.id);
+          const { error } = await supabase.from(AUTO_NUMBERING_TABLE).delete().eq('id', deleteConfirm.data.id);
           if (error) throw error;
         } else if (deleteConfirm.type === 'bulk') {
-          const { error } = await supabase.from('fm_auto_numbering').delete().in('id', deleteConfirm.data);
+          const { error } = await supabase.from(AUTO_NUMBERING_TABLE).delete().in('id', deleteConfirm.data);
           if (error) throw error;
         }
         
@@ -179,8 +196,16 @@
     };
 
     const handleOpenModal = (record = null) => {
-      setFormData(record ? { ...record } : { 
-        entity_code: '', title_fa: '', title_en: '', prefix: '', suffix: '', current_number: 0, number_length: 4, is_active: true 
+      setFormData(record ? { ...record } : {
+        entity_code: '',
+        title_fa: '',
+        title_en: '',
+        prefix: '',
+        suffix: '',
+        number_length: 4,
+        start_number: 1,
+        current_number: 0,
+        is_active: true
       });
       setCurrentRecord(record);
       setIsModalOpen(true);
@@ -194,15 +219,17 @@
     const columns = [
       { 
         field: 'entity_code', 
-        header_fa: 'کد موجودیت', 
-        header_en: 'Entity Code', 
-        width: '180px',
-        render: (val) => <span className="font-mono font-bold text-slate-700 dark:text-slate-200" dir="ltr">{val}</span>
+        header_fa: 'موجودیت هدف', 
+        header_en: 'Target Entity', 
+        width: '200px',
+        render: (val) => <span className="font-bold text-slate-700 dark:text-slate-200">{getEntityLabel(val)}</span>
       },
-      { field: 'title_fa', header_fa: 'عنوان فارسی', header_en: 'Persian Title', width: '160px' },
+      { field: 'title_fa', header_fa: 'عنوان فارسی', header_en: 'Persian Title', width: '170px', render: (val) => val || '-' },
+      { field: 'title_en', header_fa: 'عنوان انگلیسی', header_en: 'English Title', width: '170px', render: (val) => <span dir="ltr">{val || '-'}</span> },
       { field: 'prefix', header_fa: 'پیشوند', header_en: 'Prefix', width: '100px', render: (val) => <span dir="ltr">{val || '-'}</span> },
       { field: 'suffix', header_fa: 'پسوند', header_en: 'Suffix', width: '100px', render: (val) => <span dir="ltr">{val || '-'}</span> },
-      { field: 'current_number', header_fa: 'شماره فعلی', header_en: 'Current Number', width: '150px', render: (val) => <span className="font-mono text-[13px] font-bold" dir="ltr">{val}</span> },
+      { field: 'start_number', header_fa: 'شماره شروع', header_en: 'Start Number', width: '120px', render: (val) => <span className="font-mono text-[13px]" dir="ltr">{val ?? 0}</span> },
+      { field: 'current_number', header_fa: 'مقدار فعلی (آخرین شماره)', header_en: 'Current Number', width: '180px', render: (val) => <span className="font-mono text-[13px] font-bold" dir="ltr">{val ?? 0}</span> },
       { field: 'number_length', header_fa: 'طول ارقام', header_en: 'Number Length', width: '120px' },
       { 
         field: 'is_active', 
@@ -217,9 +244,9 @@
     const generatePreview = () => {
         const p = formData.prefix || '';
         const s = formData.suffix || '';
-        const val = parseInt(formData.current_number) || 0;
-        const pad = parseInt(formData.number_length) || 1;
-        const nextVal = String(val + 1).padStart(pad, '0');
+      const val = parseInt(formData.current_number) || 0;
+      const pad = parseInt(formData.number_length) || 1;
+      const nextVal = String(val + 1).padStart(pad, '0');
         return `${p}${nextVal}${s}`;
     };
 
@@ -231,6 +258,7 @@
           description={t('مدیریت پیشوندها، پسوندها و توالی کدهای سیستم', 'Manage prefixes, suffixes, and sequences for system codes')}
           language={language}
           breadcrumbs={[{ label: t('تنظیمات', 'Settings') }, { label: t('شماره‌گذاری', 'Numbering') }]}
+          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-4 animate-in fade-in duration-300">
@@ -271,7 +299,15 @@
                 size="sm" 
                 label={t('موجودیت هدف', 'Target Entity')} 
                 value={formData.entity_code} 
-                onChange={e => setFormData({...formData, entity_code: e.target.value})} 
+                onChange={e => {
+                  const selected = ENTITY_OPTIONS.find(x => x.value === e.target.value);
+                  setFormData({
+                    ...formData,
+                    entity_code: e.target.value,
+                    title_fa: formData.title_fa || selected?.label || '',
+                    title_en: formData.title_en || ''
+                  });
+                }} 
                 options={[
                   { value: '', label: t('انتخاب کنید...', 'Select...') },
                   ...ENTITY_OPTIONS
@@ -280,16 +316,19 @@
                 required
                 disabled={!!currentRecord}
               />
-              <TextField size="sm" label={t('عنوان فارسی', 'Persian Title')} value={formData.title_fa || ''} onChange={e => setFormData({...formData, title_fa: e.target.value})} isRtl={isRtl} />
+                <TextField size="sm" label={t('عنوان فارسی', 'Persian Title')} value={formData.title_fa} onChange={e => setFormData({...formData, title_fa: e.target.value})} isRtl={isRtl} />
+                <TextField size="sm" label={t('عنوان انگلیسی', 'English Title')} value={formData.title_en} onChange={e => setFormData({...formData, title_en: e.target.value})} isRtl={isRtl} dir="ltr" />
+
               <div className="md:col-start-1">
-                 <TextField size="sm" label={t('پیشوند (Prefix)', 'Prefix')} value={formData.prefix || ''} onChange={e => setFormData({...formData, prefix: e.target.value})} isRtl={isRtl} dir="ltr" />
+                 <TextField size="sm" label={t('پیشوند (Prefix)', 'Prefix')} value={formData.prefix} onChange={e => setFormData({...formData, prefix: e.target.value})} isRtl={isRtl} dir="ltr" />
               </div>
               <div>
-                 <TextField size="sm" label={t('پسوند (Suffix)', 'Suffix')} value={formData.suffix || ''} onChange={e => setFormData({...formData, suffix: e.target.value})} isRtl={isRtl} dir="ltr" />
+                 <TextField size="sm" label={t('پسوند (Suffix)', 'Suffix')} value={formData.suffix} onChange={e => setFormData({...formData, suffix: e.target.value})} isRtl={isRtl} dir="ltr" />
               </div>
 
-              <TextField size="sm" type="number" label={t('شماره فعلی', 'Current Number')} value={formData.current_number} onChange={e => setFormData({...formData, current_number: e.target.value})} isRtl={isRtl} dir="ltr" required />
-              <TextField size="sm" type="number" label={t('طول ارقام', 'Number Length')} value={formData.number_length} onChange={e => setFormData({...formData, number_length: e.target.value})} isRtl={isRtl} dir="ltr" required />
+                <TextField size="sm" type="number" label={t('شماره شروع', 'Start Number')} value={formData.start_number} onChange={e => setFormData({...formData, start_number: e.target.value})} isRtl={isRtl} dir="ltr" required />
+                <TextField size="sm" type="number" label={t('آخرین مقدار ثبت شده', 'Current Number')} value={formData.current_number} onChange={e => setFormData({...formData, current_number: e.target.value})} isRtl={isRtl} dir="ltr" required />
+                <TextField size="sm" type="number" label={t('طول ارقام', 'Number Length')} value={formData.number_length} onChange={e => setFormData({...formData, number_length: e.target.value})} isRtl={isRtl} dir="ltr" required />
               
               <div className="md:col-span-2 flex items-center justify-between mt-2 pt-4 border-t border-slate-100 dark:border-slate-700/50">
                  <ToggleField size="sm" label={t('وضعیت فعال', 'Active Status')} checked={formData.is_active} onChange={v => setFormData({...formData, is_active: v})} isRtl={isRtl} />
@@ -331,37 +370,4 @@
   };
 
   window.AutoNumbering = AutoNumbering;
-
-  window.AutoNumberingService = {
-    previewNext: async (entityType) => {
-      const sb = window.supabase;
-      if (!sb) throw new Error('Supabase not initialized');
-      const { data, error } = await sb
-        .from('fm_auto_numbering')
-        .select('prefix, suffix, current_number, number_length')
-        .eq('entity_code', entityType)
-        .eq('is_active', true)
-        .single();
-      if (error || !data) throw new Error(`No active auto-numbering config for: ${entityType}`);
-      const nextVal = String(data.current_number + 1).padStart(data.number_length, '0');
-      return `${data.prefix || ''}${nextVal}${data.suffix || ''}`;
-    },
-
-    consumeNext: async (entityType) => {
-      const sb = window.supabase;
-      if (!sb) throw new Error('Supabase not initialized');
-      const { data, error } = await sb
-        .from('fm_auto_numbering')
-        .select('id, current_number')
-        .eq('entity_code', entityType)
-        .eq('is_active', true)
-        .single();
-      if (error || !data) throw new Error(`No active auto-numbering config for: ${entityType}`);
-      const { error: updateErr } = await sb
-        .from('fm_auto_numbering')
-        .update({ current_number: data.current_number + 1 })
-        .eq('id', data.id);
-      if (updateErr) throw updateErr;
-    }
-  };
 })();

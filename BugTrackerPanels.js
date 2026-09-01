@@ -40,6 +40,7 @@
 
   const getInitialBugForm = () => ({
     id: null,
+    bug_code: '',
     title: '',
     form_name: '',
     is_general: false,
@@ -187,6 +188,14 @@
   };
 
   const buildBugColumns = ({ t, menuForms, Badge, getLabel, getBadgeVariant, specialistsMap }) => ([
+    {
+      field: 'bug_code',
+      header_fa: 'کد',
+      header_en: 'Code',
+      width: '130px',
+      render: (val) => <span className="font-mono text-[12px] font-bold text-slate-700 dark:text-slate-200" dir="ltr">{val || '-'}</span>,
+      searchAccessor: (val) => val || ''
+    },
     {
       field: 'title',
       header_fa: 'عنوان باگ',
@@ -380,7 +389,9 @@
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title={mode === 'EDIT' ? t('ویرایش باگ', 'Edit Bug') : t('ثبت باگ جدید', 'New Bug')}
+        title={mode === 'EDIT'
+          ? `${t('ویرایش باگ', 'Edit Bug')} ${bugForm.bug_code ? `- ${bugForm.bug_code}` : ''}`
+          : t('ثبت باگ جدید', 'New Bug')}
         width="max-w-5xl"
         headerActions={
           <button

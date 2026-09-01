@@ -66,6 +66,7 @@
   const TASK_TABLE = 'bt_bug_checklist';
   const TASK_ASSIGN_TABLE = 'bt_bug_checklist_assignments';
   const ATTACHMENT_ENTITY = 'BUG_TRACKER';
+  const BUG_AUTO_NUMBER_ENTITY = 'BUG_TRACKER';
 
   const bugPanels = window.BugTrackerPanels || {};
   const PRIORITY_OPTIONS = bugPanels.PRIORITY_OPTIONS || [];
@@ -89,6 +90,7 @@
 
   const getInitialBugForm = bugPanels.getInitialBugForm || (() => ({
     id: null,
+    bug_code: '',
     title: '',
     form_name: '',
     is_general: false,
@@ -341,6 +343,7 @@
       if (mode === 'EDIT' && row) {
         setBugForm({
           id: row.id,
+          bug_code: row.bug_code || '',
           title: row.title || '',
           form_name: row.form_name || '',
           is_general: !!row.is_general,
@@ -366,6 +369,7 @@
       if (!row) return;
       setBugForm({
         id: null,
+        bug_code: '',
         title: row.title ? `${row.title} ${t('(کپی)', '(Copy)')}` : '',
         form_name: row.form_name || '',
         is_general: !!row.is_general,
@@ -391,6 +395,7 @@
       setBugForm(prev => ({
         ...prev,
         id: null,
+        bug_code: '',
         title: prev.title ? `${prev.title} ${t('(کپی)', '(Copy)')}` : '',
         overall_status: 'OPEN',
         fix_status: 'TODO',
@@ -466,6 +471,7 @@
       try {
         const nowIso = new Date().toISOString();
         const payload = {
+          bug_code: bugForm.bug_code || null,
           title,
           form_name: isGeneral ? null : formName,
           is_general: isGeneral,
@@ -495,13 +501,36 @@
           const { error } = await supabase.from(BUGS_TABLE).update(payload).eq('id', bugForm.id);
           if (error) throw error;
         } else {
+          let generatedCode = payload.bug_code;
+          if (!generatedCode) {
+            if (!window.AutoNumberingService?.previewNext) {
+              throw new Error('AutoNumberingService is not available for BUG_TRACKER code generation');
+            }
+            const preview = await window.AutoNumberingService.previewNext(BUG_AUTO_NUMBER_ENTITY);
+            generatedCode = preview?.formattedCode || preview?.code || (typeof preview === 'string' ? preview : '');
+          }
+          if (!generatedCode) {
+            throw new Error('Could not generate bug code for BUG_TRACKER');
+          }
+
           const insertPayload = {
             ...payload,
+            bug_code: generatedCode,
             created_by: currentUserId
           };
           const { data, error } = await supabase.from(BUGS_TABLE).insert([insertPayload]).select('id').single();
           if (error) throw error;
           bugId = data.id;
+
+          if (window.AutoNumberingService?.consumeNext) {
+            try {
+              await window.AutoNumberingService.consumeNext(BUG_AUTO_NUMBER_ENTITY);
+            } catch (consumeErr) {
+              console.error('Bug auto-number consume error:', consumeErr);
+            }
+          }
+
+          payload.bug_code = generatedCode;
         }
 
         await supabase.from(BUG_ASSIGN_TABLE).delete().eq('bug_id', bugId);
