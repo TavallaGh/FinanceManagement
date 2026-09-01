@@ -15,7 +15,6 @@
     Trash2 = FallbackIcon,
     Paperclip = FallbackIcon,
     CheckCircle2 = FallbackIcon,
-    RotateCcw = FallbackIcon,
     Users = FallbackIcon,
     Save = FallbackIcon,
     X = FallbackIcon,
@@ -779,35 +778,6 @@
       }
     }, [bulkAssigneeModal, currentUserId, fetchAllData, showToast, t]);
 
-    const reopenBug = useCallback(async (row) => {
-      if (!['DONE', 'CLOSED'].includes(row?.overall_status)) {
-        showToast(t('فقط باگ‌های انجام‌شده/بسته‌شده قابل بازگشایی هستند.', 'Only done/closed bugs can be reopened.'), 'warning');
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const { error } = await supabase
-          .from(BUGS_TABLE)
-          .update({
-            overall_status: 'REOPENED',
-            fix_status: 'IN_PROGRESS',
-            qa_status: 'PENDING',
-            closed_at: null,
-            updated_by: currentUserId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', row.id);
-        if (error) throw error;
-        showToast(t('باگ دوباره باز شد.', 'Bug reopened.'), 'success');
-        fetchAllData();
-      } catch (error) {
-        console.error('Reopen bug error:', error);
-        showToast(t('خطا در بازگشایی باگ', 'Error reopening bug'), 'error');
-      } finally {
-        setIsLoading(false);
-      }
-    }, [currentUserId, fetchAllData, showToast, t]);
-
     const loadAttachments = useCallback(async (bugId) => {
       if (!bugId) return;
       try {
@@ -1101,13 +1071,6 @@
                     onClick: row => copyBugAsNew(row),
                     requiredAccess: 'create',
                     className: 'text-emerald-600 hover:text-emerald-700'
-                  },
-                  {
-                    icon: RotateCcw,
-                    tooltip: t('بازگشایی مجدد', 'Reopen'),
-                    onClick: row => reopenBug(row),
-                    requiredAccess: 'edit',
-                    className: row => ['DONE', 'CLOSED'].includes(row.overall_status) ? 'text-amber-600 hover:text-amber-700' : '!text-slate-200 dark:!text-slate-700 cursor-not-allowed'
                   },
                   {
                     icon: Edit,
