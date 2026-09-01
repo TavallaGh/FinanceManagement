@@ -502,12 +502,57 @@
           if (error) throw error;
         } else {
           let generatedCode = payload.bug_code;
+          let consumeAutoNumber = async () => {};
           if (!generatedCode) {
-            if (!window.AutoNumberingService?.previewNext) {
-              throw new Error('AutoNumberingService is not available for BUG_TRACKER code generation');
+            if (window.AutoNumberingService?.previewNext) {
+              const preview = await window.AutoNumberingService.previewNext(BUG_AUTO_NUMBER_ENTITY);
+              generatedCode = preview?.formattedCode || preview?.code || (typeof preview === 'string' ? preview : '');
+              consumeAutoNumber = async () => {
+                if (!window.AutoNumberingService?.consumeNext) return;
+                try {
+                  await window.AutoNumberingService.consumeNext(BUG_AUTO_NUMBER_ENTITY);
+                } catch (consumeErr) {
+                  console.error('Bug auto-number consume error:', consumeErr);
+                }
+              };
+            } else {
+              let reservedCode = '';
+              for (let i = 0; i < 3 && !reservedCode; i += 1) {
+                const { data: autoRow, error: autoRowErr } = await supabase
+                  .from('fm_auto_numbering')
+                  .select('id, prefix, suffix, number_length, current_number, is_active')
+                  .eq('entity_code', BUG_AUTO_NUMBER_ENTITY)
+                  .single();
+
+                if (autoRowErr) throw autoRowErr;
+                if (!autoRow || autoRow.is_active === false) {
+                  throw new Error('Auto numbering config for BUG_TRACKER is missing or inactive');
+                }
+
+                const currentNumber = Number(autoRow.current_number) || 0;
+                const nextNumber = currentNumber + 1;
+                const padLen = Math.max(1, Number(autoRow.number_length) || 6);
+                const prefix = autoRow.prefix || '';
+                const suffix = autoRow.suffix || '';
+
+                const { data: reservedRows, error: reserveErr } = await supabase
+                  .from('fm_auto_numbering')
+                  .update({
+                    current_number: nextNumber,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', autoRow.id)
+                  .eq('current_number', currentNumber)
+                  .select('id');
+
+                if (reserveErr) throw reserveErr;
+                if ((reservedRows || []).length) {
+                  reservedCode = `${prefix}${String(nextNumber).padStart(padLen, '0')}${suffix}`;
+                }
+              }
+
+              generatedCode = reservedCode;
             }
-            const preview = await window.AutoNumberingService.previewNext(BUG_AUTO_NUMBER_ENTITY);
-            generatedCode = preview?.formattedCode || preview?.code || (typeof preview === 'string' ? preview : '');
           }
           if (!generatedCode) {
             throw new Error('Could not generate bug code for BUG_TRACKER');
@@ -522,13 +567,7 @@
           if (error) throw error;
           bugId = data.id;
 
-          if (window.AutoNumberingService?.consumeNext) {
-            try {
-              await window.AutoNumberingService.consumeNext(BUG_AUTO_NUMBER_ENTITY);
-            } catch (consumeErr) {
-              console.error('Bug auto-number consume error:', consumeErr);
-            }
-          }
+          await consumeAutoNumber();
 
           payload.bug_code = generatedCode;
         }

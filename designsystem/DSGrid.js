@@ -626,7 +626,7 @@
 
     const getStickyStyles = (field, isAction = false, isHeader = false, isFooter = false) => {
       const bg = (isHeader || isFooter) ? (theme === 'dark' ? '#0f172a' : '#f1f5f9') : (theme === 'dark' ? '#1e293b' : '#ffffff'); 
-      if (isAction) return { position: 'sticky', [isRtl ? 'left' : 'right']: 0, zIndex: isHeader ? 50 : (isFooter ? 30 : 20), backgroundColor: bg };
+      if (isAction) return { position: 'sticky', [isRtl ? 'left' : 'right']: 0, zIndex: isHeader ? 60 : (isFooter ? 40 : 35), backgroundColor: bg };
       if (field === 'ROW_REORDER_COL') return { position: 'sticky', [isRtl ? 'right' : 'left']: 0, zIndex: isHeader ? 45 : (isFooter ? 25 : 15), backgroundColor: bg };
       if (field === 'SELECT_COL') return { position: 'sticky', [isRtl ? 'right' : 'left']: rowReorderable ? 30 : 0, zIndex: isHeader ? 45 : (isFooter ? 25 : 15), backgroundColor: bg };
 
@@ -959,7 +959,7 @@
                     ))}
                     
                     {filteredActions.length > 0 && (
-                      <td style={{...getStickyStyles('ACTIONS', true), backgroundColor: 'inherit', width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className={`p-1 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.01)] dark:shadow-none bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} border-slate-100 dark:border-slate-700/50`}>
+                      <td style={{...getStickyStyles('ACTIONS', true), width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className={`p-1 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none border-slate-100 dark:border-slate-700/50 ${isHighlighted ? 'bg-indigo-50/80 dark:bg-indigo-900/30' : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'}`}>
                         <div className="flex items-center justify-center gap-0.5">
                           {filteredActions.map((act, i) => {
                             if (act.hidden && act.hidden(row)) return null;
