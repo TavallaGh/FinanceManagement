@@ -626,7 +626,7 @@
 
     const getStickyStyles = (field, isAction = false, isHeader = false, isFooter = false) => {
       const bg = (isHeader || isFooter) ? (theme === 'dark' ? '#0f172a' : '#f1f5f9') : (theme === 'dark' ? '#1e293b' : '#ffffff'); 
-      if (isAction) return { position: 'sticky', [isRtl ? 'left' : 'right']: 0, zIndex: isHeader ? 60 : (isFooter ? 40 : 35), backgroundColor: bg };
+      if (isAction) return { position: 'sticky', [isRtl ? 'left' : 'right']: 0, zIndex: isHeader ? 50 : (isFooter ? 30 : 20), backgroundColor: bg };
       if (field === 'ROW_REORDER_COL') return { position: 'sticky', [isRtl ? 'right' : 'left']: 0, zIndex: isHeader ? 45 : (isFooter ? 25 : 15), backgroundColor: bg };
       if (field === 'SELECT_COL') return { position: 'sticky', [isRtl ? 'right' : 'left']: rowReorderable ? 30 : 0, zIndex: isHeader ? 45 : (isFooter ? 25 : 15), backgroundColor: bg };
 
