@@ -133,17 +133,32 @@
           nodes.forEach(n => { if (n.children.length > 0) { acc.add(String(n[idField])); extractIds(n.children, acc); } });
           return acc;
         };
-        setExpandedIds(extractIds(treeData, new Set(expandedIds)));
+        setExpandedIds((prev) => extractIds(treeData, new Set(prev)));
       }
     }, [searchTerm, treeData, idField]);
+
+    useEffect(() => {
+      const validIds = new Set((data || []).map((n) => String(n[idField])));
+      setExpandedIds((prev) => {
+        let changed = false;
+        const next = new Set();
+        prev.forEach((id) => {
+          if (validIds.has(id)) next.add(id);
+          else changed = true;
+        });
+        return changed ? next : prev;
+      });
+    }, [data, idField]);
 
     const toggleExpand = (id, e) => {
       if (e) e.stopPropagation();
       const strId = String(id);
-      const newExpanded = new Set(expandedIds);
-      if (newExpanded.has(strId)) newExpanded.delete(strId);
-      else newExpanded.add(strId);
-      setExpandedIds(newExpanded);
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(strId)) next.delete(strId);
+        else next.add(strId);
+        return next;
+      });
     };
 
     const expandAll = () => {
@@ -273,7 +288,7 @@
     );
   };
 
-  const TreeGrid = ({ data = [], columns = [], idField = 'id', parentField = 'parentId', actions = [], selectable = false, selectedIds = [], onSelectChange, onAddRoot, onAddChild, onDelete, onExport, onImport, onDownloadSample, language = 'fa', editingId, editData, onEditFieldChange, onSaveEdit, onCancelEdit, gridState, onGridStateChange, formCode }) => {
+  const TreeGrid = ({ data = [], columns = [], idField = 'id', parentField = 'parentId', actions = [], selectable = false, selectedIds = null, onSelectChange, onAddRoot, onAddChild, onDelete, onExport, onImport, onDownloadSample, language = 'fa', editingId, editData, onEditFieldChange, onSaveEdit, onCancelEdit, gridState, onGridStateChange, formCode, toolbarStartContent = null, toolbarEndContent = null, placeExpandControlsOnEnd = false, placeSearchBeforeExpandControls = false, exportFileName = null }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const globalMode = useCalendarMode ? useCalendarMode() : 'jalali';
@@ -309,9 +324,11 @@
     const [selectedRowId, setSelectedRowId] = useState(null);
     
     const colMenuRef = useRef(null);
+    const selectedIdsList = Array.isArray(selectedIds) ? selectedIds : [];
+    const selectedIdsFirst = selectedIdsList.length > 0 ? selectedIdsList[0] : null;
 
     useEffect(() => {
-      const activeId = editingId || selectedRowId || (selectedIds && selectedIds.length > 0 ? selectedIds[0] : null);
+      const activeId = editingId || selectedRowId || selectedIdsFirst;
       if (activeId && data && data.length > 0) {
         const parentsToExpand = new Set();
         let currentId = String(activeId);
@@ -337,7 +354,7 @@
           });
         }
       }
-    }, [editingId, selectedRowId, selectedIds, data, idField, parentField]);
+    }, [editingId, selectedRowId, selectedIdsFirst, data, idField, parentField]);
 
     useEffect(() => {
       if (gridState && gridState.hiddenCols) {
@@ -396,9 +413,22 @@
           nodes.forEach(n => { if (n.children.length > 0) { acc.add(String(n[idField])); extractIds(n.children, acc); } });
           return acc;
         };
-        setExpandedIds(extractIds(treeData, new Set(expandedIds)));
+        setExpandedIds((prev) => extractIds(treeData, new Set(prev)));
       }
     }, [searchTerm, treeData, idField]);
+
+    useEffect(() => {
+      const validIds = new Set((data || []).map((n) => String(n[idField])));
+      setExpandedIds((prev) => {
+        let changed = false;
+        const next = new Set();
+        prev.forEach((id) => {
+          if (validIds.has(id)) next.add(id);
+          else changed = true;
+        });
+        return changed ? next : prev;
+      });
+    }, [data, idField]);
 
     const flattenTree = (nodes, depth = 0) => {
       let result = [];
@@ -424,10 +454,35 @@
     const toggleExpand = (id, e) => {
       if (e) e.stopPropagation();
       const strId = String(id);
-      const newExpanded = new Set(expandedIds);
-      if (newExpanded.has(strId)) newExpanded.delete(strId);
-      else newExpanded.add(strId);
-      setExpandedIds(newExpanded);
+
+      const isDescendantOf = (targetId, ancestorId) => {
+        const target = String(targetId || '');
+        const ancestor = String(ancestorId || '');
+        if (!target || !ancestor || target === ancestor) return false;
+        let current = data.find((n) => String(n[idField]) === target) || null;
+        let guard = 0;
+        while (current && guard < 200) {
+          const parent = current[parentField] != null ? String(current[parentField]) : null;
+          if (!parent) return false;
+          if (parent === ancestor) return true;
+          current = data.find((n) => String(n[idField]) === parent) || null;
+          guard += 1;
+        }
+        return false;
+      };
+
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(strId)) {
+          next.delete(strId);
+          if (selectedRowId != null && isDescendantOf(selectedRowId, strId)) {
+            setSelectedRowId(id);
+          }
+        } else {
+          next.add(strId);
+        }
+        return next;
+      });
     };
 
     const expandAll = () => {
@@ -444,36 +499,49 @@
 
     const handleSelectCheckbox = (id) => {
       if (!onSelectChange) return;
-      if (selectedIds.includes(id)) onSelectChange(selectedIds.filter(rowId => rowId !== id));
-      else onSelectChange([...selectedIds, id]);
+      if (selectedIdsList.includes(id)) onSelectChange(selectedIdsList.filter(rowId => rowId !== id));
+      else onSelectChange([...selectedIdsList, id]);
     };
+
+    const expandControls = (
+      <>
+        <button onClick={expandAll} title={t('باز کردن همه', 'Expand All')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all"><Maximize2 size={14}/></button>
+        <button onClick={collapseAll} title={t('بستن همه', 'Collapse All')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all"><Minimize2 size={14}/></button>
+      </>
+    );
+
+    const searchControl = (
+      <div className="relative">
+        <Search size={14} className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-2' : 'left-2'} text-slate-400 dark:text-slate-500`} />
+        <input 
+          type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder={t('جستجو در درخت...', 'Search tree...')}
+          className={`w-48 h-8 text-[12px] font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-indigo-400 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all ${isRtl ? 'pr-7 pl-2' : 'pl-7 pr-2'}`}
+        />
+      </div>
+    );
 
     return (
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm flex flex-col font-sans h-full overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
-        <div className="flex items-center justify-between p-1.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 gap-2 shrink-0 overflow-x-auto custom-scrollbar">
-          <div className="flex items-center gap-1 shrink-0">
+        <div className="relative flex flex-wrap items-center justify-between p-1.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 gap-2 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 min-w-0">
             {onAddRoot && access.canCreate && <Button size="sm" variant="primary" icon={Plus} onClick={onAddRoot} className="h-8 px-3 text-[12px] shadow-sm">{t('افزودن ریشه', 'Add Root')}</Button>}
             {onAddRoot && access.canCreate && <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1"></div>}
-            <button onClick={expandAll} title={t('باز کردن همه', 'Expand All')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all"><Maximize2 size={14}/></button>
-            <button onClick={collapseAll} title={t('بستن همه', 'Collapse All')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all"><Minimize2 size={14}/></button>
+            {placeSearchBeforeExpandControls && searchControl}
+            {!placeExpandControlsOnEnd && expandControls}
+            {toolbarStartContent}
           </div>
           
-          <div className="flex items-center gap-1 shrink-0">
-            <div className="relative">
-              <Search size={14} className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-2' : 'left-2'} text-slate-400 dark:text-slate-500`} />
-              <input 
-                type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={t('جستجو در درخت...', 'Search tree...')}
-                className={`w-48 h-8 text-[12px] font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-indigo-400 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-400 dark:focus:ring-indigo-500 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all ${isRtl ? 'pr-7 pl-2' : 'pl-7 pr-2'}`}
-              />
-            </div>
+          <div className="flex items-center gap-1 shrink-0 min-w-0">
+            {toolbarEndContent}
+            {!placeSearchBeforeExpandControls && searchControl}
             
             <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
             
             <div className="relative flex items-center h-full" ref={colMenuRef}>
               <button onClick={() => setShowColMenu(!showColMenu)} title={t('نمایش/مخفی‌سازی ستون‌ها', 'Columns')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><Settings size={14} /></button>
               {showColMenu && (
-                <div className="absolute top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg p-2 z-50 min-w-[200px] right-0 animate-in zoom-in-95 duration-100">
+                <div className="absolute top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg p-2 min-w-[200px] right-0 animate-in zoom-in-95 duration-100" style={{ zIndex: 300 }}>
                   <div className="text-[12px] font-black text-slate-800 dark:text-slate-100 mb-2 pb-2 border-b border-slate-100 dark:border-slate-700 px-1">{t('نمایش / مخفی‌سازی', 'Show / Hide')}</div>
                   <div className="max-h-[250px] overflow-y-auto custom-scrollbar space-y-0.5">
                     {columns.map(c => (
@@ -497,18 +565,21 @@
               </>
             )}
             {onExport && access.canPrint && <button onClick={() => {
-                if(onExport) {
-                   const rows = flatData.map(row => visibleColumns.map(c => {
-                     let val = row[c.field];
-                     if (c.type === 'date' && formatGlobalDate) val = formatGlobalDate(val, globalMode);
-                     return `"${(val || '').toString().replace(/"/g, '""')}"`;
-                   }).join(',')).join('\n');
-                   const headers = visibleColumns.map(c => t(c.header_fa, c.header_en)).join(',');
-                   const csv = '\uFEFF' + headers + '\n' + rows;
-                   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                   const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.setAttribute('download', `tree_export_${new Date().getTime()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                }
+                const rows = flatData.map(row => visibleColumns.map(c => {
+                  let val = c.exportValue ? c.exportValue(row[c.field], row) : row[c.field];
+                  if (c.type === 'date' && formatGlobalDate) val = formatGlobalDate(val, globalMode);
+                  if (val && typeof val === 'object') val = JSON.stringify(val);
+                  return `"${(val || '').toString().replace(/"/g, '""')}"`;
+                }).join(',')).join('\n');
+                const headers = visibleColumns.map(c => t(c.header_fa, c.header_en)).join(',');
+                const csv = '\uFEFF' + headers + '\n' + rows;
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
+                link.setAttribute('download', exportFileName || `tree_export_${new Date().getTime()}.csv`);
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                onExport && onExport({ rows: flatData, columns: visibleColumns });
             }} title={t('خروجی اکسل', 'Export Excel')} className="p-1 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all"><FileSpreadsheet size={14} /></button>}
+            {placeExpandControlsOnEnd && expandControls}
           </div>
         </div>
 
@@ -518,7 +589,7 @@
               <tr>
                 {selectable && (
                   <th className={`p-1.5 border-b border-slate-200 dark:border-slate-700 text-center bg-slate-100 dark:bg-slate-900 w-10 sticky ${isRtl ? 'right-0' : 'left-0'} z-50 ${isRtl ? 'border-l' : 'border-r'}`}>
-                    <input type="checkbox" onChange={handleSelectAll} checked={flatData.length > 0 && selectedIds.length === flatData.length} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-500 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer" />
+                    <input type="checkbox" onChange={handleSelectAll} checked={flatData.length > 0 && selectedIdsList.length === flatData.length} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-500 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer" />
                   </th>
                 )}
                 {visibleColumns.map((col, index) => (
@@ -536,7 +607,7 @@
             <tbody className="z-10 relative">
               {flatData.length > 0 ? flatData.map((row, rowIndex) => {
                 const strId = String(row[idField]);
-                const isSelectedCheckbox = selectedIds.map(String).includes(strId);
+                const isSelectedCheckbox = selectedIdsList.map(String).includes(strId);
                 const isSelectedRow = String(selectedRowId) === strId;
                 const isEditing = String(editingId) === strId;
                 const hasChildren = row.children && row.children.length > 0;
@@ -546,8 +617,10 @@
                   <tr 
                     key={strId} 
                     onClick={() => setSelectedRowId(row[idField])}
-                    className={`bg-white dark:bg-slate-800 transition-colors group border-b border-slate-100 dark:border-slate-700/50 
-                      ${isSelectedRow || isEditing ? 'bg-indigo-50/50 dark:bg-indigo-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                    className={`transition-colors group border-b border-slate-100 dark:border-slate-700/50 
+                      ${isSelectedRow || isEditing
+                        ? 'bg-indigo-50/50 dark:bg-indigo-900/30'
+                        : (row._rowClassName || 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50')}`}
                   >
                     {selectable && (
                       <td className={`p-1.5 text-center bg-inherit sticky ${isRtl ? 'right-0' : 'left-0'} z-20 ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>

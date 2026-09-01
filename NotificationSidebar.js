@@ -15,6 +15,7 @@
     'fm_coa_accounts':   ['ChartOfAccountsMain'],
     'fm_brokers':        ['BrokerManagement'],
     'fm_broker_contracts': ['BrokerContract'],
+    'bt_bugs':           ['BugTracker'],
   };
 
   // Map form component name → formCode used in SecurityContext permissions
@@ -28,6 +29,7 @@
     'ChartOfAccountsMain':'CHART_OF_ACCOUNTS_MAIN',
     'BrokerManagement':   'BROKER_MANAGEMENT',
     'BrokerContract':     'BROKER_CONTRACT',
+    'BugTracker':         'BUG_TRACKER',
   };
 
   const NotificationSidebar = ({ isOpen, onClose, language = 'fa', onUpdateUnread }) => {

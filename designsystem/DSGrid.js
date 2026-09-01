@@ -202,7 +202,7 @@
     );
   };
 
-  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, onSearch, language = 'fa', defaultOpen = false, initialValues, children }) => {
+  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, onSearch, language = 'fa', defaultOpen = false, initialValues, children, inlineChildren = false, gridClassName = 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -243,7 +243,7 @@
         </div>
         {isOpen && (
           <div className="p-3 border-t border-slate-100 dark:border-slate-700/50 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+            <div className={gridClassName}>
               {fields.map((f, idx) => {
                 if (f.type === 'select') return <SelectField key={idx} size="sm" label={f.label} isRtl={isRtl} options={f.options} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} />;
                 if (f.type === 'toggle') return <ToggleField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
@@ -259,11 +259,14 @@
                 if (f.type === 'date') return <DatePicker key={idx} size="sm" label={f.label} isRtl={isRtl} language={language} value={values[f.name] || ''} onChange={(val) => handleChange(f.name, val)} />;
                 return <TextField key={idx} size="sm" label={f.label} isRtl={isRtl} type={f.type} placeholder={f.type === 'date' ? 'YYYY/MM/DD' : ''} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} dir={f.type === 'date' || !isRtl ? 'ltr' : 'rtl'} />;
               })}
+              {inlineChildren && children}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-              <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                {children}
-              </div>
+            <div className={`flex flex-wrap items-center gap-4 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 ${inlineChildren ? 'justify-end' : 'justify-between'}`}>
+              {!inlineChildren && (
+                <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                  {children}
+                </div>
+              )}
               <div className="flex items-center gap-2 shrink-0 mr-auto">
                 <Button variant="ghost" size="sm" icon={Trash2} onClick={handleClear}>{t('پاک کردن', 'Clear')}</Button>
                 <Button variant="primary" size="sm" icon={Search} onClick={() => {

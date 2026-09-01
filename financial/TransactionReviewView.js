@@ -18,6 +18,7 @@
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
   const DSGrid = window.DSGrid || DS || {};
+  const DSTree = window.DSTree || DS || {};
   const DSForms = window.DSForms || DS || {};
   const DSFeedback = window.DSFeedback || DS || {};
 
@@ -27,6 +28,7 @@
   const Button = Core.Button || FallbackComponent;
   const Tabs = Core.Tabs || FallbackComponent;
   const DataGrid = DSGrid.DataGrid || FallbackComponent;
+  const TreeGrid = DSTree.TreeGrid || FallbackComponent;
   const AdvancedFilter = DSGrid.AdvancedFilter || FallbackComponent;
   const AttachmentManager = DSForms.AttachmentManager || FallbackComponent;
   const Modal = DSFeedback.Modal || FallbackComponent;
@@ -122,6 +124,9 @@
     const [itemsGridState, setItemsGridState] = useState(() => ({
       hiddenCols: ['_doc_id', '_tx', 'exchange_rate_to_usd', 'cost_type_id', 'income_type_id', 'center_id'],
     }));
+    const [costsGridState, setCostsGridState] = useState(null);
+    const [incomesGridState, setIncomesGridState] = useState(null);
+    const [centersGridState, setCentersGridState] = useState(null);
 
     useEffect(() => {
       setItemsGridState(prev => {
@@ -139,6 +144,9 @@
         activeTab,
         documentsGridState,
         itemsGridState,
+        costsGridState,
+        incomesGridState,
+        centersGridState,
       }),
       onApplyState: (state) => {
         if (!state) {
@@ -146,14 +154,20 @@
           setActiveTab('documents');
           setDocumentsGridState(null);
           setItemsGridState({ hiddenCols: ['_doc_id', '_tx', 'exchange_rate_to_usd', 'cost_type_id', 'income_type_id', 'center_id'] });
+          setCostsGridState(null);
+          setIncomesGridState(null);
+          setCentersGridState(null);
           return;
         }
         if (state.filterState) setFilterState(state.filterState);
         if (state.activeTab) setActiveTab(state.activeTab);
         if (state.documentsGridState) setDocumentsGridState(state.documentsGridState);
         if (state.itemsGridState) setItemsGridState(state.itemsGridState);
+        if (state.costsGridState) setCostsGridState(state.costsGridState);
+        if (state.incomesGridState) setIncomesGridState(state.incomesGridState);
+        if (state.centersGridState) setCentersGridState(state.centersGridState);
       },
-    }), [activeTab, filterState, itemsGridState, documentsGridState, setActiveTab, setFilterState]);
+    }), [activeTab, filterState, itemsGridState, documentsGridState, costsGridState, incomesGridState, centersGridState, setActiveTab, setFilterState]);
 
     const COST_TYPE_LOOKUP = useMemo(() => new Map((lookups.costTypes || []).map(item => [String(item.id), item])), [lookups.costTypes]);
     const INCOME_TYPE_LOOKUP = useMemo(() => new Map((lookups.incomeTypes || []).map(item => [String(item.id), item])), [lookups.incomeTypes]);
@@ -272,15 +286,417 @@
 
     const getRemainedAmount = (row) => row?.remained_amount ?? row?._balance_after;
 
+    const formatDateTime = useCallback((value) => {
+      if (!value) return '-';
+      try {
+        return new Intl.DateTimeFormat(dateLocale, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(new Date(value));
+      } catch {
+        return String(value);
+      }
+    }, [dateLocale]);
+
+    const openDocumentDrill = useCallback((row) => {
+      if (!row) return;
+      const docFromRow = row._tx || {
+        id: row._doc_id || row.transaction_id || row.id,
+        document_code: row._doc_code || row.document_code || '',
+        document_date: row._doc_date || row.document_date || '',
+        transaction_type: row._tx_type || row.transaction_type || '',
+        status: row._tx_status || row.status || '',
+        reference_code: row._tx?.reference_code || row.reference_code || '',
+        description: row._tx?.description || row.description || '',
+        registrar_id: row._tx?.registrar_id || row.registrar_id || '',
+        reviewed_by_name: row._tx?.reviewed_by_name || row.reviewed_by_name || '',
+        approved_by_name: row._tx?.approved_by_name || row.approved_by_name || '',
+        reviewed_at: row._tx?.reviewed_at || row.reviewed_at || '',
+        approved_at: row._tx?.approved_at || row.approved_at || '',
+        created_at: row._tx?.created_at || row.created_at || '',
+        registered_at: row._tx?.registered_at || row.registered_at || '',
+        department_id: row._tx?.department_id || row.department_id || '',
+        daily_number: row._tx?.daily_number || row.daily_number || '',
+      };
+      if (!docFromRow?.id && !docFromRow?.document_code) return;
+      setDrillDoc(docFromRow);
+    }, [setDrillDoc]);
+
+    const toNum = (value) => {
+      const numeric = parseFloat(value || 0);
+      return Number.isFinite(numeric) ? numeric : 0;
+    };
+
+    const getTypeLabel = useCallback((lookupMap, id, fallback) => {
+      const item = lookupMap.get(String(id || ''));
+      if (!item) return fallback;
+      return isRtl
+        ? (item.displayLabel || item.titleFa || item.title_fa || item.titleEn || item.title_en || item.code || fallback)
+        : (item.displayLabel || item.titleEn || item.title_en || item.titleFa || item.title_fa || item.code || fallback);
+    }, [isRtl]);
+
+    const getCenterLabel = useCallback((id) => {
+      const item = CENTER_LOOKUP.get(String(id || ''));
+      if (!item) return t('بدون مرکز', 'No Center');
+      return isRtl
+        ? (item.title_fa || item.titleFa || item.title_en || item.titleEn || t('بدون عنوان', 'Untitled'))
+        : (item.title_en || item.titleEn || item.title_fa || item.titleFa || t('Untitled', 'بدون عنوان'));
+    }, [CENTER_LOOKUP, isRtl, t]);
+
+    const getItemAmountByGroup = useCallback((row) => {
+      const dep = toNum(row.deposit_amount);
+      const wid = toNum(row.withdrawal_amount);
+      const raw = dep > 0 ? dep : wid;
+      return raw;
+    }, []);
+
+    const groupedCostRows = useMemo(() => {
+      const bucket = new Map();
+      const totalDocs = new Set();
+      let totalItems = 0;
+      let totalAmount = 0;
+
+      (itemsGridData || []).forEach((row) => {
+        if (String(row.transaction_group || '').toUpperCase() !== 'COST') return;
+        const key = String(row.cost_type_id || '__unknown_cost__');
+        if (!bucket.has(key)) {
+          bucket.set(key, {
+            _groupKey: key,
+            _groupLabel: key === '__unknown_cost__' ? t('نامشخص', 'Unknown') : getTypeLabel(COST_TYPE_LOOKUP, row.cost_type_id, t('نامشخص', 'Unknown')),
+            item_count: 0,
+            amount_total: 0,
+            _docs: new Set(),
+            _items: [],
+          });
+        }
+
+        const entry = bucket.get(key);
+        const amount = getItemAmountByGroup(row);
+        entry.item_count += 1;
+        entry.amount_total += amount;
+        entry._docs.add(String(row._doc_id || ''));
+        entry._items.push(row);
+
+        totalItems += 1;
+        totalAmount += amount;
+        totalDocs.add(String(row._doc_id || ''));
+      });
+
+      const sortedGroups = Array.from(bucket.values())
+        .map((entry) => ({
+          ...entry,
+          doc_count: entry._docs.size,
+        }))
+        .sort((a, b) => toNum(b.amount_total) - toNum(a.amount_total));
+
+      const rows = [];
+      sortedGroups.forEach((entry) => {
+        const groupRowId = `cost-g-${entry._groupKey}`;
+        rows.push({
+          _rowId: groupRowId,
+          _parentRowId: null,
+          _nodeType: 'group',
+          _treeLabel: entry._groupLabel,
+          _groupLabel: entry._groupLabel,
+          _doc_code: entry._groupLabel,
+          _tx_type: `${fmt(entry.item_count)} ${t('قلم', 'items')} / ${fmt(entry.doc_count)} ${t('سند', 'docs')}`,
+          description: t('جمع گروه هزینه', 'Cost group summary'),
+          deposit_amount: entry.amount_total,
+          withdrawal_amount: 0,
+          remained_amount: entry.amount_total,
+          item_count: entry.item_count,
+          doc_count: entry.doc_count,
+          amount_total: entry.amount_total,
+        });
+
+        (entry._items || []).forEach((item, idx) => {
+          const itemId = item.id || `${item._doc_id || 'doc'}-${item.row_number || idx}`;
+          rows.push({
+            ...item,
+            _rowId: `cost-i-${entry._groupKey}-${itemId}-${idx}`,
+            _parentRowId: groupRowId,
+            _nodeType: 'item',
+            _treeLabel: '',
+            _groupLabel: '',
+            item_count: '',
+            doc_count: '',
+            amount_total: getItemAmountByGroup(item),
+          });
+        });
+      });
+
+      rows.push({
+        _rowId: 'cost-total',
+        _parentRowId: null,
+        _nodeType: 'total',
+        _rowClassName: 'bg-slate-100/80 dark:bg-slate-700/40 font-bold',
+        _treeLabel: t('جمع کل', 'Grand Total'),
+        _groupLabel: t('جمع کل', 'Grand Total'),
+        _doc_code: t('جمع کل هزینه‌ها', 'Costs Grand Total'),
+        _tx_type: `${fmt(totalItems)} ${t('قلم', 'items')} / ${fmt(totalDocs.size)} ${t('سند', 'docs')}`,
+        description: t('جمع کل همه گروه‌های هزینه', 'Total of all cost groups'),
+        deposit_amount: totalAmount,
+        withdrawal_amount: 0,
+        remained_amount: totalAmount,
+        item_count: totalItems,
+        doc_count: totalDocs.size,
+        amount_total: totalAmount,
+        _isTotal: true,
+      });
+      return rows;
+    }, [itemsGridData, t, getTypeLabel, COST_TYPE_LOOKUP, getItemAmountByGroup]);
+
+    const groupedIncomeRows = useMemo(() => {
+      const bucket = new Map();
+      const totalDocs = new Set();
+      let totalItems = 0;
+      let totalAmount = 0;
+
+      (itemsGridData || []).forEach((row) => {
+        if (String(row.transaction_group || '').toUpperCase() !== 'INCOME') return;
+        const key = String(row.income_type_id || '__unknown_income__');
+        if (!bucket.has(key)) {
+          bucket.set(key, {
+            _groupKey: key,
+            _groupLabel: key === '__unknown_income__' ? t('نامشخص', 'Unknown') : getTypeLabel(INCOME_TYPE_LOOKUP, row.income_type_id, t('نامشخص', 'Unknown')),
+            item_count: 0,
+            amount_total: 0,
+            _docs: new Set(),
+            _items: [],
+          });
+        }
+
+        const entry = bucket.get(key);
+        const amount = getItemAmountByGroup(row);
+        entry.item_count += 1;
+        entry.amount_total += amount;
+        entry._docs.add(String(row._doc_id || ''));
+        entry._items.push(row);
+
+        totalItems += 1;
+        totalAmount += amount;
+        totalDocs.add(String(row._doc_id || ''));
+      });
+
+      const sortedGroups = Array.from(bucket.values())
+        .map((entry) => ({
+          ...entry,
+          doc_count: entry._docs.size,
+        }))
+        .sort((a, b) => toNum(b.amount_total) - toNum(a.amount_total));
+
+      const rows = [];
+      sortedGroups.forEach((entry) => {
+        const groupRowId = `income-g-${entry._groupKey}`;
+        rows.push({
+          _rowId: groupRowId,
+          _parentRowId: null,
+          _nodeType: 'group',
+          _treeLabel: entry._groupLabel,
+          _groupLabel: entry._groupLabel,
+          _doc_code: entry._groupLabel,
+          _tx_type: `${fmt(entry.item_count)} ${t('قلم', 'items')} / ${fmt(entry.doc_count)} ${t('سند', 'docs')}`,
+          description: t('جمع گروه درآمد', 'Income group summary'),
+          deposit_amount: entry.amount_total,
+          withdrawal_amount: 0,
+          remained_amount: entry.amount_total,
+          item_count: entry.item_count,
+          doc_count: entry.doc_count,
+          amount_total: entry.amount_total,
+        });
+
+        (entry._items || []).forEach((item, idx) => {
+          const itemId = item.id || `${item._doc_id || 'doc'}-${item.row_number || idx}`;
+          rows.push({
+            ...item,
+            _rowId: `income-i-${entry._groupKey}-${itemId}-${idx}`,
+            _parentRowId: groupRowId,
+            _nodeType: 'item',
+            _treeLabel: '',
+            _groupLabel: '',
+            item_count: '',
+            doc_count: '',
+            amount_total: getItemAmountByGroup(item),
+          });
+        });
+      });
+
+      rows.push({
+        _rowId: 'income-total',
+        _parentRowId: null,
+        _nodeType: 'total',
+        _rowClassName: 'bg-slate-100/80 dark:bg-slate-700/40 font-bold',
+        _treeLabel: t('جمع کل', 'Grand Total'),
+        _groupLabel: t('جمع کل', 'Grand Total'),
+        _doc_code: t('جمع کل درآمدها', 'Incomes Grand Total'),
+        _tx_type: `${fmt(totalItems)} ${t('قلم', 'items')} / ${fmt(totalDocs.size)} ${t('سند', 'docs')}`,
+        description: t('جمع کل همه گروه‌های درآمد', 'Total of all income groups'),
+        deposit_amount: totalAmount,
+        withdrawal_amount: 0,
+        remained_amount: totalAmount,
+        item_count: totalItems,
+        doc_count: totalDocs.size,
+        amount_total: totalAmount,
+        _isTotal: true,
+      });
+      return rows;
+    }, [itemsGridData, t, getTypeLabel, INCOME_TYPE_LOOKUP, getItemAmountByGroup]);
+
+    const groupedCenterRows = useMemo(() => {
+      const bucket = new Map();
+      const totalDocs = new Set();
+      let totalItems = 0;
+      let totalCost = 0;
+      let totalIncome = 0;
+
+      (itemsGridData || []).forEach((row) => {
+        const group = String(row.transaction_group || '').toUpperCase();
+        if (group !== 'COST' && group !== 'INCOME') return;
+        const key = String(row.center_id || '__no_center__');
+        if (!bucket.has(key)) {
+          bucket.set(key, {
+            _groupKey: key,
+            _groupLabel: getCenterLabel(row.center_id),
+            item_count: 0,
+            cost_total: 0,
+            income_total: 0,
+            net_total: 0,
+            _docs: new Set(),
+            _items: [],
+          });
+        }
+
+        const entry = bucket.get(key);
+        const amount = getItemAmountByGroup(row);
+
+        if (group === 'COST') {
+          entry.cost_total += amount;
+          totalCost += amount;
+        }
+        if (group === 'INCOME') {
+          entry.income_total += amount;
+          totalIncome += amount;
+        }
+
+        entry.net_total = entry.income_total - entry.cost_total;
+        entry.item_count += 1;
+        entry._docs.add(String(row._doc_id || ''));
+        entry._items.push(row);
+
+        totalItems += 1;
+        totalDocs.add(String(row._doc_id || ''));
+      });
+
+      const sortedGroups = Array.from(bucket.values())
+        .map((entry) => ({
+          ...entry,
+          doc_count: entry._docs.size,
+        }))
+        .sort((a, b) => Math.abs(toNum(b.net_total)) - Math.abs(toNum(a.net_total)));
+
+      const rows = [];
+      sortedGroups.forEach((entry) => {
+        const groupRowId = `center-g-${entry._groupKey}`;
+        rows.push({
+          _rowId: groupRowId,
+          _parentRowId: null,
+          _nodeType: 'group',
+          _treeLabel: entry._groupLabel,
+          _groupLabel: entry._groupLabel,
+          _doc_code: entry._groupLabel,
+          _tx_type: `${fmt(entry.item_count)} ${t('قلم', 'items')} / ${fmt(entry.doc_count)} ${t('سند', 'docs')}`,
+          description: t('جمع مرکز هزینه/درآمد', 'Cost/Income center summary'),
+          deposit_amount: entry.income_total,
+          withdrawal_amount: entry.cost_total,
+          remained_amount: entry.net_total,
+          item_count: entry.item_count,
+          doc_count: entry.doc_count,
+          cost_total: entry.cost_total,
+          income_total: entry.income_total,
+          net_total: entry.net_total,
+        });
+
+        (entry._items || []).forEach((item, idx) => {
+          const amount = getItemAmountByGroup(item);
+          const group = String(item.transaction_group || '').toUpperCase();
+          const itemId = item.id || `${item._doc_id || 'doc'}-${item.row_number || idx}`;
+          rows.push({
+            ...item,
+            _rowId: `center-i-${entry._groupKey}-${itemId}-${idx}`,
+            _parentRowId: groupRowId,
+            _nodeType: 'item',
+            _treeLabel: '',
+            _groupLabel: '',
+            item_count: '',
+            doc_count: '',
+            cost_total: group === 'COST' ? amount : 0,
+            income_total: group === 'INCOME' ? amount : 0,
+            net_total: group === 'INCOME' ? amount : -amount,
+          });
+        });
+      });
+
+      rows.push({
+        _rowId: 'center-total',
+        _parentRowId: null,
+        _nodeType: 'total',
+        _rowClassName: 'bg-slate-100/80 dark:bg-slate-700/40 font-bold',
+        _treeLabel: t('جمع کل', 'Grand Total'),
+        _groupLabel: t('جمع کل', 'Grand Total'),
+        _doc_code: t('جمع کل مراکز', 'Centers Grand Total'),
+        _tx_type: `${fmt(totalItems)} ${t('قلم', 'items')} / ${fmt(totalDocs.size)} ${t('سند', 'docs')}`,
+        description: t('جمع کل همه مراکز', 'Total of all centers'),
+        deposit_amount: totalIncome,
+        withdrawal_amount: totalCost,
+        remained_amount: totalIncome - totalCost,
+        item_count: totalItems,
+        doc_count: totalDocs.size,
+        cost_total: totalCost,
+        income_total: totalIncome,
+        net_total: totalIncome - totalCost,
+        _isTotal: true,
+      });
+      return rows;
+    }, [itemsGridData, getCenterLabel, t, getItemAmountByGroup]);
+
     const itemsColumns = useMemo(() => [
-      { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px]' }, val || '-') },
-      { field: '_tx_type', header_fa: 'نوع سند', header_en: 'Doc Type', width: '90px', render: (val) => React.createElement('span', { className: 'text-[12px]' }, txTypes[val] || val || '-') },
+      { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val, row) => {
+        if (row._isTotal) {
+          return React.createElement('span', { className: 'text-[12px] font-black text-slate-800 dark:text-slate-100' }, val || '-');
+        }
+        if (row._nodeType === 'group') {
+          return React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-200' }, val || '-');
+        }
+        return React.createElement('button', {
+          type: 'button',
+          className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px] hover:underline cursor-pointer',
+          onClick: () => openDocumentDrill(row),
+          title: t('کلیک کنید تا سند مرتبط نمایش داده شود', 'Click to open the related document')
+        }, val || '-');
+      }},
+      { field: '_tx_type', header_fa: 'نوع سند', header_en: 'Doc Type', width: '130px', render: (val, row) => {
+        if (row._nodeType && row._nodeType !== 'item') return React.createElement('span', { className: 'text-[12px] font-semibold text-slate-600 dark:text-slate-300' }, val || '-');
+        return React.createElement('span', { className: 'text-[12px]' }, txTypes[val] || val || '-');
+      }},
       { field: '_doc_date', header_fa: 'تاریخ سند', header_en: 'Doc Date', width: '90px', render: (val) => React.createElement('span', { className: 'text-[12px]' }, fmtDate(val) || '-') },
       { field: '_tx_status', header_fa: 'وضعیت سند', header_en: 'Document Status', width: '95px', render: (val) => {
         const label = statusLabels[val] || val || '-';
         return React.createElement(Badge, { variant: statusColors[val] || 'gray', size: 'sm' }, label);
       }},
-      { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px', render: (_, __, rowIndex) => React.createElement('span', { className: 'text-[12px] font-medium text-slate-600 dark:text-slate-400' }, rowIndex + 1) },
+      { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px', render: (val, row, rowIndex) => {
+        if (row._nodeType && row._nodeType !== 'item') {
+          return React.createElement('span', { className: 'text-[12px] font-medium text-slate-600 dark:text-slate-400' }, '-');
+        }
+        const actualRowNumber = row.row_number ?? val;
+        if (actualRowNumber !== null && actualRowNumber !== undefined && String(actualRowNumber).trim() !== '') {
+          return React.createElement('span', { className: 'text-[12px] font-medium text-slate-600 dark:text-slate-400' }, String(actualRowNumber));
+        }
+        const fallbackIndex = Number.isFinite(rowIndex) ? rowIndex + 1 : '-';
+        return React.createElement('span', { className: 'text-[12px] font-medium text-slate-600 dark:text-slate-400' }, fallbackIndex);
+      } },
       { field: '_account', header_fa: 'حساب', header_en: 'Account', width: '200px', exportValue: (_, row) => getAccountExportLabel(row), render: (_, row) => {
         const acc = accountsMap.get(String(row.account_id || ''));
         if (!acc) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
@@ -301,9 +717,21 @@
           React.createElement('span', { className: 'text-[10px] text-slate-500' }, `1 $ = ${fmt(row.exchange_rate_usd_to_irr)} ﷼`)
         );
       }},
-      { field: 'deposit_amount', header_fa: 'واریز', header_en: 'Deposit', width: '110px', exportValue: (val) => fmt(val), render: (val, row) => React.createElement(AmountCell, { amount: val, usd: row.dep_usd, irr: row.dep_irr, cur: row.currency, isDeposit: true }) },
-      { field: 'withdrawal_amount', header_fa: 'برداشت', header_en: 'Withdrawal', width: '110px', exportValue: (val) => fmt(val), render: (val, row) => React.createElement(AmountCell, { amount: val, usd: row.wid_usd, irr: row.wid_irr, cur: row.currency, isDeposit: false }) },
-      { field: 'remained_amount', header_fa: 'مانده حساب', header_en: 'Account Balance', width: '120px', exportValue: (_, row) => fmt(getRemainedAmount(row)), render: (_, row) => React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300', dir: 'ltr' }, fmt(getRemainedAmount(row)))},      
+      { field: 'deposit_amount', header_fa: 'واریز', header_en: 'Deposit', width: '110px', exportValue: (val) => fmt(val), render: (val, row) => {
+        if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-emerald-700 dark:text-emerald-300', dir: 'ltr' }, fmt(val || 0));
+        if (row._nodeType === 'group') return React.createElement('span', { className: 'text-[12px] font-bold text-emerald-700 dark:text-emerald-300', dir: 'ltr' }, fmt(val || 0));
+        return React.createElement(AmountCell, { amount: val, usd: row.dep_usd, irr: row.dep_irr, cur: row.currency, isDeposit: true });
+      }},
+      { field: 'withdrawal_amount', header_fa: 'برداشت', header_en: 'Withdrawal', width: '110px', exportValue: (val) => fmt(val), render: (val, row) => {
+        if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-rose-700 dark:text-rose-300', dir: 'ltr' }, fmt(val || 0));
+        if (row._nodeType === 'group') return React.createElement('span', { className: 'text-[12px] font-bold text-rose-700 dark:text-rose-300', dir: 'ltr' }, fmt(val || 0));
+        return React.createElement(AmountCell, { amount: val, usd: row.wid_usd, irr: row.wid_irr, cur: row.currency, isDeposit: false });
+      }},
+      { field: 'remained_amount', header_fa: 'مانده حساب', header_en: 'Account Balance', width: '120px', exportValue: (_, row) => fmt(getRemainedAmount(row)), render: (_, row) => {
+        if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-amber-700 dark:text-amber-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
+        if (row._nodeType === 'group') return React.createElement('span', { className: 'text-[12px] font-bold text-amber-700 dark:text-amber-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
+        return React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
+      }},      
       { field: 'deposit_amount_usd', header_fa: 'واریز به دلار', header_en: 'Deposit (USD)', width: '95px', exportOnly: true, exportValue: (_, row) => fmt(row.dep_usd) },
       { field: 'withdrawal_amount_usd', header_fa: 'برداشت به دلار', header_en: 'Withdrawal (USD)', width: '95px', exportOnly: true, exportValue: (_, row) => fmt(row.wid_usd) },
       { field: 'exchange_rate_usd_to_irr', header_fa: 'نرخ تبدیل', header_en: 'Exchange Rate to IRR', width: '95px', exportOnly: true, exportValue: (val) => fmt(val) },
@@ -324,7 +752,137 @@
         return React.createElement('span', { className: 'text-[12px] truncate block', title: label }, label);
       }},
       { field: 'description', header_fa: 'شرح قلم', header_en: 'Item Desc.', width: '200px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block max-w-xs', title: val }, val || '-') },
-    ], [accountsMap, fmtDate, isRtl, txActions, txGroups, txTypes, statusLabels, statusColors, COST_TYPE_LOOKUP, INCOME_TYPE_LOOKUP, CENTER_LOOKUP, showCurrencySummary, setDrillDoc]);
+    ], [accountsMap, fmtDate, isRtl, txActions, txGroups, txTypes, statusLabels, statusColors, COST_TYPE_LOOKUP, INCOME_TYPE_LOOKUP, CENTER_LOOKUP, showCurrencySummary, openDocumentDrill, t]);
+
+    const groupedCommonColumns = useMemo(() => [
+      {
+        field: '_groupLabel',
+        header_fa: 'گروه',
+        header_en: 'Group',
+        width: '260px',
+        render: (val, row) => React.createElement('span', {
+          className: row._isTotal
+            ? 'inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-black bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200'
+            : row._nodeType === 'item'
+              ? 'text-[12px] text-slate-300 dark:text-slate-600'
+              : 'text-[12px] font-semibold text-slate-700 dark:text-slate-300'
+        }, row._nodeType === 'item' ? '—' : (val || '-'))
+      },
+      {
+        field: 'item_count',
+        header_fa: 'تعداد اقلام',
+        header_en: 'Items Count',
+        width: '110px',
+        render: (val, row) => React.createElement('span', {
+          className: row._isTotal
+            ? 'inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-black bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100'
+            : 'text-[12px] tabular-nums text-slate-700 dark:text-slate-300',
+          dir: 'ltr'
+        }, row._nodeType === 'item' ? '—' : fmt(val || 0))
+      },
+      {
+        field: 'doc_count',
+        header_fa: 'تعداد اسناد',
+        header_en: 'Documents Count',
+        width: '120px',
+        render: (val, row) => React.createElement('span', {
+          className: row._isTotal
+            ? 'inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-black bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100'
+            : 'text-[12px] tabular-nums text-slate-700 dark:text-slate-300',
+          dir: 'ltr'
+        }, row._nodeType === 'item' ? '—' : fmt(val || 0))
+      },
+    ], []);
+
+    const costsGroupedColumns = useMemo(() => ([
+      ...groupedCommonColumns,
+      {
+        field: 'amount_total',
+        header_fa: 'جمع مبلغ هزینه',
+        header_en: 'Total Cost Amount',
+        width: '180px',
+        render: (val, row) => React.createElement('span', {
+          className: row._isTotal
+            ? 'inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-black bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'
+            : `text-[12px] tabular-nums ${row._nodeType === 'item' ? 'text-rose-500 dark:text-rose-400' : 'font-semibold text-rose-600 dark:text-rose-400'}`,
+          dir: 'ltr'
+        }, fmt(val || 0))
+      }
+    ]), [groupedCommonColumns]);
+
+    const incomesGroupedColumns = useMemo(() => ([
+      ...groupedCommonColumns,
+      {
+        field: 'amount_total',
+        header_fa: 'جمع مبلغ درآمد',
+        header_en: 'Total Income Amount',
+        width: '180px',
+        render: (val, row) => React.createElement('span', {
+          className: row._isTotal
+            ? 'inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+            : `text-[12px] tabular-nums ${row._nodeType === 'item' ? 'text-emerald-500 dark:text-emerald-400' : 'font-semibold text-emerald-600 dark:text-emerald-400'}`,
+          dir: 'ltr'
+        }, fmt(val || 0))
+      }
+    ]), [groupedCommonColumns]);
+
+    const centersGroupedColumns = useMemo(() => ([
+      ...groupedCommonColumns,
+      {
+        field: 'cost_total',
+        header_fa: 'جمع هزینه',
+        header_en: 'Total Cost',
+        width: '160px',
+        render: (val, row) => React.createElement('span', {
+          className: row._isTotal
+            ? 'inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-black bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'
+            : `text-[12px] tabular-nums ${row._nodeType === 'item' ? 'text-rose-500 dark:text-rose-400' : 'font-semibold text-rose-600 dark:text-rose-400'}`,
+          dir: 'ltr'
+        }, fmt(val || 0))
+      },
+      {
+        field: 'income_total',
+        header_fa: 'جمع درآمد',
+        header_en: 'Total Income',
+        width: '160px',
+        render: (val, row) => React.createElement('span', {
+          className: row._isTotal
+            ? 'inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+            : `text-[12px] tabular-nums ${row._nodeType === 'item' ? 'text-emerald-500 dark:text-emerald-400' : 'font-semibold text-emerald-600 dark:text-emerald-400'}`,
+          dir: 'ltr'
+        }, fmt(val || 0))
+      },
+      {
+        field: 'net_total',
+        header_fa: 'خالص (درآمد - هزینه)',
+        header_en: 'Net (Income - Cost)',
+        width: '170px',
+        render: (val, row) => {
+          const numeric = toNum(val);
+          const color = numeric >= 0
+            ? (row._isTotal ? 'inline-flex items-center rounded-md px-2 py-0.5 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 font-black' : 'font-semibold text-indigo-600 dark:text-indigo-400')
+            : (row._isTotal ? 'inline-flex items-center rounded-md px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 font-black' : 'font-semibold text-amber-600 dark:text-amber-400');
+          return React.createElement('span', {
+            className: `text-[12px] tabular-nums ${color}`,
+            dir: 'ltr'
+          }, fmt(numeric));
+        }
+      }
+    ]), [groupedCommonColumns]);
+
+    const groupedItemsColumns = useMemo(() => ([
+      {
+        field: '_treeLabel',
+        header_fa: 'گروه',
+        header_en: 'Group',
+        width: '180px',
+        render: (val, row) => {
+          if (row._nodeType === 'item') return React.createElement('span', { className: 'text-slate-300 dark:text-slate-600' }, '-');
+          return React.createElement('span', { className: 'text-[12px] font-semibold text-slate-700 dark:text-slate-200' }, val || '-');
+        }
+      },
+      ...itemsColumns
+    ]), [itemsColumns]);
 
     const exportItemsCsv = useCallback(() => {
       const exportColumns = [
@@ -453,19 +1011,50 @@
           tabs: [
             { id: 'documents', label: t('اسناد', 'Documents') },
             { id: 'items', label: t('اقلام سند', 'Document Items') },
+            { id: 'costs', label: t('هزینه‌ها', 'Costs') },
+            { id: 'incomes', label: t('درآمدها', 'Incomes') },
+            { id: 'centers', label: t('مرکز هزینه/درآمد', 'Cost/Income Center') },
           ],
           activeTab,
           onChange: setActiveTab,
           className: 'mb-0'
         }),
 
-        drillDoc && React.createElement('div', { className: 'flex items-center gap-3 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800/50 rounded-lg px-4 py-2 shrink-0' },
-          React.createElement(Button, { variant: 'outline', size: 'sm', icon: BackIcon, onClick: () => setDrillDoc(null) }, t('برگشت به لیست اسناد', 'Back to Documents')),
-          React.createElement('div', { className: 'h-4 w-px bg-indigo-200 dark:bg-indigo-700' }),
-          React.createElement('span', { className: 'text-[12px] font-bold text-indigo-700 dark:text-indigo-300' }, t('اقلام سند', 'Document Items'), ' ', drillDoc.document_code || '—'),
-          drillDoc.document_date && React.createElement('span', { className: 'text-[11px] text-indigo-500 dark:text-indigo-400' }, fmtDate(drillDoc.document_date)),
-          drillDoc.transaction_type && React.createElement('span', { className: 'text-[11px] text-slate-500' }, txTypes[drillDoc.transaction_type] || drillDoc.transaction_type),
-          drillDoc.status && React.createElement(Badge, { variant: statusColors[drillDoc.status] || 'gray', size: 'sm' }, statusLabels[drillDoc.status] || drillDoc.status)
+        drillDoc && React.createElement('div', { className: 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shrink-0' },
+          React.createElement('div', { className: 'px-4 py-2 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40 gap-2' },
+            React.createElement('div', { className: 'flex items-center gap-3 min-w-0' },
+              React.createElement(Button, { variant: 'ghost', size: 'sm', icon: BackIcon, onClick: () => setDrillDoc(null) }, t('بازگشت به لیست', 'Back to List')),
+              React.createElement('div', { className: 'w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0' }),
+              React.createElement('span', { className: 'text-[13px] font-bold text-slate-700 dark:text-slate-200 truncate' }, t('مشاهده سند تراکنش', 'View Transaction Document')),
+              React.createElement('span', { className: 'text-slate-300 dark:text-slate-600 select-none' }, '·'),
+              React.createElement('span', { className: 'text-[12px] font-bold text-indigo-600 dark:text-indigo-400', dir: 'ltr' }, drillDoc.document_code || '—')
+            ),
+            React.createElement('div', { className: 'flex items-center gap-1.5 shrink-0' },
+              React.createElement(Badge, { variant: 'slate', size: 'sm' }, txTypes[drillDoc.transaction_type] || drillDoc.transaction_type || '-'),
+              drillDoc.status && React.createElement(Badge, { variant: statusColors[drillDoc.status] || 'gray', size: 'sm' }, statusLabels[drillDoc.status] || drillDoc.status)
+            )
+          ),
+
+          React.createElement('div', { className: 'px-4 py-2.5 text-[12px]' },
+            React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-1.5' },
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('کد سند', 'Doc Code')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, drillDoc.document_code || '-')),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('عطف', 'Reference')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, drillDoc.reference_code || '-')),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('تاریخ سند', 'Doc Date')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, fmtDate(drillDoc.document_date) || '-')),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('روزانه', 'Daily No.')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, drillDoc.daily_number || '-')),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('ثبت‌کننده', 'Registrar')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, usersMap[drillDoc.registrar_id] || drillDoc.registrar_id || '-')),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('دپارتمان', 'Department')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, deptsMap[drillDoc.department_id] || drillDoc.department_id || '-')),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('تاریخ ثبت', 'Registered At')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, formatDateTime(drillDoc.registered_at || drillDoc.created_at))),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('بررسی‌کننده', 'Reviewed By')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, drillDoc.reviewed_by_name || '-')),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('تاریخ بررسی', 'Reviewed At')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, formatDateTime(drillDoc.reviewed_at))),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('تاییدکننده', 'Approved By')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, drillDoc.approved_by_name || '-')),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('تاریخ تایید', 'Approved At')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, formatDateTime(drillDoc.approved_at))),
+              React.createElement('div', null, React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('وضعیت', 'Status')}: `), React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200' }, statusLabels[drillDoc.status] || drillDoc.status || '-'))
+            ),
+            React.createElement('div', { className: 'mt-2 pt-2 border-t border-slate-200 dark:border-slate-700' },
+              React.createElement('span', { className: 'text-slate-500 dark:text-slate-400' }, `${t('شرح سربرگ', 'Header Description')}: `),
+              React.createElement('span', { className: 'font-semibold text-slate-700 dark:text-slate-200 break-words' }, drillDoc.description || '-')
+            )
+          )
         ),
 
         React.createElement('div', { className: 'flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col overflow-hidden' },
@@ -476,7 +1065,7 @@
                 language,
               })
             : React.createElement(React.Fragment, null,
-                !drillDoc && React.createElement('div', { style: { display: activeTab === 'documents' ? 'flex' : 'none' }, className: 'flex-1 min-h-0' },
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'documents' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
                   React.createElement(DataGrid, {
                     key: 'review-documents',
                     data: documentsGridData,
@@ -494,7 +1083,7 @@
                     onSelectionChange: (ids) => setSelectedDocumentIds((ids || []).map(String)),
                   })
                 ),
-                !drillDoc && React.createElement('div', { style: { display: activeTab === 'items' ? 'flex' : 'none' }, className: 'flex-1 min-h-0' },
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'items' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
                   React.createElement(DataGrid, {
                     key: 'review-items',
                     data: itemsGridData,
@@ -512,6 +1101,78 @@
                         dir: isRtl ? 'rtl' : 'ltr',
                       }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
                     ),
+                  })
+                ),
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'costs' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
+                  React.createElement(TreeGrid, {
+                    key: `review-costs-grouped-${groupedCostRows.length}`,
+                    data: groupedCostRows,
+                    idField: '_rowId',
+                    parentField: '_parentRowId',
+                    columns: groupedItemsColumns,
+                    language,
+                    formCode,
+                    isLoading,
+                    hideImport: true,
+                    selectable: false,
+                    gridState: costsGridState,
+                    onGridStateChange: setCostsGridState,
+                    placeExpandControlsOnEnd: false,
+                    placeSearchBeforeExpandControls: false,
+                    toolbarStartContent: selectedDocumentIds.length > 0
+                      ? React.createElement('span', {
+                          className: `text-[11px] text-slate-500 dark:text-slate-400 px-1 ${isRtl ? 'text-right' : 'text-left'}`,
+                          dir: isRtl ? 'rtl' : 'ltr',
+                        }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
+                      : null
+                  })
+                ),
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'incomes' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
+                  React.createElement(TreeGrid, {
+                    key: `review-incomes-grouped-${groupedIncomeRows.length}`,
+                    data: groupedIncomeRows,
+                    idField: '_rowId',
+                    parentField: '_parentRowId',
+                    columns: groupedItemsColumns,
+                    language,
+                    formCode,
+                    isLoading,
+                    hideImport: true,
+                    selectable: false,
+                    gridState: incomesGridState,
+                    onGridStateChange: setIncomesGridState,
+                    placeExpandControlsOnEnd: false,
+                    placeSearchBeforeExpandControls: false,
+                    toolbarStartContent: selectedDocumentIds.length > 0
+                      ? React.createElement('span', {
+                          className: `text-[11px] text-slate-500 dark:text-slate-400 px-1 ${isRtl ? 'text-right' : 'text-left'}`,
+                          dir: isRtl ? 'rtl' : 'ltr',
+                        }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
+                      : null
+                  })
+                ),
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'centers' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
+                  React.createElement(TreeGrid, {
+                    key: `review-centers-grouped-${groupedCenterRows.length}`,
+                    data: groupedCenterRows,
+                    idField: '_rowId',
+                    parentField: '_parentRowId',
+                    columns: groupedItemsColumns,
+                    language,
+                    formCode,
+                    isLoading,
+                    hideImport: true,
+                    selectable: false,
+                    gridState: centersGridState,
+                    onGridStateChange: setCentersGridState,
+                    placeExpandControlsOnEnd: false,
+                    placeSearchBeforeExpandControls: false,
+                    toolbarStartContent: selectedDocumentIds.length > 0
+                      ? React.createElement('span', {
+                          className: `text-[11px] text-slate-500 dark:text-slate-400 px-1 ${isRtl ? 'text-right' : 'text-left'}`,
+                          dir: isRtl ? 'rtl' : 'ltr',
+                        }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
+                      : null
                   })
                 ),
                 drillDoc && React.createElement(DataGrid, {
