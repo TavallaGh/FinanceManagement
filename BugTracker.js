@@ -997,7 +997,7 @@
                 reserveMiddleSpace={false}
                 gridState={gridState}
                 onGridStateChange={setGridState}
-                actionWidth="220px"
+                actionWidth="170px"
                 hideImport={true}
                 onAdd={access.canCreate ? () => openBugModal('CREATE') : undefined}
                 toolbarContent={
