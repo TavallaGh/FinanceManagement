@@ -72,6 +72,11 @@
   const OVERALL_STATUS_OPTIONS = bugPanels.OVERALL_STATUS_OPTIONS || [];
   const FIX_STATUS_OPTIONS = bugPanels.FIX_STATUS_OPTIONS || [];
   const QA_STATUS_OPTIONS = bugPanels.QA_STATUS_OPTIONS || [];
+  const BULK_STATUS_DEFAULTS = {
+    overall_status: 'OPEN',
+    fix_status: 'TODO',
+    qa_status: 'PENDING'
+  };
 
   const getSessionUserId = () => {
     try {
@@ -155,7 +160,7 @@
     const [specialistForm, setSpecialistForm] = useState({ id: null, full_name: '', skill_title: '', is_active: true });
 
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, data: null });
-    const [bulkStatusModal, setBulkStatusModal] = useState({ isOpen: false, ids: [], value: 'OPEN' });
+    const [bulkStatusModal, setBulkStatusModal] = useState({ isOpen: false, ids: [], field: 'overall_status', value: 'OPEN' });
     const [bulkAssigneeModal, setBulkAssigneeModal] = useState({ isOpen: false, ids: [], assignee_ids: [] });
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
 
@@ -612,20 +617,35 @@
     const executeBulkStatusChange = useCallback(async () => {
       const targetIds = (bulkStatusModal.ids || []).filter(Boolean);
       if (!targetIds.length) {
-        setBulkStatusModal({ isOpen: false, ids: [], value: 'OPEN' });
+        setBulkStatusModal({ isOpen: false, ids: [], field: 'overall_status', value: BULK_STATUS_DEFAULTS.overall_status });
         return;
       }
 
-      const statusValue = bulkStatusModal.value || 'OPEN';
+      const statusField = ['overall_status', 'fix_status', 'qa_status'].includes(bulkStatusModal.field)
+        ? bulkStatusModal.field
+        : 'overall_status';
+      const statusOptionsByField = {
+        overall_status: OVERALL_STATUS_OPTIONS,
+        fix_status: FIX_STATUS_OPTIONS,
+        qa_status: QA_STATUS_OPTIONS
+      };
+      const selectedFieldOptions = statusOptionsByField[statusField] || [];
+      const fallbackValue = BULK_STATUS_DEFAULTS[statusField] || selectedFieldOptions[0]?.value || 'OPEN';
+      const statusValue = selectedFieldOptions.some(opt => opt.value === bulkStatusModal.value)
+        ? bulkStatusModal.value
+        : fallbackValue;
       setIsLoading(true);
       try {
         const nowIso = new Date().toISOString();
         const payload = {
-          overall_status: statusValue,
           updated_by: currentUserId,
           updated_at: nowIso,
-          closed_at: statusValue === 'CLOSED' ? nowIso : null
+          [statusField]: statusValue
         };
+
+        if (statusField === 'overall_status') {
+          payload.closed_at = ['DONE', 'CLOSED'].includes(statusValue) ? nowIso : null;
+        }
 
         const { error } = await supabase
           .from(BUGS_TABLE)
@@ -634,7 +654,7 @@
 
         if (error) throw error;
         showToast(t('وضعیت باگ‌های انتخابی بروزرسانی شد.', 'Status updated for selected bugs.'), 'success');
-        setBulkStatusModal({ isOpen: false, ids: [], value: 'OPEN' });
+        setBulkStatusModal({ isOpen: false, ids: [], field: 'overall_status', value: BULK_STATUS_DEFAULTS.overall_status });
         fetchAllData();
       } catch (error) {
         console.error('Bulk status update error:', error);
@@ -960,7 +980,7 @@
                             variant="outline"
                             icon={CheckCircle2}
                             className="!h-7 text-[10px]"
-                            onClick={() => setBulkStatusModal({ isOpen: true, ids: selectedBugIds, value: 'OPEN' })}
+                            onClick={() => setBulkStatusModal({ isOpen: true, ids: selectedBugIds, field: 'overall_status', value: BULK_STATUS_DEFAULTS.overall_status })}
                           >
                             {t('تغییر وضعیت گروهی', 'Bulk Status Change')}
                           </Button>
@@ -1131,12 +1151,14 @@
         {BulkStatusModal ? (
           <BulkStatusModal
             isOpen={bulkStatusModal.isOpen}
-            onClose={() => setBulkStatusModal({ isOpen: false, ids: [], value: 'OPEN' })}
+            onClose={() => setBulkStatusModal({ isOpen: false, ids: [], field: 'overall_status', value: BULK_STATUS_DEFAULTS.overall_status })}
             t={t}
             language={language}
             bulkStatusModal={bulkStatusModal}
             setBulkStatusModal={setBulkStatusModal}
             OVERALL_STATUS_OPTIONS={OVERALL_STATUS_OPTIONS}
+            FIX_STATUS_OPTIONS={FIX_STATUS_OPTIONS}
+            QA_STATUS_OPTIONS={QA_STATUS_OPTIONS}
             isRtl={isRtl}
             executeBulkStatusChange={executeBulkStatusChange}
             isLoading={isLoading}

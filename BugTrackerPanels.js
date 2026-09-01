@@ -760,6 +760,8 @@
     bulkStatusModal,
     setBulkStatusModal,
     OVERALL_STATUS_OPTIONS,
+    FIX_STATUS_OPTIONS,
+    QA_STATUS_OPTIONS,
     isRtl,
     executeBulkStatusChange,
     isLoading,
@@ -769,6 +771,19 @@
     SelectField,
     Save
   }) => {
+    const statusFieldOptions = [
+      { value: 'overall_status', label: t('وضعیت کلی', 'Overall Status') },
+      { value: 'fix_status', label: t('وضعیت توسعه/رفع', 'Fix Status') },
+      { value: 'qa_status', label: t('وضعیت بررسی/کنترل', 'QA Status') }
+    ];
+    const statusOptionsByField = {
+      overall_status: OVERALL_STATUS_OPTIONS,
+      fix_status: FIX_STATUS_OPTIONS,
+      qa_status: QA_STATUS_OPTIONS
+    };
+    const activeField = statusOptionsByField[bulkStatusModal.field] ? bulkStatusModal.field : 'overall_status';
+    const activeOptions = statusOptionsByField[activeField] || [];
+
     return (
       <Modal
         isOpen={isOpen}
@@ -787,10 +802,27 @@
 
           <SelectField
             size="sm"
-            label={t('وضعیت کلی', 'Overall Status')}
+            label={t('نوع تغییر وضعیت', 'Status Type')}
+            value={activeField}
+            onChange={e => {
+              const nextField = e.target.value;
+              const nextOptions = statusOptionsByField[nextField] || [];
+              setBulkStatusModal(prev => ({
+                ...prev,
+                field: nextField,
+                value: nextOptions[0]?.value || ''
+              }));
+            }}
+            options={statusFieldOptions}
+            formCode={formCode}
+          />
+
+          <SelectField
+            size="sm"
+            label={statusFieldOptions.find(x => x.value === activeField)?.label || t('وضعیت', 'Status')}
             value={bulkStatusModal.value}
             onChange={e => setBulkStatusModal(prev => ({ ...prev, value: e.target.value }))}
-            options={OVERALL_STATUS_OPTIONS.map(x => ({ value: x.value, label: isRtl ? x.fa : x.en }))}
+            options={activeOptions.map(x => ({ value: x.value, label: isRtl ? x.fa : x.en }))}
             formCode={formCode}
           />
         </div>
