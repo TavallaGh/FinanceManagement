@@ -29,11 +29,13 @@
   const Edit = LucideIcons.Edit || FallbackIcon;
   const Trash2 = LucideIcons.Trash2 || FallbackIcon;
   const Save = LucideIcons.Save || FallbackIcon;
-  const Plus = LucideIcons.Plus || FallbackIcon;
   const Sparkles = LucideIcons.Sparkles || FallbackIcon;
   const Users = LucideIcons.Users || FallbackIcon;
+  const Shield = LucideIcons.Shield || FallbackIcon;
+  const X = LucideIcons.X || FallbackIcon;
+  const UserRoundCog = LucideIcons.UserRoundCog || LucideIcons.UsersRound || FallbackIcon;
+  const UsersRound = LucideIcons.UsersRound || LucideIcons.Users || FallbackIcon;
   const AlertTriangle = LucideIcons.AlertTriangle || FallbackIcon;
-  const Lock = LucideIcons.Lock || FallbackIcon;
 
   const oneDayMs = 24 * 60 * 60 * 1000;
   const addDays = (dateObj, n) => new Date(dateObj.getTime() + n * oneDayMs);
@@ -57,6 +59,7 @@
     getMonthRangeGregorianForGregorian,
     supabase,
     users = [],
+    userGroups = [],
     showToast,
     t,
     isRtl = true,
@@ -67,18 +70,10 @@
     const [periodGridState, setPeriodGridState] = useState(null);
     const [exceptionGridState, setExceptionGridState] = useState(null);
 
-    const [periodModal, setPeriodModal] = useState({ isOpen: false, record: null });
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, payload: null });
 
-    const [exceptionModal, setExceptionModal] = useState({
-      isOpen: false,
-      period: null,
-      rows: [],
-      current: null,
-      isLoading: false
-    });
-
-    const [periodForm, setPeriodForm] = useState({
+    const [inlinePeriodEdit, setInlinePeriodEdit] = useState({ id: null, isNew: false });
+    const [periodInlineForm, setPeriodInlineForm] = useState({
       id: null,
       periodCode: '',
       title: '',
@@ -88,13 +83,21 @@
       isActive: true
     });
 
-    const [exceptionForm, setExceptionForm] = useState({
+    const [accessPanel, setAccessPanel] = useState({
+      isVisible: false,
+      period: null,
+      rows: [],
+      isLoading: false
+    });
+
+    const [inlineExceptionEdit, setInlineExceptionEdit] = useState({ id: null, isNew: false });
+    const [exceptionInlineForm, setExceptionInlineForm] = useState({
       id: null,
+      subjectType: 'USER',
       userId: null,
       userDisplay: '',
-      fromDate: '',
-      toDate: '',
-      note: '',
+      userUsername: '',
+      groupId: null,
       isActive: true
     });
 
@@ -104,7 +107,14 @@
       return map;
     }, [users]);
 
+    const groupsById = useMemo(() => {
+      const map = new Map();
+      userGroups.forEach(g => map.set(String(g.id), g));
+      return map;
+    }, [userGroups]);
+
     const activeUsers = useMemo(() => users.filter(u => u.isActive !== false), [users]);
+    const activeUserGroups = useMemo(() => userGroups.filter(g => g.isActive !== false), [userGroups]);
 
     const userLovColumns = [
       { field: 'username', header_fa: 'نام کاربری', header_en: 'Username', width: '140px' },
@@ -136,14 +146,28 @@
         const aEnd = parseSlashDate(sortedRows[i].endDate);
         const bStart = parseSlashDate(sortedRows[i + 1].startDate);
         if (!aEnd || !bStart) continue;
-        const expectedNext = addDays(aEnd, 1);
-        if (bStart.getTime() !== expectedNext.getTime()) return true;
+        if (bStart.getTime() !== addDays(aEnd, 1).getTime()) return true;
       }
       return false;
     };
 
     const normalizeAndSort = (rows) => {
       return [...rows].sort((a, b) => String(a.startDate || '').localeCompare(String(b.startDate || '')));
+    };
+
+    const resetInlinePeriodForm = () => {
+      const prefixParts = selectedYear ? getCalendarParts(selectedYear.startDate, selectedYear.calendarType) : null;
+      const prefixYear = prefixParts?.year ? String(prefixParts.year) : '';
+      const nextNo = String(periodRows.length + 1).padStart(2, '0');
+      setPeriodInlineForm({
+        id: '__new__',
+        periodCode: `${prefixYear}${nextNo}`,
+        title: `${t('دوره', 'Period')} ${nextNo}`,
+        startDate: selectedYear?.startDate || '',
+        endDate: selectedYear?.endDate || '',
+        status: status.NOT_OPENED,
+        isActive: true
+      });
     };
 
     const canDeletePeriod = useCallback((periodToDelete) => {
@@ -177,95 +201,18 @@
       return { ok: true };
     }, [periodRows, parseSlashDate, status, t]);
 
-    const openPeriodModal = (row = null) => {
-      if (!selectedYear) {
-        showToast(t('ابتدا یک سال مالی را انتخاب کنید.', 'Please select a fiscal year first.'), 'warning');
-        return;
-      }
-
-      if (row) {
-        setPeriodForm({
-          id: row.id,
-          periodCode: row.periodCode || '',
-          title: row.title || '',
-          startDate: row.startDate || '',
-          endDate: row.endDate || '',
-          status: row.status || status.NOT_OPENED,
-          isActive: row.isActive !== false
-        });
-      } else {
-        const prefixParts = getCalendarParts(selectedYear.startDate, selectedYear.calendarType);
-        const prefixYear = prefixParts?.year ? String(prefixParts.year) : '';
-        const nextNo = String(periodRows.length + 1).padStart(2, '0');
-        setPeriodForm({
-          id: null,
-          periodCode: `${prefixYear}${nextNo}`,
-          title: `${t('دوره', 'Period')} ${nextNo}`,
-          startDate: selectedYear.startDate || '',
-          endDate: selectedYear.endDate || '',
-          status: status.NOT_OPENED,
-          isActive: true
-        });
-      }
-
-      setPeriodModal({ isOpen: true, record: row });
-    };
-
-    const closeExceptionModal = () => {
-      setExceptionModal({ isOpen: false, period: null, rows: [], current: null, isLoading: false });
-      setExceptionForm({ id: null, userId: null, userDisplay: '', fromDate: '', toDate: '', note: '', isActive: true });
-      setExceptionGridState(null);
-    };
-
-    const openExceptionModal = async (periodRow) => {
-      if (!periodRow) return;
-      if (periodRow.status !== status.CLOSED) {
-        showToast(t('استثنا فقط برای دوره‌های بسته شده قابل تعریف است.', 'Exceptions are only available for closed periods.'), 'warning');
-        return;
-      }
-      setExceptionModal({ isOpen: true, period: periodRow, rows: [], current: null, isLoading: true });
-      setExceptionForm({ id: null, userId: null, userDisplay: '', fromDate: '', toDate: '', note: '', isActive: true });
-
-      try {
-        const { data, error } = await supabase
-          .from('fm_fiscal_period_exceptions')
-          .select('*')
-          .eq('period_id', periodRow.id)
-          .order('from_date', { ascending: true });
-        if (error) throw error;
-
-        const rows = (data || []).map(r => ({
-          id: r.id,
-          periodId: r.period_id,
-          userId: r.user_id,
-          userName: usersById.get(String(r.user_id))?.fullName || usersById.get(String(r.user_id))?.username || '-',
-          userUsername: usersById.get(String(r.user_id))?.username || '-',
-          fromDate: fromDash(r.from_date),
-          toDate: fromDash(r.to_date),
-          note: r.note || '',
-          isActive: r.is_active !== false
-        }));
-
-        setExceptionModal({ isOpen: true, period: periodRow, rows, current: null, isLoading: false });
-      } catch (err) {
-        console.error('load exceptions error:', err);
-        setExceptionModal(prev => ({ ...prev, isLoading: false }));
-        showToast(t('خطا در دریافت استثناها', 'Error loading exceptions'), 'error');
-      }
-    };
-
-    const validatePeriodForm = () => {
+    const validatePeriodDraft = (draft) => {
       if (!selectedYear) {
         showToast(t('ابتدا سال مالی را انتخاب کنید.', 'Please select a fiscal year first.'), 'error');
         return false;
       }
-      if (!periodForm.periodCode || !periodForm.startDate || !periodForm.endDate) {
+      if (!draft.periodCode || !draft.startDate || !draft.endDate) {
         showToast(t('کد دوره، تاریخ شروع و تاریخ پایان الزامی است.', 'Period code, start date and end date are required.'), 'error');
         return false;
       }
 
-      const start = parseSlashDate(periodForm.startDate);
-      const end = parseSlashDate(periodForm.endDate);
+      const start = parseSlashDate(draft.startDate);
+      const end = parseSlashDate(draft.endDate);
       const fyStart = parseSlashDate(selectedYear.startDate);
       const fyEnd = parseSlashDate(selectedYear.endDate);
 
@@ -280,22 +227,22 @@
       }
 
       const duplicate = periodRows.some(p =>
-        String(p.periodCode).trim() === String(periodForm.periodCode).trim() && String(p.id) !== String(periodForm.id || '')
+        String(p.periodCode).trim() === String(draft.periodCode).trim() && String(p.id) !== String(draft.id || '')
       );
       if (duplicate) {
         showToast(t('کد دوره تکراری است.', 'Period code is duplicate.'), 'error');
         return false;
       }
 
-      if (periodModal.record && !canTransitionStatus(periodModal.record.status, periodForm.status)) {
+      const oldRow = periodRows.find(p => String(p.id) === String(draft.id));
+      if (oldRow && !canTransitionStatus(oldRow.status, draft.status)) {
         showToast(t('تغییر وضعیت دوره طبق قوانین مجاز نیست.', 'Period status transition is not allowed.'), 'error');
         return false;
       }
 
-      const draftRows = periodRows
-        .filter(p => String(p.id) !== String(periodForm.id || ''))
-        .concat([{ ...periodForm }]);
-      const sorted = normalizeAndSort(draftRows);
+      const baseRows = periodRows.filter(p => String(p.id) !== String(draft.id || ''));
+      const testRows = baseRows.concat([{ ...draft }]);
+      const sorted = normalizeAndSort(testRows);
 
       if (hasOverlap(sorted)) {
         showToast(t('بازه دوره‌ها با یکدیگر تداخل دارند.', 'Period date ranges overlap.'), 'error');
@@ -310,38 +257,82 @@
       return true;
     };
 
-    const savePeriod = async () => {
-      if (!validatePeriodForm()) return;
+    const beginInlinePeriodEdit = (row = null) => {
+      if (!selectedYear) {
+        showToast(t('ابتدا یک سال مالی را انتخاب کنید.', 'Please select a fiscal year first.'), 'warning');
+        return;
+      }
+      if (inlinePeriodEdit.id) {
+        showToast(t('ابتدا ویرایش جاری را ذخیره یا لغو کنید.', 'Save or cancel current edit first.'), 'warning');
+        return;
+      }
+
+      if (row) {
+        setPeriodInlineForm({
+          id: row.id,
+          periodCode: row.periodCode || '',
+          title: row.title || '',
+          startDate: row.startDate || '',
+          endDate: row.endDate || '',
+          status: row.status || status.NOT_OPENED,
+          isActive: row.isActive !== false
+        });
+        setInlinePeriodEdit({ id: row.id, isNew: false });
+      } else {
+        resetInlinePeriodForm();
+        setInlinePeriodEdit({ id: '__new__', isNew: true });
+      }
+    };
+
+    const cancelInlinePeriodEdit = () => {
+      setInlinePeriodEdit({ id: null, isNew: false });
+      setPeriodInlineForm({
+        id: null,
+        periodCode: '',
+        title: '',
+        startDate: '',
+        endDate: '',
+        status: status?.NOT_OPENED || 'NOT_OPENED',
+        isActive: true
+      });
+    };
+
+    const saveInlinePeriod = async () => {
+      const draft = {
+        ...periodInlineForm,
+        id: inlinePeriodEdit.isNew ? null : periodInlineForm.id
+      };
+      if (!validatePeriodDraft(draft)) return;
 
       try {
         const payload = {
           fiscal_year_id: selectedYear.id,
-          period_code: String(periodForm.periodCode).trim(),
-          title: String(periodForm.title || '').trim() || null,
-          start_date: toDash(periodForm.startDate),
-          end_date: toDash(periodForm.endDate),
-          status: periodForm.status,
-          is_active: periodForm.isActive,
+          period_code: String(draft.periodCode).trim(),
+          title: String(draft.title || '').trim() || null,
+          start_date: toDash(draft.startDate),
+          end_date: toDash(draft.endDate),
+          status: draft.status,
+          is_active: draft.isActive,
           updated_at: new Date().toISOString()
         };
 
-        if (periodForm.id) {
-          const { error } = await supabase.from('fm_fiscal_periods').update(payload).eq('id', periodForm.id);
-          if (error) throw error;
-          await onLog?.(periodForm.id, 'update', `ویرایش دوره ${payload.period_code}`);
-        } else {
+        if (inlinePeriodEdit.isNew) {
           payload.created_at = new Date().toISOString();
           payload.sort_order = periodRows.length + 1;
           const { data, error } = await supabase.from('fm_fiscal_periods').insert([payload]).select('id').single();
           if (error) throw error;
           await onLog?.(data?.id, 'create', `ایجاد دوره ${payload.period_code}`);
+        } else {
+          const { error } = await supabase.from('fm_fiscal_periods').update(payload).eq('id', draft.id);
+          if (error) throw error;
+          await onLog?.(draft.id, 'update', `ویرایش دوره ${payload.period_code}`);
         }
 
-        setPeriodModal({ isOpen: false, record: null });
+        cancelInlinePeriodEdit();
         await onRefresh?.();
         showToast(t('دوره با موفقیت ذخیره شد.', 'Period saved successfully.'));
       } catch (err) {
-        console.error('savePeriod error:', err);
+        console.error('saveInlinePeriod error:', err);
         showToast(t('خطا در ذخیره دوره', 'Error saving period'), 'error');
       }
     };
@@ -349,6 +340,11 @@
     const generateMonthlyPeriods = async () => {
       if (!selectedYear) {
         showToast(t('ابتدا یک سال مالی انتخاب کنید.', 'Please select a fiscal year first.'), 'warning');
+        return;
+      }
+
+      if (inlinePeriodEdit.id) {
+        showToast(t('ابتدا ویرایش جاری دوره را ذخیره یا لغو کنید.', 'Save or cancel current period edit first.'), 'warning');
         return;
       }
 
@@ -469,6 +465,10 @@
           if (error) throw error;
           await onLog?.(p.id, 'delete', `حذف دوره ${p.periodCode}`);
           setSelectedPeriodIds(prev => prev.filter(id => String(id) !== String(p.id)));
+
+          if (accessPanel.isVisible && String(accessPanel.period?.id) === String(p.id)) {
+            setAccessPanel({ isVisible: false, period: null, rows: [], isLoading: false });
+          }
         }
 
         if (deleteConfirm.type === 'period_bulk') {
@@ -492,6 +492,10 @@
           if (error) throw error;
           await onLog?.(selectedYear?.id, 'bulk_delete', `حذف گروهی ${ids.length} دوره`);
           setSelectedPeriodIds([]);
+
+          if (accessPanel.isVisible && ids.some(id => String(id) === String(accessPanel.period?.id))) {
+            setAccessPanel({ isVisible: false, period: null, rows: [], isLoading: false });
+          }
         }
 
         setDeleteConfirm({ isOpen: false, type: null, payload: null });
@@ -503,27 +507,193 @@
       }
     };
 
-    const beginEditException = (row = null) => {
-      if (!row) {
-        setExceptionForm({ id: null, userId: null, userDisplay: '', fromDate: '', toDate: '', note: '', isActive: true });
-        setExceptionModal(prev => ({ ...prev, current: null }));
+    const normalizeSubjectType = (value) => {
+      const v = String(value || '').toLowerCase();
+      if (v === 'user_group' || v === 'group' || v === 'role') return 'USER_GROUP';
+      return 'USER';
+    };
+
+    const mapExceptionRows = useCallback((rows) => {
+      return (rows || []).map(r => {
+        const normalizedType = normalizeSubjectType(r.grantee_type || (r.user_group_id ? 'user_group' : (r.role_id ? 'user_group' : 'user')));
+        const userId = r.user_id || (normalizedType === 'USER' ? r.grantee_id : null) || null;
+        const groupId = r.user_group_id || (normalizedType === 'USER_GROUP' ? r.grantee_id : null) || null;
+
+        const userObj = userId ? usersById.get(String(userId)) : null;
+        const groupObj = groupId ? groupsById.get(String(groupId)) : null;
+
+        return {
+          id: r.id,
+          periodId: r.period_id,
+          subjectType: normalizedType,
+          userId,
+          userName: userObj?.fullName || userObj?.username || '-',
+          userUsername: userObj?.username || '-',
+          groupId,
+          groupTitle: groupObj?.title || '-',
+          accessTarget: normalizedType === 'USER_GROUP' ? (groupObj?.title || '-') : (userObj?.fullName || userObj?.username || '-'),
+          isActive: r.is_active !== false
+        };
+      });
+    }, [groupsById, usersById]);
+
+    const loadExceptionsForPeriod = async (periodRow) => {
+      if (!periodRow) return;
+      setAccessPanel(prev => ({ ...prev, isLoading: true }));
+
+      try {
+        const { data, error } = await supabase
+          .from('fm_fiscal_period_exceptions')
+          .select('*')
+          .eq('period_id', periodRow.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        setAccessPanel(prev => ({ ...prev, rows: mapExceptionRows(data), isLoading: false }));
+      } catch (err) {
+        console.error('load exceptions error:', err);
+        setAccessPanel(prev => ({ ...prev, isLoading: false }));
+        showToast(t('خطا در دریافت استثناها', 'Error loading exceptions'), 'error');
+      }
+    };
+
+    const openAccessPanel = async (periodRow) => {
+      if (!periodRow) return;
+      if (periodRow.status !== status.CLOSED) {
+        showToast(t('استثنا فقط برای دوره‌های بسته شده قابل تعریف است.', 'Exceptions are only available for closed periods.'), 'warning');
         return;
       }
 
-      setExceptionForm({
-        id: row.id,
-        userId: row.userId,
-        userDisplay: row.userName,
-        fromDate: row.fromDate,
-        toDate: row.toDate,
-        note: row.note || '',
-        isActive: row.isActive !== false
+      setAccessPanel({ isVisible: true, period: periodRow, rows: [], isLoading: true });
+      setInlineExceptionEdit({ id: null, isNew: false });
+      setExceptionInlineForm({
+        id: null,
+        subjectType: 'USER',
+        userId: null,
+        userDisplay: '',
+        userUsername: '',
+        groupId: null,
+        isActive: true
       });
-      setExceptionModal(prev => ({ ...prev, current: row }));
+
+      try {
+        const { data, error } = await supabase
+          .from('fm_fiscal_period_exceptions')
+          .select('*')
+          .eq('period_id', periodRow.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        setAccessPanel({
+          isVisible: true,
+          period: periodRow,
+          rows: mapExceptionRows(data),
+          isLoading: false
+        });
+      } catch (err) {
+        console.error('load exceptions error:', err);
+        setAccessPanel(prev => ({ ...prev, isLoading: false }));
+        showToast(t('خطا در دریافت استثناها', 'Error loading exceptions'), 'error');
+      }
     };
 
-    const saveException = async () => {
-      const period = exceptionModal.period;
+    const closeAccessPanel = () => {
+      setAccessPanel({ isVisible: false, period: null, rows: [], isLoading: false });
+      setInlineExceptionEdit({ id: null, isNew: false });
+      setExceptionInlineForm({
+        id: null,
+        subjectType: 'USER',
+        userId: null,
+        userDisplay: '',
+        userUsername: '',
+        groupId: null,
+        isActive: true
+      });
+      setExceptionGridState(null);
+    };
+
+    const resetInlineExceptionForm = (periodRow) => {
+      setExceptionInlineForm({
+        id: '__new_exception__',
+        subjectType: 'USER',
+        userId: null,
+        userDisplay: '',
+        userUsername: '',
+        groupId: null,
+        isActive: true
+      });
+      setInlineExceptionEdit({ id: '__new_exception__', isNew: true });
+      if (!periodRow) return;
+    };
+
+    const beginInlineExceptionEdit = (row = null) => {
+      if (!accessPanel.period) return;
+      if (inlineExceptionEdit.id) {
+        showToast(t('ابتدا ویرایش جاری استثنا را ذخیره یا لغو کنید.', 'Save or cancel current exception edit first.'), 'warning');
+        return;
+      }
+
+      if (!row) {
+        resetInlineExceptionForm(accessPanel.period);
+        return;
+      }
+
+      setExceptionInlineForm({
+        id: row.id,
+        subjectType: row.subjectType || 'USER',
+        userId: row.userId || null,
+        userDisplay: row.userName || '',
+        userUsername: row.userUsername || '',
+        groupId: row.groupId || null,
+        isActive: row.isActive !== false
+      });
+      setInlineExceptionEdit({ id: row.id, isNew: false });
+    };
+
+    const cancelInlineExceptionEdit = () => {
+      setInlineExceptionEdit({ id: null, isNew: false });
+      setExceptionInlineForm({
+        id: null,
+        subjectType: 'USER',
+        userId: null,
+        userDisplay: '',
+        userUsername: '',
+        groupId: null,
+        isActive: true
+      });
+    };
+
+    const validateExceptionDraft = (draft) => {
+      if (!accessPanel.period) return false;
+
+      if (draft.subjectType === 'USER' && !draft.userId) {
+        showToast(t('انتخاب کاربر الزامی است.', 'Selecting a user is required.'), 'error');
+        return false;
+      }
+      if (draft.subjectType === 'USER_GROUP' && !draft.groupId) {
+        showToast(t('انتخاب گروه کاربری الزامی است.', 'Selecting a user group is required.'), 'error');
+        return false;
+      }
+
+      const targetId = draft.subjectType === 'USER_GROUP' ? String(draft.groupId || '') : String(draft.userId || '');
+      const duplicate = accessPanel.rows.some(r => {
+        if (String(r.id) === String(draft.id || '')) return false;
+        const rowTargetId = r.subjectType === 'USER_GROUP' ? String(r.groupId || '') : String(r.userId || '');
+        return String(r.subjectType) === String(draft.subjectType) && rowTargetId === targetId;
+      });
+
+      if (duplicate) {
+        showToast(t('اطلاعات تکراری است.', 'Duplicate information.'), 'error');
+        return false;
+      }
+
+      return true;
+    };
+
+    const saveInlineException = async () => {
+      const period = accessPanel.period;
       if (!period) return;
 
       if (period.status !== status.CLOSED) {
@@ -531,38 +701,26 @@
         return;
       }
 
-      if (!exceptionForm.userId || !exceptionForm.fromDate || !exceptionForm.toDate) {
-        showToast(t('کاربر، تاریخ شروع و تاریخ پایان استثنا الزامی است.', 'User, from date and to date are required.'), 'error');
-        return;
-      }
+      const draft = {
+        ...exceptionInlineForm,
+        id: inlineExceptionEdit.isNew ? null : exceptionInlineForm.id
+      };
+      if (!validateExceptionDraft(draft)) return;
 
-      const from = parseSlashDate(exceptionForm.fromDate);
-      const to = parseSlashDate(exceptionForm.toDate);
-      const pFrom = parseSlashDate(period.startDate);
-      const pTo = parseSlashDate(period.endDate);
-      if (!from || !to || !pFrom || !pTo || from > to) {
-        showToast(t('بازه زمانی استثنا نامعتبر است.', 'Invalid exception date range.'), 'error');
-        return;
-      }
-      if (from < pFrom || to > pTo) {
-        showToast(t('بازه استثنا باید داخل بازه دوره باشد.', 'Exception range must be inside the period range.'), 'error');
-        return;
-      }
-
-      setExceptionModal(prev => ({ ...prev, isLoading: true }));
+      setAccessPanel(prev => ({ ...prev, isLoading: true }));
       try {
         const payload = {
           period_id: period.id,
-          user_id: exceptionForm.userId,
-          from_date: toDash(exceptionForm.fromDate),
-          to_date: toDash(exceptionForm.toDate),
-          note: String(exceptionForm.note || '').trim() || null,
-          is_active: exceptionForm.isActive,
+          grantee_type: draft.subjectType === 'USER_GROUP' ? 'user_group' : 'user',
+          grantee_id: draft.subjectType === 'USER_GROUP' ? draft.groupId : draft.userId,
+          user_id: draft.subjectType === 'USER' ? draft.userId : null,
+          user_group_id: draft.subjectType === 'USER_GROUP' ? draft.groupId : null,
+          is_active: draft.isActive,
           updated_at: new Date().toISOString()
         };
 
-        if (exceptionForm.id) {
-          const { error } = await supabase.from('fm_fiscal_period_exceptions').update(payload).eq('id', exceptionForm.id);
+        if (draft.id) {
+          const { error } = await supabase.from('fm_fiscal_period_exceptions').update(payload).eq('id', draft.id);
           if (error) throw error;
         } else {
           payload.created_at = new Date().toISOString();
@@ -570,256 +728,421 @@
           if (error) throw error;
         }
 
-        await openExceptionModal(period);
-        beginEditException(null);
+        cancelInlineExceptionEdit();
+        await loadExceptionsForPeriod(period);
         showToast(t('استثنا با موفقیت ذخیره شد.', 'Exception saved successfully.'));
       } catch (err) {
-        console.error('saveException error:', err);
-        setExceptionModal(prev => ({ ...prev, isLoading: false }));
+        console.error('saveInlineException error:', err);
+        setAccessPanel(prev => ({ ...prev, isLoading: false }));
+        if (String(err?.code || '') === '23505') {
+          showToast(t('اطلاعات تکراری است.', 'Duplicate information.'), 'error');
+          return;
+        }
+        const errMsg = String(err?.message || '').toLowerCase();
+        if (errMsg.includes('grantee_type') || errMsg.includes('grantee_id') || errMsg.includes('user_group_id')) {
+          showToast(t('ساختار جدول استثناها نیاز به به‌روزرسانی دارد. کوئری مهاجرت را اجرا کنید.', 'Exceptions table schema needs migration. Please run migration query.'), 'error');
+          return;
+        }
         showToast(t('خطا در ذخیره استثنا', 'Error saving exception'), 'error');
       }
     };
 
     const deleteException = async (row) => {
       if (!row) return;
-      setExceptionModal(prev => ({ ...prev, isLoading: true }));
+      setAccessPanel(prev => ({ ...prev, isLoading: true }));
       try {
         const { error } = await supabase.from('fm_fiscal_period_exceptions').delete().eq('id', row.id);
         if (error) throw error;
-        await openExceptionModal(exceptionModal.period);
+        await loadExceptionsForPeriod(accessPanel.period);
+        if (String(inlineExceptionEdit.id) === String(row.id)) {
+          cancelInlineExceptionEdit();
+        }
         showToast(t('استثنا حذف شد.', 'Exception deleted.'));
       } catch (err) {
         console.error('deleteException error:', err);
-        setExceptionModal(prev => ({ ...prev, isLoading: false }));
+        setAccessPanel(prev => ({ ...prev, isLoading: false }));
         showToast(t('خطا در حذف استثنا', 'Error deleting exception'), 'error');
       }
     };
 
+    const periodGridData = useMemo(() => {
+      if (!inlinePeriodEdit.isNew) return periodRows;
+      return [{
+        id: '__new__',
+        periodCode: periodInlineForm.periodCode,
+        title: periodInlineForm.title,
+        startDate: periodInlineForm.startDate,
+        endDate: periodInlineForm.endDate,
+        status: periodInlineForm.status,
+        isActive: periodInlineForm.isActive
+      }, ...periodRows];
+    }, [inlinePeriodEdit.isNew, periodInlineForm, periodRows]);
+
+    const exceptionGridData = useMemo(() => {
+      if (!inlineExceptionEdit.isNew) return accessPanel.rows;
+      return [{
+        id: '__new_exception__',
+        subjectType: exceptionInlineForm.subjectType,
+        accessTarget: exceptionInlineForm.subjectType === 'USER_GROUP' ? (groupsById.get(String(exceptionInlineForm.groupId))?.title || '-') : (exceptionInlineForm.userDisplay || '-'),
+        userName: exceptionInlineForm.userDisplay,
+        userUsername: exceptionInlineForm.userUsername,
+        groupId: exceptionInlineForm.groupId,
+        isActive: exceptionInlineForm.isActive
+      }, ...accessPanel.rows];
+    }, [accessPanel.rows, exceptionInlineForm, groupsById, inlineExceptionEdit.isNew]);
+
+    const isEditingPeriodRow = useCallback((row) => {
+      return inlinePeriodEdit.id && String(row?.id) === String(inlinePeriodEdit.id);
+    }, [inlinePeriodEdit.id]);
+
+    const isEditingExceptionRow = useCallback((row) => {
+      return inlineExceptionEdit.id && String(row?.id) === String(inlineExceptionEdit.id);
+    }, [inlineExceptionEdit.id]);
+
     const periodColumns = [
-      {
-        field: 'periodCode',
-        header_fa: 'کد دوره',
-        header_en: 'Period Code',
-        width: '130px',
-        render: (val) => <span className="font-mono font-bold text-slate-700 dark:text-slate-200" dir="ltr">{val || '-'}</span>
-      },
-      { field: 'title', header_fa: 'عنوان', header_en: 'Title', width: '160px', render: (v) => <span>{v || '-'}</span> },
-      { field: 'startDate', header_fa: 'شروع دوره', header_en: 'Start Date', width: '120px', type: 'date' },
-      { field: 'endDate', header_fa: 'پایان دوره', header_en: 'End Date', width: '120px', type: 'date' },
+      
       {
         field: 'status',
         header_fa: 'وضعیت',
         header_en: 'Status',
-        width: '120px',
-        render: (val) => {
+        width: '140px',
+        render: (val, row) => {
+          if (isEditingPeriodRow(row)) {
+            const baseStatus = inlinePeriodEdit.isNew ? null : (periodRows.find(p => String(p.id) === String(row.id))?.status || null);
+            return (
+              <SelectField
+                size="sm"
+                value={periodInlineForm.status}
+                onChange={(e) => setPeriodInlineForm(prev => ({ ...prev, status: e.target.value }))}
+                options={allowedStatusOptions(baseStatus).map(s => ({ value: s.value, label: isRtl ? s.label_fa : s.label_en }))}
+                isRtl={isRtl}
+                formCode={formCode}
+              />
+            );
+          }
           const meta = getStatusMeta(val);
           return <Badge variant={meta.badge}>{isRtl ? meta.label_fa : meta.label_en}</Badge>;
         }
       },
       {
-        field: 'isActive',
-        header_fa: 'فعال',
-        header_en: 'Active',
-        width: '90px',
-        render: (val) => val
-          ? <Badge variant="emerald">{t('فعال', 'Active')}</Badge>
-          : <Badge variant="slate">{t('غیرفعال', 'Inactive')}</Badge>
-      }
-    ];
-
-    const exceptionColumns = [
-      { field: 'userUsername', header_fa: 'نام کاربری', header_en: 'Username', width: '140px', render: (v) => <span dir="ltr">{v}</span> },
-      { field: 'userName', header_fa: 'نام کاربر', header_en: 'User', width: '180px' },
-      { field: 'fromDate', header_fa: 'از تاریخ', header_en: 'From Date', width: '120px', type: 'date' },
-      { field: 'toDate', header_fa: 'تا تاریخ', header_en: 'To Date', width: '120px', type: 'date' },
-      { field: 'note', header_fa: 'توضیح', header_en: 'Note', width: 'auto', minWidth: '180px', render: (v) => <span>{v || '-'}</span> },
+        field: 'periodCode',
+        header_fa: 'کد دوره',
+        header_en: 'Period Code',
+        width: '140px',
+        render: (val, row) => isEditingPeriodRow(row)
+          ? <TextField size="sm" value={periodInlineForm.periodCode} onChange={(e) => setPeriodInlineForm(prev => ({ ...prev, periodCode: e.target.value }))} dir="ltr" isRtl={isRtl} formCode={formCode} />
+          : <span className="font-sans font-bold text-slate-700 dark:text-slate-200" dir="ltr">{val || '-'}</span>
+      },
+      {
+        field: 'title',
+        header_fa: 'عنوان',
+        header_en: 'Title',
+        width: '170px',
+        render: (val, row) => isEditingPeriodRow(row)
+          ? <TextField size="sm" value={periodInlineForm.title} onChange={(e) => setPeriodInlineForm(prev => ({ ...prev, title: e.target.value }))} isRtl={isRtl} formCode={formCode} />
+          : <span>{val || '-'}</span>
+      },
+      {
+        field: 'startDate',
+        header_fa: 'شروع دوره',
+        header_en: 'Start Date',
+        width: '150px',
+        type: 'date',
+        render: (val, row) => isEditingPeriodRow(row)
+          ? <DatePicker size="sm" value={periodInlineForm.startDate} onChange={(v) => setPeriodInlineForm(prev => ({ ...prev, startDate: v }))} isRtl={isRtl} language={language} formCode={formCode} />
+          : <span dir="ltr">{val || '-'}</span>
+      },
+      {
+        field: 'endDate',
+        header_fa: 'پایان دوره',
+        header_en: 'End Date',
+        width: '150px',
+        type: 'date',
+        render: (val, row) => isEditingPeriodRow(row)
+          ? <DatePicker size="sm" value={periodInlineForm.endDate} onChange={(v) => setPeriodInlineForm(prev => ({ ...prev, endDate: v }))} isRtl={isRtl} language={language} formCode={formCode} />
+          : <span dir="ltr">{val || '-'}</span>
+      },
       {
         field: 'isActive',
         header_fa: 'فعال',
         header_en: 'Active',
-        width: '90px',
-        render: (val) => val
-          ? <Badge variant="emerald">{t('فعال', 'Active')}</Badge>
-          : <Badge variant="slate">{t('غیرفعال', 'Inactive')}</Badge>
+        width: '115px',
+        render: (val, row) => isEditingPeriodRow(row)
+          ? <ToggleField size="sm" checked={periodInlineForm.isActive} onChange={(v) => setPeriodInlineForm(prev => ({ ...prev, isActive: v }))} isRtl={isRtl} formCode={formCode} />
+          : (val ? <Badge variant="emerald">{t('فعال', 'Active')}</Badge> : <Badge variant="slate">{t('غیرفعال', 'Inactive')}</Badge>)
       }
+    ];
+
+    const exceptionColumns = [
+      {
+        field: 'isActive',
+        header_fa: 'فعال',
+        header_en: 'Active',
+        width: '110px',
+        render: (val, row) => isEditingExceptionRow(row)
+          ? <ToggleField size="sm" checked={exceptionInlineForm.isActive} onChange={(v) => setExceptionInlineForm(prev => ({ ...prev, isActive: v }))} isRtl={isRtl} formCode={formCode} />
+          : (val ? <Badge variant="emerald">{t('فعال', 'Active')}</Badge> : <Badge variant="slate">{t('غیرفعال', 'Inactive')}</Badge>)
+      },
+      {
+        field: 'subjectType',
+        header_fa: 'نوع دسترسی',
+        header_en: 'Access Type',
+        width: '150px',
+        render: (val, row) => {
+          if (isEditingExceptionRow(row)) {
+            return (
+              <SelectField
+                size="sm"
+                value={exceptionInlineForm.subjectType}
+                onChange={(e) => setExceptionInlineForm(prev => ({
+                  ...prev,
+                  subjectType: e.target.value,
+                  userId: null,
+                  userDisplay: '',
+                  userUsername: '',
+                  groupId: null
+                }))}
+                options={[
+                  { value: 'USER', label: t('کاربر', 'User') },
+                  { value: 'USER_GROUP', label: t('گروه کاربری', 'User Group') }
+                ]}
+                isRtl={isRtl}
+                formCode={formCode}
+              />
+            );
+          }
+
+          return val === 'USER_GROUP'
+            ? <Badge variant="indigo" className="inline-flex items-center gap-1"><UsersRound size={10} />{t('گروه کاربری', 'User Group')}</Badge>
+            : <Badge variant="blue" className="inline-flex items-center gap-1"><UserRoundCog size={10} />{t('کاربر', 'User')}</Badge>;
+        }
+      },
+      {
+        field: 'accessTarget',
+        header_fa: 'دسترسی برای',
+        header_en: 'Access Target',
+        width: '100px',
+        render: (val, row) => {
+          if (isEditingExceptionRow(row)) {
+            if (exceptionInlineForm.subjectType === 'USER') {
+              return (
+                <LOVField
+                  size="sm"
+                  data={activeUsers}
+                  columns={userLovColumns}
+                  displayValue={exceptionInlineForm.userDisplay}
+                  onChange={(userRow) => setExceptionInlineForm(prev => ({
+                    ...prev,
+                    userId: userRow?.id || null,
+                    userDisplay: userRow?.label || userRow?.username || '',
+                    userUsername: userRow?.username || ''
+                  }))}
+                  onClear={() => setExceptionInlineForm(prev => ({ ...prev, userId: null, userDisplay: '', userUsername: '' }))}
+                  dropdownWidth="min-w-[520px]"
+                  isRtl={isRtl}
+                  formCode={formCode}
+                />
+              );
+            }
+
+            return (
+              <SelectField
+                size="sm"
+                value={exceptionInlineForm.groupId || ''}
+                onChange={(e) => setExceptionInlineForm(prev => ({ ...prev, groupId: e.target.value || null }))}
+                options={activeUserGroups.map(g => ({ value: g.id, label: `${g.code ? `${g.code} - ` : ''}${g.title || g.id}` }))}
+                isRtl={isRtl}
+                formCode={formCode}
+              />
+            );
+          }
+
+          return (
+            <div className="flex flex-col py-0.5 w-full">
+              <span className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{val || '-'}</span>
+              {row.subjectType === 'USER' && <span className="text-[10px] text-slate-400" dir="ltr">{row.userUsername || '-'}</span>}
+            </div>
+          );
+        }
+      },
     ];
 
     return (
       <>
-        <div className="xl:col-span-3 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
-          <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
-            <Button variant="outline" size="sm" icon={Plus} onClick={() => openPeriodModal()} disabled={!selectedYear || !access.canCreate} formCode={formCode}>
-              {t('دوره جدید', 'New Period')}
-            </Button>
-            <Button variant="outline" size="sm" icon={Sparkles} onClick={generateMonthlyPeriods} disabled={!selectedYear || !access.canCreate} formCode={formCode}>
-              {t('ایجاد اتوماتیک ماهانه', 'Auto Generate Monthly')}
-            </Button>
+        <div className="flex flex-col h-[80vh] bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2">
             {selectedYear && (
               <span className="text-[12px] text-slate-500 dark:text-slate-400 mr-auto">
-                {t('سال انتخاب‌شده:', 'Selected Year:')} <span className="font-mono font-bold" dir="ltr">{selectedYear.yearCode}</span>
+                {t('سال انتخاب‌شده:', 'Selected Year:')} <span className="font-sans font-bold" dir="ltr">{selectedYear.yearCode}</span>
               </span>
             )}
           </div>
 
-          <div className="flex-1 min-h-0">
-            <DataGrid
-              data={periodRows}
-              columns={periodColumns}
-              language={language}
-              selectable={true}
-              selectedIds={selectedPeriodIds}
-              onSelectChange={setSelectedPeriodIds}
-              isLoading={isLoading}
-              onRowDoubleClick={(row) => access.canEdit ? openPeriodModal(row) : undefined}
-              gridState={periodGridState}
-              onGridStateChange={setPeriodGridState}
-              hideImport
-              hideExport
-              actions={[
-                { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => openPeriodModal(row), className: 'text-slate-400 hover:text-indigo-600' },
-                { icon: Users, tooltip: t('استثناهای دوره بسته', 'Closed Period Exceptions'), onClick: (row) => openExceptionModal(row), className: 'text-slate-400 hover:text-blue-600' },
-                {
-                  icon: Trash2,
-                  tooltip: t('حذف', 'Delete'),
-                  onClick: (row) => {
-                    const check = canDeletePeriod(row);
-                    if (!check.ok) {
-                      showToast(check.message, 'error');
-                      return;
-                    }
-                    setDeleteConfirm({ isOpen: true, type: 'period', payload: row });
-                  },
-                  className: 'text-slate-400 hover:text-red-600'
-                }
-              ]}
-              bulkActions={[
-                {
-                  label: t('حذف گروهی', 'Delete Selected'),
-                  icon: Trash2,
-                  variant: 'danger-outline',
-                  onClick: (ids) => {
-                    const rows = periodRows.filter(p => ids.includes(p.id));
-                    for (const row of rows) {
-                      const check = canDeletePeriod(row);
-                      if (!check.ok) {
-                        showToast(check.message, 'error');
-                        return;
-                      }
-                    }
-                    setDeleteConfirm({ isOpen: true, type: 'period_bulk', payload: ids });
-                  }
-                }
-              ]}
-            />
-          </div>
-        </div>
-
-        <Modal
-          isOpen={periodModal.isOpen}
-          onClose={() => setPeriodModal({ isOpen: false, record: null })}
-          title={periodModal.record ? t('ویرایش دوره', 'Edit Period') : t('تعریف دوره جدید', 'New Period')}
-          width="max-w-2xl"
-          language={language}
-        >
-          <div className="p-4 flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <TextField size="sm" label={t('کد دوره', 'Period Code')} value={periodForm.periodCode} onChange={(e) => setPeriodForm(prev => ({ ...prev, periodCode: e.target.value }))} required dir="ltr" isRtl={isRtl} formCode={formCode} />
-              <TextField size="sm" label={t('عنوان دوره', 'Period Title')} value={periodForm.title} onChange={(e) => setPeriodForm(prev => ({ ...prev, title: e.target.value }))} isRtl={isRtl} formCode={formCode} />
-              <DatePicker size="sm" label={t('تاریخ شروع دوره', 'Period Start Date')} value={periodForm.startDate} onChange={(v) => setPeriodForm(prev => ({ ...prev, startDate: v }))} isRtl={isRtl} language={language} required formCode={formCode} />
-              <DatePicker size="sm" label={t('تاریخ پایان دوره', 'Period End Date')} value={periodForm.endDate} onChange={(v) => setPeriodForm(prev => ({ ...prev, endDate: v }))} isRtl={isRtl} language={language} required formCode={formCode} />
-              <SelectField
-                size="sm"
-                label={t('وضعیت دوره', 'Period Status')}
-                value={periodForm.status}
-                onChange={(e) => setPeriodForm(prev => ({ ...prev, status: e.target.value }))}
-                options={allowedStatusOptions(periodModal.record?.status).map(s => ({ value: s.value, label: isRtl ? s.label_fa : s.label_en }))}
-                required
-                isRtl={isRtl}
-                formCode={formCode}
-              />
-              <div>
-                <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t('فعال', 'Active')}</div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-200 dark:border-slate-700">
-                  <ToggleField size="sm" label={t('این دوره فعال باشد', 'Keep this period active')} checked={periodForm.isActive} onChange={(v) => setPeriodForm(prev => ({ ...prev, isActive: v }))} isRtl={isRtl} formCode={formCode} />
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50/80 dark:bg-amber-900/20 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-300">
-              <div className="font-bold mb-1 flex items-center gap-1"><Lock size={12} />{t('قوانین تغییر وضعیت', 'Status Transition Rules')}</div>
-              <div>{t('باز نشده ← باز ، باز ← بسته شده ، بسته شده ← باز', 'Not Opened -> Open, Open -> Closed, Closed -> Open')}</div>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-              <Button variant="outline" size="sm" onClick={() => setPeriodModal({ isOpen: false, record: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" icon={Save} onClick={savePeriod}>{t('ذخیره', 'Save')}</Button>
-            </div>
-          </div>
-        </Modal>
-
-        <Modal isOpen={exceptionModal.isOpen} onClose={closeExceptionModal} title={t('مدیریت استثناهای دوره بسته', 'Closed Period Exceptions')} width="max-w-6xl" language={language}>
-          <div className="p-4 flex flex-col gap-4">
-            {exceptionModal.period && (
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 flex items-center gap-2 text-[12px]">
-                <Badge variant="slate">{t('دوره', 'Period')}</Badge>
-                <span className="font-mono" dir="ltr">{exceptionModal.period.periodCode}</span>
-                <span className="text-slate-400">|</span>
-                <span>{exceptionModal.period.title || '-'}</span>
-                <span className="mr-auto text-slate-500" dir="ltr">{exceptionModal.period.startDate} - {exceptionModal.period.endDate}</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 min-h-[400px]">
-              <div className="xl:col-span-2 border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-white dark:bg-slate-800">
-                <div className="grid grid-cols-1 gap-3">
-                  <LOVField
-                    size="sm"
-                    label={t('کاربر', 'User')}
-                    data={activeUsers}
-                    columns={userLovColumns}
-                    displayValue={exceptionForm.userDisplay}
-                    onChange={(row) => setExceptionForm(prev => ({ ...prev, userId: row?.id || null, userDisplay: row?.label || row?.username || '' }))}
-                    onClear={() => setExceptionForm(prev => ({ ...prev, userId: null, userDisplay: '' }))}
-                    dropdownWidth="min-w-[560px]"
-                    isRtl={isRtl}
-                    formCode={formCode}
-                  />
-                  <DatePicker size="sm" label={t('از تاریخ', 'From Date')} value={exceptionForm.fromDate} onChange={(v) => setExceptionForm(prev => ({ ...prev, fromDate: v }))} isRtl={isRtl} language={language} required formCode={formCode} />
-                  <DatePicker size="sm" label={t('تا تاریخ', 'To Date')} value={exceptionForm.toDate} onChange={(v) => setExceptionForm(prev => ({ ...prev, toDate: v }))} isRtl={isRtl} language={language} required formCode={formCode} />
-                  <TextField size="sm" label={t('توضیحات', 'Note')} value={exceptionForm.note} onChange={(e) => setExceptionForm(prev => ({ ...prev, note: e.target.value }))} isRtl={isRtl} formCode={formCode} />
-                  <div>
-                    <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t('فعال', 'Active')}</div>
-                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-4 py-2.5 border border-slate-200 dark:border-slate-700">
-                      <ToggleField size="sm" label={t('استثنا فعال باشد', 'Keep exception active')} checked={exceptionForm.isActive} onChange={(v) => setExceptionForm(prev => ({ ...prev, isActive: v }))} isRtl={isRtl} formCode={formCode} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-                  <Button variant="outline" size="sm" onClick={() => beginEditException(null)}>{t('پاک کردن فرم', 'Clear')}</Button>
-                  <Button variant="primary" size="sm" icon={Save} onClick={saveException} isLoading={exceptionModal.isLoading}>{t('ذخیره استثنا', 'Save Exception')}</Button>
-                </div>
-              </div>
-
-              <div className="xl:col-span-3 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800">
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
+            <div className={`flex flex-col bg-white dark:bg-slate-900 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm ${accessPanel.isVisible ? 'w-full md:w-7/12' : 'w-full'}`}>
+              <div className="flex-1 min-h-0">
                 <DataGrid
-                  data={exceptionModal.rows}
-                  columns={exceptionColumns}
+                  data={periodGridData}
+                  columns={periodColumns}
                   language={language}
-                  isLoading={exceptionModal.isLoading}
-                  gridState={exceptionGridState}
-                  onGridStateChange={setExceptionGridState}
+                  selectable={true}
+                  activeRowId={accessPanel.period?.id || null}
+                  selectedIds={selectedPeriodIds}
+                  onSelectChange={setSelectedPeriodIds}
+                  isLoading={isLoading}
+                  onAdd={() => beginInlinePeriodEdit(null)}
+                  onRowDoubleClick={(row) => {
+                    if (String(row.id) === '__new__') return;
+                    if (access.canEdit) beginInlinePeriodEdit(row);
+                  }}
+                  gridState={periodGridState}
+                  onGridStateChange={setPeriodGridState}
                   hideImport
                   hideExport
+                  formCode={formCode}
+                  toolbarContent={(
+                    <Button variant="outline" size="sm" icon={Sparkles} onClick={generateMonthlyPeriods} disabled={!selectedYear || !access.canCreate} formCode={formCode}>
+                      {t('ایجاد اتوماتیک ماهانه', 'Auto Generate Monthly')}
+                    </Button>
+                  )}
                   actions={[
-                    { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => beginEditException(row), className: 'text-slate-400 hover:text-indigo-600' },
-                    { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => deleteException(row), className: 'text-slate-400 hover:text-red-600' }
+                    {
+                      icon: Save,
+                      tooltip: t('ذخیره', 'Save'),
+                      hidden: (row) => !isEditingPeriodRow(row),
+                      onClick: () => saveInlinePeriod(),
+                      className: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-slate-800 dark:hover:bg-slate-700 p-1.5 rounded transition-colors'
+                    },
+                    {
+                      icon: X,
+                      tooltip: t('لغو', 'Cancel'),
+                      hidden: (row) => !isEditingPeriodRow(row),
+                      onClick: () => cancelInlinePeriodEdit(),
+                      className: 'text-slate-500 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 p-1.5 rounded transition-colors'
+                    },
+                    {
+                      icon: Edit,
+                      tooltip: t('ویرایش', 'Edit'),
+                      hidden: (row) => String(row.id) === '__new__' || isEditingPeriodRow(row),
+                      onClick: (row) => beginInlinePeriodEdit(row),
+                      className: 'text-slate-400 hover:text-indigo-600'
+                    },
+                    {
+                      icon: Shield,
+                      tooltip: t('استثناهای دسترسی', 'Access Exceptions'),
+                      hidden: (row) => String(row.id) === '__new__',
+                      onClick: (row) => openAccessPanel(row),
+                      className: 'text-slate-400 hover:text-blue-600'
+                    },
+                    {
+                      icon: Trash2,
+                      tooltip: t('حذف', 'Delete'),
+                      hidden: (row) => String(row.id) === '__new__' || isEditingPeriodRow(row),
+                      onClick: (row) => {
+                        const check = canDeletePeriod(row);
+                        if (!check.ok) {
+                          showToast(check.message, 'error');
+                          return;
+                        }
+                        setDeleteConfirm({ isOpen: true, type: 'period', payload: row });
+                      },
+                      className: 'text-slate-400 hover:text-red-600'
+                    }
+                  ]}
+                  bulkActions={[
+                    {
+                      label: t('حذف گروهی', 'Delete Selected'),
+                      icon: Trash2,
+                      variant: 'danger-outline',
+                      onClick: (ids) => {
+                        const rows = periodRows.filter(p => ids.includes(p.id));
+                        for (const row of rows) {
+                          const check = canDeletePeriod(row);
+                          if (!check.ok) {
+                            showToast(check.message, 'error');
+                            return;
+                          }
+                        }
+                        setDeleteConfirm({ isOpen: true, type: 'period_bulk', payload: ids });
+                      }
+                    }
                   ]}
                 />
               </div>
             </div>
+
+            {accessPanel.isVisible && (
+              <div className="w-full md:w-5/12 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 flex flex-col overflow-hidden animate-in slide-in-from-right-5 duration-200 relative z-10 shadow-sm">
+                <div className="absolute top-3 left-3">
+                  <button onClick={closeAccessPanel} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900">
+                  <h3 className="font-black text-slate-800 dark:text-slate-100 text-[13px] mb-1.5 pr-6">{t('استثناهای دسترسی دوره بسته', 'Closed Period Access Exceptions')}</h3>
+                  <div className="text-[10px] text-slate-500 font-sans leading-tight flex items-center gap-1.5">
+                    <Badge variant="blue">{t('دوره انتخاب شده', 'Selected Period')}</Badge>
+                    <span className="font-sans" dir="ltr">{accessPanel.period?.periodCode || '-'}</span>
+                    <span className="mx-1">|</span>
+                    <span>{accessPanel.period?.title || '-'}</span>
+                  </div>
+                </div>
+
+                <div className="flex-1 min-h-0 p-3">
+                  <div className="h-full min-h-0 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                    <DataGrid
+                      data={exceptionGridData}
+                      columns={exceptionColumns}
+                      language={language}
+                      isLoading={accessPanel.isLoading}
+                      gridState={exceptionGridState}
+                      onGridStateChange={setExceptionGridState}
+                      hideImport
+                      hideExport
+                      onAdd={() => beginInlineExceptionEdit(null)}
+                      onRowDoubleClick={(row) => {
+                        if (String(row.id) === '__new_exception__') return;
+                        beginInlineExceptionEdit(row);
+                      }}
+                      formCode={formCode}
+                      actions={[
+                        {
+                          icon: Save,
+                          tooltip: t('ذخیره', 'Save'),
+                          hidden: (row) => !isEditingExceptionRow(row),
+                          onClick: () => saveInlineException(),
+                          className: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-slate-800 dark:hover:bg-slate-700 p-1.5 rounded transition-colors'
+                        },
+                        {
+                          icon: X,
+                          tooltip: t('لغو', 'Cancel'),
+                          hidden: (row) => !isEditingExceptionRow(row),
+                          onClick: () => cancelInlineExceptionEdit(),
+                          className: 'text-slate-500 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 p-1.5 rounded transition-colors'
+                        },
+                        {
+                          icon: Edit,
+                          tooltip: t('ویرایش', 'Edit'),
+                          hidden: (row) => String(row.id) === '__new_exception__' || isEditingExceptionRow(row),
+                          onClick: (row) => beginInlineExceptionEdit(row),
+                          className: 'text-slate-400 hover:text-indigo-600'
+                        },
+                        {
+                          icon: Trash2,
+                          tooltip: t('حذف', 'Delete'),
+                          hidden: (row) => String(row.id) === '__new_exception__' || isEditingExceptionRow(row),
+                          onClick: (row) => deleteException(row),
+                          className: 'text-slate-400 hover:text-red-600'
+                        }
+                      ]}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </Modal>
+        </div>
 
         <Modal isOpen={deleteConfirm.isOpen} onClose={() => setDeleteConfirm({ isOpen: false, type: null, payload: null })} title={t('تایید حذف', 'Confirm Delete')} width="max-w-sm" language={language}>
           <EmptyState

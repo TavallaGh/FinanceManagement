@@ -90,11 +90,14 @@
   } = DetailsHelpers;
 
   // ── Account tree node component ────────────────────────────────────────────
-  const TreeNode = ({ node, depth, selectedIds, onToggle, isRtl, resetToken = 0, expandMode = 'collapse' }) => {
+  const TreeNode = ({ node, depth, selectedIds, onToggle, isRtl, resetToken = 0, expandMode = 'collapse', inheritedInactive = false }) => {
     const [open, setOpen] = useState(false);
     const hasKids = (node.children || []).length > 0;
     const sel = selectedIds.has(String(node.id));
     const name = isRtl ? (node.title_fa || node.title_en || '') : (node.title_en || node.title_fa || '');
+    const isDirectInactive = node.is_active === false;
+    const isInheritedInactive = !isDirectInactive && inheritedInactive;
+    const isEffectivelyInactive = isDirectInactive || inheritedInactive;
 
     useEffect(() => {
       setOpen(false);
@@ -108,7 +111,7 @@
 
     return React.createElement('div', null,
       React.createElement('div', {
-        className: 'flex items-center gap-1 py-0.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-md cursor-pointer select-none',
+        className: `flex items-center gap-1 py-0.5 px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-md cursor-pointer select-none ${isEffectivelyInactive ? 'opacity-65' : ''}`,
         style: { paddingInlineStart: `${depth * 20 + 8}px` }
       },
         hasKids
@@ -124,17 +127,24 @@
           className: 'w-3.5 h-3.5 accent-indigo-600 shrink-0 cursor-pointer'
         }),
         React.createElement('span', {
-          className: `ms-1.5 text-[12px] cursor-pointer flex items-center gap-2 min-w-0 ${hasKids ? 'font-semibold text-slate-800 dark:text-slate-100' : 'text-slate-700 dark:text-slate-300'}`,
+          className: `ms-1.5 text-[12px] cursor-pointer flex items-center gap-2 min-w-0 ${hasKids ? 'font-semibold text-slate-800 dark:text-slate-100' : 'text-slate-700 dark:text-slate-300'} ${isEffectivelyInactive ? 'text-slate-500 dark:text-slate-400' : ''}`,
           onClick: () => onToggle(String(node.id))
         },
           React.createElement('span', {
-            className: 'text-slate-500 dark:text-slate-400 font-mono text-[11px] shrink-0 min-w-[72px]'
+            className: 'text-slate-500 dark:text-slate-400 text-[11px] shrink-0 min-w-[72px]'
           }, node.code || '-'),
-          React.createElement('span', { className: 'truncate' }, name)
+          React.createElement('span', { className: 'truncate' }, name),
+          isDirectInactive && React.createElement('span', {
+            className: 'inline-flex items-center rounded-full border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 text-[10px] font-bold shrink-0'
+          }, isRtl ? 'غیرفعال' : 'Inactive')
+          ,
+          isInheritedInactive && React.createElement('span', {
+            className: 'inline-flex items-center rounded-full border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 text-[10px] font-bold shrink-0'
+          }, isRtl ? 'غیرفعال (ارثی)' : 'Inactive (Inherited)')
         )
       ),
       open && hasKids && node.children.map(c =>
-        React.createElement(TreeNode, { key: c.id, node: c, depth: depth + 1, selectedIds, onToggle, isRtl, resetToken, expandMode })
+        React.createElement(TreeNode, { key: c.id, node: c, depth: depth + 1, selectedIds, onToggle, isRtl, resetToken, expandMode, inheritedInactive: isEffectivelyInactive })
       )
     );
   };
@@ -287,9 +297,10 @@
 
     // ── Data / UI state ────────────────────────────────────────────────────
     const [currencies,   setCurrencies]   = useState([]);
-    const [accountTree,  setAccountTree]  = useState([]);
+    const [fullAccountTree, setFullAccountTree] = useState([]);
     const [accountMap,   setAccountMap]   = useState(new Map());
     const [selectedIds,  setSelectedIds]  = useState(new Set());
+    const [showInactiveAccounts, setShowInactiveAccounts] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settingsTreeResetToken, setSettingsTreeResetToken] = useState(0);
     const [settingsTreeExpandMode, setSettingsTreeExpandMode] = useState('collapse');
@@ -326,14 +337,14 @@
       try {
         const { data: charts } = await supabase.from('fm_coa_charts').select('id').eq('is_active', true);
         const chartIds = (charts || []).map(c => String(c.id));
-        if (!chartIds.length) { setAccountTree([]); setAccountMap(new Map()); return; }
+        if (!chartIds.length) { setFullAccountTree([]); setAccountMap(new Map()); return; }
 
         const { data: accs } = await supabase.from('fm_coa_accounts')
-          .select('id, code, title_fa, title_en, parent_id, currency_id, chart_id')
-          .in('chart_id', chartIds).eq('is_active', true).order('code');
+          .select('id, code, title_fa, title_en, parent_id, currency_id, chart_id, is_active')
+          .in('chart_id', chartIds).order('code');
 
         setAccountMap(new Map((accs || []).map(a => [String(a.id), a])));
-        setAccountTree(buildTree(accs || []));
+        setFullAccountTree(buildTree(accs || []));
       } catch (e) {
         console.error('BalanceMonthlyReport: loadTree error', e);
       } finally {
@@ -342,6 +353,22 @@
     }, [supabase]);
 
     useEffect(() => { loadTree(); }, [loadTree]);
+
+    const accountTree = useMemo(() => {
+      if (showInactiveAccounts) return fullAccountTree;
+
+      const filterNodes = (nodes) => (nodes || []).reduce((acc, node) => {
+        const children = filterNodes(node.children || []);
+        const isActiveNode = node.is_active !== false;
+        if (!isActiveNode && children.length === 0) return acc;
+        acc.push({ ...node, children });
+        return acc;
+      }, []);
+
+      return filterNodes(fullAccountTree);
+    }, [fullAccountTree, showInactiveAccounts]);
+
+    const reportTree = useMemo(() => (showInactiveAccounts ? fullAccountTree : accountTree), [showInactiveAccounts, fullAccountTree, accountTree]);
 
     // ── Year / month derivations ───────────────────────────────────────────
     const yearsRange = useMemo(() => {
@@ -390,9 +417,9 @@
           visit(node.children || []);
         });
       };
-      visit(accountTree);
+      visit(reportTree);
       return map;
-    }, [accountTree]);
+    }, [reportTree]);
 
     const selectedLeafCount = useMemo(() => {
       let count = 0;
@@ -403,9 +430,9 @@
           if (!isLeaf) walk(node.children);
         });
       };
-      walk(accountTree);
+      walk(reportTree);
       return count;
-    }, [accountTree, selectedIds]);
+    }, [reportTree, selectedIds]);
 
     // ── Account selection ──────────────────────────────────────────────────
     const toggleId = useCallback((id) => {
@@ -465,7 +492,7 @@
           cal,
           currencies,
           accountMap,
-          accountTree,
+          accountTree: reportTree,
           selectedIds,
           isRtl,
         });
@@ -487,7 +514,7 @@
       } finally {
         setGenerating(false);
       }
-    }, [fMonths, selectedIds, filters, availableMonths, cal, currencies, accountMap, accountTree, isRtl, t, showToast, supabase]);
+    }, [fMonths, selectedIds, filters, availableMonths, cal, currencies, accountMap, reportTree, isRtl, t, showToast, supabase]);
 
     const openCellDrill = useCallback((row, slot, val) => {
       const nextModalState = createCellDrillModalState({
@@ -510,6 +537,7 @@
         fYears:    Array.from(fYears),
         fMonths:   Array.from(fMonths),
         selIds:    Array.from(selectedIds),
+        showInactiveAccounts,
         gridState,
       }),
       onApplyState: (state) => {
@@ -518,6 +546,7 @@
           setFYears(new Set([String(curYear)]));
           setFMonths(new Set());
           setSelectedIds(new Set());
+          setShowInactiveAccounts(false);
           setGridState(null);
           setReportData(null);
           return;
@@ -526,9 +555,10 @@
         if (state.fYears)  setFYears(new Set(state.fYears));
         if (state.fMonths) setFMonths(new Set(state.fMonths));
         if (state.selIds)  setSelectedIds(new Set(state.selIds));
+        if (typeof state.showInactiveAccounts === 'boolean') setShowInactiveAccounts(state.showInactiveAccounts);
         if (state.gridState) setGridState(state.gridState);
       },
-    }), [filters, fYears, fMonths, selectedIds, gridState, curYear]);
+    }), [filters, fYears, fMonths, selectedIds, showInactiveAccounts, gridState, curYear]);
 
     const dayOptions = useMemo(() => {
       const opts = [{ value: 'LAST', label: t('آخرین روز ماه', 'Last Day of Month') }];
@@ -547,6 +577,11 @@
       { field: 'symbol', header_fa: 'نماد', header_en: 'Symbol', width: '70px' },
     ], []);
 
+    const yearOptions = useMemo(() => yearsRange.map(y => ({ value: String(y), label: String(y) })), [yearsRange]);
+    const monthOptions = useMemo(() => availableMonths.map(m => ({ value: m.key, label: m.label })), [availableMonths]);
+    const yearSummary = useMemo(() => fYears.size > 0 ? t(`${fYears.size} سال انتخاب شده`, `${fYears.size} years selected`) : t('انتخاب سال‌ها', 'Select years'), [fYears, t]);
+    const monthSummary = useMemo(() => fMonths.size > 0 ? t(`${fMonths.size} ماه انتخاب شده`, `${fMonths.size} months selected`) : t('انتخاب ماه‌ها', 'Select months'), [fMonths, t]);
+
     const advancedFilterFields = useMemo(() => ([
       {
         name: 'report_day',
@@ -563,11 +598,46 @@
         dropdownWidth: 'min-w-[360px]'
       },
       {
+        name: 'f_years',
+        label: t('سال‌ها', 'Years'),
+        type: 'custom',
+        render: ({ key }) => React.createElement('div', { key, className: 'w-full min-w-0' },
+          React.createElement(MultiSelectDropdown, {
+            label: t('سال‌ها', 'Years'),
+            options: yearOptions,
+            selected: fYears,
+            onToggle: (yearStr) => toggleYear(Number(yearStr)),
+            onSelectAll: () => setFYears(new Set(yearOptions.map(o => String(o.value)))),
+            onClear: () => { setFYears(new Set()); setFMonths(new Set()); },
+            summary: yearSummary,
+            isRtl,
+          })
+        )
+      },
+      {
+        name: 'f_months',
+        label: t('ماه‌ها', 'Months'),
+        type: 'custom',
+        render: ({ key }) => React.createElement('div', { key, className: 'w-full min-w-0' },
+          React.createElement(MultiSelectDropdown, {
+            label: t('ماه‌ها', 'Months'),
+            options: monthOptions,
+            selected: fMonths,
+            onToggle: toggleMonth,
+            onSelectAll: () => setFMonths(new Set(monthOptions.map(o => String(o.value)))),
+            onClear: () => setFMonths(new Set()),
+            summary: monthSummary,
+            isRtl,
+            disabled: fYears.size === 0,
+          })
+        )
+      },      
+      {
         name: 'show_movements',
         label: t('نمایش واریز/ برداشت', 'Show Deposit/Withdrawal'),
         type: 'toggle',
       }
-    ]), [t, dayOptions, currencyLovData, currencyLovCols]);
+    ]), [t, dayOptions, currencyLovData, currencyLovCols, yearOptions, monthOptions, yearSummary, monthSummary, fYears, isRtl, toggleYear, toggleMonth]);
 
     const advancedFilterValues = useMemo(() => ({
       report_day: filters.report_day || 'LAST',
@@ -583,11 +653,6 @@
         show_movements: !!vals?.show_movements,
       }));
     }, []);
-
-    const yearOptions = useMemo(() => yearsRange.map(y => ({ value: String(y), label: String(y) })), [yearsRange]);
-    const monthOptions = useMemo(() => availableMonths.map(m => ({ value: m.key, label: m.label })), [availableMonths]);
-    const yearSummary = useMemo(() => fYears.size > 0 ? t(`${fYears.size} سال انتخاب شده`, `${fYears.size} years selected`) : t('انتخاب سال‌ها', 'Select years'), [fYears, t]);
-    const monthSummary = useMemo(() => fMonths.size > 0 ? t(`${fMonths.size} ماه انتخاب شده`, `${fMonths.size} months selected`) : t('انتخاب ماه‌ها', 'Select months'), [fMonths, t]);
 
     // ── Dynamic grid columns ───────────────────────────────────────────────
     const columns = useMemo(() => {
@@ -625,7 +690,7 @@
           const isHdr   = row._type === 'group_header';
           const isCurrency = row._type === 'currency_header';
           const textCls = isGrand
-            ? 'font-black text-indigo-700 dark:text-indigo-300'
+            ? 'font-black text-slate-700 dark:text-slate-200'
             : isHdr
               ? 'font-bold text-slate-800 dark:text-slate-100'
               : isCurrency
@@ -635,7 +700,7 @@
             style: { paddingInlineStart: `${depth * 16}px` },
             className: 'flex items-center gap-1'
           },
-            isGrand && React.createElement('span', { className: 'text-indigo-500 text-[10px] me-0.5' }, '●'),
+            isGrand && React.createElement('span', { className: 'text-slate-500 text-[10px] me-0.5' }, '●'),
             isHdr   && React.createElement('span', { className: 'text-indigo-400 text-[10px] me-0.5' }, '■'),
             isCurrency && React.createElement('span', { className: 'text-teal-400 text-[10px] me-0.5' }, '◆'),
             React.createElement('span', { className: `text-[12px] leading-tight ${textCls}` }, val || '—')
@@ -782,22 +847,38 @@
 
           // Tree controls
           React.createElement('div', {
-            className: 'flex items-center justify-end gap-1 shrink-0 px-1'
+            className: 'flex items-center justify-between gap-2 shrink-0 px-1'
           },
             React.createElement('button', {
               type: 'button',
-              onClick: () => setSettingsTreeExpandMode('expand'),
-              title: t('باز کردن همه', 'Expand All'),
-              'aria-label': t('باز کردن همه', 'Expand All'),
-              className: 'p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all'
-            }, React.createElement(Maximize2, { size: 14 })),
-            React.createElement('button', {
-              type: 'button',
-              onClick: () => setSettingsTreeExpandMode('collapse'),
-              title: t('بستن همه', 'Collapse All'),
-              'aria-label': t('بستن همه', 'Collapse All'),
-              className: 'p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all'
-            }, React.createElement(Minimize2, { size: 14 }))
+              onClick: () => setShowInactiveAccounts(v => !v),
+              className: 'inline-flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors'
+            },
+              React.createElement('span', { className: 'whitespace-nowrap' }, t('نمایش حساب‌های غیرفعال', 'Show inactive accounts')),
+              React.createElement('span', {
+                className: `relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showInactiveAccounts ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`
+              },
+                React.createElement('span', {
+                  className: `inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showInactiveAccounts ? (isRtl ? '-translate-x-0.5' : 'translate-x-4') : (isRtl ? '-translate-x-4' : 'translate-x-0.5')}`
+                })
+              )
+            ),
+            React.createElement('div', { className: 'flex items-center gap-1' },
+              React.createElement('button', {
+                type: 'button',
+                onClick: () => setSettingsTreeExpandMode('expand'),
+                title: t('باز کردن همه', 'Expand All'),
+                'aria-label': t('باز کردن همه', 'Expand All'),
+                className: 'p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all'
+              }, React.createElement(Maximize2, { size: 14 })),
+              React.createElement('button', {
+                type: 'button',
+                onClick: () => setSettingsTreeExpandMode('collapse'),
+                title: t('بستن همه', 'Collapse All'),
+                'aria-label': t('بستن همه', 'Collapse All'),
+                className: 'p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all'
+              }, React.createElement(Minimize2, { size: 14 }))
+            )
           ),
 
           // Tree
@@ -820,7 +901,8 @@
                       key: root.id, node: root, depth: 0,
                       selectedIds, onToggle: toggleId, isRtl,
                       resetToken: settingsTreeResetToken,
-                      expandMode: settingsTreeExpandMode
+                      expandMode: settingsTreeExpandMode,
+                      inheritedInactive: false
                     })
                   )
           ),
@@ -848,6 +930,7 @@
       // Grand total row
       const grandRow = {
         _id: '__grand_total__', _type: 'grand_total', _depth: 0,
+        _rowClassName: 'bg-slate-100/80 dark:bg-slate-700/40 hover:bg-slate-100 dark:hover:bg-slate-700/50',
         _title: t('جمع کل (USD / IRR)', 'Grand Total (USD / IRR)'),
         _currency: '',
         _leafIds: Array.from(reportData.reportAccountLookup?.keys?.() || []),
@@ -859,15 +942,6 @@
       const treeRows = [...groupedRows, grandRow];
 
       const toolbarStartContent = React.createElement('div', { className: 'flex items-center gap-2 px-1' },        
-        access.canEdit && React.createElement(Button, {
-          variant: 'outline', size: 'sm',
-          onClick: () => setSettingsOpen(true)
-        },
-          React.createElement('span', { className: 'flex items-center gap-1.5' },
-            React.createElement(Settings, { size: 14 }),
-            t('تنظیمات حساب‌ها', 'Account Settings')
-          )
-        ),
         React.createElement('span', { className: 'text-[12px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold' },
           t(
             `${selectedLeafCount} حساب انتخابی · ${slots.length} ماه`,
@@ -956,52 +1030,27 @@
             onSearch: handleGenerate,
             language,
             defaultOpen: true,
-            inlineChildren: true,
-          },
-            React.createElement('div', { className: 'w-full min-w-0' },
-              React.createElement(MultiSelectDropdown, {
-                label: t('سال‌ها', 'Years'),
-                options: yearOptions,
-                selected: fYears,
-                onToggle: (yearStr) => toggleYear(Number(yearStr)),
-                onSelectAll: () => setFYears(new Set(yearOptions.map(o => String(o.value)))),
-                onClear: () => { setFYears(new Set()); setFMonths(new Set()); },
-                summary: yearSummary,
-                isRtl,
-              })
-            ),
-            React.createElement('div', { className: 'w-full min-w-0' },
-              React.createElement(MultiSelectDropdown, {
-                label: t('ماه‌ها', 'Months'),
-                options: monthOptions,
-                selected: fMonths,
-                onToggle: toggleMonth,
-                onSelectAll: () => setFMonths(new Set(monthOptions.map(o => String(o.value)))),
-                onClear: () => setFMonths(new Set()),
-                summary: monthSummary,
-                isRtl,
-                disabled: fYears.size === 0,
-              })
-            ),
-            React.createElement('div', { className: 'w-full min-w-0 flex flex-col gap-1' },
-              React.createElement('label', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300' },
-                t('انتخاب حساب', 'Account selection')
-              ),
-              React.createElement('div', {
-                className: 'h-8 px-2.5 rounded-lg border flex items-center justify-between text-[12px] bg-white dark:bg-slate-700/40 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-500'
-              },
-                React.createElement('span', { className: 'truncate min-w-0' },
-                  t(`${selectedLeafCount} حساب انتخاب شده`, `${selectedLeafCount} accounts selected`)
-                ),
-                selectedIds.size > 0 && React.createElement('button', {
-                  type: 'button',
-                  className: 'text-slate-400 hover:text-rose-500 transition-colors shrink-0',
-                  onClick: () => setSelectedIds(new Set()),
-                  title: t('حذف انتخاب حساب‌ها', 'Clear selected accounts')
-                }, React.createElement(X, { size: 13 }))
-              )
-            )
-          ),
+            inlineChildren: false,
+            footerStartContent: access.canEdit
+              ? React.createElement('div', { className: 'flex items-center gap-2' },
+                  React.createElement(Button, {
+                    variant: 'outline',
+                    size: 'sm',
+                    onClick: () => setSettingsOpen(true)
+                  },
+                    React.createElement('span', { className: 'flex items-center gap-1.5' },
+                      React.createElement(Settings, { size: 14 }),
+                      t('تنظیمات گزارش / حساب‌ها', 'Report / Accounts Settings')
+                    )
+                  ),
+                  React.createElement('span', {
+                    className: 'text-[12px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap'
+                  },
+                    t(`${selectedLeafCount} حساب انتخاب شده`, `${selectedLeafCount} accounts selected`)
+                  )
+                )
+              : null,
+          }),
 
           generating
             ? React.createElement('div', {
@@ -1016,16 +1065,11 @@
                   React.createElement(EmptyState, {
                     title: t('گزارش تولید نشده', 'Report Not Generated'),
                     description: t(
-                      'ماه‌ها را انتخاب کنید، از «تنظیمات گزارش» حساب‌ها را تعیین کنید، سپس «تولید گزارش» را بزنید.',
-                      'Select months, configure accounts via "Report Settings", then click "Generate Report".'
+                      'ماه‌ها را انتخاب کنید، از «تنظیمات گزارش» حساب‌ها را تعیین کنید، سپس «جستجو» را بزنید.',
+                      'Select months, configure accounts via "Report Settings", then click "Search".'
                     ),
                     language,
-                    action: access.canEdit
-                      ? React.createElement(Button, {
-                          variant: 'outline', size: 'sm',
-                          onClick: () => setSettingsOpen(true)
-                        }, t('تنظیمات گزارش', 'Report Settings'))
-                      : null
+                    action: null
                   })
                 )
 

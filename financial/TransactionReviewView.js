@@ -702,7 +702,7 @@
         if (!acc) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
         return React.createElement('div', { className: 'flex flex-col' },
           React.createElement('span', { className: 'text-[12px] font-medium text-slate-700 dark:text-slate-300' }, isRtl ? acc.title_fa : (acc.title_en || acc.title_fa)),
-          React.createElement('span', { className: 'text-[10px] text-slate-500 font-mono' }, acc.code)
+          React.createElement('span', { className: 'text-[10px] text-slate-500 font-sans' }, acc.code)
         );
       }},
       { field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '90px', exportValue: (val) => txActions[val] || val || '-', render: (val) => {
@@ -936,7 +936,7 @@
         if (!acc) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
         return React.createElement('div', { className: 'flex flex-col' },
           React.createElement('span', { className: 'text-[12px] font-medium text-slate-700 dark:text-slate-300' }, isRtl ? acc.title_fa : (acc.title_en || acc.title_fa)),
-          React.createElement('span', { className: 'text-[10px] text-slate-500 font-mono' }, acc.code)
+          React.createElement('span', { className: 'text-[10px] text-slate-500 font-sans' }, acc.code)
         );
       }},
       { field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '90px', render: (val) => {

@@ -202,7 +202,7 @@
     );
   };
 
-  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, onSearch, language = 'fa', defaultOpen = false, initialValues, children, inlineChildren = false, gridClassName = 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3' }) => {
+  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, onSearch, language = 'fa', defaultOpen = false, initialValues, children, inlineChildren = false, footerStartContent = null, gridClassName = 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -245,6 +245,18 @@
           <div className="p-3 border-t border-slate-100 dark:border-slate-700/50 animate-in fade-in slide-in-from-top-2 duration-200">
             <div className={gridClassName}>
               {fields.map((f, idx) => {
+                if (f.type === 'custom' && typeof f.render === 'function') {
+                  return f.render({
+                    key: idx,
+                    value: values[f.name],
+                    values,
+                    setValue: (val) => handleChange(f.name, val),
+                    handleChange,
+                    isRtl,
+                    language,
+                    t,
+                  });
+                }
                 if (f.type === 'select') return <SelectField key={idx} size="sm" label={f.label} isRtl={isRtl} options={f.options} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} />;
                 if (f.type === 'toggle') return <ToggleField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
                 if (f.type === 'checkbox') return <CheckboxField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
@@ -261,10 +273,11 @@
               })}
               {inlineChildren && children}
             </div>
-            <div className={`flex flex-wrap items-center gap-4 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 ${inlineChildren ? 'justify-end' : 'justify-between'}`}>
-              {!inlineChildren && (
+            <div className={`flex flex-wrap items-center gap-4 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 ${(!inlineChildren || footerStartContent) ? 'justify-between' : 'justify-end'}`}>
+              {(!inlineChildren || footerStartContent) && (
                 <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                  {children}
+                  {!inlineChildren && children}
+                  {footerStartContent}
                 </div>
               )}
               <div className="flex items-center gap-2 shrink-0 mr-auto">

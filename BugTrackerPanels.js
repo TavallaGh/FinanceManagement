@@ -193,7 +193,7 @@
       header_fa: 'کد',
       header_en: 'Code',
       width: '130px',
-      render: (val) => <span className="font-mono text-[12px] font-bold text-slate-700 dark:text-slate-200" dir="ltr">{val || '-'}</span>,
+      render: (val) => <span className="font-sans text-[12px] font-bold text-slate-700 dark:text-slate-200" dir="ltr">{val || '-'}</span>,
       searchAccessor: (val) => val || ''
     },
     {

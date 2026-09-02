@@ -31,6 +31,7 @@
   const Edit = LucideIcons.Edit || FallbackIcon;
   const Trash2 = LucideIcons.Trash2 || FallbackIcon;
   const Save = LucideIcons.Save || FallbackIcon;
+  const Layers = LucideIcons.Layers || LucideIcons.FolderOpen || FallbackIcon;
   const AlertTriangle = LucideIcons.AlertTriangle || FallbackIcon;
 
   const supabase = window.supabase;
@@ -139,13 +140,13 @@
     const [fiscalYears, setFiscalYears] = useState([]);
     const [periods, setPeriods] = useState([]);
     const [users, setUsers] = useState([]);
-
-    const [selectedYearId, setSelectedYearId] = useState(null);
+    const [userGroups, setUserGroups] = useState([]);
 
     const [yearGridState, setYearGridState] = useState(null);
 
     const [yearModal, setYearModal] = useState({ isOpen: false, record: null });
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, payload: null });
+    const [periodModal, setPeriodModal] = useState({ isOpen: false, year: null });
 
     const [yearForm, setYearForm] = useState({
       id: null,
@@ -162,15 +163,16 @@
     }, []);
 
     const selectedYear = useMemo(() => {
-      return fiscalYears.find(y => String(y.id) === String(selectedYearId)) || null;
-    }, [fiscalYears, selectedYearId]);
+      if (!periodModal.year) return null;
+      return fiscalYears.find(y => String(y.id) === String(periodModal.year.id)) || periodModal.year;
+    }, [fiscalYears, periodModal.year]);
 
     const periodRows = useMemo(() => {
-      if (!selectedYearId) return [];
+      if (!selectedYear?.id) return [];
       return periods
-        .filter(p => String(p.fiscalYearId) === String(selectedYearId))
+        .filter(p => String(p.fiscalYearId) === String(selectedYear.id))
         .sort((a, b) => String(a.startDate || '').localeCompare(String(b.startDate || '')));
-    }, [periods, selectedYearId]);
+    }, [periods, selectedYear]);
 
     const mapFiscalYears = (rows) => (rows || []).map(r => ({
       id: r.id,
@@ -228,16 +230,19 @@
         const [
           { data: yData, error: yErr },
           { data: pData, error: pErr },
-          { data: uData, error: uErr }
+          { data: uData, error: uErr },
+          { data: gData, error: gErr }
         ] = await Promise.all([
           supabase.from('fm_fiscal_years').select('*').order('start_date', { ascending: false }),
           supabase.from('fm_fiscal_periods').select('*').order('start_date', { ascending: true }),
-          supabase.from('sec_users').select('id, username, full_name, email, is_active').order('username', { ascending: true })
+          supabase.from('sec_users').select('id, username, full_name, email, is_active').order('username', { ascending: true }),
+          supabase.from('sec_user_groups').select('id, code, title, is_active').order('title', { ascending: true })
         ]);
 
         if (yErr) throw yErr;
         if (pErr) throw pErr;
         if (uErr) throw uErr;
+        if (gErr) throw gErr;
 
         const mappedYears = mapFiscalYears(yData);
         const mappedPeriods = mapPeriods(pData);
@@ -246,12 +251,8 @@
         setFiscalYears(mappedYears);
         setPeriods(mappedPeriods);
         setUsers(mappedUsers);
+        setUserGroups((gData || []).map(g => ({ id: g.id, code: g.code || '', title: g.title || '', isActive: g.is_active !== false })));
 
-        if (!selectedYearId && mappedYears.length > 0) {
-          setSelectedYearId(mappedYears[0].id);
-        } else if (selectedYearId && !mappedYears.some(y => String(y.id) === String(selectedYearId))) {
-          setSelectedYearId(mappedYears.length ? mappedYears[0].id : null);
-        }
       } catch (err) {
         console.error('FiscalPeriods fetch error:', err);
         showToast(
@@ -261,7 +262,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [selectedYearId, showToast, t]);
+    }, [showToast, t]);
 
     useEffect(() => {
       if (access.canView) fetchBaseData();
@@ -419,7 +420,9 @@
         const { error } = await supabase.from('fm_fiscal_years').delete().eq('id', y.id);
         if (error) throw error;
         await logAction(y.id, 'delete', `حذف سال مالی ${y.yearCode}`);
-        if (String(selectedYearId) === String(y.id)) setSelectedYearId(null);
+        if (periodModal.isOpen && String(periodModal.year?.id) === String(y.id)) {
+          setPeriodModal({ isOpen: false, year: null });
+        }
         setDeleteConfirm({ isOpen: false, payload: null });
         await fetchBaseData();
         showToast(t('سال مالی حذف شد.', 'Fiscal year deleted.'));
@@ -437,7 +440,7 @@
         header_fa: 'سال مالی',
         header_en: 'Fiscal Year',
         width: '130px',
-        render: (val) => <span className="font-mono font-bold text-indigo-700 dark:text-indigo-400" dir="ltr">{val || '-'}</span>
+        render: (val) => <span className="font-sans font-bold text-indigo-700 dark:text-indigo-400" dir="ltr">{val || '-'}</span>
       },
       {
         field: 'calendarType',
@@ -464,6 +467,11 @@
 
     const DetailsComponent = window.FiscalPeriodDetails || (() => null);
 
+    const openPeriodModal = (yearRow) => {
+      if (!yearRow) return;
+      setPeriodModal({ isOpen: true, year: yearRow });
+    };
+
     return (
       <div className="flex flex-col h-full p-4 bg-slate-50/50 dark:bg-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
         <PageHeader
@@ -476,23 +484,22 @@
           ]}
         />
 
-        <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-5 gap-4 mt-4 animate-in fade-in duration-300">
-          <div className="xl:col-span-2 min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="flex-1 min-h-0 mt-4 animate-in fade-in duration-300">
+          <div className="h-full min-h-0 bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
             <DataGrid
               data={fiscalYears}
               columns={yearColumns}
               language={language}
               isLoading={isLoading}
               onAdd={access.canCreate ? () => openYearModal() : undefined}
-              onRowClick={(row) => setSelectedYearId(row.id)}
               onRowDoubleClick={(row) => access.canEdit ? openYearModal(row) : undefined}
-              activeRowId={selectedYearId}
               gridState={yearGridState}
               onGridStateChange={setYearGridState}
               hideImport
               hideExport
               actions={[
                 { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => openYearModal(row), className: 'text-slate-400 hover:text-indigo-600' },
+                { icon: Layers, tooltip: t('مدیریت دوره‌های میانی', 'Manage Periods'), onClick: (row) => openPeriodModal(row), className: 'text-slate-400 hover:text-blue-600' },
                 {
                   icon: Trash2,
                   tooltip: t('حذف', 'Delete'),
@@ -509,7 +516,15 @@
               ]}
             />
           </div>
+        </div>
 
+        <Modal
+          isOpen={periodModal.isOpen}
+          onClose={() => setPeriodModal({ isOpen: false, year: null })}
+          title={periodModal.year ? t(`دوره‌های میانی سال مالی ${periodModal.year.yearCode}`, `Fiscal Year ${periodModal.year.yearCode} Periods`) : t('دوره‌های میانی', 'Fiscal Periods')}
+          width="max-w-7xl"
+          language={language}
+        >
           <DetailsComponent
             language={language}
             formCode={formCode}
@@ -529,13 +544,14 @@
             getMonthRangeGregorianForGregorian={getMonthRangeGregorianForGregorian}
             supabase={supabase}
             users={users}
+            userGroups={userGroups}
             showToast={showToast}
             t={t}
             isRtl={isRtl}
             onRefresh={fetchBaseData}
             onLog={logAction}
           />
-        </div>
+        </Modal>
 
         <Modal
           isOpen={yearModal.isOpen}
