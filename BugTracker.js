@@ -196,7 +196,7 @@
       try {
         const [specialistsRes, bugsRes, menusRes] = await Promise.all([
           supabase.from(SPECIALISTS_TABLE).select('*').order('full_name', { ascending: true }),
-          supabase.from(BUGS_TABLE).select('*').order('updated_at', { ascending: false }),
+          supabase.from(BUGS_TABLE).select('*').order('created_at', { ascending: false }),
           supabase
             .from('menus')
             .select('id, parent_id, menu_type, label_fa, label_en, component_path, is_visible')
