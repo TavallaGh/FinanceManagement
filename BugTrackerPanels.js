@@ -413,7 +413,7 @@
       >
         <div className="p-3 max-h-[72vh] overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900">
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-3">
-            <Card title={t('مشخصات باگ', 'Bug Details')} className="xl:col-span-5 border border-slate-200 dark:border-slate-700" noPadding={false}>
+            <Card title={t('مشخصات باگ', 'Bug Details')} className="xl:col-span-6 border border-slate-200 dark:border-slate-700" noPadding={false}>
               <div className="space-y-2">
                 <TextField
                   size="sm"
@@ -509,7 +509,7 @@
               ) : null}
             </Card>
 
-            <Card title={t('تسک‌های مرتبط', 'Related Tasks')} className="xl:col-span-7 border border-slate-200 dark:border-slate-700" noPadding={false}>
+            <Card title={t('تسک‌های مرتبط', 'Related Tasks')} className="xl:col-span-6 border border-slate-200 dark:border-slate-700" noPadding={false}>
               <div className="flex items-end gap-2">
                 <TextField
                   size="sm"

@@ -972,7 +972,7 @@
             notifFilter={filteredRecordId ? { isActive: true, onClear: () => setFilteredRecordId(null) } : null}
           />
 
-          <div className="mt-2 flex-1 min-h-0 flex flex-col gap-3">
+          <div className="mt-2 flex-1 min-h-0 flex flex-col gap-1">
             <AdvancedFilter
               fields={filterFields}
               initialValues={filters}
