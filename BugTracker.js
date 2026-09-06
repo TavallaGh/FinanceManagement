@@ -77,6 +77,12 @@
     fix_status: 'TODO',
     qa_status: 'PENDING'
   };
+  const DEFAULT_FILTERS = {
+    show_done: false,
+    assignee_id: '',
+    has_attachment: false,
+    has_comment: false
+  };
 
   const getSessionUserId = () => {
     try {
@@ -137,12 +143,7 @@
     const [specialists, setSpecialists] = useState([]);
     const [menuForms, setMenuForms] = useState([]);
     const [attachmentCounts, setAttachmentCounts] = useState({});
-    const [filters, setFilters] = useState({
-      show_done: false,
-      assignee_id: '',
-      has_attachment: false,
-      has_comment: false
-    });
+    const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [selectedBugIds, setSelectedBugIds] = useState([]);
 
     const [gridState, setGridState] = useState(null);
@@ -948,6 +949,20 @@
 
     const specialistColumns = useMemo(() => getSpecialistColumns(), []);
 
+    const viewConfig = useMemo(() => ({
+      pageId: 'bug_tracker_list',
+      currentState: () => ({ filters, gridState }),
+      onApplyState: (state) => {
+        if (state) {
+          if (state.filters) setFilters(state.filters);
+          if (Object.prototype.hasOwnProperty.call(state, 'gridState')) setGridState(state.gridState);
+        } else {
+          setFilters(DEFAULT_FILTERS);
+          setGridState(null);
+        }
+      }
+    }), [filters, gridState]);
+
     if (!access.canView) {
       return (
         <div className="h-full p-4" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -969,6 +984,7 @@
             description={t('ثبت، تخصیص، کنترل و بستن/بازگشایی مشکلات فرم‌ها', 'Track, assign, control, close/reopen form issues')}
             language={language}
             breadcrumbs={[{ label: t('امکانات عمومی سیستم', 'System Utilities') }, { label: t('رهگیری مشکلات', 'Bug Tracker') }]}
+            viewConfig={viewConfig}
             notifFilter={filteredRecordId ? { isActive: true, onClear: () => setFilteredRecordId(null) } : null}
           />
 
@@ -977,12 +993,7 @@
               fields={filterFields}
               initialValues={filters}
               onFilter={setFilters}
-              onClear={() => setFilters({
-                show_done: false,
-                assignee_id: '',
-                has_attachment: false,
-                has_comment: false
-              })}
+              onClear={() => setFilters(DEFAULT_FILTERS)}
               language={language}
             />
 
