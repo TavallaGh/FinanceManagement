@@ -33,6 +33,10 @@
   const SelectField       = safeComp(DSForms, 'SelectField');
   const DatePicker        = safeComp(DSForms, 'DatePicker');
 
+  const DSGrid      = window.DSGrid || DS;
+  const DataGrid    = safeComp(DSGrid, 'DataGrid');
+  const LOVField    = safeComp(DSGrid, 'LOVField');
+
   const DSFeedback  = window.DSFeedback || window.DSOverlays || DS;
   const Modal       = safeComp(DSFeedback, 'Modal');
   const Toast       = safeComp(DSFeedback, 'Toast');
@@ -80,7 +84,6 @@
     { value: 'CLOSED',      fa: 'بسته شده',     en: 'Closed',       color: 'gray'    },
   ];
 
-  const lockedStatuses = ['REGISTERED', 'REVIEWED', 'APPROVED', 'IN_PROGRESS', 'DONE', 'REJECTED', 'CLOSED'];
   const BALANCED_REQUEST_TYPES = ['TRANSFER', 'EXCHANGE'];
   const getStatus = (v) => STATUS_LIST.find(s => s.value === v) || STATUS_LIST[0];
 
@@ -134,7 +137,7 @@
       leafAccounts: [], allAccounts: [], costTypes: [], incomeTypes: [],
       costBenefitCenters: [],
       currencies: [], usersMap: {}, usersList: [], partiesMap: {}, partiesList: [],
-      nodesMap: {}, currentUserDeptId: null, currentUserDeptTitle: '',
+      nodesMap: {}, orgNodes: [], personnelRows: [], rolesMap: {}, currentUserDeptId: null, currentUserDeptTitle: '',
       currentUserPartyId: null, currentUserPartyName: '',
       projects: [],
     });
@@ -142,14 +145,33 @@
     const gridRef     = useRef(null);
     const initialized = useRef(false);
 
-    const isReadOnly = useMemo(
-      () => formMode !== 'CREATE' && formMode !== 'COPY' && lockedStatuses.includes(header.status || ''),
-      [formMode, header.status]
-    );
+    const isMissingWorkflowSchemaError = useCallback((error, status) => {
+      const msg = String(error?.message || '').toLowerCase();
+      const details = String(error?.details || '').toLowerCase();
+      const hint = String(error?.hint || '').toLowerCase();
+      return (
+        status === 404 ||
+        error?.code === '42P01' ||
+        msg.includes('wf_state_machines') ||
+        details.includes('wf_state_machines') ||
+        hint.includes('wf_state_machines')
+      );
+    }, []);
 
     const parseAmount = useCallback((value) => {
       return parseFloat(String(value || '0').replace(/,/g, '')) || 0;
     }, []);
+
+    const formatNumberSafe = useCallback((val) => {
+      const num = parseAmount(val);
+      return num.toLocaleString('en-US');
+    }, [parseAmount]);
+
+    const getRequestedAmount = useCallback((item) => {
+      const dep = parseAmount(item?.deposit_amount);
+      const wid = parseAmount(item?.withdrawal_amount);
+      return Math.max(dep, wid);
+    }, [parseAmount]);
 
     const getCurrencyDecimals = useCallback((currencyCode) => {
       const currency = (lookups.currencies || []).find(item => item.code === currencyCode);
@@ -174,6 +196,66 @@
       return { toUsd };
     }, []);
 
+    const dataEntryComponents = useMemo(() => ({
+      Button,
+      Modal,
+      DataGrid,
+      TextField,
+      LOVField,
+    }), []);
+
+    const useRequestWorkFlow = window.useRequestWorkFlow || (() => ({
+      dynamicActions: [],
+      workflowGraph: { nodes: [], edges: [] },
+      workflowLoading: false,
+      workflowPermissions: {},
+      renderStatusActions: () => null,
+      renderWorkflowModals: () => null,
+      resolveNextAssigneeLabel: async () => '-',
+    }));
+    const workflowModule = useRequestWorkFlow({
+      isOpen,
+      language,
+      isRtl,
+      t,
+      supabase,
+      header,
+      items,
+      lookups,
+      currentUserId,
+      isLoading,
+      access,
+      formCode,
+      parseAmount,
+      formatNumberSafe,
+      getRequestedAmount,
+      showToast,
+      setItems,
+      setIsDirty,
+      safeIcon,
+      LucideIcons,
+      getStatus,
+      isMissingWorkflowSchemaError,
+      dataEntryComponents,
+    });
+
+    const {
+      workflowPermissions,
+      renderStatusActions,
+      renderWorkflowModals,
+      resolveNextAssigneeLabel,
+    } = workflowModule;
+
+    const canEditField = useCallback((field) => {
+      if (formMode === 'CREATE' || formMode === 'COPY') return true;
+      return ['EDITABLE', 'REQUIRED'].includes(workflowPermissions[field]);
+    }, [formMode, workflowPermissions]);
+
+    const isReadOnly = formMode !== 'CREATE' && formMode !== 'COPY' &&
+      !Object.values(workflowPermissions).some(permission => permission === 'EDITABLE' || permission === 'REQUIRED');
+    const areItemsReadOnly = formMode !== 'CREATE' && formMode !== 'COPY' &&
+      !Object.entries(workflowPermissions).some(([field, permission]) => field.startsWith('items.') && ['EDITABLE', 'REQUIRED'].includes(permission));
+
     const getRatesForDate = useCallback(async (dateRaw) => {
       const dateKey = (dateRaw || new Date().toISOString()).replace(/\//g, '-').split('T')[0];
       const { data, error } = await supabase
@@ -193,13 +275,13 @@
       return latest;
     }, [supabase]);
 
-    const validateTransferBalance = useCallback(async () => {
-      if (!BALANCED_REQUEST_TYPES.includes(header.request_type) || !items.length) return true;
+    const validateTransferBalance = useCallback(async (itemsInput = items) => {
+      if (!BALANCED_REQUEST_TYPES.includes(header.request_type) || !itemsInput.length) return true;
 
       const ratesMap = await getRatesForDate(header.need_date || header.created_at || new Date().toISOString());
       let diffUsd = 0;
 
-      items.forEach(item => {
+      itemsInput.forEach(item => {
         const dep = parseAmount(item.deposit_amount);
         const wid = parseAmount(item.withdrawal_amount);
         const cur = item.currency || 'IRR';
@@ -248,7 +330,7 @@
     const fetchDeps = useCallback(async () => {
       if (!supabase) return null;
       try {
-        const [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, currRes, cbcRes, projectsRes] =
+        const [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, rolesRes, currRes, cbcRes, projectsRes] =
           await Promise.all([
             supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
             supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
@@ -257,7 +339,8 @@
             supabase.from('sec_users').select('id, full_name, username, party_id'),
             supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, mobile').eq('is_active', true),
             supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
-            supabase.from('fm_org_chart_nodes').select('id, title'),
+            supabase.from('fm_org_chart_nodes').select('id, title, parent_id'),
+            supabase.from('sec_roles').select('id, title, code').eq('is_active', true),
             supabase.from('fm_currencies').select('id, code, title'),
             supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
             supabase.from('gen_projects').select('id, code, title, status, manager_party_id').eq('is_active', true).order('code'),
@@ -309,6 +392,9 @@
         const nodesMap = {};
         (nodesRes.data || []).forEach(n => { nodesMap[n.id] = n.title; });
 
+        const rolesMap = {};
+        (rolesRes.data || []).forEach(r => { rolesMap[r.id] = r.title || r.code || ''; });
+
         let myDeptId = null, myDeptTitle = '', myPartyId = null, myPartyName = '';
         const me = currentUserId ? (usersRes.data || []).find(u => u.id === currentUserId) : null;
         if (me?.party_id) {
@@ -336,6 +422,7 @@
           })),
           currencies:   currRes.data || [],
           usersMap, usersList: usersRes.data || [], partiesMap, partiesList, nodesMap,
+          orgNodes: nodesRes.data || [], personnelRows: personnelRes.data || [], rolesMap,
           currentUserDeptId: myDeptId, currentUserDeptTitle: myDeptTitle,
           currentUserPartyId: myPartyId, currentUserPartyName: myPartyName,
           projects: (projectsRes.data || []).map(p => ({
@@ -463,32 +550,56 @@
     }, []);
 
     // ── save ─────────────────────────────────────────────────────────────
-    const handleSave = async (overrideStatus) => {
-      const statusToSave = typeof overrideStatus === 'string' ? overrideStatus : header.status;
+    const getPermissionValue = useCallback((field, sourceItems = items, sourceHeader = header) => {
+      if (field.startsWith('items.')) {
+        const itemField = field.slice(6);
+        if (itemField === 'amount') return sourceItems.some(item => parseAmount(item.deposit_amount) > 0 || parseAmount(item.withdrawal_amount) > 0);
+        return sourceItems.length > 0 && sourceItems.every(item => item[itemField] !== null && item[itemField] !== undefined && String(item[itemField]).trim() !== '');
+      }
+      const value = sourceHeader[field];
+      return value !== null && value !== undefined && String(value).trim() !== '';
+    }, [header, items, parseAmount]);
+
+    const toUuidOrNull = useCallback((value) => {
+      const v = String(value || '').trim();
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v) ? v : null;
+    }, []);
+
+    const handleSave = async (actionOrStatus, actionInput = {}) => {
+      const selectedAction = actionOrStatus && typeof actionOrStatus === 'object' ? actionOrStatus : null;
+      const statusToSave = selectedAction?.to_status || (typeof actionOrStatus === 'string' ? actionOrStatus : header.status);
+      const overrideItems = Array.isArray(actionInput?.overrideItems) ? actionInput.overrideItems : null;
+      const itemsForSave = overrideItems || items;
+
+      if (selectedAction) {
+        const missingField = Object.entries(selectedAction.field_permissions || {})
+          .find(([field, permission]) => permission === 'REQUIRED' && !getPermissionValue(field, itemsForSave, header));
+        if (missingField) {
+          const labels = {
+            need_date: t('تاریخ نیاز', 'Need Date'), request_type: t('نوع درخواست', 'Request Type'),
+            payment_type: t('نوع پرداخت', 'Payment Type'), description: t('شرح درخواست', 'Description'),
+            'items.description': t('شرح اقلام', 'Item Description'), 'items.amount': t('مبلغ اقلام', 'Item Amount'),
+            'items.approved_amount': t('مبلغ تاییدشده', 'Approved Amount'),
+          };
+          const fieldLabel = labels[missingField[0]] || missingField[0];
+          return showToast(t(`پر کردن فیلد ${fieldLabel} برای این عملیات الزامی است.`, `${fieldLabel} is required for this action.`), 'error');
+        }
+      }
 
       if (document.getElementById('grid-inline-edit-marker'))
         return showToast(t('لطفاً ابتدا سطر باز اقلام را با Enter ذخیره کنید.', 'Please save the open items row first.'), 'warning');
 
-      if (!header.description?.trim())
+      if (!selectedAction && !header.description?.trim())
         return showToast(t('شرح درخواست الزامی است.', 'Request description is required.'), 'warning');
 
       setIsLoading(true);
       try {
         const now       = new Date().toISOString();
-        const actorId   = currentUserId;
-        const actorName = actorId ? (lookups.usersMap[actorId] || currentUserName) : currentUserName;
+        const fromStatus = header.status || 'DRAFT';
 
-        if (!(await validateTransferBalance())) {
+        if (!(await validateTransferBalance(itemsForSave))) {
           return;
         }
-
-        const metaPayload = {};
-        if (statusToSave === 'REVIEWED' && header.status !== 'REVIEWED')
-          Object.assign(metaPayload, { reviewer_id: actorId, reviewed_at: now, reviewer_name: actorName });
-        if (statusToSave === 'APPROVED' && header.status !== 'APPROVED')
-          Object.assign(metaPayload, { approver_id: actorId, approved_at: now, approver_name: actorName });
-        if (statusToSave === 'REGISTERED' && header.status === 'REJECTED')
-          Object.assign(metaPayload, { reviewer_id: null, reviewed_at: null, reviewer_name: null });
 
         const payload = {
           request_code:       header.request_code,
@@ -500,7 +611,6 @@
           payment_type:       header.payment_type || null,
           description:        header.description || '',
           status:             statusToSave,
-          ...metaPayload,
         };
 
         let reqId = header.id;
@@ -518,10 +628,10 @@
           if (error) throw error;
         }
 
-        if (isDirty || !header.id) {
+        if (isDirty || !header.id || !!overrideItems) {
           await supabase.from('req_request_items').delete().eq('request_id', reqId);
-          if (items.length > 0) {
-            const itemsPayload = items.map((item, idx) => ({
+          if (itemsForSave.length > 0) {
+            const itemsPayload = itemsForSave.map((item, idx) => ({
               request_id:         reqId,
               row_number:         idx + 1,
               currency:           item.currency           || null,
@@ -536,6 +646,7 @@
               withdrawal_amount:  parseAmount(item.withdrawal_amount),
               approved_amount:    parseAmount(item.approved_amount),
               remaining_amount:   parseAmount(item.remaining_amount),
+              related_account_id: item.related_account_id || item.account_id || null,
               description:        item.description || null,
             }));
             const { data: savedItems, error: iErr } = await supabase.from('req_request_items').insert(itemsPayload).select();
@@ -550,14 +661,48 @@
           }
         }
 
-        setHeader(p => ({
-          ...p, status: statusToSave,
-          ...(statusToSave === 'REVIEWED' && p.status !== 'REVIEWED' ? { reviewer_id: actorId, reviewed_at: now, reviewer_name: actorName } : {}),
-          ...(statusToSave === 'APPROVED' && p.status !== 'APPROVED' ? { approver_id: actorId, approved_at: now, approver_name: actorName } : {}),
-        }));
+        const statusChanged = String(fromStatus || '') !== String(statusToSave || '');
+        if (statusChanged && reqId) {
+          const actorName = lookups.usersMap?.[currentUserId] || currentUserName || '';
+          const nextAssignee = await resolveNextAssigneeLabel(statusToSave);
+          const actorUserId = toUuidOrNull(currentUserId);
+          const statusLogDescription = (actionInput?.approver_note || '').trim() || null;
+          const logPayload = {
+            request_id: reqId,
+            from_status: fromStatus,
+            to_status: statusToSave,
+            actor_user_id: actorUserId,
+            actor_name: actorName || 'Unknown',
+            next_assignee: nextAssignee,
+            description: statusLogDescription,
+            metadata: {
+              actor_user_id_raw: currentUserId || null,
+              action_id: selectedAction?.id || null,
+              action_label_fa: selectedAction?.action_label_fa || null,
+              action_label_en: selectedAction?.action_label_en || null,
+              data_entry_form: selectedAction?.data_entry_form || null,
+              approver_note: statusLogDescription,
+              workflow_source: selectedAction?.workflow_source || 'VISUAL',
+            },
+          };
+
+          const { error: logError } = await supabase.from('req_request_status_logs').insert([logPayload]);
+          if (logError) {
+            console.error('Request status log insert error:', logError);
+            showToast(
+              t(
+                `ثبت لاگ تغییر وضعیت انجام نشد: ${logError.message || 'خطای نامشخص'}`,
+                `Status log was not saved: ${logError.message || 'Unknown error'}`
+              ),
+              'warning'
+            );
+          }
+        }
+
+        setHeader(p => ({ ...p, status: statusToSave }));
         setIsDirty(false);
         setHasSaved(true);
-        showToast(typeof overrideStatus === 'string'
+        showToast(selectedAction || typeof actionOrStatus === 'string'
           ? t('وضعیت درخواست تغییر کرد.', 'Request status updated.')
           : t('درخواست با موفقیت ذخیره شد.', 'Request saved successfully.'));
       } catch (err) {
@@ -599,7 +744,6 @@
     if (!isOpen) return null;
 
     const statusInfo = getStatus(header.status || 'DRAFT');
-    const cur        = header.status || 'DRAFT';
     const hasItems   = items.length > 0;
 
     const fmtDT = (v) => {
@@ -613,59 +757,7 @@
       } catch { return v; }
     };
 
-    // ── status transition buttons ────────────────────────────────────────
-    const btnBase = 'flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-1 border rounded-md transition-colors';
-    const statusActions = (
-      <div className="flex flex-wrap items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
-        {cur === 'DRAFT' && access.canEdit && (
-          <button onClick={() => handleSave('REGISTERED')} className={`${btnBase} border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30`}>
-            <Send size={12} /> {t('ارسال برای بررسی', 'Submit for Review')}
-          </button>
-        )}
-        {cur === 'REGISTERED' && access.canEdit && (<>
-          <button onClick={() => handleSave('DRAFT')} className={`${btnBase} border-slate-400 text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800`}>
-            <RotateCcw size={12} /> {t('برگشت به یادداشت', 'Back to Draft')}
-          </button>
-          <button onClick={() => handleSave('REVIEWED')} className={`${btnBase} border-indigo-500 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30`}>
-            <CheckSquare size={12} /> {t('بررسی شد', 'Mark Reviewed')}
-          </button>
-        </>)}
-        {cur === 'REVIEWED' && access.canEdit && (<>
-          <button onClick={() => handleSave('REGISTERED')} className={`${btnBase} border-slate-400 text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800`}>
-            <RotateCcw size={12} /> {t('برگشت به ثبت شده', 'Back to Registered')}
-          </button>
-          <button onClick={() => handleSave('REJECTED')} className={`${btnBase} border-red-400 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30`}>
-            <XCircle size={12} /> {t('رد درخواست', 'Reject')}
-          </button>
-          <button onClick={() => handleSave('APPROVED')} className={`${btnBase} border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30`}>
-            <CheckCircle size={12} /> {t('تایید درخواست', 'Approve')}
-          </button>
-        </>)}
-        {cur === 'APPROVED' && access.canEdit && (
-          <button onClick={() => handleSave('IN_PROGRESS')} className={`${btnBase} border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30`}>
-            <PlayCircle size={12} /> {t('شروع انجام', 'Start Processing')}
-          </button>
-        )}
-        {cur === 'IN_PROGRESS' && access.canEdit && (
-          <button onClick={() => handleSave('DONE')} className={`${btnBase} border-teal-500 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30`}>
-            <Check size={12} /> {t('اتمام انجام', 'Mark Done')}
-          </button>
-        )}
-        {cur === 'REJECTED' && access.canEdit && (
-          <button onClick={() => handleSave('DRAFT')} className={`${btnBase} border-blue-400 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30`}>
-            <RotateCcw size={12} /> {t('بازنگری مجدد', 'Revise & Resubmit')}
-          </button>
-        )}
-        {['REJECTED', 'DONE', 'APPROVED'].includes(cur) && access.canEdit && (
-          <button onClick={() => handleSave('CLOSED')} className={`${btnBase} border-slate-400 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800`}>
-            <Lock size={12} /> {t('بستن درخواست', 'Close Request')}
-          </button>
-        )}
-        {cur === 'CLOSED' && (
-          <Badge variant="gray" size="sm">{t('بسته شده - غیرقابل تغییر', 'Closed - Locked')}</Badge>
-        )}
-      </div>
-    );
+    const statusActions = renderStatusActions(handleSave);
 
     const headerCardTitle = (
       <div className="flex items-center gap-3 w-full">
@@ -736,7 +828,7 @@
                 <div className="relative z-[90]">
                   <DatePicker size="sm" label={t('تاریخ نیاز', 'Need Date')}
                     value={header.need_date || ''} onChange={v => updateHeader('need_date', v)}
-                    isRtl={isRtl} calendarMode={calendarMode} disabled={isReadOnly} />
+                    isRtl={isRtl} calendarMode={calendarMode} disabled={!canEditField('need_date')} />
                 </div>
 
                 <div className="relative z-[80]">
@@ -744,7 +836,7 @@
                     value={header.request_type || 'GENERAL'}
                     onChange={e => updateHeader('request_type', e.target.value)}
                     options={REQUEST_TYPES.map(r => ({ value: r.value, label: isRtl ? r.fa : r.en }))}
-                    isRtl={isRtl} disabled={isReadOnly || hasItems} required />
+                    isRtl={isRtl} disabled={!canEditField('request_type') || hasItems} required />
                   {hasItems && !isReadOnly && (
                     <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
                       <AlertTriangle size={10} />
@@ -758,7 +850,7 @@
                     value={header.payment_type || ''}
                     onChange={e => updateHeader('payment_type', e.target.value)}
                     options={PAYMENT_TYPES.map(r => ({ value: r.value, label: isRtl ? r.fa : r.en }))}
-                    isRtl={isRtl} disabled={isReadOnly} required />
+                    isRtl={isRtl} disabled={!canEditField('payment_type')} required />
                 </div>
 
                 {(header.reviewer_id || header.reviewer_name) && (<>
@@ -778,7 +870,7 @@
                 <div className="lg:col-span-2 md:col-span-2 relative z-[70]">
                   <TextField size="sm" label={t('شرح درخواست', 'Description')}
                     value={header.description || ''} onChange={e => updateHeader('description', e.target.value)}
-                    isRtl={isRtl} disabled={isReadOnly} required />
+                    isRtl={isRtl} disabled={!canEditField('description')} required={workflowPermissions.description === 'REQUIRED' || formMode === 'CREATE' || formMode === 'COPY'} />
                 </div>
               </div>
             </Card>
@@ -830,7 +922,7 @@
                   onItemsChange={(newItems) => { setItems(newItems); setIsDirty(true); }}
                   lookups={lookups}
                   requestType={header.request_type || 'GENERAL'}
-                  isReadOnly={isReadOnly}
+                  isReadOnly={areItemsReadOnly}
                   language={language}
                   showToast={showToast}
                   formCode={formCode}
@@ -839,6 +931,8 @@
             </Card>
 
         </div>
+
+        {renderWorkflowModals(handleSave)}
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type}
           onClose={() => setToast(p => ({ ...p, isVisible: false }))} />
