@@ -231,12 +231,12 @@
           widIrr > 0 ? React.createElement('span', { className: 'text-[12px] font-medium text-rose-500 dark:text-rose-400' }, fmtInt(widIrr)) : null
         );
       }},
-      { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '110px', render: (val) => {
+      { field: 'registrar_id', header_fa: 'ثبت کننده', header_en: 'Registrar', width: '120px', render: (val) => {
         if (!val || val === '00000000-0000-0000-0000-000000000000') return React.createElement('span', { className: 'text-[12px] text-slate-500' }, t('سیستمی', 'System'));
         return React.createElement('span', { className: 'text-[12px] truncate font-medium text-slate-700 dark:text-slate-300 block' }, usersMap[val] || val);
       }},
-      { field: 'reviewed_by_name', header_fa: 'بررسی‌کننده', header_en: 'Reviewed By', width: '110px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300' }, val || '-') },
-      { field: 'approved_by_name', header_fa: 'تاییدکننده', header_en: 'Approved By', width: '110px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300' }, val || '-') },
+      { field: 'reviewed_by_name', header_fa: 'بررسی‌کننده', header_en: 'Reviewed By', width: '120px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300' }, val || '-') },
+      { field: 'approved_by_name', header_fa: 'تاییدکننده', header_en: 'Approved By', width: '120px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300' }, val || '-') },
       { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: '160px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block max-w-xs', title: val }, val || '-') },
       { field: 'department_id', header_fa: 'دپارتمان', header_en: 'Department', width: '120px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate font-medium text-slate-600 dark:text-slate-400 block' }, deptsMap[val] || val || '-') },
       { field: 'reviewed_at', header_fa: 'تاریخ بررسی', header_en: 'Reviewed At', width: '115px', render: (val) => {
