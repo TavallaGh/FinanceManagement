@@ -8,7 +8,7 @@
   // First accessible form (based on the current user's permissions) will be opened.
   const ENTITY_TO_FORMS = {
     'fm_transactions':   ['TransactionMain', 'TransactionReview'],
-    'req_requests':      ['RequestDetails',  'RequestManagement'],
+    'req_requests':      ['RequestManagement'],
     'organization_info': ['OrganizationInfo'],
     'parties':           ['Parties'],
     'fm_coa_charts':     ['ChartOfAccountsMain'],
@@ -139,14 +139,34 @@
 
     // Resolve the first form component the current user has access to for this entity_type.
     // Returns null if the user has no access to any form that can show this entity.
-    const resolveFormComponent = (entityType) => {
+    const canOpenFormComponent = (formComponent) => {
+      if (!formComponent) return false;
+      if (isFullAccess) return true;
+      const code = FORM_CODE_MAP[formComponent];
+      if (!code) return true;
+      return !!(hasAccess && hasAccess(code));
+    };
+
+    const resolveFormComponent = (payload = {}) => {
+      const directForm = String(payload.form_component || '').trim();
+      const directForms = Array.isArray(payload.form_components) ? payload.form_components : [];
+      const explicitCandidates = [];
+      if (directForm) explicitCandidates.push(directForm);
+      directForms.forEach(item => {
+        const value = String(item || '').trim();
+        if (value) explicitCandidates.push(value);
+      });
+
+      for (const candidate of explicitCandidates) {
+        if (canOpenFormComponent(candidate)) return candidate;
+      }
+
+      const entityType = String(payload.entity_type || '').toLowerCase();
       if (!entityType) return null;
       const candidates = ENTITY_TO_FORMS[entityType] || [];
       if (candidates.length === 0) return null;
-      if (isFullAccess) return candidates[0];
       for (const formComp of candidates) {
-        const code = FORM_CODE_MAP[formComp];
-        if (code && hasAccess && hasAccess(code)) return formComp;
+        if (canOpenFormComponent(formComp)) return formComp;
       }
       return null; // no accessible form found
     };
@@ -161,7 +181,7 @@
       const action = payload.action || 'open_record';
 
       if (action === 'open_record' || action === 'open_comments') {
-        const formComponent = resolveFormComponent(payload.entity_type);
+        const formComponent = resolveFormComponent(payload);
 
         if (!formComponent) {
           // User has no access to any form that can display this entity — do nothing
@@ -173,7 +193,8 @@
             detail: {
               form_component: formComponent,
               entity_type: payload.entity_type,
-              entity_id: payload.entity_id
+              entity_id: payload.entity_id,
+              filter: payload.filter || null,
             }
           }));
         };
