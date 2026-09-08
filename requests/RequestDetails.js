@@ -86,6 +86,9 @@
 
   const BALANCED_REQUEST_TYPES = ['TRANSFER', 'EXCHANGE'];
   const getStatus = (v) => STATUS_LIST.find(s => s.value === v) || STATUS_LIST[0];
+  const workflowNotificationUtils = window.WorkflowNotificationUtils || {};
+  const sendWorkflowAssignmentNotifications = workflowNotificationUtils.sendWorkflowAssignmentNotifications
+    || (async () => 0);
 
   const getSessionUserId = () => {
     try {
@@ -211,7 +214,9 @@
       workflowPermissions: {},
       renderStatusActions: () => null,
       renderWorkflowModals: () => null,
-      resolveNextAssigneeLabel: async () => '-',
+      resolveNextAssignees: async () => ({ users: [], labels: [] }),
+      resolveDataEntryFormsForStatus: () => [],
+      selectedMachineMeta: { id: null, machine_code: '' },
     }));
     const workflowModule = useRequestWorkFlow({
       isOpen,
@@ -243,8 +248,22 @@
       workflowPermissions,
       renderStatusActions,
       renderWorkflowModals,
-      resolveNextAssigneeLabel,
+      resolveNextAssignees,
+      resolveDataEntryFormsForStatus,
+      selectedMachineMeta,
     } = workflowModule;
+
+    const isMissingWorkItemsTableError = useCallback((error) => {
+      const msg = String(error?.message || '').toLowerCase();
+      const details = String(error?.details || '').toLowerCase();
+      const hint = String(error?.hint || '').toLowerCase();
+      return error?.code === '42P01'
+        || error?.code === 'PGRST205'
+        || msg.includes('wf_work_items')
+        || msg.includes('could not find the table')
+        || details.includes('wf_work_items')
+        || hint.includes('wf_work_items');
+    }, []);
 
     const canEditField = useCallback((field) => {
       if (formMode === 'CREATE' || formMode === 'COPY') return true;
@@ -404,8 +423,18 @@
           if (myPersonnel) { myDeptId = myPersonnel.node_id; myDeptTitle = nodesMap[myPersonnel.node_id] || ''; }
         }
 
+        const currencyCodeById = {};
+        (currRes.data || []).forEach(row => {
+          currencyCodeById[String(row.id)] = row.code || '';
+        });
+
+        const leafAccountsWithCurrency = buildLeafs(accRes.data || [], activeCharts).map(account => ({
+          ...account,
+          currency_code: currencyCodeById[String(account.currency_id)] || '',
+        }));
+
         const lk = {
-          leafAccounts: buildLeafs(accRes.data || [], activeCharts),
+          leafAccounts: leafAccountsWithCurrency,
           allAccounts:  accRes.data || [],
           costTypes:    buildLeafs(costRes.data   || []),
           incomeTypes:  buildLeafs(incRes.data    || []),
@@ -664,7 +693,10 @@
         const statusChanged = String(fromStatus || '') !== String(statusToSave || '');
         if (statusChanged && reqId) {
           const actorName = lookups.usersMap?.[currentUserId] || currentUserName || '';
-          const nextAssignee = await resolveNextAssigneeLabel(statusToSave);
+          const nextAssigneeResult = await resolveNextAssignees(statusToSave);
+          const nextAssignee = nextAssigneeResult.labels.length
+            ? nextAssigneeResult.labels.join(' | ')
+            : '-';
           const actorUserId = toUuidOrNull(currentUserId);
           const statusLogDescription = (actionInput?.approver_note || '').trim() || null;
           const logPayload = {
@@ -696,6 +728,181 @@
               ),
               'warning'
             );
+          }
+
+          // Close previous open state-machine work items and create new assignee items.
+          try {
+            const closePayload = {
+              is_closed: true,
+              closed_at: now,
+              closed_by_user_id: actorUserId,
+              close_action: selectedAction?.id || statusToSave,
+              close_note: statusLogDescription,
+              current_status: statusToSave,
+            };
+
+            const { error: closeWorkItemsError } = await supabase
+              .from('wf_work_items')
+              .update(closePayload)
+              .eq('source_type', 'STATE_MACHINE')
+              .eq('entity_type', 'req_requests')
+              .eq('entity_id', String(reqId))
+              .eq('is_closed', false);
+            if (closeWorkItemsError && !isMissingWorkItemsTableError(closeWorkItemsError)) throw closeWorkItemsError;
+
+            const recipients = (nextAssigneeResult.users || []).map(item => ({
+              userId: String(item.userId || '').trim(),
+              label: String(item.label || '').trim(),
+            })).filter(item => item.userId);
+
+            const roleRecipients = (nextAssigneeResult.roles || []).map(item => ({
+              roleId: String(item.roleId || '').trim(),
+              label: String(item.label || '').trim(),
+            })).filter(item => item.roleId);
+
+            console.log('WF_WORK_ITEMS_DEBUG assignees', {
+              request_id: String(reqId),
+              from_status: fromStatus,
+              to_status: statusToSave,
+              users_count: recipients.length,
+              roles_count: roleRecipients.length,
+              machine_id: selectedMachineMeta?.id || null,
+              machine_code: selectedMachineMeta?.machine_code || null,
+            });
+
+            const machineUuid = toUuidOrNull(selectedMachineMeta?.id);
+
+            if (recipients.length > 0) {
+              const requestCaption = `${header.request_code || ''}${header.description ? ` | ${header.description}` : ''}`.trim() || String(reqId);
+              const nextDataEntryForms = resolveDataEntryFormsForStatus(statusToSave);
+              const insertRows = recipients.map(recipient => ({
+                source_type: 'STATE_MACHINE',
+                source_ref_schema: 'public',
+                source_ref_table: 'wf_state_machines',
+                source_ref_id: selectedMachineMeta?.id ? String(selectedMachineMeta.id) : null,
+                state_machine_id: machineUuid,
+                entity_code: 'REQ_REQUESTS',
+                entity_type: 'req_requests',
+                entity_id: String(reqId),
+                record_code: header.request_code || null,
+                record_title: requestCaption,
+                form_component: 'RequestManagement',
+                data_entry_forms: nextDataEntryForms,
+                from_status: fromStatus,
+                to_status: statusToSave,
+                current_status: statusToSave,
+                assigned_to_user_id: toUuidOrNull(recipient.userId),
+                assigned_to_label: recipient.label || null,
+                assigned_by_user_id: actorUserId,
+                assigned_at: now,
+                priority: 2,
+                metadata: {
+                  machine_code: selectedMachineMeta?.machine_code || null,
+                  machine_id: selectedMachineMeta?.id || null,
+                  assigned_to_user_raw: recipient.userId || null,
+                  action_id: selectedAction?.id || null,
+                  action_label_fa: selectedAction?.action_label_fa || null,
+                  action_label_en: selectedAction?.action_label_en || null,
+                  workflow_source: selectedAction?.workflow_source || 'VISUAL',
+                },
+              }));
+
+              const { error: insertWorkItemsError } = await supabase.from('wf_work_items').insert(insertRows);
+              if (!insertWorkItemsError) {
+                console.log('WF_WORK_ITEMS_DEBUG inserted user rows', insertRows.length);
+              }
+              if (insertWorkItemsError && !isMissingWorkItemsTableError(insertWorkItemsError)) throw insertWorkItemsError;
+            } else if (roleRecipients.length > 0) {
+              const requestCaption = `${header.request_code || ''}${header.description ? ` | ${header.description}` : ''}`.trim() || String(reqId);
+              const nextDataEntryForms = resolveDataEntryFormsForStatus(statusToSave);
+              const insertRows = roleRecipients.map(recipient => ({
+                source_type: 'STATE_MACHINE',
+                source_ref_schema: 'public',
+                source_ref_table: 'wf_state_machines',
+                source_ref_id: selectedMachineMeta?.id ? String(selectedMachineMeta.id) : null,
+                state_machine_id: machineUuid,
+                entity_code: 'REQ_REQUESTS',
+                entity_type: 'req_requests',
+                entity_id: String(reqId),
+                record_code: header.request_code || null,
+                record_title: requestCaption,
+                form_component: 'RequestManagement',
+                data_entry_forms: nextDataEntryForms,
+                from_status: fromStatus,
+                to_status: statusToSave,
+                current_status: statusToSave,
+                assigned_to_role_id: toUuidOrNull(recipient.roleId),
+                assigned_to_label: recipient.label || null,
+                assigned_by_user_id: actorUserId,
+                assigned_at: now,
+                priority: 2,
+                metadata: {
+                  machine_code: selectedMachineMeta?.machine_code || null,
+                  machine_id: selectedMachineMeta?.id || null,
+                  assigned_to_role_raw: recipient.roleId || null,
+                  action_id: selectedAction?.id || null,
+                  action_label_fa: selectedAction?.action_label_fa || null,
+                  action_label_en: selectedAction?.action_label_en || null,
+                  workflow_source: selectedAction?.workflow_source || 'VISUAL',
+                },
+              }));
+
+              if (insertRows.length > 0) {
+                const { error: insertRoleWorkItemsError } = await supabase.from('wf_work_items').insert(insertRows);
+                if (!insertRoleWorkItemsError) {
+                  console.log('WF_WORK_ITEMS_DEBUG inserted role rows', insertRows.length);
+                }
+                if (insertRoleWorkItemsError && !isMissingWorkItemsTableError(insertRoleWorkItemsError)) throw insertRoleWorkItemsError;
+              }
+            } else {
+              showToast(
+                t('برای وضعیت بعدی، انجام‌دهنده‌ای از روال تاییدات پیدا نشد؛ آیتمی در کارتابل ایجاد نشد.', 'No assignee was resolved for the next status, so no cartable item was created.'),
+                'warning'
+              );
+            }
+          } catch (workItemError) {
+            console.error('Request state-machine work-item sync error:', workItemError);
+            showToast(
+              t('تغییر وضعیت انجام شد اما ثبت آیتم کارتابل با خطا مواجه شد.', 'Status changed but syncing cartable work items failed.'),
+              'warning'
+            );
+          }
+
+          try {
+            const recipients = (nextAssigneeResult.users || []).map(item => ({
+              userId: item.userId,
+              label: item.label,
+            }));
+            const statusInfo = getStatus(statusToSave);
+            const fromStatusInfo = getStatus(fromStatus);
+            const requestCaption = `${header.request_code || ''}${header.description ? ` | ${header.description}` : ''}`.trim() || String(reqId);
+            const noteTextFa = statusLogDescription ? `\nتوضیحات: ${statusLogDescription}` : '';
+            const noteTextEn = statusLogDescription ? `\nNote: ${statusLogDescription}` : '';
+
+            await sendWorkflowAssignmentNotifications({
+              supabase,
+              recipients,
+              actorUserId: currentUserId,
+              titleFa: 'ارجاع مرحله تایید',
+              titleEn: 'Approval Assignment',
+              messageFa: `درخواست ${requestCaption} از وضعیت ${fromStatusInfo.fa || fromStatus} به وضعیت ${statusInfo.fa || statusToSave} تغییر کرد و برای شما ارجاع شد.${noteTextFa}`,
+              messageEn: `Request ${requestCaption} moved from ${fromStatusInfo.en || fromStatus} to ${statusInfo.en || statusToSave} and was assigned to you.${noteTextEn}`,
+              type: 'info',
+              entityType: 'req_requests',
+              entityId: String(reqId),
+              entityTitle: requestCaption,
+              formComponent: 'RequestManagement',
+              action: 'open_record',
+              actionPayloadExtra: {
+                workflow_entity_code: 'REQ_REQUESTS',
+                from_status: fromStatus,
+                to_status: statusToSave,
+                action_id: selectedAction?.id || null,
+              },
+            });
+          } catch (notificationError) {
+            console.error('Request workflow assignment notification error:', notificationError);
+            showToast(t('ارجاع انجام شد اما ارسال نوتیفیکیشن با خطا مواجه شد.', 'Assignment was done but sending notification failed.'), 'warning');
           }
         }
 

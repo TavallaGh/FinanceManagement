@@ -136,6 +136,7 @@
     const [deleteConfirm,    setDeleteConfirm]    = useState({ isOpen: false, type: null, data: null });
     const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
     const [commentedIds,     setCommentedIds]     = useState(new Set());
+    const [filteredRecordId, setFilteredRecordId] = useState(null);
     const [attachmentCounts, setAttachmentCounts] = useState({});
     const [attachModal,      setAttachModal]      = useState({ isOpen: false, record: null, files: [] });
     const [isUploading,      setIsUploading]      = useState(false);
@@ -271,6 +272,19 @@
     useEffect(() => {
       if (access.canView) { fetchMeta(); fetchData(); }
     }, [fetchMeta, fetchData, access.canView]);
+
+    useEffect(() => {
+      const handleFilterToRecord = (e) => {
+        const details = e?.detail || {};
+        const matchesForm = String(details.form_component || '') === 'RequestManagement';
+        const matchesEntity = String(details.entity_type || '').toLowerCase() === 'req_requests';
+        if ((matchesForm || matchesEntity) && details.entity_id) {
+          setFilteredRecordId(String(details.entity_id));
+        }
+      };
+      window.addEventListener('filterToRecord', handleFilterToRecord);
+      return () => window.removeEventListener('filterToRecord', handleFilterToRecord);
+    }, []);
 
     const loadAttachments = useCallback(async (recordId) => {
       if (!supabase || !recordId) return;
@@ -884,6 +898,8 @@
     const actionableRequestIds = workflowAssignments.actionableSet;
 
     const filteredData = useMemo(() => requests.filter(r => {
+      if (filteredRecordId && String(r.id) !== String(filteredRecordId)) return false;
+
       const hasItemFilters =
         !!filters.transaction_action ||
         !!filters.transaction_group ||
@@ -927,7 +943,7 @@
     }).map(r => {
       const assigned = workflowAssignments.assignedMap[String(r.id)] || { label: '-', isMine: false };
       return { ...r, assigned_to_display: assigned.label, assigned_to_is_me: assigned.isMine };
-    }), [requests, filters, actionableRequestIds, workflowAssignments.assignedMap, ownDataOnly, currentUserId]);
+    }), [requests, filteredRecordId, filters, actionableRequestIds, workflowAssignments.assignedMap, ownDataOnly, currentUserId]);
 
     const filterFields = [
       { name: 'transaction_action', label: t('نوع', 'Action'), type: 'select', options: ITEM_ACTIONS },
@@ -958,6 +974,7 @@
               language={language}
               breadcrumbs={[{ label: t('گردش کار', 'Workflow') }, { label: t('درخواست‌ها', 'Requests') }]}
               viewConfig={viewConfig}
+              notifFilter={filteredRecordId ? { isActive: true, onClear: () => setFilteredRecordId(null) } : null}
             />
 
             <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">

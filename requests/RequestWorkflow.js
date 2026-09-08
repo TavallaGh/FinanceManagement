@@ -40,6 +40,7 @@
 
     const [dynamicActions, setDynamicActions] = useState([]);
     const [workflowGraph, setWorkflowGraph] = useState({ nodes: [], edges: [] });
+    const [selectedMachineMeta, setSelectedMachineMeta] = useState({ id: null, machine_code: '' });
     const [workflowLoading, setWorkflowLoading] = useState(false);
     const [isWorkflowSchemaReady, setIsWorkflowSchemaReady] = useState(true);
     const [pendingWorkflowAction, setPendingWorkflowAction] = useState(null);
@@ -169,11 +170,13 @@
         if (!isOpen || !header.id || !header.request_type || !header.status || !currentUserId) {
           setDynamicActions([]);
           setWorkflowGraph({ nodes: [], edges: [] });
+          setSelectedMachineMeta({ id: null, machine_code: '' });
           return;
         }
         if (!isWorkflowSchemaReady) {
           setDynamicActions([]);
           setWorkflowGraph({ nodes: [], edges: [] });
+          setSelectedMachineMeta({ id: null, machine_code: '' });
           return;
         }
 
@@ -273,6 +276,7 @@
             if (!cancelled) {
               setDynamicActions([]);
               setWorkflowGraph({ nodes: [], edges: [] });
+              setSelectedMachineMeta({ id: null, machine_code: '' });
             }
             return;
           }
@@ -280,7 +284,10 @@
           const graph = parseVisualWorkflowGraph(selectedWorkflowData.graph_json);
           const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
           const edges = Array.isArray(graph.edges) ? graph.edges : [];
-          if (!cancelled) setWorkflowGraph({ nodes, edges });
+          if (!cancelled) {
+            setWorkflowGraph({ nodes, edges });
+            setSelectedMachineMeta({ id: selectedWorkflowData.id || null, machine_code: selectedWorkflowData.machine_code || '' });
+          }
           const nodeById = {};
           nodes.forEach(node => { if (node?.id) nodeById[String(node.id)] = node; });
 
@@ -325,6 +332,8 @@
                 post_action_hooks: {},
                 data_entry_form: edgeDataEntryForm,
                 workflow_source: 'VISUAL',
+                state_machine_id: selectedWorkflowData.id || null,
+                machine_code: selectedWorkflowData.machine_code || '',
               });
             });
           }
@@ -479,10 +488,21 @@
     }, [closeDataEntryModal, dataEntryModal.action, dataEntryModal.mode, dataEntryModal.note, dataEntryModal.rows, getRequestedAmount, items, parseAmount, pendingWorkflowAction, setIsDirty, setItems, showToast, t]);
 
     const accountLovColumns = useMemo(() => [
-      { field: 'code', header_fa: 'کد', header_en: 'Code', width: '90px' },
-      { field: 'displayLabel', header_fa: 'عنوان حساب', header_en: 'Account Title', width: '220px' },
-      { field: 'pathTitle', header_fa: 'مسیر', header_en: 'Path', width: 'auto' },
-      { field: 'chart_name', header_fa: 'کدینگ', header_en: 'Chart', width: '160px' },
+      { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart Structure', width: '110px' },
+      { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '100px' },
+      {
+        field: 'displayLabel',
+        header_fa: 'عنوان حساب',
+        header_en: 'Account Title',
+        width: '260px',
+        render: (val, row) => (
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-800 dark:text-slate-200">{val}</span>
+            {row.pathTitle && <span className="text-[10px] text-slate-500 truncate" title={row.pathTitle}>{row.pathTitle}</span>}
+          </div>
+        ),
+      },
+      { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '80px' },
     ], []);
 
     const dataEntryColumns = useMemo(() => {
@@ -559,6 +579,72 @@
       ];
     }, [accountLovColumns, dataEntryModal.mode, formCode, formatNumberSafe, isRtl, lookups.leafAccounts, t, updateDataEntryRow]);
 
+    const resolveAssigneeTargets = useCallback(async (type, value) => {
+      if (!type || !value) return [];
+      if (type === 'USER') {
+        const user = (lookups.usersList || []).find(item => String(item.id) === String(value));
+        return [{
+          userId: String(value),
+          label: user ? (user.full_name || user.username || String(value)) : (lookups.usersMap?.[value] || String(value)),
+        }];
+      }
+      if (type === 'ROLE') {
+        const { data, error } = await supabase
+          .from('sec_user_roles')
+          .select('user_id')
+          .eq('role_id', value);
+        if (error) throw error;
+
+        const usersById = {};
+        (lookups.usersList || []).forEach(user => { usersById[String(user.id)] = user; });
+
+        return (data || [])
+          .map(row => String(row.user_id || ''))
+          .filter(Boolean)
+          .map(userId => {
+            const user = usersById[userId];
+            return {
+              userId,
+              label: user ? (user.full_name || user.username || userId) : (lookups.usersMap?.[userId] || userId),
+            };
+          });
+      }
+      if (type === 'DYNAMIC' && value === 'REQUESTER') {
+        const requesterId = header.registrar_id || null;
+        if (!requesterId) return [];
+        const user = (lookups.usersList || []).find(item => String(item.id) === String(requesterId));
+        return [{
+          userId: String(requesterId),
+          label: user ? (user.full_name || user.username || String(requesterId)) : (lookups.usersMap?.[requesterId] || String(requesterId)),
+        }];
+      }
+      if (type === 'DYNAMIC' && value === 'DIRECT_MANAGER') {
+        const requesterUser = (lookups.usersList || []).find(item => String(item.id) === String(header.registrar_id || ''));
+        if (!requesterUser?.party_id) return [];
+
+        const requesterPartyId = String(requesterUser.party_id);
+        const requesterPersonnel = (lookups.personnelRows || []).find(row => String(row.person_id) === requesterPartyId);
+        const requesterNodeId = requesterPersonnel?.node_id ? String(requesterPersonnel.node_id) : null;
+        if (!requesterNodeId) return [];
+
+        const orgNode = (lookups.orgNodes || []).find(node => String(node.id) === requesterNodeId);
+        const parentNodeId = orgNode?.parent_id ? String(orgNode.parent_id) : null;
+        if (!parentNodeId) return [];
+
+        const managerPartyIds = (lookups.personnelRows || [])
+          .filter(row => String(row.node_id) === parentNodeId)
+          .map(row => String(row.person_id));
+        const managerRows = (lookups.usersList || [])
+          .filter(user => managerPartyIds.includes(String(user.party_id || '')))
+          .map(user => ({
+            userId: String(user.id),
+            label: user.full_name || user.username || String(user.id),
+          }));
+        return managerRows;
+      }
+      return [];
+    }, [header.registrar_id, lookups.orgNodes, lookups.personnelRows, lookups.usersList, lookups.usersMap, supabase]);
+
     const resolveAssigneeLabelsForLog = useCallback(async (type, value) => {
       if (!type || !value) return [];
       if (type === 'USER') {
@@ -598,32 +684,85 @@
       return [];
     }, [header.registrar_id, lookups.orgNodes, lookups.personnelRows, lookups.rolesMap, lookups.usersList, lookups.usersMap]);
 
-    const resolveNextAssigneeLabel = useCallback(async (nextStatus) => {
+    const resolveDataEntryFormsForStatus = useCallback((statusValue) => {
       const nodes = Array.isArray(workflowGraph?.nodes) ? workflowGraph.nodes : [];
       const edges = Array.isArray(workflowGraph?.edges) ? workflowGraph.edges : [];
-      if (!nodes.length) return '-';
+      if (!nodes.length || !edges.length) return [];
+
+      const targetNodes = nodes.filter(node => String(node?.status || '') === String(statusValue || ''));
+      const forms = [];
+
+      targetNodes.forEach(node => {
+        const outgoing = edges.filter(edge => String(edge?.source || '') === String(node?.id || ''));
+        outgoing.forEach(edge => {
+          const edgeForms = edge?.settings?.data_entry?.forms;
+          if (!Array.isArray(edgeForms) || !edgeForms.length) return;
+          edgeForms.forEach(formCode => {
+            const value = String(formCode || '').trim();
+            if (!value || forms.includes(value)) return;
+            forms.push(value);
+          });
+        });
+      });
+
+      return forms;
+    }, [workflowGraph]);
+
+    const resolveNextAssignees = useCallback(async (nextStatus) => {
+      const nodes = Array.isArray(workflowGraph?.nodes) ? workflowGraph.nodes : [];
+      const edges = Array.isArray(workflowGraph?.edges) ? workflowGraph.edges : [];
+      if (!nodes.length) return { users: [], roles: [], labels: [] };
 
       const targetNodes = nodes.filter(node => String(node?.status || '') === String(nextStatus || ''));
+      const uniqueUsers = [];
+      const uniqueRoles = [];
+      const seenUserIds = new Set();
+      const seenRoleIds = new Set();
       const labels = [];
+
+      const addRoleTarget = (roleId) => {
+        const safeRoleId = String(roleId || '').trim();
+        if (!safeRoleId || seenRoleIds.has(safeRoleId)) return;
+        seenRoleIds.add(safeRoleId);
+        const roleLabel = lookups.rolesMap?.[safeRoleId] || safeRoleId;
+        uniqueRoles.push({ roleId: safeRoleId, label: roleLabel });
+        if (roleLabel && !labels.includes(roleLabel)) labels.push(roleLabel);
+      };
 
       for (const node of targetNodes) {
         const hasOutgoing = edges.some(edge => String(edge?.source || '') === String(node?.id || ''));
         if (!hasOutgoing) continue;
+
         const blocks = Array.isArray(node?.settings?.assignee?.blocks) ? node.settings.assignee.blocks : [];
         for (const block of blocks) {
           if (!assigneeBlockConditionsMatch(block?.conditions || [])) continue;
-          let assigneeLabels = await resolveAssigneeLabelsForLog(block?.assignee_type, block?.assignee_value);
-          if (!assigneeLabels.length && block?.fallback_assignee_type) {
-            assigneeLabels = await resolveAssigneeLabelsForLog(block.fallback_assignee_type, block.fallback_assignee_value);
+
+          if (block?.assignee_type === 'ROLE') addRoleTarget(block?.assignee_value);
+          if (block?.fallback_assignee_type === 'ROLE') addRoleTarget(block?.fallback_assignee_value);
+
+          let targets = await resolveAssigneeTargets(block?.assignee_type, block?.assignee_value);
+          if (!targets.length && block?.fallback_assignee_type) {
+            targets = await resolveAssigneeTargets(block.fallback_assignee_type, block.fallback_assignee_value);
           }
-          assigneeLabels.forEach(label => {
+
+          targets.forEach(target => {
+            const userId = String(target?.userId || '').trim();
+            if (!userId || seenUserIds.has(userId)) return;
+            seenUserIds.add(userId);
+            uniqueUsers.push({ userId, label: target?.label || userId });
+            const label = String(target?.label || '').trim();
             if (label && !labels.includes(label)) labels.push(label);
           });
         }
       }
 
-      return labels.length ? labels.join(' | ') : '-';
-    }, [assigneeBlockConditionsMatch, resolveAssigneeLabelsForLog, workflowGraph]);
+      return { users: uniqueUsers, roles: uniqueRoles, labels };
+    }, [assigneeBlockConditionsMatch, lookups.rolesMap, resolveAssigneeTargets, workflowGraph]);
+
+    const resolveNextAssigneeLabel = useCallback(async (nextStatus) => {
+      const assigneeInfo = await resolveNextAssignees(nextStatus);
+      return assigneeInfo.labels.length ? assigneeInfo.labels.join(' | ') : '-';
+    }, [resolveNextAssignees]);
 
     const handleWorkflowActionClick = useCallback((action, handleSave) => {
       const dataEntryForm = String(action?.data_entry_form || '').trim();
@@ -800,7 +939,10 @@
       workflowPermissions,
       renderStatusActions,
       renderWorkflowModals,
+      resolveNextAssignees,
+      resolveDataEntryFormsForStatus,
       resolveNextAssigneeLabel,
+      selectedMachineMeta,
     };
   };
 
