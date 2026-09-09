@@ -3,6 +3,54 @@
   const React = window.React;
   const { useState, useMemo, useCallback, useEffect, useRef } = React;
 
+  const RequestWorkflowShared = window.RequestWorkflowShared || {
+    parseVisualWorkflowGraph: (raw) => {
+      if (!raw) return { nodes: [], edges: [] };
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          return {
+            nodes: Array.isArray(parsed?.nodes) ? parsed.nodes : [],
+            edges: Array.isArray(parsed?.edges) ? parsed.edges : [],
+          };
+        } catch {
+          return { nodes: [], edges: [] };
+        }
+      }
+      return {
+        nodes: Array.isArray(raw?.nodes) ? raw.nodes : [],
+        edges: Array.isArray(raw?.edges) ? raw.edges : [],
+      };
+    },
+    matchOperator: (actualCandidate, operator, expectedValue) => {
+      if (operator === 'contains') return String(actualCandidate ?? '').includes(String(expectedValue ?? ''));
+      const numeric = actualCandidate !== '' && expectedValue !== '' && !isNaN(Number(actualCandidate)) && !isNaN(Number(expectedValue));
+      const left = numeric ? Number(actualCandidate) : String(actualCandidate ?? '');
+      const right = numeric ? Number(expectedValue) : String(expectedValue ?? '');
+      if (operator === '=') return left === right;
+      if (operator === '!=') return left !== right;
+      if (operator === '>') return left > right;
+      if (operator === '>=') return left >= right;
+      if (operator === '<') return left < right;
+      if (operator === '<=') return left <= right;
+      return false;
+    },
+    parseEntryConditionText: (textValue) => {
+      const raw = String(textValue || '').trim();
+      if (!raw) return null;
+      const match = raw.match(/^\s*([a-zA-Z0-9_.]+)\s*(=|!=|>=|<=|>|<|contains)\s*(.+?)\s*$/i);
+      if (!match) return null;
+      const valueRaw = String(match[3] || '').trim();
+      const normalizedValue = valueRaw.replace(/^['\"]|['\"]$/g, '');
+      return {
+        field: match[1],
+        operator: String(match[2] || '=').toLowerCase(),
+        value: normalizedValue,
+      };
+    },
+  };
+  window.RequestWorkflowShared = RequestWorkflowShared;
+
   const useRequestWorkFlow = (params) => {
     const {
       isOpen,
@@ -49,24 +97,7 @@
     const [dataEntryModal, setDataEntryModal] = useState({ isOpen: false, mode: '', action: null, rows: [], note: '' });
     const hasShownMissingWorkflowWarning = useRef(false);
 
-    const parseVisualWorkflowGraph = useCallback((raw) => {
-      if (!raw) return { nodes: [], edges: [] };
-      if (typeof raw === 'string') {
-        try {
-          const parsed = JSON.parse(raw);
-          return {
-            nodes: Array.isArray(parsed?.nodes) ? parsed.nodes : [],
-            edges: Array.isArray(parsed?.edges) ? parsed.edges : [],
-          };
-        } catch {
-          return { nodes: [], edges: [] };
-        }
-      }
-      return {
-        nodes: Array.isArray(raw?.nodes) ? raw.nodes : [],
-        edges: Array.isArray(raw?.edges) ? raw.edges : [],
-      };
-    }, []);
+    const parseVisualWorkflowGraph = useCallback((raw) => RequestWorkflowShared.parseVisualWorkflowGraph(raw), []);
 
     const getConditionValue = useCallback((field) => {
       if (field === 'total_usd_amount') {
@@ -92,19 +123,7 @@
       const expected = condition.value;
       const values = Array.isArray(actual) ? actual : [actual];
 
-      const compare = (candidate) => {
-        if (condition.operator === 'contains') return String(candidate ?? '').includes(String(expected ?? ''));
-        const numeric = candidate !== '' && expected !== '' && !isNaN(Number(candidate)) && !isNaN(Number(expected));
-        const left = numeric ? Number(candidate) : String(candidate ?? '');
-        const right = numeric ? Number(expected) : String(expected ?? '');
-        if (condition.operator === '=') return left === right;
-        if (condition.operator === '!=') return left !== right;
-        if (condition.operator === '>') return left > right;
-        if (condition.operator === '>=') return left >= right;
-        if (condition.operator === '<') return left < right;
-        if (condition.operator === '<=') return left <= right;
-        return false;
-      };
+      const compare = (candidate) => RequestWorkflowShared.matchOperator(candidate, condition.operator, expected);
 
       return values.some(compare);
     }, [getConditionValue]);
@@ -182,39 +201,11 @@
 
         setWorkflowLoading(true);
         try {
-          const matchOperator = (actualCandidate, operator, expectedValue) => {
-            if (operator === 'contains') return String(actualCandidate ?? '').includes(String(expectedValue ?? ''));
-            const numeric = actualCandidate !== '' && expectedValue !== '' && !isNaN(Number(actualCandidate)) && !isNaN(Number(expectedValue));
-            const left = numeric ? Number(actualCandidate) : String(actualCandidate ?? '');
-            const right = numeric ? Number(expectedValue) : String(expectedValue ?? '');
-            if (operator === '=') return left === right;
-            if (operator === '!=') return left !== right;
-            if (operator === '>') return left > right;
-            if (operator === '>=') return left >= right;
-            if (operator === '<') return left < right;
-            if (operator === '<=') return left <= right;
-            return false;
-          };
-
-          const parseEntryConditionText = (textValue) => {
-            const raw = String(textValue || '').trim();
-            if (!raw) return null;
-            const match = raw.match(/^\s*([a-zA-Z0-9_.]+)\s*(=|!=|>=|<=|>|<|contains)\s*(.+?)\s*$/i);
-            if (!match) return null;
-            const valueRaw = String(match[3] || '').trim();
-            const normalizedValue = valueRaw.replace(/^['\"]|['\"]$/g, '');
-            return {
-              field: match[1],
-              operator: String(match[2] || '=').toLowerCase(),
-              value: normalizedValue,
-            };
-          };
-
           const conditionMatches = (condition) => {
             if (!condition?.field) return true;
             const actual = getConditionValue(condition.field);
             const values = Array.isArray(actual) ? actual : [actual];
-            return values.some(candidate => matchOperator(candidate, condition.operator || '=', condition.value));
+            return values.some(candidate => RequestWorkflowShared.matchOperator(candidate, condition.operator || '=', condition.value));
           };
 
           const stateMachineMatchesRequest = (machine) => {
@@ -240,7 +231,7 @@
               });
             }
 
-            const parsedText = parseEntryConditionText(machine.entry_condition_text);
+            const parsedText = RequestWorkflowShared.parseEntryConditionText(machine.entry_condition_text);
             if (parsedText) return conditionMatches(parsedText);
             return true;
           };
