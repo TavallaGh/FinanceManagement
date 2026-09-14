@@ -8,80 +8,30 @@
   const FallbackComponent = () => null;
 
   const LucideIcons = window.LucideIcons || {};
-  const BarChart2 = LucideIcons.BarChart2 || LucideIcons.TrendingUp || FallbackIcon;
-  const Settings  = LucideIcons.Settings  || FallbackIcon;
-  const Check     = LucideIcons.Check     || FallbackIcon;
-  const X         = LucideIcons.X         || FallbackIcon;
-  const ChevronDown  = LucideIcons.ChevronDown  || FallbackIcon;
+  const ChevronDown = LucideIcons.ChevronDown || FallbackIcon;
   const ChevronRight = LucideIcons.ChevronRight || FallbackIcon;
   const Maximize2 = LucideIcons.Maximize2 || FallbackIcon;
   const Minimize2 = LucideIcons.Minimize2 || FallbackIcon;
+  const Check = LucideIcons.Check || FallbackIcon;
 
-  const DS        = window.DesignSystem || {};
-  const Core      = window.DSCore       || DS || {};
-  const DSGridMod = window.DSGrid       || DS || {};
-  const DSTreeMod = window.DSTree       || DS || {};
-  const Feedback  = window.DSFeedback   || window.DSOverlays || DS || {};
+  const DS = window.DesignSystem || {};
+  const Core = window.DSCore || DS || {};
+  const DSGridMod = window.DSGrid || DS || {};
+  const DSTreeMod = window.DSTree || DS || {};
+  const Feedback = window.DSFeedback || window.DSOverlays || DS || {};
 
-  const PageHeader  = Core.PageHeader         || FallbackComponent;
-  const EmptyState  = Core.EmptyState         || FallbackComponent;
-  const Badge       = Core.Badge              || FallbackComponent;
-  const Button      = Core.Button             || FallbackComponent;
-  const Modal       = Feedback.Modal          || FallbackComponent;
-  const Toast       = Feedback.Toast          || FallbackComponent;
-  const DataGrid    = DSGridMod.DataGrid      || FallbackComponent;
+  const PageHeader = Core.PageHeader || FallbackComponent;
+  const EmptyState = Core.EmptyState || FallbackComponent;
+  const Badge = Core.Badge || FallbackComponent;
+  const Button = Core.Button || FallbackComponent;
+  const Modal = Feedback.Modal || FallbackComponent;
+  const Toast = Feedback.Toast || FallbackComponent;
+  const DataGrid = DSGridMod.DataGrid || FallbackComponent;
   const AdvancedFilter = DSGridMod.AdvancedFilter || FallbackComponent;
-  const TreeGrid    = DSTreeMod.TreeGrid      || FallbackComponent;
+  const TreeGrid = DSTreeMod.TreeGrid || FallbackComponent;
+  const BarChart2 = LucideIcons.BarChart2 || LucideIcons.TrendingUp || FallbackIcon;
   const BalanceMonthlyReportDetailsModal = window.BalanceMonthlyReportDetailsModal || window.BalanceReportDrillModal || FallbackComponent;
-  const DetailsHelpers = window.BalanceMonthlyReportDetails || {};
 
-  const Logic = window.BalanceMonthlyReportLogic || {};
-  const {
-    pad2 = (n) => String(n).padStart(2, '0'),
-    normalizeSlashDate = (v) => String(v || '').replace(/-/g, '/'),
-    normalizeDashDate = (v) => String(v || '').replace(/\//g, '-'),
-    fmt = (num) => {
-      if (num === null || num === undefined) return '—';
-      const v = parseFloat(num);
-      if (Number.isNaN(v)) return '—';
-      if (v === 0) return '0';
-      const abs = Math.abs(v).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      return v < 0 ? `(${abs})` : abs;
-    },
-    fmtDecimal = (num, maxFractionDigits = 6) => {
-      if (num === null || num === undefined) return '—';
-      const value = Number(num);
-      if (Number.isNaN(value)) return '—';
-      return value.toLocaleString('en-US', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: maxFractionDigits
-      });
-    },
-    buildRateLookup = () => new Map(),
-    resolveRate = () => 0,
-    buildTree = (accounts) => accounts || [],
-    buildGroupedRows = () => [],
-    generateMonthlyReportData = async () => ({ kind: 'ok', reportData: null }),
-  } = Logic;
-  const {
-    getInitialCellDrillModal = () => ({
-      isOpen: false,
-      kind: 'account',
-      accountId: '',
-      accountLabel: '',
-      accountCode: '',
-      currencyCode: '',
-      currencyLabel: '',
-      date: '',
-      periodFrom: '',
-      periodTo: '',
-      balance: null,
-      items: []
-    }),
-    createCellDrillModalState = () => null,
-  } = DetailsHelpers;
-
-  // ── Account tree node component ────────────────────────────────────────────
   const TreeNode = ({ node, depth, selectedIds, onToggle, isRtl, resetToken = 0, expandMode = 'collapse', inheritedInactive = false }) => {
     const [open, setOpen] = useState(false);
     const hasKids = (node.children || []).length > 0;
@@ -109,7 +59,7 @@
         hasKids
           ? React.createElement('button', {
               className: 'p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 shrink-0',
-              onClick: (e) => { e.stopPropagation(); setOpen(x => !x); }
+              onClick: (e) => { e.stopPropagation(); setOpen((x) => !x); }
             }, open ? React.createElement(ChevronDown, { size: 13 }) : React.createElement(ChevronRight, { size: 13 }))
           : React.createElement('span', { className: 'w-5 shrink-0' }),
         React.createElement('input', {
@@ -128,14 +78,13 @@
           React.createElement('span', { className: 'truncate' }, name),
           isDirectInactive && React.createElement('span', {
             className: 'inline-flex items-center rounded-full border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 text-[10px] font-bold shrink-0'
-          }, isRtl ? 'غیرفعال' : 'Inactive')
-          ,
+          }, isRtl ? 'غیرفعال' : 'Inactive'),
           isInheritedInactive && React.createElement('span', {
             className: 'inline-flex items-center rounded-full border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 text-[10px] font-bold shrink-0'
           }, isRtl ? 'غیرفعال (ارثی)' : 'Inactive (Inherited)')
         )
       ),
-      open && hasKids && node.children.map(c =>
+      open && hasKids && node.children.map((c) =>
         React.createElement(TreeNode, { key: c.id, node: c, depth: depth + 1, selectedIds, onToggle, isRtl, resetToken, expandMode, inheritedInactive: isEffectivelyInactive })
       )
     );
@@ -151,6 +100,9 @@
     summary = '',
     isRtl = true,
     disabled = false,
+    hideLabel = false,
+    triggerClassName = '',
+    triggerStyle = null,
   }) => {
     const [isOpen, setIsOpen] = useState(false);
     const rootRef = useRef(null);
@@ -184,16 +136,17 @@
     }, [isOpen]);
 
     return React.createElement('div', { className: 'flex flex-col gap-1 w-full min-w-0 relative', ref: rootRef },
-      React.createElement('label', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300' }, label),
+      !hideLabel && React.createElement('label', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300' }, label),
       React.createElement('button', {
         type: 'button',
         disabled,
-        onClick: () => !disabled && setIsOpen(v => !v),
+        onClick: () => !disabled && setIsOpen((v) => !v),
+        style: triggerStyle || undefined,
         className: `h-8 px-2.5 rounded-lg border flex items-center justify-between text-[12px] transition-colors ${
           disabled
             ? 'bg-slate-100 dark:bg-slate-800/40 text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed'
             : 'bg-white dark:bg-slate-700/40 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-500 hover:border-indigo-400'
-        }`
+        } ${triggerClassName}`
       },
         React.createElement('span', { className: 'truncate text-start' }, summary),
         React.createElement(ChevronDown, { size: 14 })
@@ -227,7 +180,7 @@
                 }, isRtl ? 'پاک کردن' : 'Clear')
               ),
               React.createElement('div', { className: 'max-h-56 overflow-y-auto custom-scrollbar' },
-                options.map(opt => {
+                options.map((opt) => {
                   const checked = selected.has(String(opt.value));
                   return React.createElement('button', {
                     key: opt.value,
@@ -254,418 +207,84 @@
     );
   };
 
-  // ══════════════════════════════════════════════════════════════════════════
-  const BalanceMonthlyReport = ({ language = 'fa', formCode = 'FIN_BALANCE_MONTHLY_REPORT' }) => {
-    const isRtl = language === 'fa';
-    const t = useCallback((fa, en) => (isRtl ? fa : en), [isRtl]);
-    const cal = Core.useCalendarMode ? Core.useCalendarMode() : (isRtl ? 'jalali' : 'gregorian');
-    const fmtDate = useCallback((d) => {
-      const slash = normalizeSlashDate(d);
-      return Core.formatGlobalDate ? Core.formatGlobalDate(slash, cal) : slash;
-    }, [cal]);
-    const supabase = window.supabase;
+  const BalanceMonthlyReport = ({
+    language,
+    formCode,
+    isRtl,
+    t,
+    fmt,
+    fmtDecimal,
+    fmtDate,
+    resolveRate,
+    getInitialCellDrillModal,
+    filters,
+    setFilters,
+    fYears,
+    setFYears,
+    fMonths,
+    setFMonths,
+    fBalanceGroups,
+    setFBalanceGroups,
+    currencies,
+    balanceGroups,
+    fiscalYears,
+    availableMonths,
+    accountTree,
+    loadingFiscalFilters,
+    loadingBalanceGroups,
+    loadingTree,
+    generating,
+    selectedIds,
+    setSelectedIds,
+    selectedLeafCount,
+    showInactiveAccounts,
+    setShowInactiveAccounts,
+    settingsOpen,
+    setSettingsOpen,
+    settingsTreeResetToken,
+    settingsTreeExpandMode,
+    setSettingsTreeExpandMode,
+    reportData,
+    setReportData,
+    gridState,
+    setGridState,
+    cellDrillModal,
+    setCellDrillModal,
+    toast,
+    setToast,
+    showToast,
+    defaultYearId,
+    toggleYear,
+    toggleMonth,
+    clearYearAndPeriods,
+    toggleBalanceGroup,
+    toggleId,
+    selectAllTree,
+    handleGenerate,
+    openCellDrill,
+    viewConfig,
+  }) => {
+    const accountFilterTypeOptions = useMemo(() => ([
+      { value: 'balance_group', label: t('گروه بالانس', 'Balance Group') },
+      { value: 'account', label: t('انتخاب حساب', 'Select Account') },
+    ]), [t]);
 
-    const sessionData = useMemo(() => {
-      try { return JSON.parse(sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}'); }
-      catch { return {}; }
-    }, []);
-    const navUser = window.NavigationSystem?.currentUser || {};
-    const currentUserId = sessionData.id || navUser.id || null;
-    const userType = (sessionData.type || sessionData.user_type || navUser.user_type || '').toLowerCase();
-    const isAdmin = userType === 'admin' || userType === 'superadmin';
-
-    const secCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
-    const access = useMemo(() => {
-      const raw = secCtx ? secCtx.getActions(formCode) : null;
-      return raw || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
-    }, [secCtx, formCode]);
-
-    // ── Filter state ───────────────────────────────────────────────────────
-    const [filters,   setFilters]   = useState({ currency: null, show_movements: false });
-    const [fYears,    setFYears]    = useState(() => new Set());
-    const [fMonths,   setFMonths]   = useState(() => new Set());
-
-    // ── Data / UI state ────────────────────────────────────────────────────
-    const [currencies,   setCurrencies]   = useState([]);
-    const [fiscalYears,  setFiscalYears]  = useState([]);
-    const [fiscalPeriods, setFiscalPeriods] = useState([]);
-    const [loadingFiscalFilters, setLoadingFiscalFilters] = useState(false);
-    const [fullAccountTree, setFullAccountTree] = useState([]);
-    const [accountMap,   setAccountMap]   = useState(new Map());
-    const [selectedIds,  setSelectedIds]  = useState(new Set());
-    const [showInactiveAccounts, setShowInactiveAccounts] = useState(false);
-    const [settingsOpen, setSettingsOpen] = useState(false);
-    const [settingsTreeResetToken, setSettingsTreeResetToken] = useState(0);
-    const [settingsTreeExpandMode, setSettingsTreeExpandMode] = useState('collapse');
-    const [loadingTree,  setLoadingTree]  = useState(false);
-    const [generating,   setGenerating]   = useState(false);
-    const [reportData,   setReportData]   = useState(null);
-    const [gridState,    setGridState]    = useState(null);
-    const [cellDrillModal, setCellDrillModal] = useState(() => getInitialCellDrillModal());
-    const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
-
-    const showToast = useCallback((msg, type = 'success') => {
-      setToast({ isVisible: true, message: msg, type });
-      setTimeout(() => setToast(p => ({ ...p, isVisible: false })), 3000);
-    }, []);
-
-    useEffect(() => {
-      if (settingsOpen) {
-        setSettingsTreeResetToken(v => v + 1);
-        setSettingsTreeExpandMode('collapse');
-      }
-    }, [settingsOpen]);
-
-    // ── Load currencies ────────────────────────────────────────────────────
-    useEffect(() => {
-      if (!supabase) return;
-      supabase.from('fm_currencies').select('id, code, title, symbol').order('code')
-        .then(({ data }) => setCurrencies(data || []));
-    }, []);
-
-    // ── Load fiscal years / periods for advanced filters ───────────────────
-    useEffect(() => {
-      if (!supabase) return;
-      let cancelled = false;
-
-      const loadFiscalFilterData = async () => {
-        setLoadingFiscalFilters(true);
-        try {
-          const [yearsRes, periodsRes] = await Promise.all([
-            supabase
-              .from('fm_fiscal_years')
-              .select('id, year_code, calendar_type, start_date, end_date, status, is_active')
-              .eq('is_active', true)
-              .order('start_date', { ascending: false }),
-            supabase
-              .from('fm_fiscal_periods')
-              .select('id, fiscal_year_id, period_code, title, start_date, end_date, sort_order, status, is_active')
-              .eq('is_active', true)
-              .order('start_date', { ascending: true })
-          ]);
-
-          if (yearsRes.error) throw yearsRes.error;
-          if (periodsRes.error) throw periodsRes.error;
-          if (cancelled) return;
-
-          const mappedYears = (yearsRes.data || []).map((y) => ({
-            id: y.id,
-            yearCode: y.year_code,
-            calendarType: y.calendar_type || 'SHAMSI',
-            startDate: normalizeSlashDate(y.start_date),
-            endDate: normalizeSlashDate(y.end_date),
-            status: y.status || 'NOT_OPENED',
-            isActive: y.is_active !== false,
-          }));
-
-          const mappedPeriods = (periodsRes.data || []).map((p) => ({
-            id: p.id,
-            fiscalYearId: p.fiscal_year_id,
-            periodCode: p.period_code || '',
-            title: p.title || '',
-            startDate: normalizeSlashDate(p.start_date),
-            endDate: normalizeSlashDate(p.end_date),
-            sortOrder: p.sort_order || 0,
-            status: p.status || 'NOT_OPENED',
-            isActive: p.is_active !== false,
-          }));
-
-          setFiscalYears(mappedYears);
-          setFiscalPeriods(mappedPeriods);
-        } catch (e) {
-          console.error('BalanceMonthlyReport: load fiscal filters error', e);
-          showToast(
-            t('خطا در بارگذاری سال‌ها و دوره‌های مالی.', 'Error loading fiscal years and fiscal periods.'),
-            'error'
-          );
-        } finally {
-          if (!cancelled) setLoadingFiscalFilters(false);
-        }
-      };
-
-      loadFiscalFilterData();
-      return () => { cancelled = true; };
-    }, [supabase, showToast, t, normalizeSlashDate]);
-
-    // ── Load account tree ──────────────────────────────────────────────────
-    const loadTree = useCallback(async () => {
-      if (!supabase) return;
-      setLoadingTree(true);
-      try {
-        const { data: charts } = await supabase.from('fm_coa_charts').select('id').eq('is_active', true);
-        const chartIds = (charts || []).map(c => String(c.id));
-        if (!chartIds.length) { setFullAccountTree([]); setAccountMap(new Map()); return; }
-
-        const { data: accs } = await supabase.from('fm_coa_accounts')
-          .select('id, code, title_fa, title_en, parent_id, currency_id, chart_id, is_active')
-          .in('chart_id', chartIds).order('code');
-
-        setAccountMap(new Map((accs || []).map(a => [String(a.id), a])));
-        setFullAccountTree(buildTree(accs || []));
-      } catch (e) {
-        console.error('BalanceMonthlyReport: loadTree error', e);
-      } finally {
-        setLoadingTree(false);
-      }
-    }, [supabase]);
-
-    useEffect(() => { loadTree(); }, [loadTree]);
-
-    const accountTree = useMemo(() => {
-      if (showInactiveAccounts) return fullAccountTree;
-
-      const filterNodes = (nodes) => (nodes || []).reduce((acc, node) => {
-        const children = filterNodes(node.children || []);
-        const isActiveNode = node.is_active !== false;
-        if (!isActiveNode && children.length === 0) return acc;
-        acc.push({ ...node, children });
-        return acc;
-      }, []);
-
-      return filterNodes(fullAccountTree);
-    }, [fullAccountTree, showInactiveAccounts]);
-
-    const reportTree = useMemo(() => (showInactiveAccounts ? fullAccountTree : accountTree), [showInactiveAccounts, fullAccountTree, accountTree]);
-
-    // ── Fiscal year / period derivations ───────────────────────────────────
-    const todaySlash = useMemo(() => {
-      const d = new Date();
-      return `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}`;
-    }, [pad2]);
-
-    const yearMap = useMemo(
-      () => new Map((fiscalYears || []).map((y) => [String(y.id), y])),
-      [fiscalYears]
+    const balanceGroupOptions = useMemo(() =>
+      (balanceGroups || []).map((g) => ({
+        value: String(g.id),
+        label: `${g.code ? `${g.code} - ` : ''}${g.displayLabel || '-'}`,
+      })),
+      [balanceGroups]
     );
 
-    const defaultYearId = useMemo(() => {
-      if (!fiscalYears.length) return null;
+    const balanceGroupSummary = useMemo(() =>
+      fBalanceGroups.size > 0
+        ? t(`${fBalanceGroups.size} گروه انتخاب شده`, `${fBalanceGroups.size} groups selected`)
+        : t('انتخاب گروه‌های بالانس', 'Select balance groups'),
+      [fBalanceGroups, t]
+    );
 
-      const containing = fiscalYears.find((y) => {
-        const from = String(y.startDate || '');
-        const to = String(y.endDate || '');
-        return from && to && todaySlash >= from && todaySlash <= to;
-      });
-      if (containing?.id) return String(containing.id);
-
-      return String(fiscalYears[0].id);
-    }, [fiscalYears, todaySlash]);
-
-    useEffect(() => {
-      const validIds = new Set((fiscalYears || []).map((y) => String(y.id)));
-      setFYears((prev) => {
-        const kept = new Set([...prev].filter((id) => validIds.has(String(id))));
-        if (kept.size > 0) return kept;
-        return defaultYearId ? new Set([String(defaultYearId)]) : kept;
-      });
-    }, [fiscalYears, defaultYearId]);
-
-    const availableMonths = useMemo(() => {
-      const selectedYearIds = new Set(Array.from(fYears || []).map(String));
-      return (fiscalPeriods || [])
-        .filter((p) => selectedYearIds.has(String(p.fiscalYearId)))
-        .sort((a, b) => {
-          const byStart = String(a.startDate || '').localeCompare(String(b.startDate || ''));
-          if (byStart !== 0) return byStart;
-          const byOrder = Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
-          if (byOrder !== 0) return byOrder;
-          return String(a.periodCode || '').localeCompare(String(b.periodCode || ''));
-        })
-        .map((p) => {
-          const periodTitle = String(p.title || '').trim() || String(p.periodCode || '').trim() || t('دوره بدون عنوان', 'Untitled Period');
-          return {
-            key: String(p.id),
-            periodId: String(p.id),
-            fiscalYearId: String(p.fiscalYearId),
-            periodFrom: normalizeSlashDate(p.startDate),
-            periodTo: normalizeSlashDate(p.endDate),
-            label: periodTitle,
-          };
-        });
-    }, [fYears, fiscalPeriods, t, normalizeSlashDate]);
-
-    useEffect(() => {
-      const validPeriodIds = new Set((availableMonths || []).map((m) => String(m.key)));
-      setFMonths((prev) => new Set([...prev].filter((id) => validPeriodIds.has(String(id)))));
-    }, [availableMonths]);
-
-    const toggleYear = useCallback((yearId) => {
-      const yStr = String(yearId);
-      setFYears(prev => {
-        const next = new Set(prev);
-        if (next.has(yStr)) {
-          next.delete(yStr);
-          setFMonths(pm => {
-            const nm = new Set(pm);
-            (availableMonths || [])
-              .filter((p) => String(p.fiscalYearId) === yStr)
-              .forEach((p) => nm.delete(String(p.key)));
-            return nm;
-          });
-        } else {
-          next.add(yStr);
-        }
-        return next;
-      });
-    }, [availableMonths]);
-
-    const toggleMonth = useCallback((key) =>
-      setFMonths(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; }), []);
-
-    const treeNodeMap = useMemo(() => {
-      const map = new Map();
-      const visit = (nodes) => {
-        (nodes || []).forEach(node => {
-          map.set(String(node.id), node);
-          visit(node.children || []);
-        });
-      };
-      visit(reportTree);
-      return map;
-    }, [reportTree]);
-
-    const selectedLeafCount = useMemo(() => {
-      let count = 0;
-      const walk = (nodes) => {
-        (nodes || []).forEach(node => {
-          const isLeaf = !node.children || node.children.length === 0;
-          if (isLeaf && selectedIds.has(String(node.id))) count += 1;
-          if (!isLeaf) walk(node.children);
-        });
-      };
-      walk(reportTree);
-      return count;
-    }, [reportTree, selectedIds]);
-
-    // ── Account selection ──────────────────────────────────────────────────
-    const toggleId = useCallback((id) => {
-      const targetId = String(id);
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        const targetNode = treeNodeMap.get(targetId);
-        if (!targetNode) {
-          if (next.has(targetId)) next.delete(targetId);
-          else next.add(targetId);
-          return next;
-        }
-
-        const subtreeIds = [];
-        const collect = (node) => {
-          subtreeIds.push(String(node.id));
-          (node.children || []).forEach(collect);
-        };
-        collect(targetNode);
-
-        const shouldSelect = !next.has(targetId);
-        subtreeIds.forEach(nodeId => {
-          if (shouldSelect) next.add(nodeId);
-          else next.delete(nodeId);
-        });
-        return next;
-      });
-    }, [treeNodeMap]);
-
-    const selectAllTree = useCallback(() => {
-      const ids = new Set();
-      const visit = (ns) => ns.forEach(n => { ids.add(String(n.id)); visit(n.children || []); });
-      visit(accountTree);
-      setSelectedIds(ids);
-    }, [accountTree]);
-
-    // ── Generate report ────────────────────────────────────────────────────
-    const handleGenerate = useCallback(async () => {
-      if (fMonths.size === 0) {
-        showToast(t('لطفاً حداقل یک دوره مالی انتخاب کنید.', 'Please select at least one fiscal period.'), 'warning');
-        return;
-      }
-      if (selectedIds.size === 0) {
-        showToast(t('لطفاً حساب‌ها را از طریق «تنظیمات گزارش» انتخاب کنید.', 'Please select accounts via "Report Settings".'), 'warning');
-        return;
-      }
-
-      setGenerating(true);
-      setReportData(null);
-
-      try {
-        const result = await generateMonthlyReportData({
-          supabase,
-          filters,
-          availablePeriods: availableMonths,
-          fPeriods: fMonths,
-          cal,
-          currencies,
-          accountMap,
-          accountTree: reportTree,
-          selectedIds,
-          isRtl,
-        });
-
-        if (result?.kind === 'invalid_months') {
-          showToast(t('دوره‌های انتخابی نامعتبر هستند.', 'Invalid selected periods.'), 'warning');
-          return;
-        }
-
-        if (result?.kind === 'no_leaf_accounts') {
-          showToast(t('حساب‌های انتخابی برگ‌نما ندارند.', 'Selected accounts have no leaf accounts.'), 'warning');
-          return;
-        }
-
-        setReportData(result?.reportData || null);
-      } catch (e) {
-        console.error('BalanceMonthlyReport: generate error', e);
-        showToast(t('خطا در تولید گزارش', 'Error generating report'), 'error');
-      } finally {
-        setGenerating(false);
-      }
-    }, [fMonths, selectedIds, filters, availableMonths, cal, currencies, accountMap, reportTree, isRtl, t, showToast, supabase]);
-
-    const openCellDrill = useCallback((row, slot, val) => {
-      const nextModalState = createCellDrillModalState({
-        reportData,
-        row,
-        slot,
-        val,
-        isRtl,
-        normalizeSlashDate,
-      });
-      if (!nextModalState) return;
-      setCellDrillModal(nextModalState);
-    }, [isRtl, normalizeSlashDate, reportData, createCellDrillModalState]);
-
-    // ── viewConfig ─────────────────────────────────────────────────────────
-    const viewConfig = useMemo(() => ({
-      pageId: 'balance_monthly_report',
-      currentState: () => ({
-        filters,
-        fYears:    Array.from(fYears),
-        fPeriods:  Array.from(fMonths),
-        fMonths:   Array.from(fMonths),
-        selIds:    Array.from(selectedIds),
-        showInactiveAccounts,
-        gridState,
-      }),
-      onApplyState: (state) => {
-        if (!state) {
-          setFilters({ currency: null, show_movements: false });
-          setFYears(defaultYearId ? new Set([String(defaultYearId)]) : new Set());
-          setFMonths(new Set());
-          setSelectedIds(new Set());
-          setShowInactiveAccounts(false);
-          setGridState(null);
-          setReportData(null);
-          return;
-        }
-        if (state.filters) setFilters(state.filters);
-        if (state.fYears)  setFYears(new Set(state.fYears));
-        if (state.fPeriods) setFMonths(new Set(state.fPeriods));
-        else if (state.fMonths) setFMonths(new Set(state.fMonths));
-        if (state.selIds)  setSelectedIds(new Set(state.selIds));
-        if (typeof state.showInactiveAccounts === 'boolean') setShowInactiveAccounts(state.showInactiveAccounts);
-        if (state.gridState) setGridState(state.gridState);
-      },
-    }), [filters, fYears, fMonths, selectedIds, showInactiveAccounts, gridState, defaultYearId]);
-
-    const currencyLovData = useMemo(() => (currencies || []).map(c => ({
+    const currencyLovData = useMemo(() => (currencies || []).map((c) => ({
       ...c,
       displayLabel: `${c.code || ''} - ${c.title || ''}${c.symbol ? ` (${c.symbol})` : ''}`.trim()
     })), [currencies]);
@@ -689,31 +308,24 @@
         }),
       [fiscalYears, t]
     );
-    const monthOptions = useMemo(() => availableMonths.map(m => ({ value: m.key, label: m.label })), [availableMonths]);
+
+    const monthOptions = useMemo(() => availableMonths.map((m) => ({ value: m.key, label: m.label })), [availableMonths]);
     const yearSummary = useMemo(() => fYears.size > 0 ? t(`${fYears.size} سال انتخاب شده`, `${fYears.size} years selected`) : t('انتخاب سال‌ها', 'Select years'), [fYears, t]);
     const monthSummary = useMemo(() => fMonths.size > 0 ? t(`${fMonths.size} دوره انتخاب شده`, `${fMonths.size} periods selected`) : t('انتخاب دوره‌ها', 'Select periods'), [fMonths, t]);
 
     const advancedFilterFields = useMemo(() => ([
       {
-        name: 'currency',
-        label: t('ارز', 'Currency'),
-        type: 'lov',
-        lovData: currencyLovData,
-        lovColumns: currencyLovCols,
-        dropdownWidth: 'min-w-[360px]'
-      },
-      {
         name: 'f_years',
-        label: t('سال‌ها', 'Years'),
+        label: t('سال مالی', 'Fiscal Year'),
         type: 'custom',
         render: ({ key }) => React.createElement('div', { key, className: 'w-full min-w-0' },
           React.createElement(MultiSelectDropdown, {
-            label: t('سال‌ها', 'Years'),
+            label: t('سال مالی', 'Fiscal Year'),
             options: yearOptions,
             selected: fYears,
             onToggle: toggleYear,
-            onSelectAll: () => setFYears(new Set(yearOptions.map(o => String(o.value)))),
-            onClear: () => { setFYears(new Set()); setFMonths(new Set()); },
+            onSelectAll: () => setFYears(new Set(yearOptions.map((o) => String(o.value)))),
+            onClear: clearYearAndPeriods,
             summary: loadingFiscalFilters ? t('در حال بارگذاری...', 'Loading...') : yearSummary,
             isRtl,
             disabled: loadingFiscalFilters,
@@ -730,35 +342,127 @@
             options: monthOptions,
             selected: fMonths,
             onToggle: toggleMonth,
-            onSelectAll: () => setFMonths(new Set(monthOptions.map(o => String(o.value)))),
+            onSelectAll: () => setFMonths(new Set(monthOptions.map((o) => String(o.value)))),
             onClear: () => setFMonths(new Set()),
             summary: loadingFiscalFilters ? t('در حال بارگذاری...', 'Loading...') : monthSummary,
             isRtl,
             disabled: loadingFiscalFilters || fYears.size === 0,
           })
         )
-      },      
+      },
+      {
+        name: 'account_filter_type',
+        label: t('فیلتر نوع حساب', 'Account Filter Type'),
+        type: 'select',
+        options: accountFilterTypeOptions,
+      },
+      {
+        name: 'account_group_selector',
+        label: filters.account_filter_type === 'balance_group'
+          ? t('انتخاب گروه‌ها', 'Select Groups')
+          : t('انتخاب حساب‌ها', 'Select Accounts'),
+        type: 'custom',
+        render: ({ key }) => React.createElement('div', { key, className: 'w-full min-w-0 flex flex-col gap-1' },
+          React.createElement('label', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300' },
+            filters.account_filter_type === 'balance_group'
+              ? t('انتخاب گروه‌ها / درخت حساب', 'Select Groups / Account Tree')
+              : t('انتخاب حساب‌ها / درخت حساب', 'Select Accounts / Account Tree')
+          ),
+          React.createElement('div', { className: 'w-full min-w-0 flex items-stretch gap-0' },
+            filters.account_filter_type === 'balance_group'
+              ? React.createElement('div', { className: 'flex-1 min-w-0' },
+                  React.createElement(MultiSelectDropdown, {
+                    label: t('انتخاب گروه‌ها', 'Select Groups'),
+                    options: balanceGroupOptions,
+                    selected: fBalanceGroups,
+                    onToggle: toggleBalanceGroup,
+                    onSelectAll: () => setFBalanceGroups(new Set(balanceGroupOptions.map((o) => String(o.value)))),
+                    onClear: () => setFBalanceGroups(new Set()),
+                    summary: loadingBalanceGroups ? t('در حال بارگذاری...', 'Loading...') : balanceGroupSummary,
+                    isRtl,
+                    disabled: loadingBalanceGroups,
+                    hideLabel: true,
+                    triggerClassName: 'rounded-r-lg rounded-l-none',
+                    triggerStyle: isRtl
+                      ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }
+                      : { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+                  })
+                )
+              : React.createElement('div', {
+                  className: 'flex-1 min-w-0 h-8 px-2.5 border bg-white dark:bg-slate-700/40 border-slate-300 dark:border-slate-500 flex items-center text-[12px] text-slate-600 dark:text-slate-300 truncate rounded-r-lg rounded-l-none',
+                  style: isRtl
+                    ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }
+                    : { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+                },
+                  t(`${selectedLeafCount} حساب انتخاب شده`, `${selectedLeafCount} accounts selected`)
+                ),
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => setSettingsOpen(true),
+              className: 'h-8 px-2.5 border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[12px] font-bold whitespace-nowrap hover:bg-indigo-100 dark:hover:bg-indigo-900/45 transition-colors rounded-l-lg rounded-r-none',
+              style: isRtl
+                ? { borderTopRightRadius: 0, borderBottomRightRadius: 0, marginRight: '-1px' }
+                : { borderTopLeftRadius: 0, borderBottomLeftRadius: 0, marginLeft: '-1px' }
+            }, t('درخت حساب', 'Account Tree'))
+          )
+        )
+      },
+      {
+        name: 'currency',
+        label: t('نوع ارز', 'Currency Type'),
+        type: 'lov',
+        lovData: currencyLovData,
+        lovColumns: currencyLovCols,
+        dropdownWidth: 'min-w-[360px]'
+      },
       {
         name: 'show_movements',
         label: t('نمایش واریز/ برداشت', 'Show Deposit/Withdrawal'),
         type: 'toggle',
       }
-    ]), [t, currencyLovData, currencyLovCols, yearOptions, monthOptions, yearSummary, monthSummary, fYears, isRtl, toggleYear, toggleMonth, loadingFiscalFilters]);
+    ]), [
+      t,
+      filters.account_filter_type,
+      accountFilterTypeOptions,
+      balanceGroupOptions,
+      fBalanceGroups,
+      toggleBalanceGroup,
+      balanceGroupSummary,
+      loadingBalanceGroups,
+      selectedLeafCount,
+      clearYearAndPeriods,
+      currencyLovData,
+      currencyLovCols,
+      yearOptions,
+      monthOptions,
+      yearSummary,
+      monthSummary,
+      fYears,
+      isRtl,
+      toggleYear,
+      toggleMonth,
+      loadingFiscalFilters,
+      setFBalanceGroups,
+      setFMonths,
+      setFYears,
+      setSettingsOpen,
+    ]);
 
     const advancedFilterValues = useMemo(() => ({
+      account_filter_type: filters.account_filter_type || 'account',
       currency: filters.currency || null,
       show_movements: !!filters.show_movements,
     }), [filters]);
 
     const handleAdvancedFilterChange = useCallback((vals) => {
-      setFilters(prev => ({
+      setFilters((prev) => ({
         ...prev,
+        account_filter_type: vals?.account_filter_type || 'account',
         currency: vals?.currency || null,
         show_movements: !!vals?.show_movements,
       }));
-    }, []);
+    }, [setFilters]);
 
-    // ── Dynamic grid columns ───────────────────────────────────────────────
     const columns = useMemo(() => {
       if (!reportData) return [];
       const { slots, showMovements } = reportData;
@@ -791,7 +495,7 @@
         render: (val, row) => {
           const depth = row._depth || 0;
           const isGrand = row._type === 'grand_total';
-          const isHdr   = row._type === 'group_header';
+          const isHdr = row._type === 'group_header';
           const isCurrency = row._type === 'currency_header';
           const textCls = isGrand
             ? 'font-black text-slate-700 dark:text-slate-200'
@@ -805,7 +509,7 @@
             className: 'flex items-center gap-1'
           },
             isGrand && React.createElement('span', { className: 'text-slate-500 text-[10px] me-0.5' }, '●'),
-            isHdr   && React.createElement('span', { className: 'text-indigo-400 text-[10px] me-0.5' }, '■'),
+            isHdr && React.createElement('span', { className: 'text-indigo-400 text-[10px] me-0.5' }, '■'),
             isCurrency && React.createElement('span', { className: 'text-teal-400 text-[10px] me-0.5' }, '◆'),
             React.createElement('span', { className: `text-[12px] leading-tight ${textCls}` }, val || '—')
           );
@@ -826,7 +530,7 @@
             )
       };
 
-      const slotCols = slots.map(slot => ({
+      const slotCols = slots.map((slot) => ({
         field: slot.key,
         header_fa: slot.label,
         header_en: slot.label,
@@ -866,7 +570,6 @@
               }, fmt(bal));
             }
           } else {
-            // Group/currency/grand rows: show USD and IRR
             const isGrand = row._type === 'grand_total';
             const isCurrency = row._type === 'currency_header';
             content = React.createElement('div', { className: 'flex flex-col gap-0.5 leading-4 items-end' },
@@ -909,7 +612,7 @@
       }));
 
       return [titleCol, currCol, ...slotCols];
-    }, [reportData, openCellDrill, t]);
+    }, [reportData, openCellDrill, t, fmt]);
 
     const handleClearFilters = useCallback(() => {
       setFilters({ currency: null, show_movements: false });
@@ -917,9 +620,8 @@
       setFMonths(new Set());
       setReportData(null);
       setGridState(null);
-    }, [defaultYearId]);
+    }, [defaultYearId, setFMonths, setFYears, setFilters, setGridState, setReportData]);
 
-    // ── Settings modal ─────────────────────────────────────────────────────
     const renderSettings = () =>
       React.createElement(Modal, {
         isOpen: settingsOpen,
@@ -929,13 +631,17 @@
         width: 'max-w-lg'
       },
         React.createElement('div', { className: 'flex flex-col gap-3 p-4 max-h-[72vh] overflow-hidden' },
-          // Header row
           React.createElement('div', { className: 'flex items-start justify-between gap-3 shrink-0' },
             React.createElement('p', { className: 'text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-[70%]' },
-              t(
-                'شاخه‌ها یا حساب‌هایی که می‌خواهید در گزارش نمایش داده شوند را انتخاب کنید. انتخاب یک شاخه، تمام زیرمجموعه‌های آن را شامل می‌شود.',
-                'Select branches or accounts to include in the report. Selecting a branch includes all its descendants.'
-              )
+              filters.account_filter_type === 'balance_group'
+                ? t(
+                    'حساب‌های این درخت براساس گروه‌های بالانس انتخابی تیک خورده‌اند. در صورت نیاز می‌توانید همینجا آن‌ها را کم یا زیاد کنید.',
+                    'Accounts are pre-selected from the chosen balance groups. You can fine-tune selection here.'
+                  )
+                : t(
+                    'شاخه‌ها یا حساب‌هایی که می‌خواهید در گزارش نمایش داده شوند را انتخاب کنید. انتخاب یک شاخه، تمام زیرمجموعه‌های آن را شامل می‌شود.',
+                    'Select branches or accounts to include in the report. Selecting a branch includes all its descendants.'
+                  )
             ),
             React.createElement('div', { className: 'flex gap-3 shrink-0' },
               React.createElement('button', {
@@ -949,13 +655,12 @@
             )
           ),
 
-          // Tree controls
           React.createElement('div', {
             className: 'flex items-center justify-between gap-2 shrink-0 px-1'
           },
             React.createElement('button', {
               type: 'button',
-              onClick: () => setShowInactiveAccounts(v => !v),
+              onClick: () => setShowInactiveAccounts((v) => !v),
               className: 'inline-flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors'
             },
               React.createElement('span', { className: 'whitespace-nowrap' }, t('نمایش حساب‌های غیرفعال', 'Show inactive accounts')),
@@ -985,7 +690,6 @@
             )
           ),
 
-          // Tree
           React.createElement('div', {
             className: 'flex-1 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 min-h-[300px] py-1'
           },
@@ -1000,10 +704,14 @@
                     description: t('هیچ نمودار حساب فعالی وجود ندارد.', 'No active chart of accounts exists.'),
                     language
                   })
-                : accountTree.map(root =>
+                : accountTree.map((root) =>
                     React.createElement(TreeNode, {
-                      key: root.id, node: root, depth: 0,
-                      selectedIds, onToggle: toggleId, isRtl,
+                      key: root.id,
+                      node: root,
+                      depth: 0,
+                      selectedIds,
+                      onToggle: toggleId,
+                      isRtl,
                       resetToken: settingsTreeResetToken,
                       expandMode: settingsTreeExpandMode,
                       inheritedInactive: false
@@ -1011,7 +719,6 @@
                   )
           ),
 
-          // Footer
           React.createElement('div', {
             className: 'flex items-center justify-between border-t border-slate-200 dark:border-slate-700 pt-3 shrink-0'
           },
@@ -1019,19 +726,18 @@
               t(`${selectedLeafCount} حساب انتخاب شده`, `${selectedLeafCount} accounts selected`)
             ),
             React.createElement(Button, {
-              variant: 'primary', size: 'sm',
+              variant: 'primary',
+              size: 'sm',
               onClick: () => setSettingsOpen(false)
             }, t('تایید', 'Confirm'))
           )
         )
       );
 
-    // ── Grid render ────────────────────────────────────────────────────────
     const renderGrid = () => {
       if (!reportData) return null;
-      const { slots, groupedRows, grandTotal, leafCount } = reportData;
+      const { slots, groupedRows, grandTotal } = reportData;
 
-      // Grand total row
       const grandRow = {
         _id: '__grand_total__', _type: 'grand_total', _depth: 0,
         _rowClassName: 'bg-slate-100/80 dark:bg-slate-700/40 hover:bg-slate-100 dark:hover:bg-slate-700/50',
@@ -1041,11 +747,11 @@
         _rowId: '__grand_total__',
         _parentRowId: null,
       };
-      slots.forEach(s => { grandRow[s.key] = grandTotal[s.key] || { usd: 0, irr: 0 }; });
+      slots.forEach((s) => { grandRow[s.key] = grandTotal[s.key] || { usd: 0, irr: 0 }; });
 
       const treeRows = [...groupedRows, grandRow];
 
-      const toolbarStartContent = React.createElement('div', { className: 'flex items-center gap-2 px-1' },        
+      const toolbarStartContent = React.createElement('div', { className: 'flex items-center gap-2 px-1' },
         React.createElement('span', { className: 'text-[12px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold' },
           t(
             `${selectedLeafCount} حساب انتخابی · ${slots.length} دوره`,
@@ -1101,7 +807,6 @@
       formCode
     });
 
-    // ── Main render ────────────────────────────────────────────────────────
     return React.createElement('div', {
       className: 'h-full flex flex-col font-sans',
       dir: isRtl ? 'rtl' : 'ltr'
@@ -1135,25 +840,13 @@
             language,
             defaultOpen: true,
             inlineChildren: false,
-            footerStartContent: access.canEdit
-              ? React.createElement('div', { className: 'flex items-center gap-2' },
-                  React.createElement(Button, {
-                    variant: 'outline',
-                    size: 'sm',
-                    onClick: () => setSettingsOpen(true)
-                  },
-                    React.createElement('span', { className: 'flex items-center gap-1.5' },
-                      React.createElement(Settings, { size: 14 }),
-                      t('تنظیمات گزارش / حساب‌ها', 'Report / Accounts Settings')
-                    )
-                  ),
-                  React.createElement('span', {
-                    className: 'text-[12px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap'
-                  },
-                    t(`${selectedLeafCount} حساب انتخاب شده`, `${selectedLeafCount} accounts selected`)
-                  )
-                )
-              : null,
+            footerStartContent: React.createElement('div', {
+              className: 'text-[12px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap'
+            },
+              filters.account_filter_type === 'balance_group'
+                ? t(`${selectedLeafCount} حساب از گروه‌های بالانس انتخاب شده`, `${selectedLeafCount} accounts selected from balance groups`)
+                : t(`${selectedLeafCount} حساب انتخاب شده`, `${selectedLeafCount} selected accounts`)
+            ),
           }),
 
           generating
@@ -1191,14 +884,13 @@
 
       React.createElement(Toast, {
         isVisible: toast.isVisible,
-        message:   toast.message,
-        type:      toast.type,
-        onClose:   () => setToast(p => ({ ...p, isVisible: false })),
+        message: toast.message,
+        type: toast.type,
+        onClose: () => setToast((p) => ({ ...p, isVisible: false })),
         language
       })
     );
   };
 
-  BalanceMonthlyReport.formCode = 'FIN_BALANCE_MONTHLY_REPORT';
   window.BalanceMonthlyReport = BalanceMonthlyReport;
 })();
