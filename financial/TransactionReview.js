@@ -633,49 +633,6 @@
       { name: 'date_from', label: t('از تاریخ', 'From Date'), type: 'date' },
       { name: 'date_to', label: t('تا تاریخ', 'To Date'), type: 'date' },
       {
-        name: 'account_filter_type',
-        label: t('نوع فیلتر حساب', 'Account Filter Type'),
-        type: 'select',
-        options: [
-          { value: 'balance_group', label: t('گروه بالانس', 'Balance Group') },
-          { value: 'account', label: t('انتخاب حساب', 'Select Account') },
-        ],
-      },
-      filterState.account_filter_type === 'account'
-        ? {
-            name: 'filter_value',
-            label: t('حساب', 'Account'),
-            type: 'lov',
-            lovData: accountLovData,
-            lovColumns: [
-              { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '80px' },
-              { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '80px' },
-              {
-                field: 'displayLabel',
-                header_fa: 'عنوان حساب',
-                header_en: 'Account Title',
-                width: '240px',
-                render: (val, row) => React.createElement('div', { className: 'flex flex-col' },
-                  React.createElement('span', { className: 'font-bold text-slate-800 dark:text-slate-200' }, val),
-                  row.pathTitle && React.createElement('span', { className: 'text-[10px] text-slate-500 truncate', title: row.pathTitle }, row.pathTitle)
-                )
-              },
-              { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' },
-            ],
-            dropdownWidth: 'min-w-[540px] max-w-[540px]',
-          }
-        : {
-            name: 'filter_value',
-            label: t('گروه بالانس', 'Balance Group'),
-            type: 'lov',
-            lovData: balanceGroups,
-            lovColumns: [
-              { field: 'code', header_fa: 'کد', header_en: 'Code', width: '70px' },
-              { field: 'title_fa', header_fa: 'عنوان گروه بالانس', header_en: 'Balance Group', width: '220px' },
-            ],
-            dropdownWidth: 'min-w-[340px]',
-          },
-      {
         name: 'transaction_types',
         type: 'custom',
         render: ({ key, values }) => {
@@ -720,12 +677,55 @@
             })
           );
         },
-      },
+      },   
       {
         name: 'summary_currency',
         label: t('خلاصه ارزی', 'Currency Summary'),
         type: 'toggle',
+      },      
+      {
+        name: 'account_filter_type',
+        label: t('نوع فیلتر حساب', 'Account Filter Type'),
+        type: 'select',
+        options: [
+          { value: 'balance_group', label: t('گروه بالانس', 'Balance Group') },
+          { value: 'account', label: t('انتخاب حساب', 'Select Account') },
+        ],
       },
+      filterState.account_filter_type === 'account'
+        ? {
+            name: 'filter_value',
+            label: t('حساب', 'Account'),
+            type: 'lov',
+            lovData: accountLovData,
+            lovColumns: [
+              { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '80px' },
+              { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '80px' },
+              {
+                field: 'displayLabel',
+                header_fa: 'عنوان حساب',
+                header_en: 'Account Title',
+                width: '240px',
+                render: (val, row) => React.createElement('div', { className: 'flex flex-col' },
+                  React.createElement('span', { className: 'font-bold text-slate-800 dark:text-slate-200' }, val),
+                  row.pathTitle && React.createElement('span', { className: 'text-[10px] text-slate-500 truncate', title: row.pathTitle }, row.pathTitle)
+                )
+              },
+              { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' },
+            ],
+            dropdownWidth: 'min-w-[540px] max-w-[540px]',
+          }
+        : {
+            name: 'filter_value',
+            label: t('گروه بالانس', 'Balance Group'),
+            type: 'lov',
+            lovData: balanceGroups,
+            lovColumns: [
+              { field: 'code', header_fa: 'کد', header_en: 'Code', width: '70px' },
+              { field: 'title_fa', header_fa: 'عنوان گروه بالانس', header_en: 'Balance Group', width: '220px' },
+            ],
+            dropdownWidth: 'min-w-[340px]',
+          },               
     ], [t, filterState.account_filter_type, accountLovData, balanceGroups, TRANSACTION_TYPE_OPTIONS, DOCUMENT_STATUS_OPTIONS, transactionTypeSummary, documentStatusSummary, handleFilterChange]);
 
     const TX_TYPES = {
