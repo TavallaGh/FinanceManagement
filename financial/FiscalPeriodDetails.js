@@ -1,7 +1,7 @@
 /* Filename: financial/FiscalPeriodDetails.js */
 (() => {
   const React = window.React;
-  const { useState, useMemo, useCallback } = React;
+  const { useState, useMemo, useEffect, useCallback } = React;
 
   const Fallback = () => null;
   const DS = window.DesignSystem || {};
@@ -20,8 +20,6 @@
   const DatePicker = DSForms.DatePicker || DS.DatePicker || Fallback;
 
   const DataGrid = DSGrid.DataGrid || DS.DataGrid || Fallback;
-  const LOVField = DSGrid.LOVField || DS.LOVField || Fallback;
-
   const Modal = DSFeedback.Modal || DS.Modal || Fallback;
 
   const LucideIcons = window.LucideIcons || {};
@@ -30,11 +28,8 @@
   const Trash2 = LucideIcons.Trash2 || FallbackIcon;
   const Save = LucideIcons.Save || FallbackIcon;
   const Sparkles = LucideIcons.Sparkles || FallbackIcon;
-  const Users = LucideIcons.Users || FallbackIcon;
   const Shield = LucideIcons.Shield || FallbackIcon;
   const X = LucideIcons.X || FallbackIcon;
-  const UserRoundCog = LucideIcons.UserRoundCog || LucideIcons.UsersRound || FallbackIcon;
-  const UsersRound = LucideIcons.UsersRound || LucideIcons.Users || FallbackIcon;
   const AlertTriangle = LucideIcons.AlertTriangle || FallbackIcon;
 
   const oneDayMs = 24 * 60 * 60 * 1000;
@@ -68,9 +63,10 @@
   }) => {
     const [selectedPeriodIds, setSelectedPeriodIds] = useState([]);
     const [periodGridState, setPeriodGridState] = useState(null);
-    const [exceptionGridState, setExceptionGridState] = useState(null);
 
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, payload: null });
+    const [accessPanelPeriod, setAccessPanelPeriod] = useState(null);
+    const [exceptionPeriodIds, setExceptionPeriodIds] = useState(() => new Set());
 
     const [inlinePeriodEdit, setInlinePeriodEdit] = useState({ id: null, isNew: false });
     const [periodInlineForm, setPeriodInlineForm] = useState({
@@ -83,53 +79,63 @@
       isActive: true
     });
 
-    const [accessPanel, setAccessPanel] = useState({
-      isVisible: false,
-      period: null,
-      rows: [],
-      isLoading: false
-    });
-
-    const [inlineExceptionEdit, setInlineExceptionEdit] = useState({ id: null, isNew: false });
-    const [exceptionInlineForm, setExceptionInlineForm] = useState({
-      id: null,
-      subjectType: 'USER',
-      userId: null,
-      userDisplay: '',
-      userUsername: '',
-      groupId: null,
-      isActive: true
-    });
-
-    const usersById = useMemo(() => {
-      const map = new Map();
-      users.forEach(u => map.set(String(u.id), u));
-      return map;
-    }, [users]);
-
-    const groupsById = useMemo(() => {
-      const map = new Map();
-      userGroups.forEach(g => map.set(String(g.id), g));
-      return map;
-    }, [userGroups]);
-
-    const activeUsers = useMemo(() => users.filter(u => u.isActive !== false), [users]);
-    const activeUserGroups = useMemo(() => userGroups.filter(g => g.isActive !== false), [userGroups]);
-
-    const userLovColumns = [
-      { field: 'username', header_fa: 'نام کاربری', header_en: 'Username', width: '140px' },
-      { field: 'fullName', header_fa: 'نام کامل', header_en: 'Full Name', width: '220px' },
-      { field: 'email', header_fa: 'ایمیل', header_en: 'Email', width: '200px' }
-    ];
-
     const getStatusMeta = useCallback((statusValue) => {
       return (statusOptions || []).find(s => s.value === statusValue) || (statusOptions || [])[0] || { badge: 'slate', label_fa: statusValue, label_en: statusValue };
     }, [statusOptions]);
 
     const allowedStatusOptions = useCallback((currentStatus) => {
-      if (!currentStatus) return statusOptions || [];
-      return (statusOptions || []).filter(opt => opt.value === currentStatus || canTransitionStatus(currentStatus, opt.value));
-    }, [statusOptions, canTransitionStatus]);
+      const base = (!currentStatus)
+        ? (statusOptions || [])
+        : (statusOptions || []).filter(opt => opt.value === currentStatus || canTransitionStatus(currentStatus, opt.value));
+
+      if (selectedYear?.status === status.CLOSED) {
+        return base.filter(opt => opt.value === status.CLOSED || opt.value === currentStatus);
+      }
+
+      return base;
+    }, [statusOptions, canTransitionStatus, selectedYear?.status, status?.CLOSED]);
+
+    useEffect(() => {
+      const loadExceptionMarkers = async () => {
+        if (!supabase || !selectedYear?.id || !Array.isArray(periodRows) || periodRows.length === 0) {
+          setExceptionPeriodIds(new Set());
+          return;
+        }
+
+        try {
+          const periodIds = periodRows
+            .map(p => p?.id)
+            .filter(Boolean);
+
+          if (periodIds.length === 0) {
+            setExceptionPeriodIds(new Set());
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from('fm_fiscal_period_exceptions')
+            .select('period_id')
+            .eq('is_active', true)
+            .in('period_id', periodIds);
+
+          if (error) throw error;
+
+          const ids = new Set((data || []).map(r => String(r.period_id)).filter(Boolean));
+          setExceptionPeriodIds(ids);
+        } catch (err) {
+          console.error('load exception markers error:', err);
+          setExceptionPeriodIds(new Set());
+        }
+      };
+
+      loadExceptionMarkers();
+    }, [supabase, selectedYear?.id, periodRows]);
+
+    useEffect(() => {
+      if (!accessPanelPeriod) return;
+      const stillExists = periodRows.some(p => String(p.id) === String(accessPanelPeriod.id));
+      if (!stillExists) setAccessPanelPeriod(null);
+    }, [accessPanelPeriod, periodRows]);
 
     const hasOverlap = (sortedRows) => {
       for (let i = 0; i < sortedRows.length - 1; i++) {
@@ -237,6 +243,14 @@
       const oldRow = periodRows.find(p => String(p.id) === String(draft.id));
       if (oldRow && !canTransitionStatus(oldRow.status, draft.status)) {
         showToast(t('تغییر وضعیت دوره طبق قوانین مجاز نیست.', 'Period status transition is not allowed.'), 'error');
+        return false;
+      }
+
+      if (selectedYear?.status === status.CLOSED && draft.status !== status.CLOSED) {
+        showToast(
+          t('وقتی سال مالی بسته است، وضعیت دوره فقط می‌تواند بسته شده باشد.', 'When fiscal year is closed, period status cannot be Open or Not Opened.'),
+          'error'
+        );
         return false;
       }
 
@@ -466,8 +480,8 @@
           await onLog?.(p.id, 'delete', `حذف دوره ${p.periodCode}`);
           setSelectedPeriodIds(prev => prev.filter(id => String(id) !== String(p.id)));
 
-          if (accessPanel.isVisible && String(accessPanel.period?.id) === String(p.id)) {
-            setAccessPanel({ isVisible: false, period: null, rows: [], isLoading: false });
+          if (accessPanelPeriod && String(accessPanelPeriod.id) === String(p.id)) {
+            setAccessPanelPeriod(null);
           }
         }
 
@@ -493,8 +507,8 @@
           await onLog?.(selectedYear?.id, 'bulk_delete', `حذف گروهی ${ids.length} دوره`);
           setSelectedPeriodIds([]);
 
-          if (accessPanel.isVisible && ids.some(id => String(id) === String(accessPanel.period?.id))) {
-            setAccessPanel({ isVisible: false, period: null, rows: [], isLoading: false });
+          if (accessPanelPeriod && ids.some(id => String(id) === String(accessPanelPeriod.id))) {
+            setAccessPanelPeriod(null);
           }
         }
 
@@ -504,264 +518,6 @@
       } catch (err) {
         console.error('delete period error:', err);
         showToast(t('خطا در حذف. احتمالاً رکورد وابسته وجود دارد.', 'Delete failed. The record may have dependencies.'), 'error');
-      }
-    };
-
-    const normalizeSubjectType = (value) => {
-      const v = String(value || '').toLowerCase();
-      if (v === 'user_group' || v === 'group' || v === 'role') return 'USER_GROUP';
-      return 'USER';
-    };
-
-    const mapExceptionRows = useCallback((rows) => {
-      return (rows || []).map(r => {
-        const normalizedType = normalizeSubjectType(r.grantee_type || (r.user_group_id ? 'user_group' : (r.role_id ? 'user_group' : 'user')));
-        const userId = r.user_id || (normalizedType === 'USER' ? r.grantee_id : null) || null;
-        const groupId = r.user_group_id || (normalizedType === 'USER_GROUP' ? r.grantee_id : null) || null;
-
-        const userObj = userId ? usersById.get(String(userId)) : null;
-        const groupObj = groupId ? groupsById.get(String(groupId)) : null;
-
-        return {
-          id: r.id,
-          periodId: r.period_id,
-          subjectType: normalizedType,
-          userId,
-          userName: userObj?.fullName || userObj?.username || '-',
-          userUsername: userObj?.username || '-',
-          groupId,
-          groupTitle: groupObj?.title || '-',
-          accessTarget: normalizedType === 'USER_GROUP' ? (groupObj?.title || '-') : (userObj?.fullName || userObj?.username || '-'),
-          isActive: r.is_active !== false
-        };
-      });
-    }, [groupsById, usersById]);
-
-    const loadExceptionsForPeriod = async (periodRow) => {
-      if (!periodRow) return;
-      setAccessPanel(prev => ({ ...prev, isLoading: true }));
-
-      try {
-        const { data, error } = await supabase
-          .from('fm_fiscal_period_exceptions')
-          .select('*')
-          .eq('period_id', periodRow.id)
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-
-        setAccessPanel(prev => ({ ...prev, rows: mapExceptionRows(data), isLoading: false }));
-      } catch (err) {
-        console.error('load exceptions error:', err);
-        setAccessPanel(prev => ({ ...prev, isLoading: false }));
-        showToast(t('خطا در دریافت استثناها', 'Error loading exceptions'), 'error');
-      }
-    };
-
-    const openAccessPanel = async (periodRow) => {
-      if (!periodRow) return;
-      if (periodRow.status !== status.CLOSED) {
-        showToast(t('استثنا فقط برای دوره‌های بسته شده قابل تعریف است.', 'Exceptions are only available for closed periods.'), 'warning');
-        return;
-      }
-
-      setAccessPanel({ isVisible: true, period: periodRow, rows: [], isLoading: true });
-      setInlineExceptionEdit({ id: null, isNew: false });
-      setExceptionInlineForm({
-        id: null,
-        subjectType: 'USER',
-        userId: null,
-        userDisplay: '',
-        userUsername: '',
-        groupId: null,
-        isActive: true
-      });
-
-      try {
-        const { data, error } = await supabase
-          .from('fm_fiscal_period_exceptions')
-          .select('*')
-          .eq('period_id', periodRow.id)
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-
-        setAccessPanel({
-          isVisible: true,
-          period: periodRow,
-          rows: mapExceptionRows(data),
-          isLoading: false
-        });
-      } catch (err) {
-        console.error('load exceptions error:', err);
-        setAccessPanel(prev => ({ ...prev, isLoading: false }));
-        showToast(t('خطا در دریافت استثناها', 'Error loading exceptions'), 'error');
-      }
-    };
-
-    const closeAccessPanel = () => {
-      setAccessPanel({ isVisible: false, period: null, rows: [], isLoading: false });
-      setInlineExceptionEdit({ id: null, isNew: false });
-      setExceptionInlineForm({
-        id: null,
-        subjectType: 'USER',
-        userId: null,
-        userDisplay: '',
-        userUsername: '',
-        groupId: null,
-        isActive: true
-      });
-      setExceptionGridState(null);
-    };
-
-    const resetInlineExceptionForm = (periodRow) => {
-      setExceptionInlineForm({
-        id: '__new_exception__',
-        subjectType: 'USER',
-        userId: null,
-        userDisplay: '',
-        userUsername: '',
-        groupId: null,
-        isActive: true
-      });
-      setInlineExceptionEdit({ id: '__new_exception__', isNew: true });
-      if (!periodRow) return;
-    };
-
-    const beginInlineExceptionEdit = (row = null) => {
-      if (!accessPanel.period) return;
-      if (inlineExceptionEdit.id) {
-        showToast(t('ابتدا ویرایش جاری استثنا را ذخیره یا لغو کنید.', 'Save or cancel current exception edit first.'), 'warning');
-        return;
-      }
-
-      if (!row) {
-        resetInlineExceptionForm(accessPanel.period);
-        return;
-      }
-
-      setExceptionInlineForm({
-        id: row.id,
-        subjectType: row.subjectType || 'USER',
-        userId: row.userId || null,
-        userDisplay: row.userName || '',
-        userUsername: row.userUsername || '',
-        groupId: row.groupId || null,
-        isActive: row.isActive !== false
-      });
-      setInlineExceptionEdit({ id: row.id, isNew: false });
-    };
-
-    const cancelInlineExceptionEdit = () => {
-      setInlineExceptionEdit({ id: null, isNew: false });
-      setExceptionInlineForm({
-        id: null,
-        subjectType: 'USER',
-        userId: null,
-        userDisplay: '',
-        userUsername: '',
-        groupId: null,
-        isActive: true
-      });
-    };
-
-    const validateExceptionDraft = (draft) => {
-      if (!accessPanel.period) return false;
-
-      if (draft.subjectType === 'USER' && !draft.userId) {
-        showToast(t('انتخاب کاربر الزامی است.', 'Selecting a user is required.'), 'error');
-        return false;
-      }
-      if (draft.subjectType === 'USER_GROUP' && !draft.groupId) {
-        showToast(t('انتخاب گروه کاربری الزامی است.', 'Selecting a user group is required.'), 'error');
-        return false;
-      }
-
-      const targetId = draft.subjectType === 'USER_GROUP' ? String(draft.groupId || '') : String(draft.userId || '');
-      const duplicate = accessPanel.rows.some(r => {
-        if (String(r.id) === String(draft.id || '')) return false;
-        const rowTargetId = r.subjectType === 'USER_GROUP' ? String(r.groupId || '') : String(r.userId || '');
-        return String(r.subjectType) === String(draft.subjectType) && rowTargetId === targetId;
-      });
-
-      if (duplicate) {
-        showToast(t('اطلاعات تکراری است.', 'Duplicate information.'), 'error');
-        return false;
-      }
-
-      return true;
-    };
-
-    const saveInlineException = async () => {
-      const period = accessPanel.period;
-      if (!period) return;
-
-      if (period.status !== status.CLOSED) {
-        showToast(t('فقط برای دوره بسته شده می‌توان استثنا تعریف کرد.', 'Exceptions can only be saved for closed periods.'), 'error');
-        return;
-      }
-
-      const draft = {
-        ...exceptionInlineForm,
-        id: inlineExceptionEdit.isNew ? null : exceptionInlineForm.id
-      };
-      if (!validateExceptionDraft(draft)) return;
-
-      setAccessPanel(prev => ({ ...prev, isLoading: true }));
-      try {
-        const payload = {
-          period_id: period.id,
-          grantee_type: draft.subjectType === 'USER_GROUP' ? 'user_group' : 'user',
-          grantee_id: draft.subjectType === 'USER_GROUP' ? draft.groupId : draft.userId,
-          user_id: draft.subjectType === 'USER' ? draft.userId : null,
-          user_group_id: draft.subjectType === 'USER_GROUP' ? draft.groupId : null,
-          is_active: draft.isActive,
-          updated_at: new Date().toISOString()
-        };
-
-        if (draft.id) {
-          const { error } = await supabase.from('fm_fiscal_period_exceptions').update(payload).eq('id', draft.id);
-          if (error) throw error;
-        } else {
-          payload.created_at = new Date().toISOString();
-          const { error } = await supabase.from('fm_fiscal_period_exceptions').insert([payload]);
-          if (error) throw error;
-        }
-
-        cancelInlineExceptionEdit();
-        await loadExceptionsForPeriod(period);
-        showToast(t('استثنا با موفقیت ذخیره شد.', 'Exception saved successfully.'));
-      } catch (err) {
-        console.error('saveInlineException error:', err);
-        setAccessPanel(prev => ({ ...prev, isLoading: false }));
-        if (String(err?.code || '') === '23505') {
-          showToast(t('اطلاعات تکراری است.', 'Duplicate information.'), 'error');
-          return;
-        }
-        const errMsg = String(err?.message || '').toLowerCase();
-        if (errMsg.includes('grantee_type') || errMsg.includes('grantee_id') || errMsg.includes('user_group_id')) {
-          showToast(t('ساختار جدول استثناها نیاز به به‌روزرسانی دارد. کوئری مهاجرت را اجرا کنید.', 'Exceptions table schema needs migration. Please run migration query.'), 'error');
-          return;
-        }
-        showToast(t('خطا در ذخیره استثنا', 'Error saving exception'), 'error');
-      }
-    };
-
-    const deleteException = async (row) => {
-      if (!row) return;
-      setAccessPanel(prev => ({ ...prev, isLoading: true }));
-      try {
-        const { error } = await supabase.from('fm_fiscal_period_exceptions').delete().eq('id', row.id);
-        if (error) throw error;
-        await loadExceptionsForPeriod(accessPanel.period);
-        if (String(inlineExceptionEdit.id) === String(row.id)) {
-          cancelInlineExceptionEdit();
-        }
-        showToast(t('استثنا حذف شد.', 'Exception deleted.'));
-      } catch (err) {
-        console.error('deleteException error:', err);
-        setAccessPanel(prev => ({ ...prev, isLoading: false }));
-        showToast(t('خطا در حذف استثنا', 'Error deleting exception'), 'error');
       }
     };
 
@@ -778,29 +534,20 @@
       }, ...periodRows];
     }, [inlinePeriodEdit.isNew, periodInlineForm, periodRows]);
 
-    const exceptionGridData = useMemo(() => {
-      if (!inlineExceptionEdit.isNew) return accessPanel.rows;
-      return [{
-        id: '__new_exception__',
-        subjectType: exceptionInlineForm.subjectType,
-        accessTarget: exceptionInlineForm.subjectType === 'USER_GROUP' ? (groupsById.get(String(exceptionInlineForm.groupId))?.title || '-') : (exceptionInlineForm.userDisplay || '-'),
-        userName: exceptionInlineForm.userDisplay,
-        userUsername: exceptionInlineForm.userUsername,
-        groupId: exceptionInlineForm.groupId,
-        isActive: exceptionInlineForm.isActive
-      }, ...accessPanel.rows];
-    }, [accessPanel.rows, exceptionInlineForm, groupsById, inlineExceptionEdit.isNew]);
-
     const isEditingPeriodRow = useCallback((row) => {
       return inlinePeriodEdit.id && String(row?.id) === String(inlinePeriodEdit.id);
     }, [inlinePeriodEdit.id]);
 
-    const isEditingExceptionRow = useCallback((row) => {
-      return inlineExceptionEdit.id && String(row?.id) === String(inlineExceptionEdit.id);
-    }, [inlineExceptionEdit.id]);
+    const updateExceptionMarker = useCallback((periodId, hasActive) => {
+      setExceptionPeriodIds(prev => {
+        const next = new Set(prev);
+        if (hasActive) next.add(String(periodId));
+        else next.delete(String(periodId));
+        return next;
+      });
+    }, []);
 
     const periodColumns = [
-      
       {
         field: 'status',
         header_fa: 'وضعیت',
@@ -873,99 +620,16 @@
       }
     ];
 
-    const exceptionColumns = [
-      {
-        field: 'isActive',
-        header_fa: 'فعال',
-        header_en: 'Active',
-        width: '110px',
-        render: (val, row) => isEditingExceptionRow(row)
-          ? <ToggleField size="sm" checked={exceptionInlineForm.isActive} onChange={(v) => setExceptionInlineForm(prev => ({ ...prev, isActive: v }))} isRtl={isRtl} formCode={formCode} />
-          : (val ? <Badge variant="emerald">{t('فعال', 'Active')}</Badge> : <Badge variant="slate">{t('غیرفعال', 'Inactive')}</Badge>)
-      },
-      {
-        field: 'subjectType',
-        header_fa: 'نوع دسترسی',
-        header_en: 'Access Type',
-        width: '150px',
-        render: (val, row) => {
-          if (isEditingExceptionRow(row)) {
-            return (
-              <SelectField
-                size="sm"
-                value={exceptionInlineForm.subjectType}
-                onChange={(e) => setExceptionInlineForm(prev => ({
-                  ...prev,
-                  subjectType: e.target.value,
-                  userId: null,
-                  userDisplay: '',
-                  userUsername: '',
-                  groupId: null
-                }))}
-                options={[
-                  { value: 'USER', label: t('کاربر', 'User') },
-                  { value: 'USER_GROUP', label: t('گروه کاربری', 'User Group') }
-                ]}
-                isRtl={isRtl}
-                formCode={formCode}
-              />
-            );
-          }
+    const AccessPanelComponent = window.FiscalPeriodAccess || (() => null);
 
-          return val === 'USER_GROUP'
-            ? <Badge variant="indigo" className="inline-flex items-center gap-1"><UsersRound size={10} />{t('گروه کاربری', 'User Group')}</Badge>
-            : <Badge variant="blue" className="inline-flex items-center gap-1"><UserRoundCog size={10} />{t('کاربر', 'User')}</Badge>;
-        }
-      },
-      {
-        field: 'accessTarget',
-        header_fa: 'دسترسی برای',
-        header_en: 'Access Target',
-        width: '100px',
-        render: (val, row) => {
-          if (isEditingExceptionRow(row)) {
-            if (exceptionInlineForm.subjectType === 'USER') {
-              return (
-                <LOVField
-                  size="sm"
-                  data={activeUsers}
-                  columns={userLovColumns}
-                  displayValue={exceptionInlineForm.userDisplay}
-                  onChange={(userRow) => setExceptionInlineForm(prev => ({
-                    ...prev,
-                    userId: userRow?.id || null,
-                    userDisplay: userRow?.label || userRow?.username || '',
-                    userUsername: userRow?.username || ''
-                  }))}
-                  onClear={() => setExceptionInlineForm(prev => ({ ...prev, userId: null, userDisplay: '', userUsername: '' }))}
-                  dropdownWidth="min-w-[520px]"
-                  isRtl={isRtl}
-                  formCode={formCode}
-                />
-              );
-            }
-
-            return (
-              <SelectField
-                size="sm"
-                value={exceptionInlineForm.groupId || ''}
-                onChange={(e) => setExceptionInlineForm(prev => ({ ...prev, groupId: e.target.value || null }))}
-                options={activeUserGroups.map(g => ({ value: g.id, label: `${g.code ? `${g.code} - ` : ''}${g.title || g.id}` }))}
-                isRtl={isRtl}
-                formCode={formCode}
-              />
-            );
-          }
-
-          return (
-            <div className="flex flex-col py-0.5 w-full">
-              <span className="text-[12px] font-bold text-slate-800 dark:text-slate-200">{val || '-'}</span>
-              {row.subjectType === 'USER' && <span className="text-[10px] text-slate-400" dir="ltr">{row.userUsername || '-'}</span>}
-            </div>
-          );
-        }
-      },
-    ];
+    const openAccessPanel = async (periodRow) => {
+      if (!periodRow) return;
+      if (periodRow.status !== status.CLOSED) {
+        showToast(t('استثنا فقط برای دوره‌های بسته شده قابل تعریف است.', 'Exceptions are only available for closed periods.'), 'warning');
+        return;
+      }
+      setAccessPanelPeriod(periodRow);
+    };
 
     return (
       <>
@@ -979,14 +643,14 @@
           </div>
 
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
-            <div className={`flex flex-col bg-white dark:bg-slate-900 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm ${accessPanel.isVisible ? 'w-full md:w-7/12' : 'w-full'}`}>
+            <div className={`flex flex-col bg-white dark:bg-slate-900 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm ${accessPanelPeriod ? 'w-full md:w-7/12' : 'w-full'}`}>
               <div className="flex-1 min-h-0">
                 <DataGrid
                   data={periodGridData}
                   columns={periodColumns}
                   language={language}
                   selectable={true}
-                  activeRowId={accessPanel.period?.id || null}
+                  activeRowId={accessPanelPeriod?.id || null}
                   selectedIds={selectedPeriodIds}
                   onSelectChange={setSelectedPeriodIds}
                   isLoading={isLoading}
@@ -1032,7 +696,12 @@
                       tooltip: t('استثناهای دسترسی', 'Access Exceptions'),
                       hidden: (row) => String(row.id) === '__new__',
                       onClick: (row) => openAccessPanel(row),
-                      className: 'text-slate-400 hover:text-blue-600'
+                      className: (row) => {
+                        const hasActiveException = row?.status === status.CLOSED && exceptionPeriodIds.has(String(row?.id));
+                        return hasActiveException
+                          ? 'text-amber-500 hover:text-amber-600'
+                          : 'text-slate-400 hover:text-blue-600';
+                      }
                     },
                     {
                       icon: Trash2,
@@ -1071,75 +740,21 @@
               </div>
             </div>
 
-            {accessPanel.isVisible && (
-              <div className="w-full md:w-5/12 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 flex flex-col overflow-hidden animate-in slide-in-from-right-5 duration-200 relative z-10 shadow-sm">
-                <div className="absolute top-3 left-3">
-                  <button onClick={closeAccessPanel} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-500 transition-colors">
-                    <X size={14} />
-                  </button>
-                </div>
-
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900">
-                  <h3 className="font-black text-slate-800 dark:text-slate-100 text-[13px] mb-1.5 pr-6">{t('استثناهای دسترسی دوره بسته', 'Closed Period Access Exceptions')}</h3>
-                  <div className="text-[10px] text-slate-500 font-sans leading-tight flex items-center gap-1.5">
-                    <Badge variant="blue">{t('دوره انتخاب شده', 'Selected Period')}</Badge>
-                    <span className="font-sans" dir="ltr">{accessPanel.period?.periodCode || '-'}</span>
-                    <span className="mx-1">|</span>
-                    <span>{accessPanel.period?.title || '-'}</span>
-                  </div>
-                </div>
-
-                <div className="flex-1 min-h-0 p-3">
-                  <div className="h-full min-h-0 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                    <DataGrid
-                      data={exceptionGridData}
-                      columns={exceptionColumns}
-                      language={language}
-                      isLoading={accessPanel.isLoading}
-                      gridState={exceptionGridState}
-                      onGridStateChange={setExceptionGridState}
-                      hideImport
-                      hideExport
-                      onAdd={() => beginInlineExceptionEdit(null)}
-                      onRowDoubleClick={(row) => {
-                        if (String(row.id) === '__new_exception__') return;
-                        beginInlineExceptionEdit(row);
-                      }}
-                      formCode={formCode}
-                      actions={[
-                        {
-                          icon: Save,
-                          tooltip: t('ذخیره', 'Save'),
-                          hidden: (row) => !isEditingExceptionRow(row),
-                          onClick: () => saveInlineException(),
-                          className: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-slate-800 dark:hover:bg-slate-700 p-1.5 rounded transition-colors'
-                        },
-                        {
-                          icon: X,
-                          tooltip: t('لغو', 'Cancel'),
-                          hidden: (row) => !isEditingExceptionRow(row),
-                          onClick: () => cancelInlineExceptionEdit(),
-                          className: 'text-slate-500 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 p-1.5 rounded transition-colors'
-                        },
-                        {
-                          icon: Edit,
-                          tooltip: t('ویرایش', 'Edit'),
-                          hidden: (row) => String(row.id) === '__new_exception__' || isEditingExceptionRow(row),
-                          onClick: (row) => beginInlineExceptionEdit(row),
-                          className: 'text-slate-400 hover:text-indigo-600'
-                        },
-                        {
-                          icon: Trash2,
-                          tooltip: t('حذف', 'Delete'),
-                          hidden: (row) => String(row.id) === '__new_exception__' || isEditingExceptionRow(row),
-                          onClick: (row) => deleteException(row),
-                          className: 'text-slate-400 hover:text-red-600'
-                        }
-                      ]}
-                    />
-                  </div>
-                </div>
-              </div>
+            {accessPanelPeriod && (
+              <AccessPanelComponent
+                language={language}
+                formCode={formCode}
+                period={accessPanelPeriod}
+                status={status}
+                supabase={supabase}
+                users={users}
+                userGroups={userGroups}
+                showToast={showToast}
+                t={t}
+                isRtl={isRtl}
+                onClose={() => setAccessPanelPeriod(null)}
+                onExceptionMarkerChange={updateExceptionMarker}
+              />
             )}
           </div>
         </div>

@@ -49,6 +49,10 @@
     { value: STATUS.CLOSED, label_fa: 'بسته شده', label_en: 'Closed', badge: 'red' }
   ];
 
+  const getStatusMeta = (statusValue) => {
+    return STATUS_OPTIONS.find(s => s.value === statusValue) || STATUS_OPTIONS[0];
+  };
+
   const CALENDAR_OPTIONS = [
     { value: 'SHAMSI', label_fa: 'شمسی', label_en: 'Jalali' },
     { value: 'GREGORIAN', label_fa: 'میلادی', label_en: 'Gregorian' }
@@ -154,6 +158,7 @@
       calendarType: 'SHAMSI',
       startDate: '',
       endDate: '',
+      status: STATUS.NOT_OPENED,
       isActive: true
     });
 
@@ -180,6 +185,7 @@
       calendarType: r.calendar_type || 'SHAMSI',
       startDate: fromDash(r.start_date),
       endDate: fromDash(r.end_date),
+      status: r.status || STATUS.NOT_OPENED,
       isActive: r.is_active !== false,
       createdAt: r.created_at
     }));
@@ -276,6 +282,7 @@
           calendarType: row.calendarType || 'SHAMSI',
           startDate: row.startDate || '',
           endDate: row.endDate || '',
+          status: row.status || STATUS.NOT_OPENED,
           isActive: row.isActive !== false
         });
       } else {
@@ -285,6 +292,7 @@
           calendarType: 'SHAMSI',
           startDate: '',
           endDate: '',
+          status: STATUS.NOT_OPENED,
           isActive: true
         });
       }
@@ -336,6 +344,34 @@
         return false;
       }
 
+      if (!STATUS_OPTIONS.some(s => s.value === yearForm.status)) {
+        showToast(t('وضعیت سال مالی نامعتبر است.', 'Fiscal year status is invalid.'), 'error');
+        return false;
+      }
+
+      if (yearForm.id) {
+        const oldYear = fiscalYears.find(y => String(y.id) === String(yearForm.id));
+        if (oldYear && !canTransitionStatus(oldYear.status || STATUS.NOT_OPENED, yearForm.status)) {
+          showToast(
+            t('تغییر وضعیت سال مالی مجاز نیست. فقط مسیرهای باز نشده→باز، باز→بسته و بسته→باز مجاز است.', 'Fiscal year status transition is not allowed. Allowed paths: Not Opened->Open, Open->Closed, Closed->Open.'),
+            'error'
+          );
+          return false;
+        }
+
+        if (yearForm.status === STATUS.CLOSED) {
+          const relatedPeriods = periods.filter(p => String(p.fiscalYearId) === String(yearForm.id));
+          const hasOpenOrNotOpened = relatedPeriods.some(p => (p.status || STATUS.NOT_OPENED) !== STATUS.CLOSED);
+          if (hasOpenOrNotOpened) {
+            showToast(
+              t('تا وقتی همه دوره‌های این سال مالی بسته نشده‌اند، امکان بستن سال مالی وجود ندارد.', 'Fiscal year cannot be closed until all related periods are closed.'),
+              'error'
+            );
+            return false;
+          }
+        }
+      }
+
       const draftRows = fiscalYears
         .filter(y => String(y.id) !== String(yearForm.id || ''))
         .concat([{ ...yearForm }]);
@@ -354,6 +390,22 @@
       return true;
     };
 
+    const allowedYearStatusOptions = useMemo(() => {
+      if (!yearForm.id) return STATUS_OPTIONS;
+      const oldYear = fiscalYears.find(y => String(y.id) === String(yearForm.id));
+      const baseStatus = oldYear?.status || STATUS.NOT_OPENED;
+      const relatedPeriods = periods.filter(p => String(p.fiscalYearId) === String(yearForm.id));
+      const canCloseYear = relatedPeriods.every(p => (p.status || STATUS.NOT_OPENED) === STATUS.CLOSED);
+
+      return STATUS_OPTIONS
+        .filter(opt => opt.value === baseStatus || canTransitionStatus(baseStatus, opt.value))
+        .filter(opt => {
+          if (opt.value !== STATUS.CLOSED) return true;
+          if (baseStatus === STATUS.CLOSED) return true;
+          return canCloseYear;
+        });
+    }, [fiscalYears, periods, yearForm.id]);
+
     const saveYear = async () => {
       if (!validateYearForm()) return;
 
@@ -364,6 +416,7 @@
           calendar_type: yearForm.calendarType,
           start_date: toDash(yearForm.startDate),
           end_date: toDash(yearForm.endDate),
+          status: yearForm.status,
           is_active: yearForm.isActive,
           updated_at: new Date().toISOString()
         };
@@ -462,6 +515,16 @@
         render: (val) => val
           ? <Badge variant="emerald">{t('فعال', 'Active')}</Badge>
           : <Badge variant="slate">{t('غیرفعال', 'Inactive')}</Badge>
+      },
+      {
+        field: 'status',
+        header_fa: 'وضعیت',
+        header_en: 'Status',
+        width: '120px',
+        render: (val) => {
+          const meta = getStatusMeta(val);
+          return <Badge variant={meta.badge}>{isRtl ? meta.label_fa : meta.label_en}</Badge>;
+        }
       }
     ];
 
@@ -613,19 +676,25 @@
                 formCode={formCode}
               />
 
-              <div className="md:col-span-2">
-                <div className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t('فعال', 'Active')}</div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg px-4 py-3 border border-slate-200 dark:border-slate-700">
-                  <ToggleField
-                    size="sm"
-                    label={t('این سال مالی فعال باشد', 'Keep this fiscal year active')}
-                    checked={yearForm.isActive}
-                    onChange={(v) => setYearForm(prev => ({ ...prev, isActive: v }))}
-                    isRtl={isRtl}
-                    formCode={formCode}
-                  />
-                </div>
-              </div>
+              <SelectField
+                size="sm"
+                label={t('وضعیت سال مالی', 'Fiscal Year Status')}
+                value={yearForm.status}
+                onChange={(e) => setYearForm(prev => ({ ...prev, status: e.target.value }))}
+                options={allowedYearStatusOptions.map(s => ({ value: s.value, label: isRtl ? s.label_fa : s.label_en }))}
+                required
+                isRtl={isRtl}
+                formCode={formCode}
+              />
+
+              <ToggleField
+                size="sm"
+                label={t('سال مالی فعال است', 'Active')}
+                checked={yearForm.isActive}
+                onChange={(v) => setYearForm(prev => ({ ...prev, isActive: v }))}
+                isRtl={isRtl}
+                formCode={formCode}
+              />
             </div>
 
             <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
