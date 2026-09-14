@@ -550,6 +550,8 @@
           Link2,
           UserRound,
           Database,
+          ArrowLeft,
+          ArrowRight,
           LOVField: safeComp(Grid, 'LOVField'),
         },
       })
@@ -577,7 +579,6 @@
 
         {viewMode === 'list' && (
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-            <AdvancedFilter fields={stateMachineFilterFields} initialValues={stateMachineFilters} onFilter={setStateMachineFilters} onClear={() => setStateMachineFilters({})} language={language} />
 
             <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
               {!isStateMachineTableReady ? (
@@ -605,7 +606,11 @@
           </div>
         )}
 
-        {viewMode === 'design' && design.designContent}
+        {viewMode === 'design' && (
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {design.designContent}
+          </div>
+        )}
         {design.settingsModals}
 
         <Modal isOpen={machineEditor.isOpen} onClose={closeMachineEditor} title={machineEditor.mode === 'edit' ? t('ویرایش روال', 'Edit State Machine') : t('ایجاد روال جدید', 'Create State Machine')} language={language} width="max-w-3xl">

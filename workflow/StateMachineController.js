@@ -830,6 +830,8 @@
       entityLabelByCode,
       Sparkles: controls.Sparkles,
       Button: controls.Button,
+      BackIcon: isRtl ? controls.ArrowRight : controls.ArrowLeft,
+      onBackToList: requestBackToList,
       currentTypeDirty,
       isLoading,
       Save: controls.Save,

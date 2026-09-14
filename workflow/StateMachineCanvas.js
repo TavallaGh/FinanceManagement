@@ -336,6 +336,8 @@
       entityLabelByCode,
       Sparkles,
       Button,
+      BackIcon,
+      onBackToList,
       currentTypeDirty,
       isLoading,
       Save,
@@ -375,28 +377,27 @@
       <>
         {activeMachine && (
           <div className="mt-2 rounded-xl border border-indigo-200 dark:border-indigo-700 bg-indigo-50/70 dark:bg-indigo-950/30 px-3 py-2 text-[12px] text-indigo-900 dark:text-indigo-100">
-            <span className="font-bold">{t('روال', 'Machine')}:</span> {activeMachine.machine_title || activeMachine.machine_code || '-'}
-            {' | '}
-            <span className="font-bold">{t('موجودیت', 'Entity')}:</span> {entityLabelByCode[activeMachine.entity_code] || activeMachine.entity_code || '-'}
-            {' | '}
-            <span className="font-bold">{t('شرط ورود', 'Entry Condition')}:</span> {activeMachine.entry_condition_text || '-'}
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+                <Button size="sm" variant="outline" icon={BackIcon} onClick={onBackToList}>{t('بازگشت به لیست', 'Back To List')}</Button>
+                <div id="state-machine-design-header" className="min-w-0">
+                  <span className="font-bold">{t('روال', 'Machine')}:</span> {activeMachine.machine_title || activeMachine.machine_code || '-'}
+                  {' | '}
+                  <span className="font-bold">{t('موجودیت', 'Entity')}:</span> {entityLabelByCode[activeMachine.entity_code] || activeMachine.entity_code || '-'}
+                  {' | '}
+                  <span className="font-bold">{t('شرط ورود', 'Entry Condition')}:</span> {activeMachine.entry_condition_text || '-'}
+                </div>
+              </div>
+              <div className="shrink-0 flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" icon={Sparkles} onClick={onAutoLayout}>{t('مرتب سازی چیدمان', 'Auto Layout')}</Button>
+                <Button size="sm" variant="outline" onClick={onCancel} disabled={!currentTypeDirty || isLoading}>{t('لغو', 'Cancel')}</Button>
+                <Button size="sm" variant={currentTypeDirty ? 'primary' : 'outline'} icon={Save} isLoading={isLoading} disabled={!currentTypeDirty || isLoading} onClick={() => onSave()}>
+                  {t('ذخیره طراحی روال', 'Save Machine Design')}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
-
-        <div className="mt-2">
-          <div className="flex items-center justify-between gap-3">
-            <div id="state-machine-design-header" className="flex-1 min-w-0 text-[12px] text-slate-600 dark:text-slate-300 font-semibold">
-              {t('در حال طراحی روال انتخاب‌شده', 'Designing selected state machine')}
-            </div>
-            <div className="shrink-0 flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" icon={Sparkles} onClick={onAutoLayout}>{t('مرتب سازی چیدمان', 'Auto Layout')}</Button>
-              <Button size="sm" variant="outline" onClick={onCancel} disabled={!currentTypeDirty || isLoading}>{t('لغو', 'Cancel')}</Button>
-              <Button size="sm" variant={currentTypeDirty ? 'primary' : 'outline'} icon={Save} isLoading={isLoading} disabled={!currentTypeDirty || isLoading} onClick={() => onSave()}>
-                {t('ذخیره طراحی روال', 'Save Machine Design')}
-              </Button>
-            </div>
-          </div>
-        </div>
 
         <div id="state-machine-design-panel" role="tabpanel" aria-labelledby="state-machine-design-header" className="flex-1 min-h-0 flex flex-row gap-3">
           <div className="w-[125px] sm:w-[140px] shrink-0 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 p-2 overflow-auto custom-scrollbar">
