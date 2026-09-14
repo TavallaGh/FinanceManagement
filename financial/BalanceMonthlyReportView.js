@@ -768,6 +768,7 @@
             idField: '_rowId',
             parentField: '_parentRowId',
             columns,
+            defaultPinnedCols: ['_title', '_currency'],
             actions: [],
             selectable: false,
             language,
