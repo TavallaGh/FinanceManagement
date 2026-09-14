@@ -1,4 +1,4 @@
-/* Filename: financial/BalanceMonthlyReport.js */
+/* Filename: financial/BalanceMonthlyReportView.js */
 (() => {
   const React = window.React;
   const { useState, useEffect, useMemo, useCallback, useRef } = React;
@@ -207,7 +207,7 @@
     );
   };
 
-  const BalanceMonthlyReport = ({
+  const BalanceMonthlyReportView = ({
     language,
     formCode,
     isRtl,
@@ -892,5 +892,5 @@
     );
   };
 
-  window.BalanceMonthlyReport = BalanceMonthlyReport;
+  window.BalanceMonthlyReportView = BalanceMonthlyReportView;
 })();

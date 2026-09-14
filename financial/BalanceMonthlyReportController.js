@@ -652,7 +652,7 @@
   const FallbackComponent = () => null;
 
   const BalanceMonthlyReport = ({ language = 'fa', formCode = 'FIN_BALANCE_MONTHLY_REPORT' }) => {
-    const View = window.BalanceMonthlyReport || FallbackComponent;
+    const View = window.BalanceMonthlyReportView || FallbackComponent;
     const controller = useBalanceMonthlyReportController({ language, formCode });
 
     return React.createElement(View, {
