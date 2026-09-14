@@ -40,14 +40,6 @@
     pad2 = (n) => String(n).padStart(2, '0'),
     normalizeSlashDate = (v) => String(v || '').replace(/-/g, '/'),
     normalizeDashDate = (v) => String(v || '').replace(/\//g, '-'),
-    monthLabel = (year, month) => `${month}/${year}`,
-    currentCalYear = () => new Date().getFullYear(),
-    slotTargetDate = (year, month, day) => {
-      const d = String(day || '01').toUpperCase() === 'LAST' ? '31' : String(day || '01').padStart(2, '0');
-      const slash = `${year}/${String(month).padStart(2, '0')}/${d}`;
-      return { slash, dash: slash.replace(/\//g, '-') };
-    },
-    prevMonthSlot = (year, month) => (month <= 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }),
     fmt = (num) => {
       if (num === null || num === undefined) return '—';
       const v = parseFloat(num);
@@ -288,15 +280,16 @@
       return raw || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
     }, [secCtx, formCode]);
 
-    const curYear = useMemo(() => currentCalYear(cal), [cal]);
-
     // ── Filter state ───────────────────────────────────────────────────────
-    const [filters,   setFilters]   = useState({ report_day: 'LAST', currency: null, show_movements: false });
-    const [fYears,    setFYears]    = useState(() => new Set([String(curYear)]));
+    const [filters,   setFilters]   = useState({ currency: null, show_movements: false });
+    const [fYears,    setFYears]    = useState(() => new Set());
     const [fMonths,   setFMonths]   = useState(() => new Set());
 
     // ── Data / UI state ────────────────────────────────────────────────────
     const [currencies,   setCurrencies]   = useState([]);
+    const [fiscalYears,  setFiscalYears]  = useState([]);
+    const [fiscalPeriods, setFiscalPeriods] = useState([]);
+    const [loadingFiscalFilters, setLoadingFiscalFilters] = useState(false);
     const [fullAccountTree, setFullAccountTree] = useState([]);
     const [accountMap,   setAccountMap]   = useState(new Map());
     const [selectedIds,  setSelectedIds]  = useState(new Set());
@@ -329,6 +322,70 @@
       supabase.from('fm_currencies').select('id, code, title, symbol').order('code')
         .then(({ data }) => setCurrencies(data || []));
     }, []);
+
+    // ── Load fiscal years / periods for advanced filters ───────────────────
+    useEffect(() => {
+      if (!supabase) return;
+      let cancelled = false;
+
+      const loadFiscalFilterData = async () => {
+        setLoadingFiscalFilters(true);
+        try {
+          const [yearsRes, periodsRes] = await Promise.all([
+            supabase
+              .from('fm_fiscal_years')
+              .select('id, year_code, calendar_type, start_date, end_date, status, is_active')
+              .eq('is_active', true)
+              .order('start_date', { ascending: false }),
+            supabase
+              .from('fm_fiscal_periods')
+              .select('id, fiscal_year_id, period_code, title, start_date, end_date, sort_order, status, is_active')
+              .eq('is_active', true)
+              .order('start_date', { ascending: true })
+          ]);
+
+          if (yearsRes.error) throw yearsRes.error;
+          if (periodsRes.error) throw periodsRes.error;
+          if (cancelled) return;
+
+          const mappedYears = (yearsRes.data || []).map((y) => ({
+            id: y.id,
+            yearCode: y.year_code,
+            calendarType: y.calendar_type || 'SHAMSI',
+            startDate: normalizeSlashDate(y.start_date),
+            endDate: normalizeSlashDate(y.end_date),
+            status: y.status || 'NOT_OPENED',
+            isActive: y.is_active !== false,
+          }));
+
+          const mappedPeriods = (periodsRes.data || []).map((p) => ({
+            id: p.id,
+            fiscalYearId: p.fiscal_year_id,
+            periodCode: p.period_code || '',
+            title: p.title || '',
+            startDate: normalizeSlashDate(p.start_date),
+            endDate: normalizeSlashDate(p.end_date),
+            sortOrder: p.sort_order || 0,
+            status: p.status || 'NOT_OPENED',
+            isActive: p.is_active !== false,
+          }));
+
+          setFiscalYears(mappedYears);
+          setFiscalPeriods(mappedPeriods);
+        } catch (e) {
+          console.error('BalanceMonthlyReport: load fiscal filters error', e);
+          showToast(
+            t('خطا در بارگذاری سال‌ها و دوره‌های مالی.', 'Error loading fiscal years and fiscal periods.'),
+            'error'
+          );
+        } finally {
+          if (!cancelled) setLoadingFiscalFilters(false);
+        }
+      };
+
+      loadFiscalFilterData();
+      return () => { cancelled = true; };
+    }, [supabase, showToast, t, normalizeSlashDate]);
 
     // ── Load account tree ──────────────────────────────────────────────────
     const loadTree = useCallback(async () => {
@@ -370,33 +427,79 @@
 
     const reportTree = useMemo(() => (showInactiveAccounts ? fullAccountTree : accountTree), [showInactiveAccounts, fullAccountTree, accountTree]);
 
-    // ── Year / month derivations ───────────────────────────────────────────
-    const yearsRange = useMemo(() => {
-      const res = [];
-      for (let y = curYear - 5; y <= curYear + 3; y++) res.push(y);
-      return res;
-    }, [curYear]);
+    // ── Fiscal year / period derivations ───────────────────────────────────
+    const todaySlash = useMemo(() => {
+      const d = new Date();
+      return `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}`;
+    }, [pad2]);
+
+    const yearMap = useMemo(
+      () => new Map((fiscalYears || []).map((y) => [String(y.id), y])),
+      [fiscalYears]
+    );
+
+    const defaultYearId = useMemo(() => {
+      if (!fiscalYears.length) return null;
+
+      const containing = fiscalYears.find((y) => {
+        const from = String(y.startDate || '');
+        const to = String(y.endDate || '');
+        return from && to && todaySlash >= from && todaySlash <= to;
+      });
+      if (containing?.id) return String(containing.id);
+
+      return String(fiscalYears[0].id);
+    }, [fiscalYears, todaySlash]);
+
+    useEffect(() => {
+      const validIds = new Set((fiscalYears || []).map((y) => String(y.id)));
+      setFYears((prev) => {
+        const kept = new Set([...prev].filter((id) => validIds.has(String(id))));
+        if (kept.size > 0) return kept;
+        return defaultYearId ? new Set([String(defaultYearId)]) : kept;
+      });
+    }, [fiscalYears, defaultYearId]);
 
     const availableMonths = useMemo(() => {
-      const sorted = Array.from(fYears).map(Number).sort();
-      const res = [];
-      sorted.forEach(y => {
-        for (let m = 1; m <= 12; m++) {
-          res.push({ key: `${y}/${pad2(m)}`, year: y, month: m, label: monthLabel(y, m, cal, isRtl) });
-        }
-      });
-      return res;
-    }, [fYears, cal, isRtl]);
+      const selectedYearIds = new Set(Array.from(fYears || []).map(String));
+      return (fiscalPeriods || [])
+        .filter((p) => selectedYearIds.has(String(p.fiscalYearId)))
+        .sort((a, b) => {
+          const byStart = String(a.startDate || '').localeCompare(String(b.startDate || ''));
+          if (byStart !== 0) return byStart;
+          const byOrder = Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+          if (byOrder !== 0) return byOrder;
+          return String(a.periodCode || '').localeCompare(String(b.periodCode || ''));
+        })
+        .map((p) => {
+          const periodTitle = String(p.title || '').trim() || String(p.periodCode || '').trim() || t('دوره بدون عنوان', 'Untitled Period');
+          return {
+            key: String(p.id),
+            periodId: String(p.id),
+            fiscalYearId: String(p.fiscalYearId),
+            periodFrom: normalizeSlashDate(p.startDate),
+            periodTo: normalizeSlashDate(p.endDate),
+            label: periodTitle,
+          };
+        });
+    }, [fYears, fiscalPeriods, t, normalizeSlashDate]);
 
-    const toggleYear = useCallback((year) => {
-      const yStr = String(year);
+    useEffect(() => {
+      const validPeriodIds = new Set((availableMonths || []).map((m) => String(m.key)));
+      setFMonths((prev) => new Set([...prev].filter((id) => validPeriodIds.has(String(id)))));
+    }, [availableMonths]);
+
+    const toggleYear = useCallback((yearId) => {
+      const yStr = String(yearId);
       setFYears(prev => {
         const next = new Set(prev);
         if (next.has(yStr)) {
           next.delete(yStr);
           setFMonths(pm => {
             const nm = new Set(pm);
-            [...nm].filter(k => k.startsWith(`${yStr}/`)).forEach(k => nm.delete(k));
+            (availableMonths || [])
+              .filter((p) => String(p.fiscalYearId) === yStr)
+              .forEach((p) => nm.delete(String(p.key)));
             return nm;
           });
         } else {
@@ -404,7 +507,7 @@
         }
         return next;
       });
-    }, []);
+    }, [availableMonths]);
 
     const toggleMonth = useCallback((key) =>
       setFMonths(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; }), []);
@@ -472,7 +575,7 @@
     // ── Generate report ────────────────────────────────────────────────────
     const handleGenerate = useCallback(async () => {
       if (fMonths.size === 0) {
-        showToast(t('لطفاً حداقل یک ماه انتخاب کنید.', 'Please select at least one month.'), 'warning');
+        showToast(t('لطفاً حداقل یک دوره مالی انتخاب کنید.', 'Please select at least one fiscal period.'), 'warning');
         return;
       }
       if (selectedIds.size === 0) {
@@ -487,8 +590,8 @@
         const result = await generateMonthlyReportData({
           supabase,
           filters,
-          availableMonths,
-          fMonths,
+          availablePeriods: availableMonths,
+          fPeriods: fMonths,
           cal,
           currencies,
           accountMap,
@@ -498,7 +601,7 @@
         });
 
         if (result?.kind === 'invalid_months') {
-          showToast(t('ماه‌های انتخابی نامعتبر هستند.', 'Invalid selected months.'), 'warning');
+          showToast(t('دوره‌های انتخابی نامعتبر هستند.', 'Invalid selected periods.'), 'warning');
           return;
         }
 
@@ -535,6 +638,7 @@
       currentState: () => ({
         filters,
         fYears:    Array.from(fYears),
+        fPeriods:  Array.from(fMonths),
         fMonths:   Array.from(fMonths),
         selIds:    Array.from(selectedIds),
         showInactiveAccounts,
@@ -542,8 +646,8 @@
       }),
       onApplyState: (state) => {
         if (!state) {
-          setFilters({ report_day: 'LAST', currency: null, show_movements: false });
-          setFYears(new Set([String(curYear)]));
+          setFilters({ currency: null, show_movements: false });
+          setFYears(defaultYearId ? new Set([String(defaultYearId)]) : new Set());
           setFMonths(new Set());
           setSelectedIds(new Set());
           setShowInactiveAccounts(false);
@@ -553,18 +657,13 @@
         }
         if (state.filters) setFilters(state.filters);
         if (state.fYears)  setFYears(new Set(state.fYears));
-        if (state.fMonths) setFMonths(new Set(state.fMonths));
+        if (state.fPeriods) setFMonths(new Set(state.fPeriods));
+        else if (state.fMonths) setFMonths(new Set(state.fMonths));
         if (state.selIds)  setSelectedIds(new Set(state.selIds));
         if (typeof state.showInactiveAccounts === 'boolean') setShowInactiveAccounts(state.showInactiveAccounts);
         if (state.gridState) setGridState(state.gridState);
       },
-    }), [filters, fYears, fMonths, selectedIds, showInactiveAccounts, gridState, curYear]);
-
-    const dayOptions = useMemo(() => {
-      const opts = [{ value: 'LAST', label: t('آخرین روز ماه', 'Last Day of Month') }];
-      for (let i = 1; i <= 31; i++) opts.push({ value: String(i), label: String(i) });
-      return opts;
-    }, [t]);
+    }), [filters, fYears, fMonths, selectedIds, showInactiveAccounts, gridState, defaultYearId]);
 
     const currencyLovData = useMemo(() => (currencies || []).map(c => ({
       ...c,
@@ -577,18 +676,24 @@
       { field: 'symbol', header_fa: 'نماد', header_en: 'Symbol', width: '70px' },
     ], []);
 
-    const yearOptions = useMemo(() => yearsRange.map(y => ({ value: String(y), label: String(y) })), [yearsRange]);
+    const yearOptions = useMemo(() =>
+      (fiscalYears || [])
+        .map((y) => {
+          const calTitle = y.calendarType === 'GREGORIAN'
+            ? t('میلادی', 'Gregorian')
+            : t('شمسی', 'Jalali');
+          return {
+            value: String(y.id),
+            label: `${y.yearCode || '-'} (${calTitle})`
+          };
+        }),
+      [fiscalYears, t]
+    );
     const monthOptions = useMemo(() => availableMonths.map(m => ({ value: m.key, label: m.label })), [availableMonths]);
     const yearSummary = useMemo(() => fYears.size > 0 ? t(`${fYears.size} سال انتخاب شده`, `${fYears.size} years selected`) : t('انتخاب سال‌ها', 'Select years'), [fYears, t]);
-    const monthSummary = useMemo(() => fMonths.size > 0 ? t(`${fMonths.size} ماه انتخاب شده`, `${fMonths.size} months selected`) : t('انتخاب ماه‌ها', 'Select months'), [fMonths, t]);
+    const monthSummary = useMemo(() => fMonths.size > 0 ? t(`${fMonths.size} دوره انتخاب شده`, `${fMonths.size} periods selected`) : t('انتخاب دوره‌ها', 'Select periods'), [fMonths, t]);
 
     const advancedFilterFields = useMemo(() => ([
-      {
-        name: 'report_day',
-        label: t('روز گزارش', 'Report Day'),
-        type: 'select',
-        options: dayOptions,
-      },
       {
         name: 'currency',
         label: t('ارز', 'Currency'),
@@ -606,29 +711,30 @@
             label: t('سال‌ها', 'Years'),
             options: yearOptions,
             selected: fYears,
-            onToggle: (yearStr) => toggleYear(Number(yearStr)),
+            onToggle: toggleYear,
             onSelectAll: () => setFYears(new Set(yearOptions.map(o => String(o.value)))),
             onClear: () => { setFYears(new Set()); setFMonths(new Set()); },
-            summary: yearSummary,
+            summary: loadingFiscalFilters ? t('در حال بارگذاری...', 'Loading...') : yearSummary,
             isRtl,
+            disabled: loadingFiscalFilters,
           })
         )
       },
       {
         name: 'f_months',
-        label: t('ماه‌ها', 'Months'),
+        label: t('دوره‌های مالی', 'Fiscal Periods'),
         type: 'custom',
         render: ({ key }) => React.createElement('div', { key, className: 'w-full min-w-0' },
           React.createElement(MultiSelectDropdown, {
-            label: t('ماه‌ها', 'Months'),
+            label: t('دوره‌های مالی', 'Fiscal Periods'),
             options: monthOptions,
             selected: fMonths,
             onToggle: toggleMonth,
             onSelectAll: () => setFMonths(new Set(monthOptions.map(o => String(o.value)))),
             onClear: () => setFMonths(new Set()),
-            summary: monthSummary,
+            summary: loadingFiscalFilters ? t('در حال بارگذاری...', 'Loading...') : monthSummary,
             isRtl,
-            disabled: fYears.size === 0,
+            disabled: loadingFiscalFilters || fYears.size === 0,
           })
         )
       },      
@@ -637,10 +743,9 @@
         label: t('نمایش واریز/ برداشت', 'Show Deposit/Withdrawal'),
         type: 'toggle',
       }
-    ]), [t, dayOptions, currencyLovData, currencyLovCols, yearOptions, monthOptions, yearSummary, monthSummary, fYears, isRtl, toggleYear, toggleMonth]);
+    ]), [t, currencyLovData, currencyLovCols, yearOptions, monthOptions, yearSummary, monthSummary, fYears, isRtl, toggleYear, toggleMonth, loadingFiscalFilters]);
 
     const advancedFilterValues = useMemo(() => ({
-      report_day: filters.report_day || 'LAST',
       currency: filters.currency || null,
       show_movements: !!filters.show_movements,
     }), [filters]);
@@ -648,7 +753,6 @@
     const handleAdvancedFilterChange = useCallback((vals) => {
       setFilters(prev => ({
         ...prev,
-        report_day: vals?.report_day || 'LAST',
         currency: vals?.currency || null,
         show_movements: !!vals?.show_movements,
       }));
@@ -808,12 +912,12 @@
     }, [reportData, openCellDrill, t]);
 
     const handleClearFilters = useCallback(() => {
-      setFilters({ report_day: 'LAST', currency: null, show_movements: false });
-      setFYears(new Set([String(curYear)]));
+      setFilters({ currency: null, show_movements: false });
+      setFYears(defaultYearId ? new Set([String(defaultYearId)]) : new Set());
       setFMonths(new Set());
       setReportData(null);
       setGridState(null);
-    }, [curYear]);
+    }, [defaultYearId]);
 
     // ── Settings modal ─────────────────────────────────────────────────────
     const renderSettings = () =>
@@ -944,8 +1048,8 @@
       const toolbarStartContent = React.createElement('div', { className: 'flex items-center gap-2 px-1' },        
         React.createElement('span', { className: 'text-[12px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold' },
           t(
-            `${selectedLeafCount} حساب انتخابی · ${slots.length} ماه`,
-            `${selectedLeafCount} selected accounts · ${slots.length} months`
+            `${selectedLeafCount} حساب انتخابی · ${slots.length} دوره`,
+            `${selectedLeafCount} selected accounts · ${slots.length} periods`
           )
         )
       );
@@ -1065,8 +1169,8 @@
                   React.createElement(EmptyState, {
                     title: t('گزارش تولید نشده', 'Report Not Generated'),
                     description: t(
-                      'ماه‌ها را انتخاب کنید، از «تنظیمات گزارش» حساب‌ها را تعیین کنید، سپس «جستجو» را بزنید.',
-                      'Select months, configure accounts via "Report Settings", then click "Search".'
+                      'دوره‌های مالی را انتخاب کنید، از «تنظیمات گزارش» حساب‌ها را تعیین کنید، سپس «جستجو» را بزنید.',
+                      'Select fiscal periods, configure accounts via "Report Settings", then click "Search".'
                     ),
                     language,
                     action: null

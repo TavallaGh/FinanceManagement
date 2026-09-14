@@ -340,8 +340,8 @@
   const generateMonthlyReportData = async ({
     supabase,
     filters,
-    availableMonths,
-    fMonths,
+    availablePeriods,
+    fPeriods,
     cal,
     currencies,
     accountMap,
@@ -349,22 +349,24 @@
     selectedIds,
     isRtl,
   }) => {
-    const selectedReportDay = filters?.report_day || 'LAST';
     const showMovements = !!filters?.show_movements;
 
-    const slots = (availableMonths || [])
-      .filter((m) => fMonths.has(m.key))
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map((m) => {
-        const prev = prevMonthSlot(m.year, m.month);
-        const periodFrom = slotTargetDate(prev.year, prev.month, selectedReportDay, cal);
-        const periodTo = slotTargetDate(m.year, m.month, selectedReportDay, cal);
+    const slots = (availablePeriods || [])
+      .filter((p) => fPeriods.has(p.key))
+      .sort((a, b) => {
+        const byStart = String(a.periodFrom || '').localeCompare(String(b.periodFrom || ''));
+        if (byStart !== 0) return byStart;
+        return String(a.key || '').localeCompare(String(b.key || ''));
+      })
+      .map((p) => {
+        const periodFrom = normalizeSlashDate(p.periodFrom);
+        const periodTo = normalizeSlashDate(p.periodTo);
         return {
-          ...m,
-          targetDate: periodTo.slash,
-          targetRateDate: periodTo.dash,
-          periodFrom: periodFrom.slash,
-          periodTo: periodTo.slash,
+          ...p,
+          targetDate: periodTo,
+          targetRateDate: normalizeDashDate(periodTo),
+          periodFrom,
+          periodTo,
         };
       });
 
