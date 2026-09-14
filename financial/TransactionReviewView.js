@@ -38,6 +38,7 @@
     groupedCostRows: [],
     groupedIncomeRows: [],
     groupedCenterRows: [],
+    groupedAccountRows: [],
   }));
 
   const fmt = (num) => {
@@ -75,6 +76,8 @@
       date_to: formatLocalIsoDate(today),
       account_filter_type: 'balance_group',
       filter_value: null,
+      transaction_types: [],
+      document_statuses: [],
       summary_currency: false,
     };
   };
@@ -133,6 +136,7 @@
     const [costsGridState, setCostsGridState] = useState(null);
     const [incomesGridState, setIncomesGridState] = useState(null);
     const [centersGridState, setCentersGridState] = useState(null);
+    const [accountsGridState, setAccountsGridState] = useState(null);
 
     useEffect(() => {
       setItemsGridState(prev => {
@@ -153,6 +157,7 @@
         costsGridState,
         incomesGridState,
         centersGridState,
+        accountsGridState,
       }),
       onApplyState: (state) => {
         if (!state) {
@@ -163,6 +168,7 @@
           setCostsGridState(null);
           setIncomesGridState(null);
           setCentersGridState(null);
+          setAccountsGridState(null);
           return;
         }
         if (state.filterState) setFilterState(state.filterState);
@@ -172,8 +178,9 @@
         if (state.costsGridState) setCostsGridState(state.costsGridState);
         if (state.incomesGridState) setIncomesGridState(state.incomesGridState);
         if (state.centersGridState) setCentersGridState(state.centersGridState);
+        if (state.accountsGridState) setAccountsGridState(state.accountsGridState);
       },
-    }), [activeTab, filterState, itemsGridState, documentsGridState, costsGridState, incomesGridState, centersGridState, setActiveTab, setFilterState]);
+    }), [activeTab, filterState, itemsGridState, documentsGridState, costsGridState, incomesGridState, centersGridState, accountsGridState, setActiveTab, setFilterState]);
 
     const COST_TYPE_LOOKUP = useMemo(() => new Map((lookups.costTypes || []).map(item => [String(item.id), item])), [lookups.costTypes]);
     const INCOME_TYPE_LOOKUP = useMemo(() => new Map((lookups.incomeTypes || []).map(item => [String(item.id), item])), [lookups.incomeTypes]);
@@ -335,11 +342,13 @@
       groupedCostRows,
       groupedIncomeRows,
       groupedCenterRows,
+      groupedAccountRows,
     } = useTransactionReviewAnalyticsModel({
       itemsGridData,
       t,
       isRtl,
       lookups,
+      accountsMap,
       fmt,
     });
 
@@ -349,7 +358,7 @@
           return React.createElement('span', { className: 'text-[12px] font-black text-slate-800 dark:text-slate-100' }, val || '-');
         }
         if (row._nodeType === 'group') {
-          return React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-200' }, val || '-');
+          return React.createElement('span', { className: 'text-[12px] text-slate-300 dark:text-slate-600' }, '');
         }
         return React.createElement('button', {
           type: 'button',
@@ -359,17 +368,21 @@
         }, val || '-');
       }},
       { field: '_tx_type', header_fa: 'نوع سند', header_en: 'Doc Type', width: '130px', render: (val, row) => {
-        if (row._nodeType && row._nodeType !== 'item') return React.createElement('span', { className: 'text-[12px] font-semibold text-slate-600 dark:text-slate-300' }, val || '-');
+        if (row._nodeType && row._nodeType !== 'item') return React.createElement('span', { className: 'text-[12px]' }, '');
         return React.createElement('span', { className: 'text-[12px]' }, txTypes[val] || val || '-');
       }},
-      { field: '_doc_date', header_fa: 'تاریخ سند', header_en: 'Doc Date', width: '90px', render: (val) => React.createElement('span', { className: 'text-[12px]' }, fmtDate(val) || '-') },
-      { field: '_tx_status', header_fa: 'وضعیت سند', header_en: 'Document Status', width: '95px', render: (val) => {
+      { field: '_doc_date', header_fa: 'تاریخ سند', header_en: 'Doc Date', width: '90px', render: (val, row) => {
+        if (row._nodeType && row._nodeType !== 'item') return React.createElement('span', { className: 'text-[12px]' }, '');
+        return React.createElement('span', { className: 'text-[12px]' }, fmtDate(val) || '-');
+      }},
+      { field: '_tx_status', header_fa: 'وضعیت سند', header_en: 'Document Status', width: '95px', render: (val, row) => {
+        if (row._nodeType && row._nodeType !== 'item') return React.createElement('span', { className: 'text-[12px]' }, '');
         const label = statusLabels[val] || val || '-';
         return React.createElement(Badge, { variant: statusColors[val] || 'gray', size: 'sm' }, label);
       }},
       { field: 'row_number', header_fa: 'ردیف', header_en: 'Row', width: '60px', render: (val, row, rowIndex) => {
         if (row._nodeType && row._nodeType !== 'item') {
-          return React.createElement('span', { className: 'text-[12px] font-medium text-slate-600 dark:text-slate-400' }, '-');
+          return React.createElement('span', { className: 'text-[12px] font-medium text-slate-600 dark:text-slate-400' }, '');
         }
         const actualRowNumber = row.row_number ?? val;
         if (actualRowNumber !== null && actualRowNumber !== undefined && String(actualRowNumber).trim() !== '') {
@@ -387,10 +400,15 @@
         );
       }},
       { field: 'transaction_action', header_fa: 'نوع', header_en: 'Action', width: '90px', exportValue: (val) => txActions[val] || val || '-', render: (val) => {
+        if (String(val || '').trim() === '') return React.createElement('span', { className: 'text-[12px]' }, '');
         const color = val === 'DEPOSIT' ? 'text-emerald-600 dark:text-emerald-500' : 'text-rose-500 dark:text-rose-400';
         return React.createElement('span', { className: `text-[12px] font-medium ${color}` }, txActions[val] || val);
       }},
-      { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '65px' },
+      { field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '85px', render: (val, row) => {
+        if (row._isTotal) return React.createElement('span', { className: 'text-[11px] font-semibold text-slate-500 dark:text-slate-400' }, t('ترکیبی', 'Mixed'));
+        if (row._nodeType === 'group') return React.createElement('span', { className: 'text-[12px] font-semibold text-slate-700 dark:text-slate-200' }, val || '-');
+        return React.createElement('span', { className: 'text-[12px] font-medium text-slate-700 dark:text-slate-300' }, val || '-');
+      }},
       { field: 'exchange_rate_to_usd', header_fa: 'نرخ تبدیل', header_en: 'Exchange Rate to USD', width: '95px', exportValue: (val) => fmt(val), render: (val, row) => {
         if (!showCurrencySummary) return React.createElement('span', { className: 'text-slate-300 dark:text-slate-600 text-[12px]' }, '—');
         return React.createElement('div', { className: 'flex flex-col gap-[2px]', dir: 'ltr' },
@@ -399,18 +417,57 @@
         );
       }},
       { field: 'deposit_amount', header_fa: 'واریز', header_en: 'Deposit', width: '110px', exportValue: (val) => fmt(val), render: (val, row) => {
-        if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-emerald-700 dark:text-emerald-300', dir: 'ltr' }, fmt(val || 0));
-        if (row._nodeType === 'group') return React.createElement('span', { className: 'text-[12px] font-bold text-emerald-700 dark:text-emerald-300', dir: 'ltr' }, fmt(val || 0));
+        if (row._isTotal || row._nodeType === 'group') {
+          if (row._summaryMode === 'converted_only') {
+            return React.createElement('div', { className: 'flex flex-col gap-[2px]', dir: 'ltr' },
+              React.createElement('span', { className: 'text-[11px] font-bold text-emerald-700 dark:text-emerald-300' }, `$ ${fmt(row.dep_usd_total || 0)}`),
+              React.createElement('span', { className: 'text-[10px] font-bold text-teal-700 dark:text-teal-300' }, `﷼ ${fmt(row.dep_irr_total || 0)}`)
+            );
+          }
+          if (row._summaryMode === 'account_with_converted') {
+            return React.createElement('div', { className: 'flex flex-col gap-[2px]', dir: 'ltr' },
+              React.createElement('span', { className: 'text-[12px] font-black text-emerald-700 dark:text-emerald-300' }, fmt(val || 0)),
+              React.createElement('span', { className: 'text-[10px] text-slate-500 dark:text-slate-400' }, `≈ $ ${fmt(row.dep_usd_total || 0)}`),
+              React.createElement('span', { className: 'text-[10px] text-slate-500 dark:text-slate-400' }, `≈ ﷼ ${fmt(row.dep_irr_total || 0)}`)
+            );
+          }
+          if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-emerald-700 dark:text-emerald-300', dir: 'ltr' }, fmt(val || 0));
+          return React.createElement('span', { className: 'text-[12px] font-bold text-emerald-700 dark:text-emerald-300', dir: 'ltr' }, fmt(val || 0));
+        }
         return React.createElement(AmountCell, { amount: val, usd: row.dep_usd, irr: row.dep_irr, cur: row.currency, isDeposit: true });
       }},
       { field: 'withdrawal_amount', header_fa: 'برداشت', header_en: 'Withdrawal', width: '110px', exportValue: (val) => fmt(val), render: (val, row) => {
-        if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-rose-700 dark:text-rose-300', dir: 'ltr' }, fmt(val || 0));
-        if (row._nodeType === 'group') return React.createElement('span', { className: 'text-[12px] font-bold text-rose-700 dark:text-rose-300', dir: 'ltr' }, fmt(val || 0));
+        if (row._isTotal || row._nodeType === 'group') {
+          if (row._summaryMode === 'converted_only') {
+            return React.createElement('div', { className: 'flex flex-col gap-[2px]', dir: 'ltr' },
+              React.createElement('span', { className: 'text-[11px] font-bold text-rose-700 dark:text-rose-300' }, `$ ${fmt(row.wid_usd_total || 0)}`),
+              React.createElement('span', { className: 'text-[10px] font-bold text-orange-700 dark:text-orange-300' }, `﷼ ${fmt(row.wid_irr_total || 0)}`)
+            );
+          }
+          if (row._summaryMode === 'account_with_converted') {
+            return React.createElement('div', { className: 'flex flex-col gap-[2px]', dir: 'ltr' },
+              React.createElement('span', { className: 'text-[12px] font-black text-rose-700 dark:text-rose-300' }, fmt(val || 0)),
+              React.createElement('span', { className: 'text-[10px] text-slate-500 dark:text-slate-400' }, `≈ $ ${fmt(row.wid_usd_total || 0)}`),
+              React.createElement('span', { className: 'text-[10px] text-slate-500 dark:text-slate-400' }, `≈ ﷼ ${fmt(row.wid_irr_total || 0)}`)
+            );
+          }
+          if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-rose-700 dark:text-rose-300', dir: 'ltr' }, fmt(val || 0));
+          return React.createElement('span', { className: 'text-[12px] font-bold text-rose-700 dark:text-rose-300', dir: 'ltr' }, fmt(val || 0));
+        }
         return React.createElement(AmountCell, { amount: val, usd: row.wid_usd, irr: row.wid_irr, cur: row.currency, isDeposit: false });
       }},
       { field: 'remained_amount', header_fa: 'مانده حساب', header_en: 'Account Balance', width: '120px', exportValue: (_, row) => fmt(getRemainedAmount(row)), render: (_, row) => {
-        if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-amber-700 dark:text-amber-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
-        if (row._nodeType === 'group') return React.createElement('span', { className: 'text-[12px] font-bold text-amber-700 dark:text-amber-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
+        if (row._isTotal || row._nodeType === 'group') {
+          if (row._summaryMode === 'converted_only') {
+            return React.createElement('span', { className: 'text-[12px]' }, '');
+          }
+          if (row._summaryMode === 'account_with_converted') {
+            if (row._isTotal) return React.createElement('span', { className: 'text-[12px]' }, '');
+            return React.createElement('span', { className: 'text-[12px] font-bold text-amber-700 dark:text-amber-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
+          }
+          if (row._isTotal) return React.createElement('span', { className: 'text-[12px] font-black text-amber-700 dark:text-amber-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
+          return React.createElement('span', { className: 'text-[12px] font-bold text-amber-700 dark:text-amber-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
+        }
         return React.createElement('span', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300', dir: 'ltr' }, fmt(getRemainedAmount(row)));
       }},      
       { field: 'deposit_amount_usd', header_fa: 'واریز به دلار', header_en: 'Deposit (USD)', width: '95px', exportOnly: true, exportValue: (_, row) => fmt(row.dep_usd) },
@@ -420,6 +477,7 @@
       { field: 'withdrawal_amount_irr', header_fa: 'برداشت به ريال', header_en: 'Withdrawal (IRR)', width: '95px', exportOnly: true, exportValue: (_, row) => fmt(row.wid_irr) },
       { field: 'transaction_group', header_fa: 'گروه', header_en: 'Group', width: '75px', render: (val) => React.createElement('span', { className: 'text-[12px]' }, txGroups[val] || val || '-') },
       { field: 'cost_income', header_fa: 'هزینه/درآمد', header_en: 'Cost/Income', width: '170px', render: (_, row) => {
+        if (row._nodeType && row._nodeType !== 'item') return React.createElement('span', { className: 'text-[12px]' }, '');
         const item = row.cost_type_id ? COST_TYPE_LOOKUP.get(String(row.cost_type_id)) : INCOME_TYPE_LOOKUP.get(String(row.income_type_id || ''));
         const label = item
           ? (isRtl
@@ -429,6 +487,7 @@
         return React.createElement('span', { className: 'text-[12px] truncate block', title: label }, label);
       }},
       { field: 'center_id', header_fa: 'مرکز هزینه/درآمد', header_en: 'Center', width: '170px', exportValue: (val) => getLookupExportLabel(CENTER_LOOKUP, val, val || '-'), render: (val) => {
+        if (String(val || '').trim() === '') return React.createElement('span', { className: 'text-[12px]' }, '');
         const label = getLookupExportLabel(CENTER_LOOKUP, val, val || '-');
         return React.createElement('span', { className: 'text-[12px] truncate block', title: label }, label);
       }},
@@ -448,6 +507,34 @@
       },
       ...itemsColumns
     ]), [itemsColumns]);
+
+    const groupedCurrencyDetailFields = useMemo(() => new Set([
+      'deposit_amount_usd',
+      'withdrawal_amount_usd',
+      'exchange_rate_usd_to_irr',
+      'deposit_amount_irr',
+      'withdrawal_amount_irr',
+    ]), []);
+
+    const groupedAccountColumns = useMemo(
+      () => groupedItemsColumns.filter(col => col.field !== '_account' && !groupedCurrencyDetailFields.has(col.field)),
+      [groupedItemsColumns, groupedCurrencyDetailFields]
+    );
+
+    const groupedCostsColumns = useMemo(
+      () => groupedItemsColumns.filter(col => col.field !== 'cost_income' && !groupedCurrencyDetailFields.has(col.field)),
+      [groupedItemsColumns, groupedCurrencyDetailFields]
+    );
+
+    const groupedIncomesColumns = useMemo(
+      () => groupedItemsColumns.filter(col => col.field !== 'cost_income' && !groupedCurrencyDetailFields.has(col.field)),
+      [groupedItemsColumns, groupedCurrencyDetailFields]
+    );
+
+    const groupedCentersColumns = useMemo(
+      () => groupedItemsColumns.filter(col => col.field !== 'center_id' && !groupedCurrencyDetailFields.has(col.field)),
+      [groupedItemsColumns, groupedCurrencyDetailFields]
+    );
 
     const exportItemsCsv = useCallback(() => {
       const exportColumns = [
@@ -576,6 +663,7 @@
           tabs: [
             { id: 'documents', label: t('اسناد', 'Documents') },
             { id: 'items', label: t('اقلام سند', 'Document Items') },
+            { id: 'accounts', label: t('حساب‌ها', 'Accounts') },
             { id: 'costs', label: t('هزینه‌ها', 'Costs') },
             { id: 'incomes', label: t('درآمدها', 'Incomes') },
             { id: 'centers', label: t('مرکز هزینه/درآمد', 'Cost/Income Center') },
@@ -668,13 +756,39 @@
                     ),
                   })
                 ),
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'accounts' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
+                  React.createElement(TreeGrid, {
+                    key: `review-accounts-grouped-${groupedAccountRows.length}`,
+                    data: groupedAccountRows,
+                    idField: '_rowId',
+                    parentField: '_parentRowId',
+                    columns: groupedAccountColumns,
+                    defaultPinnedCols: ['_treeLabel'],
+                    language,
+                    formCode,
+                    isLoading,
+                    hideImport: true,
+                    selectable: false,
+                    gridState: accountsGridState,
+                    onGridStateChange: setAccountsGridState,
+                    placeExpandControlsOnEnd: false,
+                    placeSearchBeforeExpandControls: false,
+                    toolbarStartContent: selectedDocumentIds.length > 0
+                      ? React.createElement('span', {
+                          className: `text-[11px] text-slate-500 dark:text-slate-400 px-1 ${isRtl ? 'text-right' : 'text-left'}`,
+                          dir: isRtl ? 'rtl' : 'ltr',
+                        }, t('فقط اقلام اسناد انتخاب‌شده نمایش داده می‌شود', 'Only items from selected documents are shown'))
+                      : null
+                  })
+                ),
                 !drillDoc && React.createElement('div', { style: { display: activeTab === 'costs' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
                   React.createElement(TreeGrid, {
                     key: `review-costs-grouped-${groupedCostRows.length}`,
                     data: groupedCostRows,
                     idField: '_rowId',
                     parentField: '_parentRowId',
-                    columns: groupedItemsColumns,
+                    columns: groupedCostsColumns,
+                    defaultPinnedCols: ['_treeLabel'],
                     language,
                     formCode,
                     isLoading,
@@ -698,7 +812,8 @@
                     data: groupedIncomeRows,
                     idField: '_rowId',
                     parentField: '_parentRowId',
-                    columns: groupedItemsColumns,
+                    columns: groupedIncomesColumns,
+                    defaultPinnedCols: ['_treeLabel'],
                     language,
                     formCode,
                     isLoading,
@@ -722,7 +837,8 @@
                     data: groupedCenterRows,
                     idField: '_rowId',
                     parentField: '_parentRowId',
-                    columns: groupedItemsColumns,
+                    columns: groupedCentersColumns,
+                    defaultPinnedCols: ['_treeLabel'],
                     language,
                     formCode,
                     isLoading,

@@ -1,7 +1,7 @@
 /* Filename: financial/TransactionReview.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo, useCallback } = React;
+  const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
   // ── Fallbacks ─────────────────────────────────────────────────────────────
   const FallbackIcon = ({ size = 16 }) =>
@@ -14,6 +14,8 @@
     Eye          = FallbackIcon,
     ChevronLeft  = FallbackIcon,
     ChevronRight = FallbackIcon,
+    ChevronDown  = FallbackIcon,
+    Check        = FallbackIcon,
     Paperclip    = FallbackIcon,
   } = LucideIcons;
 
@@ -64,6 +66,123 @@
     return `${y}-${m}-${d}`;
   };
 
+  const MultiSelectDropdown = ({
+    label,
+    options = [],
+    selected = new Set(),
+    onToggle = () => {},
+    onSelectAll = () => {},
+    onClear = () => {},
+    summary = '',
+    isRtl = true,
+    disabled = false,
+    hideLabel = false,
+    triggerClassName = '',
+    triggerStyle = null,
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const rootRef = useRef(null);
+    const dropdownRef = useRef(null);
+    const [rect, setRect] = useState(null);
+    const ReactDOM = window.ReactDOM;
+
+    useEffect(() => {
+      const onDocClick = (e) => {
+        const insideRoot = rootRef.current && rootRef.current.contains(e.target);
+        const insideDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
+        if (!insideRoot && !insideDropdown) setIsOpen(false);
+      };
+      if (isOpen) document.addEventListener('mousedown', onDocClick);
+      return () => document.removeEventListener('mousedown', onDocClick);
+    }, [isOpen]);
+
+    useEffect(() => {
+      const updateRect = () => {
+        if (rootRef.current) setRect(rootRef.current.getBoundingClientRect());
+      };
+      if (isOpen) {
+        updateRect();
+        window.addEventListener('scroll', updateRect, true);
+        window.addEventListener('resize', updateRect);
+      }
+      return () => {
+        window.removeEventListener('scroll', updateRect, true);
+        window.removeEventListener('resize', updateRect);
+      };
+    }, [isOpen]);
+
+    return React.createElement('div', { className: 'flex flex-col gap-1 w-full min-w-0 relative', ref: rootRef },
+      !hideLabel && React.createElement('label', { className: 'text-[12px] font-bold text-slate-700 dark:text-slate-300' }, label),
+      React.createElement('button', {
+        type: 'button',
+        disabled,
+        onClick: () => !disabled && setIsOpen((v) => !v),
+        style: triggerStyle || undefined,
+        className: `h-8 px-2.5 rounded-lg border flex items-center justify-between text-[12px] transition-colors ${
+          disabled
+            ? 'bg-slate-100 dark:bg-slate-800/40 text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+            : 'bg-white dark:bg-slate-700/40 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-500 hover:border-indigo-400'
+        } ${triggerClassName}`
+      },
+        React.createElement('span', { className: 'truncate text-start' }, summary),
+        React.createElement(ChevronDown, { size: 14 })
+      ),
+
+      isOpen && rect && (ReactDOM
+        ? ReactDOM.createPortal(
+            React.createElement('div', {
+              ref: dropdownRef,
+              style: {
+                position: 'fixed',
+                top: rect.bottom + 4,
+                [isRtl ? 'right' : 'left']: isRtl ? Math.max(8, window.innerWidth - rect.right) : Math.max(8, rect.left),
+                width: Math.max(rect.width, 260),
+                zIndex: 999999,
+              },
+              className: 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150'
+            },
+              React.createElement('div', { className: 'flex items-center justify-between px-2 py-1.5 border-b border-slate-100 dark:border-slate-700/70 bg-slate-50/70 dark:bg-slate-900/40' },
+                React.createElement('button', {
+                  type: 'button',
+                  className: 'text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline',
+                  onMouseDown: (e) => { e.preventDefault(); e.stopPropagation(); },
+                  onClick: onSelectAll
+                }, isRtl ? 'انتخاب همه' : 'Select All'),
+                React.createElement('button', {
+                  type: 'button',
+                  className: 'text-[10px] font-bold text-rose-500 hover:underline',
+                  onMouseDown: (e) => { e.preventDefault(); e.stopPropagation(); },
+                  onClick: onClear
+                }, isRtl ? 'پاک کردن' : 'Clear')
+              ),
+              React.createElement('div', { className: 'max-h-56 overflow-y-auto custom-scrollbar' },
+                options.map((opt) => {
+                  const checked = selected.has(String(opt.value));
+                  return React.createElement('button', {
+                    key: opt.value,
+                    type: 'button',
+                    onMouseDown: (e) => { e.preventDefault(); e.stopPropagation(); },
+                    onClick: () => onToggle(String(opt.value)),
+                    className: `w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] border-b border-slate-100 dark:border-slate-700/50 last:border-b-0 ${
+                      checked
+                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/40'
+                    }`
+                  },
+                    React.createElement('span', {
+                      className: `w-4 h-4 rounded border flex items-center justify-center ${checked ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 dark:border-slate-500 text-transparent'}`
+                    }, React.createElement(Check, { size: 10 })),
+                    React.createElement('span', { className: 'truncate text-start' }, opt.label)
+                  );
+                })
+              )
+            ),
+            document.body
+          )
+        : null)
+    );
+  };
+
   const getDefaultFilters = () => {
     const today = new Date();
     const start = new Date(today);
@@ -74,6 +193,8 @@
       date_to:             formatLocalIsoDate(today),
       account_filter_type: 'balance_group',
       filter_value:        null,
+      transaction_types:   [],
+      document_statuses:   [],
       summary_currency:    false,
     };
   };
@@ -384,7 +505,7 @@
 
     // ── Search / fetch data ───────────────────────────────────────────────────
     const handleSearch = useCallback(async (formValues) => {
-      const { date_type, date_from, date_to, account_filter_type, filter_value } = formValues;
+      const { date_type, date_from, date_to, account_filter_type, filter_value, transaction_types, document_statuses } = formValues;
 
       if (!date_from || !date_to) {
         showToast(t('لطفاً بازه تاریخی را مشخص کنید.', 'Please specify a date range.'), 'warning');
@@ -404,6 +525,13 @@
       setAppliedFilters(formValues);
 
       try {
+        const selectedTypes = Array.isArray(transaction_types)
+          ? transaction_types.map(v => String(v || '').trim()).filter(Boolean)
+          : [];
+        const selectedStatuses = Array.isArray(document_statuses)
+          ? document_statuses.map(v => String(v || '').trim()).filter(Boolean)
+          : [];
+
         let query = supabase
           .from('fm_transactions')
           .select('*, fm_transaction_items(*)')
@@ -416,6 +544,13 @@
         } else {
           if (isoFrom) query = query.gte('created_at', isoFrom + 'T00:00:00Z');
           if (isoTo)   query = query.lte('created_at', isoTo   + 'T23:59:59Z');
+        }
+
+        if (selectedTypes.length > 0) {
+          query = query.in('transaction_type', selectedTypes);
+        }
+        if (selectedStatuses.length > 0) {
+          query = query.in('status', selectedStatuses);
         }
 
         const { data: txData, error } = await query;
@@ -461,13 +596,37 @@
     }, []);
 
     // ── Filter fields (LOV switches based on account_filter_type) ─────────────
+    const TRANSACTION_TYPE_OPTIONS = useMemo(() => ([
+      { value: 'OPENING', label: t('افتتاحیه', 'Opening') },
+      { value: 'CLOSING', label: t('اختتامیه', 'Closing') },
+      { value: 'GENERAL', label: t('عمومی', 'General') },
+      { value: 'TRANSFER', label: t('انتقال', 'Transfer') },
+    ]), [t]);
+
+    const DOCUMENT_STATUS_OPTIONS = useMemo(() => ([
+      { value: 'DRAFT', label: t('یادداشت', 'Draft') },
+      { value: 'TEMPORARY', label: t('موقت', 'Temporary') },
+      { value: 'FINAL', label: t('بررسی شده', 'Final') },
+      { value: 'APPROVED', label: t('تایید شده', 'Approved') },
+    ]), [t]);
+
+    const transactionTypeSummary = useCallback((selectedSet) => {
+      if (!selectedSet || selectedSet.size === 0) return t('همه انواع سند', 'All document types');
+      return t(`${selectedSet.size} نوع سند انتخاب شده`, `${selectedSet.size} document types selected`);
+    }, [t]);
+
+    const documentStatusSummary = useCallback((selectedSet) => {
+      if (!selectedSet || selectedSet.size === 0) return t('همه وضعیت‌ها', 'All statuses');
+      return t(`${selectedSet.size} وضعیت انتخاب شده`, `${selectedSet.size} statuses selected`);
+    }, [t]);
+
     const filterFields = useMemo(() => [
       {
         name: 'date_type',
         label: t('نوع تاریخ', 'Date Type'),
         type: 'select',
         options: [
-          { value: 'registered_at', label: t('تاریخ ثبت', 'Registration Date') },
+          { value: 'registered_at', label: t('تاریخ تراکنش', 'Transaction Date') },
           { value: 'created_at', label: t('تاریخ ایجاد', 'Creation Date') },
         ],
       },
@@ -517,11 +676,57 @@
             dropdownWidth: 'min-w-[340px]',
           },
       {
+        name: 'transaction_types',
+        type: 'custom',
+        render: ({ key, values }) => {
+          const selectedSet = new Set((Array.isArray(values.transaction_types) ? values.transaction_types : []).map(String));
+          return React.createElement('div', { key, className: 'flex flex-col gap-1' },
+            React.createElement(MultiSelectDropdown, {
+              label: t('نوع سند', 'Document Type'),
+              options: TRANSACTION_TYPE_OPTIONS,
+              selected: selectedSet,
+              onToggle: (value) => {
+                const next = new Set(selectedSet);
+                if (next.has(value)) next.delete(value); else next.add(value);
+                handleFilterChange({ ...values, transaction_types: Array.from(next) });
+              },
+              onSelectAll: () => handleFilterChange({ ...values, transaction_types: TRANSACTION_TYPE_OPTIONS.map(opt => String(opt.value)) }),
+              onClear: () => handleFilterChange({ ...values, transaction_types: [] }),
+              summary: transactionTypeSummary(selectedSet),
+              isRtl,
+            })
+          );
+        },
+      },
+      {
+        name: 'document_statuses',
+        type: 'custom',
+        render: ({ key, values }) => {
+          const selectedSet = new Set((Array.isArray(values.document_statuses) ? values.document_statuses : []).map(String));
+          return React.createElement('div', { key, className: 'flex flex-col gap-1' },
+            React.createElement(MultiSelectDropdown, {
+              label: t('وضعیت سند', 'Document Status'),
+              options: DOCUMENT_STATUS_OPTIONS,
+              selected: selectedSet,
+              onToggle: (value) => {
+                const next = new Set(selectedSet);
+                if (next.has(value)) next.delete(value); else next.add(value);
+                handleFilterChange({ ...values, document_statuses: Array.from(next) });
+              },
+              onSelectAll: () => handleFilterChange({ ...values, document_statuses: DOCUMENT_STATUS_OPTIONS.map(opt => String(opt.value)) }),
+              onClear: () => handleFilterChange({ ...values, document_statuses: [] }),
+              summary: documentStatusSummary(selectedSet),
+              isRtl,
+            })
+          );
+        },
+      },
+      {
         name: 'summary_currency',
         label: t('خلاصه ارزی', 'Currency Summary'),
         type: 'toggle',
       },
-    ], [t, filterState.account_filter_type, accountLovData, balanceGroups]);
+    ], [t, filterState.account_filter_type, accountLovData, balanceGroups, TRANSACTION_TYPE_OPTIONS, DOCUMENT_STATUS_OPTIONS, transactionTypeSummary, documentStatusSummary, handleFilterChange]);
 
     const TX_TYPES = {
       OPENING: t('افتتاحیه', 'Opening'),

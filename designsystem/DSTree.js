@@ -8,7 +8,7 @@
   const { 
     ChevronDown = FallbackIcon, ChevronRight = FallbackIcon, ChevronLeft = FallbackIcon, Folder = FallbackIcon, FolderOpen = FallbackIcon, FileText = FallbackIcon, 
     Plus = FallbackIcon, Trash2 = FallbackIcon, Maximize2 = FallbackIcon, Minimize2 = FallbackIcon, Search = FallbackIcon, FileDown = FallbackIcon, Upload = FallbackIcon, FileSpreadsheet = FallbackIcon, 
-    Check = FallbackIcon, X = FallbackIcon, Layers = FallbackIcon, Settings = FallbackIcon 
+    Check = FallbackIcon, X = FallbackIcon, Layers = FallbackIcon, Settings = FallbackIcon, Pin = FallbackIcon, PinOff = FallbackIcon
   } = LucideIcons;
 
   const FallbackComponent = () => null;
@@ -288,7 +288,7 @@
     );
   };
 
-  const TreeGrid = ({ data = [], columns = [], idField = 'id', parentField = 'parentId', actions = [], selectable = false, selectedIds = null, onSelectChange, onAddRoot, onAddChild, onDelete, onExport, onImport, onDownloadSample, language = 'fa', editingId, editData, onEditFieldChange, onSaveEdit, onCancelEdit, gridState, onGridStateChange, formCode, toolbarStartContent = null, toolbarEndContent = null, placeExpandControlsOnEnd = false, placeSearchBeforeExpandControls = false, exportFileName = null }) => {
+  const TreeGrid = ({ data = [], columns = [], idField = 'id', parentField = 'parentId', actions = [], selectable = false, selectedIds = null, onSelectChange, onAddRoot, onAddChild, onDelete, onExport, onImport, onDownloadSample, language = 'fa', editingId, editData, onEditFieldChange, onSaveEdit, onCancelEdit, gridState, onGridStateChange, formCode, toolbarStartContent = null, toolbarEndContent = null, placeExpandControlsOnEnd = false, placeSearchBeforeExpandControls = false, exportFileName = null, defaultHiddenCols = [], defaultPinnedCols = [] }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const globalMode = useCalendarMode ? useCalendarMode() : 'jalali';
@@ -319,11 +319,15 @@
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [searchTerm, setSearchTerm] = useState('');
     
-    const [hiddenCols, setHiddenCols] = useState([]);
+    const [hiddenCols, setHiddenCols] = useState(defaultHiddenCols);
+    const [pinnedCols, setPinnedCols] = useState(defaultPinnedCols);
     const [showColMenu, setShowColMenu] = useState(false);
     const [selectedRowId, setSelectedRowId] = useState(null);
     
     const colMenuRef = useRef(null);
+    const colMenuPortalRef = useRef(null);
+    const [colMenuPosition, setColMenuPosition] = useState(null);
+    const ReactDOM = window.ReactDOM;
     const selectedIdsList = Array.isArray(selectedIds) ? selectedIds : [];
     const selectedIdsFirst = selectedIdsList.length > 0 ? selectedIdsList[0] : null;
 
@@ -357,19 +361,24 @@
     }, [editingId, selectedRowId, selectedIdsFirst, data, idField, parentField]);
 
     useEffect(() => {
-      if (gridState && gridState.hiddenCols) {
-        setHiddenCols(gridState.hiddenCols);
+      if (gridState) {
+        setHiddenCols(gridState.hiddenCols || defaultHiddenCols);
+        setPinnedCols(gridState.pinnedCols || defaultPinnedCols);
       }
-    }, [gridState]);
+    }, [gridState, defaultHiddenCols, defaultPinnedCols]);
 
     useEffect(() => {
       if (onGridStateChange && !gridState) {
-        onGridStateChange({ hiddenCols });
+        onGridStateChange({ hiddenCols, pinnedCols });
       }
-    }, [hiddenCols, gridState, onGridStateChange]);
+    }, [hiddenCols, pinnedCols, gridState, onGridStateChange]);
 
     useEffect(() => {
-      const handleClickOutside = (e) => { if (colMenuRef.current && !colMenuRef.current.contains(e.target)) setShowColMenu(false); };
+      const handleClickOutside = (e) => {
+        const inColBtn = colMenuRef.current && colMenuRef.current.contains(e.target);
+        const inColPortal = colMenuPortalRef.current && colMenuPortalRef.current.contains(e.target);
+        if (!inColBtn && !inColPortal) setShowColMenu(false);
+      };
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
@@ -444,11 +453,34 @@
     const flatData = useMemo(() => flattenTree(treeData), [treeData, expandedIds, idField]);
 
     const visibleColumns = useMemo(() => {
-      return columns.filter(c => !hiddenCols.includes(c.field));
+      return columns.filter(c => !hiddenCols.includes(c.field) && !c.exportOnly);
     }, [columns, hiddenCols]);
+
+    const menuColumns = useMemo(() => {
+      return columns.filter(c => !c.exportOnly);
+    }, [columns]);
 
     const toggleVisibility = (field) => {
       setHiddenCols(prev => prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]);
+    };
+
+    const togglePin = (field) => {
+      setPinnedCols(prev => prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]);
+    };
+
+    const getStickyStyles = (field, isHeader = false) => {
+      if (!pinnedCols.includes(field)) return {};
+      let offset = selectable ? 40 : 0;
+      for (const col of visibleColumns) {
+        if (col.field === field) break;
+        offset += parseInt(col.width || '150', 10);
+      }
+      return {
+        position: 'sticky',
+        [isRtl ? 'right' : 'left']: offset,
+        zIndex: isHeader ? 45 : 15,
+        backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+      };
     };
 
     const toggleExpand = (id, e) => {
@@ -539,21 +571,51 @@
             <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
             
             <div className="relative flex items-center h-full" ref={colMenuRef}>
-              <button onClick={() => setShowColMenu(!showColMenu)} title={t('نمایش/مخفی‌سازی ستون‌ها', 'Columns')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><Settings size={14} /></button>
-              {showColMenu && (
-                <div className="absolute top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg p-2 min-w-[200px] right-0 animate-in zoom-in-95 duration-100" style={{ zIndex: 300 }}>
+              <button
+                onClick={() => {
+                  if (!showColMenu && colMenuRef.current) setColMenuPosition(colMenuRef.current.getBoundingClientRect());
+                  setShowColMenu(prev => !prev);
+                }}
+                title={t('نمایش/مخفی‌سازی ستون‌ها', 'Columns')}
+                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"
+              ><Settings size={14} /></button>
+            </div>
+
+            {showColMenu && colMenuPosition && (() => {
+              const menuWidth = 240;
+              const resultingLeftEdge = colMenuPosition.right - menuWidth;
+              const posH = resultingLeftEdge >= 8
+                ? { right: Math.max(4, window.innerWidth - colMenuPosition.right) }
+                : { left: Math.max(8, Math.min(colMenuPosition.left, window.innerWidth - menuWidth - 8)) };
+              const spaceBelow = window.innerHeight - colMenuPosition.bottom;
+              const posV = spaceBelow > 270
+                ? { top: colMenuPosition.bottom + 4 }
+                : { bottom: window.innerHeight - colMenuPosition.top + 4 };
+              const menuNode = (
+                <div
+                  ref={colMenuPortalRef}
+                  style={{ position: 'fixed', zIndex: 999999, ...posH, ...posV }}
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg p-2 min-w-[220px] animate-in zoom-in-95 duration-100"
+                >
                   <div className="text-[12px] font-black text-slate-800 dark:text-slate-100 mb-2 pb-2 border-b border-slate-100 dark:border-slate-700 px-1">{t('نمایش / مخفی‌سازی', 'Show / Hide')}</div>
-                  <div className="max-h-[250px] overflow-y-auto custom-scrollbar space-y-0.5">
-                    {columns.map(c => (
-                      <label key={c.field} className="flex items-center gap-2.5 cursor-pointer p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-md text-[12px] font-bold text-slate-600 dark:text-slate-300 transition-colors">
-                        <input type="checkbox" checked={!hiddenCols.includes(c.field)} onChange={() => toggleVisibility(c.field)} className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-500 focus:ring-indigo-500 dark:focus:ring-indigo-400 w-3.5 h-3.5" />
-                        {t(c.header_fa, c.header_en)}
-                      </label>
-                    ))}
+                  <div className="max-h-[280px] overflow-y-auto custom-scrollbar space-y-0.5">
+                    {menuColumns.map(c => {
+                      const isPinned = pinnedCols.includes(c.field);
+                      return (
+                        <div key={c.field} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-md text-[12px] font-bold text-slate-600 dark:text-slate-300 transition-colors">
+                          <input type="checkbox" checked={!hiddenCols.includes(c.field)} onChange={() => toggleVisibility(c.field)} className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-500 focus:ring-indigo-500 dark:focus:ring-indigo-400 w-3.5 h-3.5" />
+                          <span className="flex-1 truncate">{t(c.header_fa, c.header_en)}</span>
+                          <button type="button" onClick={() => togglePin(c.field)} title={t('سنجاق کردن ستون', 'Pin Column')} className={`p-1 rounded transition-colors ${isPinned ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                            {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
-            </div>
+              );
+              return ReactDOM ? ReactDOM.createPortal(menuNode, document.body) : menuNode;
+            })()}
 
             <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
 
@@ -593,7 +655,7 @@
                   </th>
                 )}
                 {visibleColumns.map((col, index) => (
-                  <th key={col.field} style={{ width: col.width || '150px' }} className={`p-2 border-b border-slate-200 dark:border-slate-700 text-[12px] font-black text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-900 ${isRtl ? 'border-l' : 'border-r'}`}>
+                  <th key={col.field} style={{ width: col.width || '150px', ...getStickyStyles(col.field, true), backgroundColor: theme === 'dark' ? '#0f172a' : '#f1f5f9' }} className={`p-2 border-b border-slate-200 dark:border-slate-700 text-[12px] font-black text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-900 ${isRtl ? 'border-l' : 'border-r'}`}>
                     {t(col.header_fa, col.header_en)}
                   </th>
                 ))}
@@ -628,7 +690,7 @@
                       </td>
                     )}
                     {visibleColumns.map((col, colIndex) => (
-                      <td key={col.field} className={`py-1 px-2 text-[12px] text-slate-700 dark:text-slate-300 truncate bg-inherit ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
+                      <td key={col.field} style={{ ...getStickyStyles(col.field), backgroundColor: 'inherit' }} className={`py-1 px-2 text-[12px] text-slate-700 dark:text-slate-300 truncate bg-inherit ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
                         
                         {colIndex === 0 ? (
                           <div className="flex items-center gap-2 relative" style={{ paddingInlineStart: `${row._depth * 20}px` }}>
