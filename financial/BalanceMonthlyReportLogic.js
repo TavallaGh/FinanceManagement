@@ -320,6 +320,136 @@
     return rows;
   };
 
+  // Presentation layers share the original account matrix and report scope.
+  const buildMonthlyAccountPaths = (tree) => {
+    const paths = new Map();
+    const visit = (node, parents) => {
+      const path = [...parents, node];
+      paths.set(String(node.id), path);
+      (node.children || []).forEach(child => visit(child, path));
+    };
+    (tree || []).forEach(node => visit(node, []));
+    return paths;
+  };
+
+  const buildMonthlyTabRows = (reportData, level, previousRows, selectedRows = [], isRtl = true) => {
+    if (!reportData) return [];
+    const { matrix = {}, accountPaths = new Map(), reportAccountLookup = new Map(), slots } = reportData;
+    const selected = new Set(selectedRows.map(String));
+    const scope = previousRows
+      ? new Set(previousRows.filter(row => !selected.size || selected.has(row.id)).flatMap(row => row._leafIds))
+      : new Set(reportAccountLookup.keys());
+    const name = node => isRtl
+      ? (node.title_fa || node.title_en || '')
+      : (node.title_en || node.title_fa || '');
+    const title = node => [node.code, name(node)].filter(Boolean).join(' - ');
+    const buckets = new Map();
+    scope.forEach(accountId => {
+      const account = reportAccountLookup.get(accountId);
+      if (!account) return;
+      const path = accountPaths.get(accountId) || [account];
+      const node = level < 3 ? path[level] : account;
+      if (!node) return;
+      const currency = String(account.currency_code || '').toUpperCase();
+      const parents = level < 3 ? path.slice(0, level) : path.slice(0, -1);
+      const pathIds = parents.map(parent => String(parent.id));
+      // Stable account IDs keep identically named paths separate in both languages.
+      const pathKey = JSON.stringify(pathIds);
+      const id = level === 3
+        ? 'currency-' + JSON.stringify([pathIds, String(account.currency_id || currency)])
+        : 'account-' + node.id;
+      if (!buckets.has(id)) {
+        buckets.set(id, {
+          id, _id: id,
+          _type: level === 4 ? 'leaf' : level === 3 ? 'currency_header' : 'group_header',
+          _title: level === 3 ? (currency || (isRtl ? 'نامشخص' : 'N/A')) : title(node),
+          _currency: level >= 3 ? currency : '',
+          _accountId: level === 4 ? accountId : undefined,
+          _leafIds: [],
+          _pathKey: pathKey,
+          _path: parents.map(name).join(' / '),
+        });
+      }
+      const row = buckets.get(id);
+      row._leafIds.push(accountId);
+    });
+    return Array.from(buckets.values()).map(row => {
+      slots.forEach(slot => {
+        if (level === 4) {
+          row[slot.key] = matrix[row._accountId]?.[slot.key] || null;
+          return;
+        }
+        const value = { usd: 0, irr: 0 };
+        if (level === 3) value.nat = 0;
+        row._leafIds.forEach(id => {
+          const cell = matrix[id]?.[slot.key];
+          Object.keys(value).forEach(key => { value[key] += cell?.[key] || 0; });
+        });
+        row[slot.key] = value;
+      });
+      return row;
+    }).sort((a, b) => {
+      if (level === 3) {
+        const pathOrder = a._path.localeCompare(b._path) || a._pathKey.localeCompare(b._pathKey);
+        if (pathOrder) return pathOrder;
+      }
+      return a._title.localeCompare(b._title);
+    });
+  };
+
+  const buildMonthlyWorkbook = (reportData, XLSX, isRtl) => {
+    if (!reportData || !XLSX) throw new Error('Monthly report or Excel library is unavailable.');
+    const t = (fa, en) => isRtl ? fa : en;
+    const labels = [
+      t('گروه حساب', 'Account Groups'), t('حساب کل', 'General Ledger'),
+      t('حساب معین', 'Subsidiary Accounts'), t('ارز', 'Currencies'), t('حساب‌ها', 'Accounts'),
+    ];
+    const workbook = XLSX.utils.book_new();
+    workbook.Workbook = { Views: [{ RTL: isRtl }] };
+    let previousRows = null;
+    labels.forEach((label, level) => {
+      // Export uses the current advanced-filter scope, not selections in displayed tabs.
+      const rows = buildMonthlyTabRows(reportData, level, previousRows, [], isRtl);
+      previousRows = rows;
+      const headers = [
+        t('مسیر حساب', 'Account Path'),
+        level === 3 ? t('ارز حساب', 'Account Currency') : t('حساب / گروه', 'Account / Group'),
+        t('ارز مبلغ', 'Amount Currency'),
+        ...reportData.slots.map(slot => slot.label),
+      ];
+      const data = [headers];
+      rows.forEach(row => {
+        let amounts = [{ currency: 'USD', field: 'usd' }, { currency: 'IRR', field: 'irr' }];
+        if (level === 3 && row._currency !== 'USD' && row._currency !== 'IRR') {
+          amounts = [{ currency: row._currency || t('نامشخص', 'Unknown'), field: 'nat' }, ...amounts];
+        }
+        if (level === 4) amounts = [{ currency: row._currency || t('نامشخص', 'Unknown'), field: 'nat' }];
+        amounts.forEach(({ currency, field }) => {
+          data.push([row._path, row._title, currency, ...reportData.slots.map(slot => {
+            const value = row[slot.key]?.[field];
+            if (value === null || value === undefined) return null;
+            if (typeof value !== 'number' || !Number.isFinite(value)) {
+              throw new Error('Invalid balance in Excel export.');
+            }
+            return value;
+          })]);
+        });
+      });
+      const sheet = XLSX.utils.aoa_to_sheet(data);
+      sheet['!cols'] = [{ wch: 42 }, { wch: 32 }, { wch: 16 }, ...reportData.slots.map(() => ({ wch: 20 }))];
+      sheet['!autofilter'] = { ref: sheet['!ref'] };
+      // Keep balances numeric; locale formatting and debit/credit text never enter cells.
+      for (let row = 1; row < data.length; row += 1) {
+        for (let col = 3; col < headers.length; col += 1) {
+          const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
+          if (cell?.t === 'n') cell.z = '#,##0.############;(#,##0.############);0';
+        }
+      }
+      XLSX.utils.book_append_sheet(workbook, sheet, label);
+    });
+    return workbook;
+  };
+
   const collectSelectedLeafIds = ({ selectedIds, accountTree }) => {
     const result = new Set();
     const addLeaves = (node) => {
@@ -581,6 +711,8 @@
       reportData: {
         slots,
         groupedRows,
+        matrix,
+        accountPaths: buildMonthlyAccountPaths(accountTree),
         grandTotal,
         leafCount: baseAccounts.length,
         detailItems,
@@ -605,6 +737,9 @@
     resolveRate,
     buildTree,
     buildGroupedRows,
+    buildMonthlyAccountPaths,
+    buildMonthlyTabRows,
+    buildMonthlyWorkbook,
     collectSelectedLeafIds,
     generateMonthlyReportData,
   };

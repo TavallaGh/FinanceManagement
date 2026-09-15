@@ -222,7 +222,7 @@
     );
   };
 
-  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, onSearch, language = 'fa', defaultOpen = false, initialValues, children, inlineChildren = false, footerStartContent = null, gridClassName = 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3' }) => {
+  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, onSearch, language = 'fa', defaultOpen = false, initialValues, children, inlineChildren = false, footerStartContent = null, actionContent = null, searchDisabled = false, gridClassName = 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -306,11 +306,12 @@
               )}
               <div className="flex items-center gap-2 shrink-0 mr-auto">
                 <Button variant="ghost" size="sm" icon={Trash2} onClick={handleClear}>{t('پاک کردن', 'Clear')}</Button>
-                <Button variant="primary" size="sm" icon={Search} onClick={() => {
+                <Button variant="primary" size="sm" icon={Search} disabled={searchDisabled} onClick={() => {
                   const latestValues = lastSyncValues.current || values;
                   if (onSearch) onSearch(latestValues);
                   else if (onFilter) onFilter(latestValues);
                 }}>{t('جستجو', 'Search')}</Button>
+                {actionContent}
               </div>
             </div>
           </div>
@@ -319,7 +320,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [], defaultPinnedCols = [], pageSizeOptions = [10, 20, 50, 100], toolbarContent = null, onSelectionChange = null, minVisibleRows = 0, reserveMiddleSpace = true }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [], defaultPinnedCols = [], pageSizeOptions = [10, 20, 50, 100], toolbarContent = null, onSelectionChange = null, selectedRowIds, summaryRow = null, minVisibleRows = 0, reserveMiddleSpace = true }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -394,7 +395,12 @@
     const [pageSize, setPageSize] = useState(() => gridState?.pageSize || 20);
     const [showColMenu, setShowColMenu] = useState(false);
     const [activeHeaderMenu, setActiveHeaderMenu] = useState(null);
-    const [selectedRows, setSelectedRows] = useState([]);
+    const [localSelectedRows, setLocalSelectedRows] = useState([]);
+    const selectedRows = selectedRowIds === undefined ? localSelectedRows : selectedRowIds;
+    const setSelectedRows = (ids) => {
+      if (selectedRowIds === undefined) setLocalSelectedRows(ids);
+      else if (onSelectionChange) onSelectionChange(ids);
+    };
     const [draggableRowIndex, setDraggableRowIndex] = useState(null);
     
     const colMenuRef = useRef(null);
@@ -460,11 +466,15 @@
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    useEffect(() => { setGridData(data); setSelectedRows([]); }, [data]);
+    useEffect(() => {
+      setGridData(data);
+      setLocalSelectedRows([]);
+      if (selectedRowIds !== undefined) setPage(1);
+    }, [data]);
 
     useEffect(() => {
-      if (onSelectionChange) onSelectionChange(selectedRows);
-    }, [selectedRows, onSelectionChange]);
+      if (selectedRowIds === undefined && onSelectionChange) onSelectionChange(localSelectedRows);
+    }, [localSelectedRows, selectedRowIds, onSelectionChange]);
 
     const visibleColumns = useMemo(() => {
       const visibleFields = columnOrder.filter(f => !hiddenCols.includes(f));
@@ -971,10 +981,10 @@
                     onClick={() => onRowClick && onRowClick(row)}
                     draggable={isDragging}
                     onDragStart={(e) => handleRowDragStart(e, rowIndex)} onDragEnter={(e) => handleRowDragEnter(e, rowIndex)} onDragEnd={handleRowDragEnd} onDragOver={(e) => e.preventDefault()}
-                    className={`bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700/50 transition-colors group ${isHighlighted ? 'bg-indigo-50/80 dark:bg-indigo-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'} ${isDragging ? 'opacity-50' : ''}`}
+                    className={`border-b border-slate-100 dark:border-slate-700/50 transition-colors group ${isHighlighted ? 'bg-indigo-50 dark:bg-indigo-900' : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'} ${isDragging ? 'opacity-50' : ''}`}
                   >
                     {rowReorderable && (
-                      <td style={{...getStickyStyles('ROW_REORDER_COL', false), backgroundColor: 'inherit'}} className={`p-0 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
+                      <td style={{...getStickyStyles('ROW_REORDER_COL', false), backgroundColor: 'inherit'}} className={`p-0 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
                         <div 
                           onMouseDown={() => setDraggableRowIndex(rowIndex)}
                           onMouseUp={() => setDraggableRowIndex(null)}
@@ -985,18 +995,18 @@
                       </td>
                     )}
                     {selectable && (
-                      <td style={{...getStickyStyles('SELECT_COL', false), backgroundColor: 'inherit'}} className={`p-1.5 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
+                      <td style={{...getStickyStyles('SELECT_COL', false), backgroundColor: 'inherit'}} className={`p-1.5 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
                         <input type="checkbox" checked={isSelected} onChange={() => handleSelectRow(row.id)} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700/40 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer" />
                       </td>
                     )}
                     {visibleColumns.map((col) => (
-                      <td key={`${row.id || rowIndex}-${col.field}`} style={{...getStickyStyles(col.field), backgroundColor: 'inherit'}} className={`p-1.5 text-[12px] text-slate-700 dark:text-slate-300 bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
+                      <td key={`${row.id || rowIndex}-${col.field}`} style={{...getStickyStyles(col.field), backgroundColor: 'inherit'}} className={`p-1.5 text-[12px] text-slate-700 dark:text-slate-300 bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
                         {renderCellContent(col, row, rowIndex)}
                       </td>
                     ))}
                     
                     {filteredActions.length > 0 && (
-                      <td style={{...getStickyStyles('ACTIONS', true), width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className={`p-1 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none border-slate-100 dark:border-slate-700/50 ${isHighlighted ? 'bg-indigo-50/80 dark:bg-indigo-900/30' : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'}`}>
+                      <td style={{...getStickyStyles('ACTIONS', true), width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className={`p-1 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none border-slate-100 dark:border-slate-700/50 ${isHighlighted ? 'bg-indigo-50 dark:bg-indigo-900' : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700'}`}>
                         <div className="flex items-center justify-center gap-0.5">
                           {filteredActions.map((act, i) => {
                             if (act.hidden && act.hidden(row)) return null;
@@ -1035,14 +1045,16 @@
               )}
             </tbody>
             
-            {showSummaryRow && summaryData && (
+            {((showSummaryRow && summaryData) || summaryRow) && (
               <tfoot className="sticky bottom-0 z-20 bg-slate-100 dark:bg-slate-900 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] border-t-2 border-slate-200 dark:border-slate-700">
                 <tr>
                   {rowReorderable && <td style={getStickyStyles('ROW_REORDER_COL', false, false, true)} className={`p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 ${isRtl ? 'border-l' : 'border-r'}`}></td>}
                   {selectable && <td style={getStickyStyles('SELECT_COL', false, false, true)} className={`p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 ${isRtl ? 'border-l' : 'border-r'}`}></td>}
                   {visibleColumns.map((col, idx) => {
                     const isFirstVisible = idx === 0;
-                    const cellValue = col.summarizable && summaryData[col.field] !== undefined 
+                    const cellValue = summaryRow
+                      ? (col.render ? col.render(summaryRow[col.field], summaryRow) : (summaryRow[col.field] ?? ''))
+                      : col.summarizable && summaryData[col.field] !== undefined
                       ? (col.formatSummary ? col.formatSummary(summaryData[col.field]) : summaryData[col.field].toLocaleString()) 
                       : (isFirstVisible && !col.summarizable ? t('جمع کل:', 'Total:') : '');
                     return (

@@ -28,6 +28,8 @@
       });
     },
     resolveRate = () => 0,
+    buildMonthlyTabRows,
+    buildMonthlyWorkbook,
     buildTree = (accounts) => accounts || [],
     generateMonthlyReportData = async () => ({ kind: 'ok', reportData: null }),
   } = Logic;
@@ -95,8 +97,37 @@
     const [settingsTreeExpandMode, setSettingsTreeExpandMode] = useState('collapse');
     const [loadingTree, setLoadingTree] = useState(false);
     const [generating, setGenerating] = useState(false);
+    const [exporting, setExporting] = useState(false);
+    const reportRunRef = useRef(0);
+    const reportBusyRef = useRef(false);
     const [reportData, setReportData] = useState(null);
     const [gridState, setGridState] = useState(null);
+    const [activeReportTab, setActiveReportTab] = useState('groups');
+    const [tabSelections, setTabSelections] = useState([[], [], [], [], []]);
+    const changeTabSelection = useCallback((index, ids) => {
+      setTabSelections(previous => {
+        const nextIds = [...new Set(ids.map(String))];
+        if (JSON.stringify(previous[index]) === JSON.stringify(nextIds)) return previous;
+        return previous.map((value, i) => i < index ? value : i === index ? nextIds : []);
+      });
+    }, []);
+    useEffect(() => {
+      setTabSelections([[], [], [], [], []]);
+    }, [reportData]);
+    const groupRows = useMemo(() => buildMonthlyTabRows(reportData, 0, null, [], isRtl), [reportData, isRtl]);
+    const ledgerRows = useMemo(() => buildMonthlyTabRows(reportData, 1, groupRows, tabSelections[0], isRtl), [reportData, groupRows, tabSelections[0], isRtl]);
+    const subsidiaryRows = useMemo(() => buildMonthlyTabRows(reportData, 2, ledgerRows, tabSelections[1], isRtl), [reportData, ledgerRows, tabSelections[1], isRtl]);
+    const currencyRows = useMemo(() => buildMonthlyTabRows(reportData, 3, subsidiaryRows, tabSelections[2], isRtl), [reportData, subsidiaryRows, tabSelections[2], isRtl]);
+    const accountRows = useMemo(() => buildMonthlyTabRows(reportData, 4, currencyRows, tabSelections[3], isRtl), [reportData, currencyRows, tabSelections[3], isRtl]);
+    const reportTabs = useMemo(() => [
+      { id: 'groups', label: t('گروه حساب', 'Account Groups'), rows: groupRows },
+      { id: 'ledger', label: t('حساب کل', 'General Ledger'), rows: ledgerRows },
+      { id: 'subsidiary', label: t('حساب معین', 'Subsidiary Accounts'), rows: subsidiaryRows },
+      { id: 'currencies', label: t('ارز', 'Currencies'), rows: currencyRows },
+      { id: 'accounts', label: t('حساب‌ها', 'Accounts'), rows: accountRows },
+    ],
+    [reportData, groupRows, ledgerRows, subsidiaryRows, currencyRows, accountRows, isRtl, t]);
+
     const [cellDrillModal, setCellDrillModal] = useState(() => getInitialCellDrillModal());
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const hasSeededYearsRef = useRef(false);
@@ -476,7 +507,25 @@
       setSelectedIds(ids);
     }, [accountTree]);
 
-    const handleGenerate = useCallback(async () => {
+    useEffect(() => {
+      reportRunRef.current += 1;
+      reportBusyRef.current = false;
+      setGenerating(false);
+      setExporting(false);
+      return () => { reportRunRef.current += 1; };
+    }, [filters, fMonths, selectedIds, fBalanceGroups, availableMonths, currencies, accountMap, reportTree, cal, supabase, isRtl, access.canView, access.canPrint]);
+
+    const runReport = useCallback(async (mode) => {
+      if (reportBusyRef.current) return;
+      const isExport = mode === 'export';
+      if (!access.canView || (isExport && !access.canPrint)) {
+        showToast(t('دسترسی به این عملیات ندارید.', 'You do not have permission for this action.'), 'error');
+        return;
+      }
+      if (isExport && !window.XLSX) {
+        showToast(t('کتابخانه ساخت فایل اکسل در دسترس نیست.', 'Excel library is not available.'), 'error');
+        return;
+      }
       if (fMonths.size === 0) {
         showToast(t('لطفاً حداقل یک دوره مالی انتخاب کنید.', 'Please select at least one fiscal period.'), 'warning');
         return;
@@ -495,8 +544,13 @@
         return;
       }
 
-      setGenerating(true);
-      setReportData(null);
+      const runId = ++reportRunRef.current;
+      reportBusyRef.current = true;
+      if (isExport) setExporting(true);
+      else {
+        setGenerating(true);
+        setReportData(null);
+      }
 
       try {
         const result = await generateMonthlyReportData({
@@ -512,6 +566,8 @@
           isRtl,
         });
 
+        if (runId !== reportRunRef.current) return;
+
         if (result?.kind === 'invalid_months') {
           showToast(t('دوره‌های انتخابی نامعتبر هستند.', 'Invalid selected periods.'), 'warning');
           return;
@@ -522,14 +578,27 @@
           return;
         }
 
-        setReportData(result?.reportData || null);
+        if (!result?.reportData) throw new Error('Report data is unavailable.');
+        if (isExport) {
+          const workbook = buildMonthlyWorkbook(result.reportData, window.XLSX, isRtl);
+          window.XLSX.writeFile(workbook, `balance_monthly_report_${Date.now()}.xlsx`);
+          showToast(t('فایل اکسل آماده و دانلود آغاز شد.', 'Excel file is ready and the download has started.'), 'success');
+        } else setReportData(result.reportData);
       } catch (e) {
+        if (runId !== reportRunRef.current) return;
         console.error('BalanceMonthlyReport: generate error', e);
-        showToast(t('خطا در تولید گزارش', 'Error generating report'), 'error');
+        showToast(isExport ? t('خطا در تهیه خروجی اکسل', 'Error preparing Excel export') : t('خطا در تولید گزارش', 'Error generating report'), 'error');
       } finally {
-        setGenerating(false);
+        if (runId === reportRunRef.current) {
+          reportBusyRef.current = false;
+          setGenerating(false);
+          setExporting(false);
+        }
       }
-    }, [fMonths, selectedIds, filters, fBalanceGroups, availableMonths, cal, currencies, accountMap, reportTree, isRtl, t, showToast, supabase]);
+    }, [fMonths, selectedIds, filters, fBalanceGroups, availableMonths, cal, currencies, accountMap, reportTree, isRtl, t, showToast, supabase, access.canView, access.canPrint]);
+
+    const handleGenerate = useCallback(() => runReport('view'), [runReport]);
+    const handleExport = useCallback(() => runReport('export'), [runReport]);
 
     const openCellDrill = useCallback((row, slot, val) => {
       const nextModalState = createCellDrillModalState({
@@ -555,6 +624,7 @@
         selIds: Array.from(selectedIds),
         showInactiveAccounts,
         gridState,
+        activeReportTab,
       }),
       onApplyState: (state) => {
         if (!state) {
@@ -566,6 +636,7 @@
           setSelectedIds(new Set());
           setShowInactiveAccounts(false);
           setGridState(null);
+          setActiveReportTab('groups');
           setReportData(null);
           return;
         }
@@ -576,9 +647,10 @@
         if (state.fBalanceGroups) setFBalanceGroups(new Set(state.fBalanceGroups));
         if (state.selIds) setSelectedIds(new Set(state.selIds));
         if (typeof state.showInactiveAccounts === 'boolean') setShowInactiveAccounts(state.showInactiveAccounts);
+        if (['groups', 'ledger', 'subsidiary', 'currencies', 'accounts'].includes(state.activeReportTab)) setActiveReportTab(state.activeReportTab);
         if (state.gridState) setGridState(state.gridState);
       },
-    }), [filters, fYears, fMonths, fBalanceGroups, selectedIds, showInactiveAccounts, gridState, defaultYearId]);
+    }), [filters, fYears, fMonths, fBalanceGroups, selectedIds, showInactiveAccounts, gridState, activeReportTab, defaultYearId]);
 
     return {
       isRtl,
@@ -609,6 +681,9 @@
       loadingBalanceGroups,
       loadingTree,
       generating,
+      exporting,
+      canExport: !!access.canView && !!access.canPrint,
+      handleExport,
 
       selectedIds,
       setSelectedIds,
@@ -626,6 +701,11 @@
       setReportData,
       gridState,
       setGridState,
+      activeReportTab,
+      setActiveReportTab,
+      tabSelections,
+      changeTabSelection,
+      reportTabs,
 
       cellDrillModal,
       setCellDrillModal,

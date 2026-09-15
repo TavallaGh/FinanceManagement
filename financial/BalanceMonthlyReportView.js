@@ -12,12 +12,13 @@
   const ChevronRight = LucideIcons.ChevronRight || FallbackIcon;
   const Maximize2 = LucideIcons.Maximize2 || FallbackIcon;
   const Minimize2 = LucideIcons.Minimize2 || FallbackIcon;
+  const FileSpreadsheet = LucideIcons.FileSpreadsheet || FallbackIcon;
   const Check = LucideIcons.Check || FallbackIcon;
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
   const DSGridMod = window.DSGrid || DS || {};
-  const DSTreeMod = window.DSTree || DS || {};
+
   const Feedback = window.DSFeedback || window.DSOverlays || DS || {};
 
   const PageHeader = Core.PageHeader || FallbackComponent;
@@ -28,7 +29,7 @@
   const Toast = Feedback.Toast || FallbackComponent;
   const DataGrid = DSGridMod.DataGrid || FallbackComponent;
   const AdvancedFilter = DSGridMod.AdvancedFilter || FallbackComponent;
-  const TreeGrid = DSTreeMod.TreeGrid || FallbackComponent;
+  const Tabs = Core.Tabs || FallbackComponent;
   const BarChart2 = LucideIcons.BarChart2 || LucideIcons.TrendingUp || FallbackIcon;
   const BalanceMonthlyReportDetailsModal = window.BalanceMonthlyReportDetailsModal || window.BalanceReportDrillModal || FallbackComponent;
 
@@ -234,6 +235,9 @@
     loadingBalanceGroups,
     loadingTree,
     generating,
+    exporting,
+    canExport,
+    handleExport,
     selectedIds,
     setSelectedIds,
     selectedLeafCount,
@@ -248,6 +252,11 @@
     setReportData,
     gridState,
     setGridState,
+    activeReportTab,
+    setActiveReportTab,
+    tabSelections,
+    changeTabSelection,
+    reportTabs,
     cellDrillModal,
     setCellDrillModal,
     toast,
@@ -491,29 +500,12 @@
         field: '_title',
         header_fa: 'حساب / گروه',
         header_en: 'Account / Group',
-        width: '300px',
-        render: (val, row) => {
-          const depth = row._depth || 0;
-          const isGrand = row._type === 'grand_total';
-          const isHdr = row._type === 'group_header';
-          const isCurrency = row._type === 'currency_header';
-          const textCls = isGrand
-            ? 'font-black text-slate-700 dark:text-slate-200'
-            : isHdr
-              ? 'font-bold text-slate-800 dark:text-slate-100'
-              : isCurrency
-                ? 'font-semibold text-teal-700 dark:text-teal-300'
-                : 'font-medium text-slate-700 dark:text-slate-300';
-          return React.createElement('div', {
-            style: { paddingInlineStart: `${depth * 16}px` },
-            className: 'flex items-center gap-1'
-          },
-            isGrand && React.createElement('span', { className: 'text-slate-500 text-[10px] me-0.5' }, '●'),
-            isHdr && React.createElement('span', { className: 'text-indigo-400 text-[10px] me-0.5' }, '■'),
-            isCurrency && React.createElement('span', { className: 'text-teal-400 text-[10px] me-0.5' }, '◆'),
-            React.createElement('span', { className: `text-[12px] leading-tight ${textCls}` }, val || '—')
-          );
-        }
+        width: '200px',
+        render: val => React.createElement('span', {
+          className: 'block whitespace-normal break-words text-[12px] leading-5 font-medium text-slate-700 dark:text-slate-300',
+          style: { maxWidth: '200px', overflowWrap: 'anywhere' },
+          title: val || '',
+        }, val || '\u2014')
       };
 
       const currCol = {
@@ -570,7 +562,7 @@
               }, fmt(bal));
             }
           } else {
-            const isGrand = row._type === 'grand_total';
+            const isGrand = (row._type === 'grand_total' || row._type === 'scope_total');
             const isCurrency = row._type === 'currency_header';
             content = React.createElement('div', { className: 'flex flex-col gap-0.5 leading-4 items-end' },
               isCurrency && renderAmountWithMarker(
@@ -591,10 +583,11 @@
             );
           }
 
-          return React.createElement('button', {
-            type: 'button',
-            className: 'w-full text-right cursor-pointer hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 rounded px-0.5 py-0.5',
-            onClick: () => openCellDrill(row, slot, val),
+          return React.createElement(Button, {
+            variant: 'ghost',
+            size: 'sm',
+            className: 'w-full !h-auto !justify-end text-end cursor-pointer hover:opacity-90 focus:ring-2 focus:ring-indigo-400/30 rounded px-0.5 py-0.5',
+            onClick: (event) => { event.stopPropagation(); openCellDrill(row, slot, val); },
             title: t('کلیک کنید تا اقلام این دوره نمایش داده شود', 'Click to view period transaction items')
           }, content);
         },
@@ -611,8 +604,40 @@
         }
       }));
 
-      return [titleCol, currCol, ...slotCols];
-    }, [reportData, openCellDrill, t, fmt]);
+      const pathCol = {
+        field: '_path', header_fa: 'مسیر حساب', header_en: 'Account Path', width: '200px',
+        render: value => React.createElement('span', {
+          className: 'block whitespace-normal break-words text-[12px] leading-5 text-slate-500 dark:text-slate-400',
+          style: { maxWidth: '200px', overflowWrap: 'anywhere' },
+          title: value || '', dir: isRtl ? 'rtl' : 'ltr',
+        }, value || '\u2014'),
+      };
+      return [pathCol, titleCol, currCol, ...slotCols];
+    }, [reportData, openCellDrill, t, fmt, isRtl]);
+
+    const tabColumns = useMemo(() => reportTabs.map((tab, index) =>
+      columns.filter(column => index === 4 || column.field !== '_currency')
+        .map(column => index === 3 && column.field === '_title'
+          ? { ...column, header_fa: 'ارز', header_en: 'Currency' }
+          : column)
+    ), [columns, reportTabs]);
+    const tabGridStates = useMemo(() => reportTabs.map((tab, index) => {
+      const state = gridState?.tabs?.[tab.id];
+      if (!state) return null;
+      const { layoutVersion, ...savedState } = state;
+      const fields = tabColumns[index].map(column => column.field);
+      const savedOrder = (state.columnOrder || fields).filter(field => fields.includes(field));
+      const order = state.layoutVersion === 2 ? savedOrder : [
+        '_path', '_title', ...savedOrder.filter(field => field !== '_path' && field !== '_title'),
+      ];
+      return {
+        ...savedState,
+        columnOrder: order,
+        pinnedCols: state.layoutVersion === 2
+          ? (state.pinnedCols || []).filter(field => fields.includes(field))
+          : (index === 0 ? ['_title'] : ['_path', '_title']),
+      };
+    }), [gridState, reportTabs, tabColumns]);
 
     const handleClearFilters = useCallback(() => {
       setFilters({ currency: null, show_movements: false });
@@ -736,52 +761,41 @@
 
     const renderGrid = () => {
       if (!reportData) return null;
-      const { slots, groupedRows, grandTotal } = reportData;
-
-      const grandRow = {
-        _id: '__grand_total__', _type: 'grand_total', _depth: 0,
-        _rowClassName: 'bg-slate-100/80 dark:bg-slate-700/40 hover:bg-slate-100 dark:hover:bg-slate-700/50',
-        _title: t('جمع کل (USD / IRR)', 'Grand Total (USD / IRR)'),
-        _currency: '',
-        _leafIds: Array.from(reportData.reportAccountLookup?.keys?.() || []),
-        _rowId: '__grand_total__',
-        _parentRowId: null,
-      };
-      slots.forEach((s) => { grandRow[s.key] = grandTotal[s.key] || { usd: 0, irr: 0 }; });
-
-      const treeRows = [...groupedRows, grandRow];
-
-      const toolbarStartContent = React.createElement('div', { className: 'flex items-center gap-2 px-1' },
-        React.createElement('span', { className: 'text-[12px] text-slate-500 dark:text-slate-400 whitespace-nowrap font-bold' },
-          t(
-            `${selectedLeafCount} حساب انتخابی · ${slots.length} دوره`,
-            `${selectedLeafCount} selected accounts · ${slots.length} periods`
-          )
-        )
-      );
-
       return React.createElement('div', { className: 'h-full flex flex-col min-h-0' },
-        React.createElement('div', { className: 'flex-1 min-h-0' },
-          React.createElement(TreeGrid, {
-            key: `bmr-tree-${slots.length}-${groupedRows.length}`,
-            data: treeRows,
-            idField: '_rowId',
-            parentField: '_parentRowId',
-            columns,
-            defaultPinnedCols: ['_title', '_currency'],
-            actions: [],
-            selectable: false,
-            language,
-            formCode,
-            gridState,
-            onGridStateChange: setGridState,
-            toolbarStartContent,
-            placeExpandControlsOnEnd: false,
-            placeSearchBeforeExpandControls: false,
-            exportFileName: `balance_monthly_report_${new Date().getTime()}.csv`,
-            onExport: () => showToast(t('خروجی گزارش آماده شد.', 'Report export completed.'), 'success'),
-          })
-        )
+        React.createElement(Tabs, {
+          tabs: reportTabs.map((tab, index) => ({
+            id: tab.id,
+            label: tab.label + (tabSelections[index].length ? ' (' + tabSelections[index].length + ')' : ''),
+          })),
+          activeTab: activeReportTab,
+          onChange: setActiveReportTab,
+          className: 'mb-0',
+        }),
+        reportTabs.map((tab, index) => React.createElement('div', {
+          key: tab.id,
+          style: { display: activeReportTab === tab.id ? 'flex' : 'none' },
+          className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden',
+        }, React.createElement(DataGrid, {
+          data: tab.rows,
+          columns: tabColumns[index],
+          defaultPinnedCols: index === 0 ? ['_title'] : ['_path', '_title'],
+          defaultHiddenCols: index === 0 ? ['_path'] : [],
+          selectable: index < 4,
+          selectedRowIds: tabSelections[index],
+          onSelectionChange: ids => changeTabSelection(index, ids),
+          language,
+          formCode,
+          hideImport: true,
+          hideExport: true,
+          gridState: tabGridStates[index],
+          onGridStateChange: state => setGridState(previous => ({
+            ...previous, tabs: { ...previous?.tabs, [tab.id]: { ...state, layoutVersion: 2 } },
+          })),
+          toolbarContent: index === 0 ? React.createElement('span', {
+            className: 'text-[12px] text-slate-500 dark:text-slate-400 whitespace-normal',
+          }, t('با انتخاب ردیف در تب‌های قبلی، اطلاعات تب‌های بعدی فیلتر می‌شود. بدون انتخاب، همه موارد دامنه قبلی نمایش داده می‌شوند.', 'Select rows in earlier tabs to filter the following tabs. No selection means all rows in the previous scope.')) : null,
+
+        })))
       );
     };
 
@@ -821,8 +835,8 @@
           language,
           viewConfig,
           description: t(
-            'موجودی ماهیانه حساب‌ها با گروه‌بندی درختی و تجمیع به USD / IRR',
-            'Monthly account balances with hierarchical grouping and USD / IRR aggregation'
+            'موجودی ماهیانه به تفکیک سطوح حساب و ارز با تجمیع به USD / IRR',
+            'Monthly balances by account level and currency with USD / IRR aggregation'
           ),
           breadcrumbs: [
             { label: t('مدیریت مالی', 'Financial Management') },
@@ -838,6 +852,11 @@
             onFilter: handleAdvancedFilterChange,
             onClear: handleClearFilters,
             onSearch: handleGenerate,
+            searchDisabled: generating || exporting,
+            actionContent: canExport && React.createElement(Button, {
+              variant: 'outline', size: 'sm', icon: FileSpreadsheet,
+              onClick: handleExport, isLoading: exporting, disabled: generating || exporting,
+            }, t('دریافت خروجی اکسل', 'Export Excel')),
             language,
             defaultOpen: true,
             inlineChildren: false,

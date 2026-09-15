@@ -83,7 +83,8 @@
     };
   };
 
-    const TransactionReviewView = ({
+    const TransactionReviewView = (props) => {
+    const {
       language = 'fa',
       formCode = 'FIN_TRANSACTION_REVIEW',
       isRtl,
@@ -127,7 +128,7 @@
       txGroups,
       statusColors,
       statusLabels,
-    }) => {
+    } = props;
     const BackIcon = isRtl ? ChevronRight : ChevronLeft;
     const showCurrencySummary = !!filterState.summary_currency;
     const [documentsGridState, setDocumentsGridState] = useState(null);
@@ -140,6 +141,60 @@
     const [accountsGridState, setAccountsGridState] = useState(null);
     const [groupDrillId, setGroupDrillId] = useState(null);
     const [groupDrillGridState, setGroupDrillGridState] = useState(null);
+    // Separate-tab drilldown shares report data, but must not apply saved report views.
+    const [documentTab, setDocumentTab] = useState(null);
+    useEffect(() => {
+      if (!documentTab) return;
+      const targetDocument = documentTab.popup.document;
+      // Tailwind's runtime watches the main document, not React portal documents.
+      // Mirror only class names so newly rendered document styles are generated there.
+      const classMirror = document.createElement('span');
+      classMirror.hidden = true;
+      classMirror.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(classMirror);
+      const mirrorClasses = () => {
+        const classes = new Set();
+        documentTab.container.querySelectorAll('[class]').forEach(node => {
+          node.classList.forEach(name => classes.add(name));
+        });
+        const className = Array.from(classes).sort().join(' ');
+        if (classMirror.className !== className) classMirror.className = className;
+      };
+      let copiedStyles = [];
+      const syncStyles = () => {
+        if (documentTab.popup.closed) return;
+        const nextStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'), node => {
+          const clone = node.cloneNode(true);
+          if (node.tagName === 'STYLE' && !clone.textContent && node.sheet) {
+            clone.textContent = Array.from(node.sheet.cssRules, rule => rule.cssText).join('\n');
+          }
+          targetDocument.head.appendChild(clone);
+          return clone;
+        });
+        copiedStyles.forEach(node => node.remove());
+        copiedStyles = nextStyles;
+        targetDocument.documentElement.className = document.documentElement.className;
+        targetDocument.body.className = document.body.className;
+      };
+      const contentObserver = new MutationObserver(mirrorClasses);
+      contentObserver.observe(documentTab.container, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+      const styleObserver = new MutationObserver(syncStyles);
+      styleObserver.observe(document.head, { subtree: true, childList: true, characterData: true, attributes: true });
+      styleObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      styleObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+      mirrorClasses();
+      syncStyles();
+      const onClose = () => setDocumentTab(current => current === documentTab ? null : current);
+      documentTab.popup.addEventListener('pagehide', onClose);
+      return () => {
+        contentObserver.disconnect();
+        styleObserver.disconnect();
+        classMirror.remove();
+        copiedStyles.forEach(node => node.remove());
+        documentTab.popup.removeEventListener('pagehide', onClose);
+        if (!documentTab.popup.closed) documentTab.popup.close();
+      };
+    }, [documentTab]);
     const handleDocumentSelectionChange = useCallback((ids) => {
       const nextIds = (ids || []).map(String);
       setSelectedDocumentIds(previous => (
@@ -164,7 +219,7 @@
       });
     }, [showCurrencySummary]);
 
-    const viewConfig = useMemo(() => ({
+    const viewConfig = useMemo(() => props.isDocumentTab ? null : ({
       pageId: 'transaction_review',
       currentState: () => ({
         filterState,
@@ -197,7 +252,7 @@
         if (state.centersGridState) setCentersGridState(state.centersGridState);
         if (state.accountsGridState) setAccountsGridState(state.accountsGridState);
       },
-    }), [activeTab, filterState, itemsGridState, documentsGridState, costsGridState, incomesGridState, centersGridState, accountsGridState, setActiveTab, setFilterState]);
+    }), [props.isDocumentTab, activeTab, filterState, itemsGridState, documentsGridState, costsGridState, incomesGridState, centersGridState, accountsGridState, setActiveTab, setFilterState]);
 
     const COST_TYPE_LOOKUP = useMemo(() => new Map((lookups.costTypes || []).map(item => [String(item.id), item])), [lookups.costTypes]);
     const INCOME_TYPE_LOOKUP = useMemo(() => new Map((lookups.incomeTypes || []).map(item => [String(item.id), item])), [lookups.incomeTypes]);
@@ -331,7 +386,7 @@
       }
     }, [dateLocale]);
 
-    const openDocumentDrill = useCallback((row) => {
+    const getDocumentFromRow = useCallback((row) => {
       if (!row) return;
       const docFromRow = row._tx || {
         id: row._doc_id || row.transaction_id || row.id,
@@ -351,10 +406,41 @@
         department_id: row._tx?.department_id || row.department_id || '',
         daily_number: row._tx?.daily_number || row.daily_number || '',
       };
-      if (!docFromRow?.id && !docFromRow?.document_code) return;
+      return docFromRow?.id || docFromRow?.document_code ? docFromRow : null;
+    }, []);
+
+    const openDocumentDrill = useCallback((row) => {
+      const docFromRow = getDocumentFromRow(row);
+      if (!docFromRow) return;
       setGroupDrillId(null);
       setDrillDoc(docFromRow);
-    }, [setDrillDoc]);
+    }, [setDrillDoc, getDocumentFromRow]);
+
+    const openDocumentTab = useCallback((row) => {
+      const doc = getDocumentFromRow(row);
+      if (!doc || !window.ReactDOM?.createPortal) return;
+      const popup = window.open('about:blank', '_blank');
+      if (!popup) {
+        setToast({ isVisible: true, type: 'warning', message: t('مرورگر تب جدید را مسدود کرده است. اجازهٔ بازشدن پنجره را برای این سایت فعال کنید.', 'The browser blocked the new tab. Allow popups for this site.') });
+        return;
+      }
+      popup.document.title = `${t('سند', 'Document')} ${doc.document_code || ''}`;
+      popup.document.documentElement.lang = language;
+      popup.document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+      popup.document.documentElement.className = document.documentElement.className;
+      const base = popup.document.createElement('base');
+      base.href = document.baseURI;
+      popup.document.head.appendChild(base);
+      const viewport = popup.document.createElement('meta');
+      viewport.name = 'viewport';
+      viewport.content = 'width=device-width, initial-scale=1.0';
+      popup.document.head.appendChild(viewport);
+      popup.document.body.className = document.body.className;
+      const container = popup.document.createElement('div');
+      container.style.height = '100vh';
+      popup.document.body.appendChild(container);
+      setDocumentTab({ popup, container, doc });
+    }, [getDocumentFromRow, isRtl, language, setToast, t]);
 
     const {
       groupedCostRows,
@@ -548,7 +634,17 @@
       },
     ]), [itemsColumns, openGroupDrill, t]);
 
-    const groupDrillColumns = useMemo(() => itemsColumns.filter(col => col.field !== '_tx_type'), [itemsColumns]);
+    const groupDrillColumns = useMemo(() => itemsColumns.filter(col => col.field !== '_tx_type').map(col =>
+      col.field !== '_doc_code' ? col : {
+        ...col,
+        render: (val, row) => React.createElement('button', {
+          type: 'button',
+          className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px] hover:underline cursor-pointer',
+          title: t('نمایش سند در تب جدید', 'View document in a new tab'),
+          onClick: (event) => { event.stopPropagation(); openDocumentTab(row); },
+        }, val || '-'),
+      }
+    ), [itemsColumns, openDocumentTab, t]);
 
     const groupedAccountColumns = useMemo(() => groupedItemsColumns.filter(col => col.field !== 'remained_amount').map(col =>
       col.field === '_treeLabel' ? { ...col, header_fa: 'حساب', header_en: 'Account' } : col
@@ -703,15 +799,15 @@
         drillDoc && React.createElement('div', { className: 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shrink-0' },
           React.createElement('div', { className: 'px-4 py-2 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40 gap-2' },
             React.createElement('div', { className: 'flex items-center gap-3 min-w-0' },
-              React.createElement(Button, { variant: 'ghost', size: 'sm', icon: BackIcon, onClick: () => setDrillDoc(null) }, t('بازگشت به لیست', 'Back to List')),
+              React.createElement(Button, { variant: 'ghost', size: 'sm', icon: BackIcon, onClick: () => setDrillDoc(null) }, props.isDocumentTab ? t('بستن تب سند', 'Close Document Tab') : t('بازگشت به لیست', 'Back to List')),
               React.createElement('div', { className: 'w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0' }),
               React.createElement('span', { className: 'text-[13px] font-bold text-slate-700 dark:text-slate-200 truncate' }, t('مشاهده سند تراکنش', 'View Transaction Document')),
               React.createElement('span', { className: 'text-slate-300 dark:text-slate-600 select-none' }, '·'),
               React.createElement('span', { className: 'text-[12px] font-bold text-indigo-600 dark:text-indigo-400', dir: 'ltr' }, drillDoc.document_code || '—')
             ),
             React.createElement('div', { className: 'flex items-center gap-1.5 shrink-0' },
-              React.createElement(Badge, { variant: 'slate', size: 'sm' }, txTypes[drillDoc.transaction_type] || drillDoc.transaction_type || '-'),
-              drillDoc.status && React.createElement(Badge, { variant: statusColors[drillDoc.status] || 'gray', size: 'sm' }, statusLabels[drillDoc.status] || drillDoc.status)
+              React.createElement(Badge, { variant: 'slate', size: 'sm' }, `${t('نوع سند', 'Document Type')}: ${txTypes[drillDoc.transaction_type] || drillDoc.transaction_type || '-'}`),
+              React.createElement(Badge, { variant: statusColors[drillDoc.status] || 'gray', size: 'sm' }, `${t('وضعیت', 'Status')}: ${statusLabels[drillDoc.status] || drillDoc.status || '-'}`)
             )
           ),
 
@@ -940,6 +1036,24 @@
         React.createElement('div', { className: 'p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg' },
           React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => setAttachModal({ isOpen: false, record: null, files: [] }) }, t('بستن', 'Close'))
         )
+      ),
+
+      documentTab && !documentTab.popup.closed && window.ReactDOM.createPortal(
+        React.createElement(TransactionReviewView, {
+          ...props,
+          isDocumentTab: true,
+          drillDoc: documentTab.doc,
+          setDrillDoc: () => setDocumentTab(null),
+          activeDrillData: (documentTab.doc.fm_transaction_items || []).map(item => ({
+            ...item,
+            _doc_code: documentTab.doc.document_code,
+            _doc_date: documentTab.doc.document_date,
+            _tx_type: documentTab.doc.transaction_type,
+          })),
+          attachModal: { isOpen: false, files: [] },
+          toast: { isVisible: false },
+        }),
+        documentTab.container
       ),
 
       React.createElement(Toast, {
