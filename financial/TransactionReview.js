@@ -41,6 +41,12 @@
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const toIso = (d) => (d ? String(d).replace(/\//g, '-') : '');
+  const getSelectedIds = (value) => new Set(
+    (Array.isArray(value) ? value : value == null || value === '' ? [] : [value])
+      .map(item => item?.id ?? item)
+      .filter(id => id != null && id !== '')
+      .map(String)
+  );
 
   const fmt = (num) => {
     if (num === null || num === undefined) return '—';
@@ -195,6 +201,9 @@
       filter_value:        null,
       transaction_types:   [],
       document_statuses:   [],
+      cost_type_ids:       [],
+      income_type_ids:     [],
+      center_ids:          [],
       summary_currency:    false,
     };
   };
@@ -335,7 +344,7 @@
         const [costRes, incRes, cbcRes] = await Promise.all([
           supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
           supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
-          supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active')
+          supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)')
         ]);
 
         const buildTree = (rows = []) => {
@@ -366,6 +375,10 @@
             ...row,
             titleFa: row.title_fa || '',
             titleEn: row.title_en || '',
+            centerKind: row.center_kind || '',
+            isActive: row.is_active ?? true,
+            managerName: row.manager ? `${row.manager.first_name || ''} ${row.manager.last_name || ''}`.trim() : '',
+            officeName: row.office?.title || '',
           })),
         });
       } catch (e) {
@@ -497,7 +510,7 @@
     const handleFilterChange = useCallback((newValues) => {
       setFilterState(prev => {
         if (newValues.account_filter_type !== prev.account_filter_type) {
-          return { ...newValues, filter_value: null };
+          return { ...newValues, filter_value: newValues.account_filter_type === 'account' ? [] : null };
         }
         return newValues;
       });
@@ -506,6 +519,11 @@
     // ── Search / fetch data ───────────────────────────────────────────────────
     const handleSearch = useCallback(async (formValues) => {
       const { date_type, date_from, date_to, account_filter_type, filter_value, transaction_types, document_statuses } = formValues;
+
+      if (!['registered_at', 'created_at'].includes(date_type)) {
+        showToast(t('لطفاً نوع تاریخ را مشخص کنید.', 'Please select a date type.'), 'warning');
+        return;
+      }
 
       if (!date_from || !date_to) {
         showToast(t('لطفاً بازه تاریخی را مشخص کنید.', 'Please specify a date range.'), 'warning');
@@ -559,10 +577,10 @@
         let txList = txData || [];
 
         // Apply account / balance-group filter client-side
-        if (account_filter_type === 'account' && filter_value) {
-          const accountId = typeof filter_value === 'object' ? filter_value.id : filter_value;
-          txList = txList.filter(tx =>
-            (tx.fm_transaction_items || []).some(item => item.account_id === accountId)
+        if (account_filter_type === 'account') {
+          const accountIds = getSelectedIds(filter_value);
+          if (accountIds.size > 0) txList = txList.filter(tx =>
+            (tx.fm_transaction_items || []).some(item => accountIds.has(String(item.account_id)))
           );
         } else if (account_filter_type === 'balance_group' && filter_value) {
           const groupId = typeof filter_value === 'object' ? filter_value.id : filter_value;
@@ -620,18 +638,36 @@
       return t(`${selectedSet.size} وضعیت انتخاب شده`, `${selectedSet.size} statuses selected`);
     }, [t]);
 
+    const centerLovColumns = useMemo(() => [
+      { field: isRtl ? 'titleFa' : 'titleEn', header_fa: 'عنوان مرکز', header_en: 'Center Title', width: '150px', render: (val, row) => React.createElement('div', { className: 'flex items-center gap-2' },
+        React.createElement('span', { className: 'font-bold text-slate-800 dark:text-slate-200' }, val || row.titleFa),
+        !row.isActive && React.createElement('span', { className: 'text-[10px] px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 font-medium shrink-0' }, t('غیرفعال', 'Inactive'))
+      ) },
+      { field: 'managerName', header_fa: 'مسئول', header_en: 'Manager', width: '112px' },
+      { field: 'centerKind', header_fa: 'گروه مرکز', header_en: 'Center Group', width: '82px', render: val => ({
+        DEPARTMENT: t('دپارتمان', 'Department'), TEAM: t('تیم', 'Team'), PROJECT: t('پروژه', 'Project'), OTHER: t('سایر', 'Other'),
+      })[val] || val },
+      { field: 'officeName', header_fa: 'محل مرکز', header_en: 'Location', width: '112px' },
+    ], [isRtl, t]);
+    const typeLovColumns = useMemo(() => [
+      { field: 'code', header_fa: 'کد', header_en: 'Code', width: '68px' },
+      { field: 'displayLabel', header_fa: 'عنوان', header_en: 'Title', width: '150px' },
+      { field: 'pathTitle', header_fa: 'مسیر', header_en: 'Path', width: '172px' },
+    ], []);
+
     const filterFields = useMemo(() => [
       {
         name: 'date_type',
         label: t('نوع تاریخ', 'Date Type'),
         type: 'select',
+        required: true,
         options: [
           { value: 'registered_at', label: t('تاریخ تراکنش', 'Transaction Date') },
           { value: 'created_at', label: t('تاریخ ایجاد', 'Creation Date') },
         ],
       },
-      { name: 'date_from', label: t('از تاریخ', 'From Date'), type: 'date' },
-      { name: 'date_to', label: t('تا تاریخ', 'To Date'), type: 'date' },
+      { name: 'date_from', label: t('از تاریخ', 'From Date'), type: 'date', required: true },
+      { name: 'date_to', label: t('تا تاریخ', 'To Date'), type: 'date', required: true },
       {
         name: 'transaction_types',
         type: 'custom',
@@ -697,23 +733,24 @@
             name: 'filter_value',
             label: t('حساب', 'Account'),
             type: 'lov',
+            multiple: true,
             lovData: accountLovData,
             lovColumns: [
-              { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '80px' },
-              { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '80px' },
+              { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '60px' },
+              { field: 'code', header_fa: 'کد حساب', header_en: 'Account Code', width: '60px' },
               {
                 field: 'displayLabel',
                 header_fa: 'عنوان حساب',
                 header_en: 'Account Title',
-                width: '240px',
+                width: '180px',
                 render: (val, row) => React.createElement('div', { className: 'flex flex-col' },
                   React.createElement('span', { className: 'font-bold text-slate-800 dark:text-slate-200' }, val),
                   row.pathTitle && React.createElement('span', { className: 'text-[10px] text-slate-500 truncate', title: row.pathTitle }, row.pathTitle)
                 )
               },
-              { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '60px' },
+              { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '45px' },
             ],
-            dropdownWidth: 'min-w-[540px] max-w-[540px]',
+            dropdownWidth: 'min-w-[405px] max-w-[405px]',
           }
         : {
             name: 'filter_value',
@@ -721,12 +758,15 @@
             type: 'lov',
             lovData: balanceGroups,
             lovColumns: [
-              { field: 'code', header_fa: 'کد', header_en: 'Code', width: '70px' },
-              { field: 'title_fa', header_fa: 'عنوان گروه بالانس', header_en: 'Balance Group', width: '220px' },
+              { field: 'code', header_fa: 'کد', header_en: 'Code', width: '52px' },
+              { field: 'title_fa', header_fa: 'عنوان گروه بالانس', header_en: 'Balance Group', width: '165px' },
             ],
-            dropdownWidth: 'min-w-[340px]',
+            dropdownWidth: 'min-w-[255px]',
           },               
-    ], [t, filterState.account_filter_type, accountLovData, balanceGroups, TRANSACTION_TYPE_OPTIONS, DOCUMENT_STATUS_OPTIONS, transactionTypeSummary, documentStatusSummary, handleFilterChange]);
+      { name: 'cost_type_ids', label: t('نوع هزینه', 'Cost Type'), type: 'lov', multiple: true, lovData: lookups.costTypes, lovColumns: typeLovColumns, dropdownWidth: 'min-w-[420px]' },
+      { name: 'income_type_ids', label: t('نوع درآمد', 'Income Type'), type: 'lov', multiple: true, lovData: lookups.incomeTypes, lovColumns: typeLovColumns, dropdownWidth: 'min-w-[420px]' },
+      { name: 'center_ids', label: t('مرکز هزینه/درآمد', 'Cost/Income Center'), type: 'lov', multiple: true, lovData: lookups.costBenefitCenters, lovColumns: centerLovColumns, dropdownWidth: 'min-w-[495px]' },
+    ], [t, isRtl, filterState.account_filter_type, accountLovData, balanceGroups, TRANSACTION_TYPE_OPTIONS, DOCUMENT_STATUS_OPTIONS, transactionTypeSummary, documentStatusSummary, handleFilterChange, lookups, centerLovColumns, typeLovColumns]);
 
     const TX_TYPES = {
       OPENING: t('افتتاحیه', 'Opening'),
@@ -759,22 +799,19 @@
     const INCOME_TYPE_LOOKUP = useMemo(() => new Map((lookups.incomeTypes || []).map(item => [String(item.id), item])), [lookups.incomeTypes]);
     const CENTER_LOOKUP = useMemo(() => new Map((lookups.costBenefitCenters || []).map(item => [String(item.id), item])), [lookups.costBenefitCenters]);
 
-    const { documentsGridData, itemsGridData } = useMemo(() => {
+    const { documentsGridData, itemsGridData: matchingGridItems } = useMemo(() => {
       if (!transactions) return { documentsGridData: [], itemsGridData: [] };
 
-      const filterAccountId =
-        appliedFilters?.account_filter_type === 'account' && appliedFilters?.filter_value
-          ? (typeof appliedFilters.filter_value === 'object'
-              ? appliedFilters.filter_value.id
-              : appliedFilters.filter_value)
-          : null;
+      const filterAccountIds = appliedFilters?.account_filter_type === 'account'
+        ? getSelectedIds(appliedFilters.filter_value)
+        : new Set();
 
       const items = [];
       const balanceByAccount = new Map();
 
       transactions.forEach(tx => {
         (tx.fm_transaction_items || []).forEach(item => {
-          if (filterAccountId && item.account_id !== filterAccountId) return;
+          if (filterAccountIds.size > 0 && !filterAccountIds.has(String(item.account_id))) return;
           const rawDep = parseFloat(item.deposit_amount || 0);
           const rawWid = parseFloat(item.withdrawal_amount || 0);
           const signedAmount = rawDep > 0 ? rawDep : (rawWid > 0 ? -rawWid : 0);
@@ -811,15 +848,36 @@
         });
       });
 
-      const filteredItems = selectedDocumentIds.length > 0
-        ? items.filter(item => selectedDocumentIds.includes(String(item._doc_id)))
-        : items;
+      const toIdSet = values => new Set((Array.isArray(values) ? values : []).map(value => String(value?.id ?? value)));
+      const costIds = toIdSet(appliedFilters?.cost_type_ids);
+      const incomeIds = toIdSet(appliedFilters?.income_type_ids);
+      const centerIds = toIdSet(appliedFilters?.center_ids);
+      const hasItemFilters = filterAccountIds.size > 0 || costIds.size > 0 || incomeIds.size > 0 || centerIds.size > 0;
+      const matchingItems = items.filter(item => {
+        const matchesType = (!costIds.size && !incomeIds.size)
+          || (String(item.transaction_group).toUpperCase() === 'COST' && costIds.has(String(item.cost_type_id)))
+          || (String(item.transaction_group).toUpperCase() === 'INCOME' && incomeIds.has(String(item.income_type_id)));
+        return matchesType && (!centerIds.size || centerIds.has(String(item.center_id)));
+      });
+      const itemsByDocument = new Map();
+      if (hasItemFilters) matchingItems.forEach(item => {
+        const key = String(item._doc_id);
+        if (!itemsByDocument.has(key)) itemsByDocument.set(key, []);
+        itemsByDocument.get(key).push(item);
+      });
 
       return {
-        documentsGridData: transactions,
-        itemsGridData: filteredItems,
+        documentsGridData: hasItemFilters
+          ? transactions.filter(tx => itemsByDocument.has(String(tx.id)))
+            .map(tx => ({ ...tx, fm_transaction_items: itemsByDocument.get(String(tx.id)) }))
+          : transactions,
+        itemsGridData: matchingItems,
       };
-    }, [transactions, appliedFilters, selectedDocumentIds]);
+    }, [transactions, appliedFilters]);
+
+    const itemsGridData = useMemo(() => selectedDocumentIds.length > 0
+      ? matchingGridItems.filter(item => selectedDocumentIds.includes(String(item._doc_id)))
+      : matchingGridItems, [matchingGridItems, selectedDocumentIds]);
 
     const activeDrillData = useMemo(() => {
       if (!drillDoc) return [];

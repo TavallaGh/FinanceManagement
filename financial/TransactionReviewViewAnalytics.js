@@ -151,7 +151,9 @@
       sortedGroups.forEach((entry) => {
         const groupRowId = `cost-g-${entry._groupKey}`;
         rows.push({
+          id: groupRowId,
           _rowId: groupRowId,
+          _items: entry._items,
           _parentRowId: null,
           _nodeType: 'group',
           _summaryMode: 'converted_only',
@@ -173,23 +175,11 @@
           net_irr_total: entry.net_irr_total,
         });
 
-        (entry._items || []).forEach((item, idx) => {
-          const itemId = item.id || `${item._doc_id || 'doc'}-${item.row_number || idx}`;
-          rows.push({
-            ...item,
-            _rowId: `cost-i-${entry._groupKey}-${itemId}-${idx}`,
-            _parentRowId: groupRowId,
-            _nodeType: 'item',
-            _treeLabel: '',
-            _groupLabel: '',
-            item_count: '',
-            doc_count: '',
-            amount_total: getItemAmountByGroup(item),
-          });
-        });
+
       });
 
       rows.push({
+        id: 'cost-total',
         _rowId: 'cost-total',
         _parentRowId: null,
         _nodeType: 'total',
@@ -287,7 +277,9 @@
       sortedGroups.forEach((entry) => {
         const groupRowId = `income-g-${entry._groupKey}`;
         rows.push({
+          id: groupRowId,
           _rowId: groupRowId,
+          _items: entry._items,
           _parentRowId: null,
           _nodeType: 'group',
           _summaryMode: 'converted_only',
@@ -309,23 +301,11 @@
           net_irr_total: entry.net_irr_total,
         });
 
-        (entry._items || []).forEach((item, idx) => {
-          const itemId = item.id || `${item._doc_id || 'doc'}-${item.row_number || idx}`;
-          rows.push({
-            ...item,
-            _rowId: `income-i-${entry._groupKey}-${itemId}-${idx}`,
-            _parentRowId: groupRowId,
-            _nodeType: 'item',
-            _treeLabel: '',
-            _groupLabel: '',
-            item_count: '',
-            doc_count: '',
-            amount_total: getItemAmountByGroup(item),
-          });
-        });
+
       });
 
       rows.push({
+        id: 'income-total',
         _rowId: 'income-total',
         _parentRowId: null,
         _nodeType: 'total',
@@ -440,7 +420,9 @@
       sortedGroups.forEach((entry) => {
         const groupRowId = `center-g-${entry._groupKey}`;
         rows.push({
+          id: groupRowId,
           _rowId: groupRowId,
+          _items: entry._items,
           _parentRowId: null,
           _nodeType: 'group',
           _summaryMode: 'converted_only',
@@ -465,27 +447,11 @@
           net_irr_total: entry.net_irr_total,
         });
 
-        (entry._items || []).forEach((item, idx) => {
-          const amount = getItemAmountByGroup(item);
-          const group = String(item.transaction_group || '').toUpperCase();
-          const itemId = item.id || `${item._doc_id || 'doc'}-${item.row_number || idx}`;
-          rows.push({
-            ...item,
-            _rowId: `center-i-${entry._groupKey}-${itemId}-${idx}`,
-            _parentRowId: groupRowId,
-            _nodeType: 'item',
-            _treeLabel: '',
-            _groupLabel: '',
-            item_count: '',
-            doc_count: '',
-            cost_total: group === 'COST' ? amount : 0,
-            income_total: group === 'INCOME' ? amount : 0,
-            net_total: group === 'INCOME' ? amount : -amount,
-          });
-        });
+
       });
 
       rows.push({
+        id: 'center-total',
         _rowId: 'center-total',
         _parentRowId: null,
         _nodeType: 'total',
@@ -609,7 +575,9 @@
       sortedGroups.forEach((entry) => {
         const groupRowId = `account-g-${entry._groupKey}`;
         rows.push({
+          id: groupRowId,
           _rowId: groupRowId,
+          _items: entry._items,
           _parentRowId: null,
           _nodeType: 'group',
           _summaryMode: 'account_with_converted',
@@ -635,30 +603,11 @@
           net_irr_total: entry.net_irr_total,
         });
 
-        (entry._items || []).forEach((item, idx) => {
-          const amount = getItemAmountByGroup(item);
-          const action = String(item.transaction_action || '').toUpperCase();
-          const isDeposit = action
-            ? action === 'DEPOSIT'
-            : toNum(item.deposit_amount) > 0;
-          const itemId = item.id || `${item._doc_id || 'doc'}-${item.row_number || idx}`;
-          rows.push({
-            ...item,
-            _rowId: `account-i-${entry._groupKey}-${itemId}-${idx}`,
-            _parentRowId: groupRowId,
-            _nodeType: 'item',
-            _treeLabel: '',
-            _groupLabel: '',
-            item_count: '',
-            doc_count: '',
-            deposit_total: isDeposit ? amount : 0,
-            withdrawal_total: isDeposit ? 0 : amount,
-            net_total: isDeposit ? amount : -amount,
-          });
-        });
+
       });
 
       rows.push({
+        id: 'account-total',
         _rowId: 'account-total',
         _parentRowId: null,
         _nodeType: 'total',

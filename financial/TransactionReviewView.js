@@ -18,7 +18,6 @@
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
   const DSGrid = window.DSGrid || DS || {};
-  const DSTree = window.DSTree || DS || {};
   const DSForms = window.DSForms || DS || {};
   const DSFeedback = window.DSFeedback || DS || {};
 
@@ -28,7 +27,6 @@
   const Button = Core.Button || FallbackComponent;
   const Tabs = Core.Tabs || FallbackComponent;
   const DataGrid = DSGrid.DataGrid || FallbackComponent;
-  const TreeGrid = DSTree.TreeGrid || FallbackComponent;
   const AdvancedFilter = DSGrid.AdvancedFilter || FallbackComponent;
   const AttachmentManager = DSForms.AttachmentManager || FallbackComponent;
   const Modal = DSFeedback.Modal || FallbackComponent;
@@ -78,6 +76,9 @@
       filter_value: null,
       transaction_types: [],
       document_statuses: [],
+      cost_type_ids: [],
+      income_type_ids: [],
+      center_ids: [],
       summary_currency: false,
     };
   };
@@ -137,6 +138,22 @@
     const [incomesGridState, setIncomesGridState] = useState(null);
     const [centersGridState, setCentersGridState] = useState(null);
     const [accountsGridState, setAccountsGridState] = useState(null);
+    const [groupDrillId, setGroupDrillId] = useState(null);
+    const [groupDrillGridState, setGroupDrillGridState] = useState(null);
+    const handleDocumentSelectionChange = useCallback((ids) => {
+      const nextIds = (ids || []).map(String);
+      setSelectedDocumentIds(previous => (
+        previous.length === nextIds.length && previous.every((id, index) => id === nextIds[index])
+          ? previous
+          : nextIds
+      ));
+    }, [setSelectedDocumentIds]);
+    const openGroupDrill = useCallback((row) => {
+      if (row?._nodeType !== 'group') return;
+      setGroupDrillGridState(null);
+      setGroupDrillId(row._rowId);
+    }, []);
+
 
     useEffect(() => {
       setItemsGridState(prev => {
@@ -335,6 +352,7 @@
         daily_number: row._tx?.daily_number || row.daily_number || '',
       };
       if (!docFromRow?.id && !docFromRow?.document_code) return;
+      setGroupDrillId(null);
       setDrillDoc(docFromRow);
     }, [setDrillDoc]);
 
@@ -351,6 +369,13 @@
       accountsMap,
       fmt,
     });
+
+    const groupDrillRow = useMemo(() => (
+      [...groupedAccountRows, ...groupedCostRows, ...groupedIncomeRows, ...groupedCenterRows]
+        .find(row => row._rowId === groupDrillId)
+    ), [groupDrillId, groupedAccountRows, groupedCostRows, groupedIncomeRows, groupedCenterRows]);
+
+    useEffect(() => { setGroupDrillId(null); }, [itemsGridData, activeTab]);
 
     const itemsColumns = useMemo(() => [
       { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val, row) => {
@@ -496,45 +521,47 @@
 
     const groupedItemsColumns = useMemo(() => ([
       {
-        field: '_treeLabel',
-        header_fa: 'گروه',
-        header_en: 'Group',
-        width: '180px',
-        render: (val, row) => {
-          if (row._nodeType === 'item') return React.createElement('span', { className: 'text-slate-300 dark:text-slate-600' }, '-');
-          return React.createElement('span', { className: 'text-[12px] font-semibold text-slate-700 dark:text-slate-200' }, val || '-');
-        }
+        field: '_treeLabel', header_fa: 'گروه', header_en: 'Group', width: '240px',
+        render: (val, row) => row._isTotal
+          ? React.createElement('span', { className: 'font-bold' }, val)
+          : React.createElement('button', {
+              type: 'button',
+              className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px] hover:underline text-start',
+              title: t('نمایش اقلام سند این گروه', 'View transaction items in this group'),
+              onClick: (event) => { event.stopPropagation(); openGroupDrill(row); },
+            }, val || '-'),
       },
-      ...itemsColumns
-    ]), [itemsColumns]);
+      { field: 'doc_count', header_fa: 'تعداد اسناد', header_en: 'Documents', width: '90px' },
+      { field: 'item_count', header_fa: 'تعداد اقلام', header_en: 'Items', width: '90px' },
+      ...itemsColumns.filter(col => ['currency', 'deposit_amount', 'withdrawal_amount', 'remained_amount'].includes(col.field)),
+      {
+        field: 'net_usd_total', header_fa: 'خالص تغییر', header_en: 'Net Change', width: '160px',
+        exportValue: (_, row) => `USD ${fmt(row.net_usd_total)} / IRR ${fmt(row.net_irr_total)}`,
+        render: (_, row) => React.createElement('div', { className: 'flex flex-col gap-0.5 font-bold', dir: 'ltr' },
+          ...[['USD', row.net_usd_total], ['IRR', row.net_irr_total]].map(([currency, amount]) =>
+            React.createElement('span', {
+              key: currency,
+              className: amount < 0 ? 'text-rose-600 dark:text-rose-400' : amount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500',
+            }, `${currency} ${fmt(amount)}`)
+          )
+        ),
+      },
+    ]), [itemsColumns, openGroupDrill, t]);
 
-    const groupedCurrencyDetailFields = useMemo(() => new Set([
-      'deposit_amount_usd',
-      'withdrawal_amount_usd',
-      'exchange_rate_usd_to_irr',
-      'deposit_amount_irr',
-      'withdrawal_amount_irr',
-    ]), []);
+    const groupDrillColumns = useMemo(() => itemsColumns.filter(col => col.field !== '_tx_type'), [itemsColumns]);
 
-    const groupedAccountColumns = useMemo(
-      () => groupedItemsColumns.filter(col => col.field !== '_account' && !groupedCurrencyDetailFields.has(col.field)),
-      [groupedItemsColumns, groupedCurrencyDetailFields]
-    );
-
-    const groupedCostsColumns = useMemo(
-      () => groupedItemsColumns.filter(col => col.field !== 'cost_income' && !groupedCurrencyDetailFields.has(col.field)),
-      [groupedItemsColumns, groupedCurrencyDetailFields]
-    );
-
-    const groupedIncomesColumns = useMemo(
-      () => groupedItemsColumns.filter(col => col.field !== 'cost_income' && !groupedCurrencyDetailFields.has(col.field)),
-      [groupedItemsColumns, groupedCurrencyDetailFields]
-    );
-
-    const groupedCentersColumns = useMemo(
-      () => groupedItemsColumns.filter(col => col.field !== 'center_id' && !groupedCurrencyDetailFields.has(col.field)),
-      [groupedItemsColumns, groupedCurrencyDetailFields]
-    );
+    const groupedAccountColumns = useMemo(() => groupedItemsColumns.filter(col => col.field !== 'remained_amount').map(col =>
+      col.field === '_treeLabel' ? { ...col, header_fa: 'حساب', header_en: 'Account' } : col
+    ), [groupedItemsColumns]);
+    const groupedCostsColumns = useMemo(() => groupedItemsColumns
+      .filter(col => !['currency', 'remained_amount'].includes(col.field))
+      .map(col => col.field === '_treeLabel' ? { ...col, header_fa: 'هزینه', header_en: 'Cost' } : col), [groupedItemsColumns]);
+    const groupedIncomesColumns = useMemo(() => groupedCostsColumns.map(col =>
+      col.field === '_treeLabel' ? { ...col, header_fa: 'درآمد', header_en: 'Income' } : col
+    ), [groupedCostsColumns]);
+    const groupedCentersColumns = useMemo(() => groupedCostsColumns.map(col =>
+      col.field === '_treeLabel' ? { ...col, header_fa: 'مرکز هزینه/درآمد', header_en: 'Cost/Income Center' } : col
+    ), [groupedCostsColumns]);
 
     const exportItemsCsv = useCallback(() => {
       const exportColumns = [
@@ -638,7 +665,7 @@
     ];
 
     return React.createElement('div', {
-      className: 'p-4 h-full flex flex-col bg-slate-50/50 dark:bg-slate-900 overflow-hidden font-sans',
+      className: 'p-4 h-full w-full min-w-0 flex flex-col bg-slate-50/50 dark:bg-slate-900 overflow-hidden font-sans',
       dir: isRtl ? 'rtl' : 'ltr',
     },
       React.createElement(PageHeader, {
@@ -718,7 +745,7 @@
                 language,
               })
             : React.createElement(React.Fragment, null,
-                !drillDoc && React.createElement('div', { style: { display: activeTab === 'documents' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'documents' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden' },
                   React.createElement(DataGrid, {
                     key: 'review-documents',
                     data: documentsGridData,
@@ -733,10 +760,10 @@
                     onGridStateChange: setDocumentsGridState,
                     actions: [{ id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: 'text-indigo-500 hover:text-indigo-600' }],
                     onRowDoubleClick: (row) => setDrillDoc(row),
-                    onSelectionChange: (ids) => setSelectedDocumentIds((ids || []).map(String)),
+                    onSelectionChange: handleDocumentSelectionChange,
                   })
                 ),
-                !drillDoc && React.createElement('div', { style: { display: activeTab === 'items' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'items' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden' },
                   React.createElement(DataGrid, {
                     key: 'review-items',
                     data: itemsGridData,
@@ -756,12 +783,11 @@
                     ),
                   })
                 ),
-                !drillDoc && React.createElement('div', { style: { display: activeTab === 'accounts' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
-                  React.createElement(TreeGrid, {
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'accounts' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden' },
+                  React.createElement(DataGrid, {
                     key: `review-accounts-grouped-${groupedAccountRows.length}`,
                     data: groupedAccountRows,
-                    idField: '_rowId',
-                    parentField: '_parentRowId',
+                    onRowClick: openGroupDrill,
                     columns: groupedAccountColumns,
                     defaultPinnedCols: ['_treeLabel'],
                     language,
@@ -771,9 +797,7 @@
                     selectable: false,
                     gridState: accountsGridState,
                     onGridStateChange: setAccountsGridState,
-                    placeExpandControlsOnEnd: false,
-                    placeSearchBeforeExpandControls: false,
-                    toolbarStartContent: selectedDocumentIds.length > 0
+                    toolbarContent: selectedDocumentIds.length > 0
                       ? React.createElement('span', {
                           className: `text-[11px] text-slate-500 dark:text-slate-400 px-1 ${isRtl ? 'text-right' : 'text-left'}`,
                           dir: isRtl ? 'rtl' : 'ltr',
@@ -781,12 +805,11 @@
                       : null
                   })
                 ),
-                !drillDoc && React.createElement('div', { style: { display: activeTab === 'costs' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
-                  React.createElement(TreeGrid, {
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'costs' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden' },
+                  React.createElement(DataGrid, {
                     key: `review-costs-grouped-${groupedCostRows.length}`,
                     data: groupedCostRows,
-                    idField: '_rowId',
-                    parentField: '_parentRowId',
+                    onRowClick: openGroupDrill,
                     columns: groupedCostsColumns,
                     defaultPinnedCols: ['_treeLabel'],
                     language,
@@ -796,9 +819,7 @@
                     selectable: false,
                     gridState: costsGridState,
                     onGridStateChange: setCostsGridState,
-                    placeExpandControlsOnEnd: false,
-                    placeSearchBeforeExpandControls: false,
-                    toolbarStartContent: selectedDocumentIds.length > 0
+                    toolbarContent: selectedDocumentIds.length > 0
                       ? React.createElement('span', {
                           className: `text-[11px] text-slate-500 dark:text-slate-400 px-1 ${isRtl ? 'text-right' : 'text-left'}`,
                           dir: isRtl ? 'rtl' : 'ltr',
@@ -806,12 +827,11 @@
                       : null
                   })
                 ),
-                !drillDoc && React.createElement('div', { style: { display: activeTab === 'incomes' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
-                  React.createElement(TreeGrid, {
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'incomes' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden' },
+                  React.createElement(DataGrid, {
                     key: `review-incomes-grouped-${groupedIncomeRows.length}`,
                     data: groupedIncomeRows,
-                    idField: '_rowId',
-                    parentField: '_parentRowId',
+                    onRowClick: openGroupDrill,
                     columns: groupedIncomesColumns,
                     defaultPinnedCols: ['_treeLabel'],
                     language,
@@ -821,9 +841,7 @@
                     selectable: false,
                     gridState: incomesGridState,
                     onGridStateChange: setIncomesGridState,
-                    placeExpandControlsOnEnd: false,
-                    placeSearchBeforeExpandControls: false,
-                    toolbarStartContent: selectedDocumentIds.length > 0
+                    toolbarContent: selectedDocumentIds.length > 0
                       ? React.createElement('span', {
                           className: `text-[11px] text-slate-500 dark:text-slate-400 px-1 ${isRtl ? 'text-right' : 'text-left'}`,
                           dir: isRtl ? 'rtl' : 'ltr',
@@ -831,12 +849,11 @@
                       : null
                   })
                 ),
-                !drillDoc && React.createElement('div', { style: { display: activeTab === 'centers' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 w-full overflow-hidden' },
-                  React.createElement(TreeGrid, {
+                !drillDoc && React.createElement('div', { style: { display: activeTab === 'centers' ? 'flex' : 'none' }, className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden' },
+                  React.createElement(DataGrid, {
                     key: `review-centers-grouped-${groupedCenterRows.length}`,
                     data: groupedCenterRows,
-                    idField: '_rowId',
-                    parentField: '_parentRowId',
+                    onRowClick: openGroupDrill,
                     columns: groupedCentersColumns,
                     defaultPinnedCols: ['_treeLabel'],
                     language,
@@ -846,9 +863,7 @@
                     selectable: false,
                     gridState: centersGridState,
                     onGridStateChange: setCentersGridState,
-                    placeExpandControlsOnEnd: false,
-                    placeSearchBeforeExpandControls: false,
-                    toolbarStartContent: selectedDocumentIds.length > 0
+                    toolbarContent: selectedDocumentIds.length > 0
                       ? React.createElement('span', {
                           className: `text-[11px] text-slate-500 dark:text-slate-400 px-1 ${isRtl ? 'text-right' : 'text-left'}`,
                           dir: isRtl ? 'rtl' : 'ltr',
@@ -865,6 +880,37 @@
                   isLoading,
                 })
               )
+        )
+      ),
+
+      React.createElement(Modal, {
+        isOpen: !!groupDrillRow,
+        onClose: () => setGroupDrillId(null),
+        title: t('اقلام سند', 'Transaction Items'),
+        language,
+        width: 'max-w-7xl',
+      },
+        groupDrillRow && React.createElement('div', { className: 'p-3 flex flex-col max-h-[80vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50' },
+          React.createElement('div', { className: 'h-[calc(52vh+64px)] min-h-[424px] shrink-0 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700' },
+            React.createElement(DataGrid, {
+              key: groupDrillRow._rowId,
+              data: groupDrillRow._items,
+              columns: groupDrillColumns,
+              language,
+              formCode,
+              hideImport: true,
+              toolbarContent: React.createElement('div', { className: 'flex flex-1 items-center gap-3 min-w-0', dir: isRtl ? 'rtl' : 'ltr' },
+                React.createElement('span', { className: 'truncate text-[12px] font-bold text-indigo-600 dark:text-indigo-400', title: groupDrillRow._groupLabel }, groupDrillRow._groupLabel),
+                React.createElement('span', { className: 'shrink-0 text-[12px] text-slate-500 dark:text-slate-400' },
+                  `${groupDrillRow.doc_count} ${t('سند', 'documents')} / ${groupDrillRow.item_count} ${t('قلم', 'items')}`)
+              ),
+              gridState: groupDrillGridState,
+              onGridStateChange: setGroupDrillGridState,
+              defaultPinnedCols: ['_doc_code', '_tx_status'],
+              pageSizeOptions: [5, 10, 20, 50, 100],
+              minVisibleRows: 5,
+            })
+          )
         )
       ),
 

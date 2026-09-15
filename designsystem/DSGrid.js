@@ -37,10 +37,11 @@
     }
   };
 
-  const LOVField = ({ label, displayValue, onChange, data = [], columns = [], disabled = false, required = false, wrapperClassName = '', size = 'md', isRtl = true, placeholder = '', formCode, dropdownWidth = 'min-w-[300px] max-w-[500px]' }) => {
+  const LOVField = ({ label, displayValue, onChange, data = [], columns = [], multiple = false, selectedValues = [], disabled = false, required = false, wrapperClassName = '', size = 'md', isRtl = true, placeholder = '', formCode, dropdownWidth = 'min-w-[300px] max-w-[500px]' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
+    const dropdownRef = useRef(null);
     const inputRef = useRef(null);
     const [rect, setRect] = useState(null);
     const t = (fa, en) => isRtl ? fa : en;
@@ -50,7 +51,7 @@
     
     useEffect(() => {
       const handleClickOutside = (e) => {
-        if (containerRef.current && !containerRef.current.contains(e.target)) {
+        if (containerRef.current && !containerRef.current.contains(e.target) && !dropdownRef.current?.contains(e.target)) {
           setIsOpen(false);
         }
       };
@@ -91,13 +92,30 @@
     }, [data, columns, searchTerm]);
 
     const heights = { xs: 'h-6 text-[10px]', sm: 'h-8 text-[12px]', md: 'h-10 text-[14px]', lg: 'h-12 text-[14px]' };
+    const selectedIds = new Set(selectedValues.map(value => String(value?.id ?? value)));
+    const toggleRow = (row) => {
+      if (multiple) {
+        onChange(selectedIds.has(String(row.id))
+          ? selectedValues.filter(value => String(value?.id ?? value) !== String(row.id))
+          : [...selectedValues, row]);
+      } else {
+        onChange(row);
+        setIsOpen(false);
+        setSearchTerm('');
+      }
+    };
 
     const dropdownContentBox = (
-      <div className="max-h-64 overflow-y-auto custom-scrollbar">
+      <div ref={dropdownRef} className="max-h-64 overflow-y-auto custom-scrollbar">
+        {multiple && <div className="flex justify-between p-2 border-b border-slate-200 dark:border-slate-700">
+          <button type="button" className="text-[12px] text-indigo-600" onClick={() => onChange([...selectedValues, ...filteredData.filter(row => !selectedIds.has(String(row.id)))])}>{t('انتخاب همه نتایج', 'Select all results')}</button>
+          <button type="button" className="text-[12px] text-rose-500" onClick={() => onChange([])}>{t('پاک کردن', 'Clear')}</button>
+        </div>}
         {filteredData.length > 0 ? (
           <table className="w-full text-start border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm z-10">
               <tr>
+                {multiple && <th className="w-10" aria-label={t('انتخاب', 'Select')} />}
                 {columns.map((col, idx) => (
                   <th key={idx} className={`p-2.5 text-[12px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 overflow-hidden ${isRtl ? 'text-right' : 'text-left'}`} style={{ width: col.width || 'auto' }}>
                     {t(col.header_fa, col.header_en)}
@@ -109,9 +127,10 @@
               {filteredData.map((row, rIdx) => (
                 <tr 
                   key={rIdx} 
-                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onChange(row); setIsOpen(false); setSearchTerm(''); }}
+                  onClick={() => toggleRow(row)}
                   className="cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors"
                 >
+                  {multiple && <td className="p-2"><input type="checkbox" checked={selectedIds.has(String(row.id))} aria-label={t('انتخاب ردیف', 'Select row')} onClick={e => e.stopPropagation()} onChange={() => toggleRow(row)} /></td>}
                   {columns.map((col, cIdx) => (
                     <td key={cIdx} className="p-2.5 text-[12px] text-slate-700 dark:text-slate-300 overflow-hidden" style={{ maxWidth: col.width || 'auto', overflow: 'hidden' }}>
                       {col.render ? col.render(row[col.field], row) : (row[col.field] || '-')}
@@ -159,7 +178,8 @@
           
           {displayValue && !isOpen && !isDisabled && (
             <button 
-              onClick={(e) => { e.stopPropagation(); onChange(null); }}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange(multiple ? [] : null); }}
               className={`absolute ${isRtl ? 'left-8' : 'right-8'} text-slate-400 hover:text-red-500 transition-colors p-1`}
               title={t('پاک کردن', 'Clear')}
             >
@@ -257,10 +277,14 @@
                     t,
                   });
                 }
-                if (f.type === 'select') return <SelectField key={idx} size="sm" label={f.label} isRtl={isRtl} options={f.options} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} />;
+                if (f.type === 'select') return <SelectField key={idx} size="sm" label={f.label} required={f.required} isRtl={isRtl} options={f.options} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} />;
                 if (f.type === 'toggle') return <ToggleField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
                 if (f.type === 'checkbox') return <CheckboxField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
                 if (f.type === 'lov') {
+                  if (f.multiple) {
+                    const selected = Array.isArray(values[f.name]) ? values[f.name] : values[f.name] ? [values[f.name]] : [];
+                    return <LOVField key={idx} size="sm" label={f.label} isRtl={isRtl} data={f.lovData} columns={f.lovColumns} multiple selectedValues={selected} displayValue={selected.length ? `${selected.length} ${t('انتخاب شده', 'selected')}` : ''} placeholder={t('همه', 'All')} onChange={rows => handleChange(f.name, rows)} dropdownWidth={f.dropdownWidth} />;
+                  }
                   let displayStr = values[f.name];
                   if (values[f.name] && typeof values[f.name] === 'object') {
                       const v = values[f.name];
@@ -268,7 +292,7 @@
                   }
                   return <LOVField key={idx} size="sm" label={f.label} isRtl={isRtl} data={f.lovData} columns={f.lovColumns} displayValue={displayStr} onChange={(row) => handleChange(f.name, row)} dropdownWidth={f.dropdownWidth} />;
                 }
-                if (f.type === 'date') return <DatePicker key={idx} size="sm" label={f.label} isRtl={isRtl} language={language} value={values[f.name] || ''} onChange={(val) => handleChange(f.name, val)} />;
+                if (f.type === 'date') return <DatePicker key={idx} size="sm" label={f.label} required={f.required} isRtl={isRtl} language={language} value={values[f.name] || ''} onChange={(val) => handleChange(f.name, val)} />;
                 return <TextField key={idx} size="sm" label={f.label} isRtl={isRtl} type={f.type} placeholder={f.type === 'date' ? 'YYYY/MM/DD' : ''} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} dir={f.type === 'date' || !isRtl ? 'ltr' : 'rtl'} />;
               })}
               {inlineChildren && children}
