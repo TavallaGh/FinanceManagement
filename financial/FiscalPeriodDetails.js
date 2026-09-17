@@ -1,7 +1,7 @@
 /* Filename: financial/FiscalPeriodDetails.js */
 (() => {
   const React = window.React;
-  const { useState, useMemo, useEffect, useCallback } = React;
+  const { useState, useMemo, useCallback } = React;
 
   const Fallback = () => null;
   const DS = window.DesignSystem || {};
@@ -28,12 +28,19 @@
   const Trash2 = LucideIcons.Trash2 || FallbackIcon;
   const Save = LucideIcons.Save || FallbackIcon;
   const Sparkles = LucideIcons.Sparkles || FallbackIcon;
-  const Shield = LucideIcons.Shield || FallbackIcon;
   const X = LucideIcons.X || FallbackIcon;
   const AlertTriangle = LucideIcons.AlertTriangle || FallbackIcon;
 
   const oneDayMs = 24 * 60 * 60 * 1000;
   const addDays = (dateObj, n) => new Date(dateObj.getTime() + n * oneDayMs);
+  const GREGORIAN_MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const JALALI_MONTH_NAMES = [
+    'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+    'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
+  ];
 
   const FiscalPeriodDetails = ({
     language = 'fa',
@@ -53,8 +60,6 @@
     getMonthRangeGregorianForJalali,
     getMonthRangeGregorianForGregorian,
     supabase,
-    users = [],
-    userGroups = [],
     showToast,
     t,
     isRtl = true,
@@ -65,8 +70,7 @@
     const [periodGridState, setPeriodGridState] = useState(null);
 
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, type: null, payload: null });
-    const [accessPanelPeriod, setAccessPanelPeriod] = useState(null);
-    const [exceptionPeriodIds, setExceptionPeriodIds] = useState(() => new Set());
+    const [statusConfirm, setStatusConfirm] = useState({ isOpen: false, type: null });
 
     const [inlinePeriodEdit, setInlinePeriodEdit] = useState({ id: null, isNew: false });
     const [periodInlineForm, setPeriodInlineForm] = useState({
@@ -85,7 +89,7 @@
 
     const allowedStatusOptions = useCallback((currentStatus) => {
       const base = (!currentStatus)
-        ? (statusOptions || [])
+        ? (statusOptions || []).filter(opt => opt.value === status.NOT_OPENED)
         : (statusOptions || []).filter(opt => opt.value === currentStatus || canTransitionStatus(currentStatus, opt.value));
 
       if (selectedYear?.status === status.CLOSED) {
@@ -93,49 +97,7 @@
       }
 
       return base;
-    }, [statusOptions, canTransitionStatus, selectedYear?.status, status?.CLOSED]);
-
-    useEffect(() => {
-      const loadExceptionMarkers = async () => {
-        if (!supabase || !selectedYear?.id || !Array.isArray(periodRows) || periodRows.length === 0) {
-          setExceptionPeriodIds(new Set());
-          return;
-        }
-
-        try {
-          const periodIds = periodRows
-            .map(p => p?.id)
-            .filter(Boolean);
-
-          if (periodIds.length === 0) {
-            setExceptionPeriodIds(new Set());
-            return;
-          }
-
-          const { data, error } = await supabase
-            .from('fm_fiscal_period_exceptions')
-            .select('period_id')
-            .eq('is_active', true)
-            .in('period_id', periodIds);
-
-          if (error) throw error;
-
-          const ids = new Set((data || []).map(r => String(r.period_id)).filter(Boolean));
-          setExceptionPeriodIds(ids);
-        } catch (err) {
-          console.error('load exception markers error:', err);
-          setExceptionPeriodIds(new Set());
-        }
-      };
-
-      loadExceptionMarkers();
-    }, [supabase, selectedYear?.id, periodRows]);
-
-    useEffect(() => {
-      if (!accessPanelPeriod) return;
-      const stillExists = periodRows.some(p => String(p.id) === String(accessPanelPeriod.id));
-      if (!stillExists) setAccessPanelPeriod(null);
-    }, [accessPanelPeriod, periodRows]);
+    }, [statusOptions, canTransitionStatus, selectedYear?.status, status?.NOT_OPENED, status?.CLOSED]);
 
     const hasOverlap = (sortedRows) => {
       for (let i = 0; i < sortedRows.length - 1; i++) {
@@ -176,36 +138,36 @@
       });
     };
 
-    const canDeletePeriod = useCallback((periodToDelete) => {
-      if (!periodToDelete) return { ok: false, message: t('رکورد دوره نامعتبر است.', 'Invalid period record.') };
+    const validatePeriodDeletion = useCallback((periodIds) => {
+      const idSet = new Set((periodIds || []).map(id => String(id)));
+      const sorted = normalizeAndSort(periodRows);
+      const selectedRows = sorted.filter(p => idSet.has(String(p.id)));
 
-      if (periodToDelete.status === status.OPEN || periodToDelete.status === status.CLOSED) {
-        return { ok: false, message: t('امکان حذف دوره باز یا بسته شده وجود ندارد.', 'Open or closed periods cannot be deleted.') };
+      if (idSet.size === 0 || selectedRows.length !== idSet.size) {
+        return { ok: false, message: t('دوره‌های انتخاب‌شده معتبر نیستند.', 'The selected periods are invalid.') };
       }
 
-      const lockedPeriods = periodRows.filter(p => p.status === status.OPEN || p.status === status.CLOSED);
-      if (lockedPeriods.length > 0 && periodToDelete.status === status.NOT_OPENED) {
-        const minLockedStart = normalizeAndSort(lockedPeriods)[0];
-        const candStart = parseSlashDate(periodToDelete.startDate);
-        const lockStart = parseSlashDate(minLockedStart.startDate);
-        if (candStart && lockStart && candStart < lockStart) {
-          return {
-            ok: false,
-            message: t('با وجود دوره باز/بسته، حذف دوره‌های قبل از آن مجاز نیست.', 'When any period is open/closed, you cannot delete earlier not-opened periods.')
-          };
-        }
+      if (selectedRows.some(p => (p.status || status.NOT_OPENED) !== status.NOT_OPENED)) {
+        return { ok: false, message: t('فقط دوره‌های «باز نشده» قابل حذف هستند.', 'Only Not Opened periods can be deleted.') };
       }
 
-      const remaining = normalizeAndSort(periodRows.filter(p => String(p.id) !== String(periodToDelete.id)));
-      if (remaining.length > 1 && hasInternalGap(remaining)) {
+      const firstSelectedIndex = sorted.findIndex(p => idSet.has(String(p.id)));
+      const selectedIsCompleteSuffix = firstSelectedIndex >= 0
+        && sorted.slice(firstSelectedIndex).every(p => idSet.has(String(p.id)));
+      if (!selectedIsCompleteSuffix) {
         return {
           ok: false,
-          message: t('این حذف باعث ایجاد بازه خالی بین دوره‌ها می‌شود و مجاز نیست.', 'This delete creates an unassigned date gap between periods and is not allowed.')
+          message: t('حذف باید از آخرین دوره انجام شود. در حذف گروهی نیز همه دوره‌های انتهایی باید پشت سر هم انتخاب شده باشند.', 'Deletion must start from the last period. For bulk deletion, all selected periods must form a contiguous suffix of the list.')
         };
       }
 
       return { ok: true };
-    }, [periodRows, parseSlashDate, status, t]);
+    }, [periodRows, status.NOT_OPENED, t]);
+
+    const canDeletePeriod = useCallback((periodToDelete) => {
+      if (!periodToDelete) return { ok: false, message: t('رکورد دوره نامعتبر است.', 'Invalid period record.') };
+      return validatePeriodDeletion([periodToDelete.id]);
+    }, [validatePeriodDeletion, t]);
 
     const validatePeriodDraft = (draft) => {
       if (!selectedYear) {
@@ -246,6 +208,11 @@
         return false;
       }
 
+      if (!oldRow && draft.status !== status.NOT_OPENED) {
+        showToast(t('دوره جدید باید ابتدا با وضعیت «باز نشده» ایجاد شود.', 'A new period must initially be created with Not Opened status.'), 'error');
+        return false;
+      }
+
       if (selectedYear?.status === status.CLOSED && draft.status !== status.CLOSED) {
         showToast(
           t('وقتی سال مالی بسته است، وضعیت دوره فقط می‌تواند بسته شده باشد.', 'When fiscal year is closed, period status cannot be Open or Not Opened.'),
@@ -257,6 +224,21 @@
       const baseRows = periodRows.filter(p => String(p.id) !== String(draft.id || ''));
       const testRows = baseRows.concat([{ ...draft }]);
       const sorted = normalizeAndSort(testRows);
+
+      if (oldRow && oldRow.status !== draft.status) {
+        const draftIndex = sorted.findIndex(p => String(p.id) === String(draft.id));
+        const priorPeriods = draftIndex > 0 ? sorted.slice(0, draftIndex) : [];
+
+        if (draft.status === status.OPEN && priorPeriods.some(p => (p.status || status.NOT_OPENED) === status.NOT_OPENED)) {
+          showToast(t('برای بازکردن این دوره، نباید هیچ دوره «باز نشده‌ای» قبل از آن وجود داشته باشد.', 'This period cannot be opened while an earlier period is still Not Opened.'), 'error');
+          return false;
+        }
+
+        if (draft.status === status.CLOSED && priorPeriods.some(p => (p.status || status.NOT_OPENED) !== status.CLOSED)) {
+          showToast(t('برای بستن این دوره، همه دوره‌های قبل از آن باید بسته شده باشند.', 'This period cannot be closed until every earlier period is closed.'), 'error');
+          return false;
+        }
+      }
 
       if (hasOverlap(sorted)) {
         showToast(t('بازه دوره‌ها با یکدیگر تداخل دارند.', 'Period date ranges overlap.'), 'error');
@@ -311,12 +293,20 @@
       });
     };
 
-    const saveInlinePeriod = async () => {
+    const saveInlinePeriod = async (statusChangeConfirmed = false) => {
       const draft = {
         ...periodInlineForm,
         id: inlinePeriodEdit.isNew ? null : periodInlineForm.id
       };
       if (!validatePeriodDraft(draft)) return;
+
+      const oldRow = periodRows.find(p => String(p.id) === String(draft.id));
+      const isOpening = oldRow?.status === status.NOT_OPENED && draft.status === status.OPEN;
+      const isClosing = oldRow?.status === status.OPEN && draft.status === status.CLOSED;
+      if ((isOpening || isClosing) && !statusChangeConfirmed) {
+        setStatusConfirm({ isOpen: true, type: isClosing ? 'close_period' : 'open_period' });
+        return;
+      }
 
       try {
         const payload = {
@@ -384,7 +374,11 @@
           if (!range || range.start > fyEnd) break;
 
           if (range.start >= fyStart && range.end <= fyEnd) {
-            generated.push({ startDate: toSlashFromDate(range.start), endDate: toSlashFromDate(range.end) });
+            generated.push({
+              startDate: toSlashFromDate(range.start),
+              endDate: toSlashFromDate(range.end),
+              title: `${GREGORIAN_MONTH_NAMES[m - 1]} ${y}`
+            });
           }
 
           m += 1;
@@ -408,7 +402,11 @@
           if (!range || range.start > fyEnd) break;
 
           if (range.start >= fyStart && range.end <= fyEnd) {
-            generated.push({ startDate: toSlashFromDate(range.start), endDate: toSlashFromDate(range.end) });
+            generated.push({
+              startDate: toSlashFromDate(range.start),
+              endDate: toSlashFromDate(range.end),
+              title: `${JALALI_MONTH_NAMES[jm - 1]} ${jy}`
+            });
           }
 
           jm += 1;
@@ -430,7 +428,7 @@
           return {
             fiscal_year_id: selectedYear.id,
             period_code: code,
-            title: `${t('دوره', 'Period')} ${String(idx + 1).padStart(2, '0')}`,
+            title: g.title,
             start_date: toDash(g.startDate),
             end_date: toDash(g.endDate),
             status: status.NOT_OPENED,
@@ -479,37 +477,27 @@
           if (error) throw error;
           await onLog?.(p.id, 'delete', `حذف دوره ${p.periodCode}`);
           setSelectedPeriodIds(prev => prev.filter(id => String(id) !== String(p.id)));
-
-          if (accessPanelPeriod && String(accessPanelPeriod.id) === String(p.id)) {
-            setAccessPanelPeriod(null);
-          }
         }
 
         if (deleteConfirm.type === 'period_bulk') {
           const ids = deleteConfirm.payload || [];
-          const rows = periodRows.filter(p => ids.includes(p.id));
-          for (const row of rows) {
-            const check = canDeletePeriod(row);
-            if (!check.ok) {
-              showToast(check.message, 'error');
-              return;
-            }
-          }
-
-          const remaining = normalizeAndSort(periodRows.filter(p => !ids.includes(p.id)));
-          if (remaining.length > 1 && hasInternalGap(remaining)) {
-            showToast(t('حذف گروهی باعث ایجاد بازه خالی بین دوره‌ها می‌شود.', 'Bulk delete creates an unassigned date gap between periods.'), 'error');
+          const check = validatePeriodDeletion(ids);
+          if (!check.ok) {
+            showToast(check.message, 'error');
             return;
           }
 
-          const { error } = await supabase.from('fm_fiscal_periods').delete().in('id', ids);
-          if (error) throw error;
+          const idSet = new Set(ids.map(id => String(id)));
+          const rowsToDelete = normalizeAndSort(periodRows)
+            .filter(p => idSet.has(String(p.id)))
+            .reverse();
+
+          for (const row of rowsToDelete) {
+            const { error } = await supabase.from('fm_fiscal_periods').delete().eq('id', row.id);
+            if (error) throw error;
+          }
           await onLog?.(selectedYear?.id, 'bulk_delete', `حذف گروهی ${ids.length} دوره`);
           setSelectedPeriodIds([]);
-
-          if (accessPanelPeriod && ids.some(id => String(id) === String(accessPanelPeriod.id))) {
-            setAccessPanelPeriod(null);
-          }
         }
 
         setDeleteConfirm({ isOpen: false, type: null, payload: null });
@@ -517,6 +505,9 @@
         showToast(t('عملیات حذف با موفقیت انجام شد.', 'Deletion completed successfully.'));
       } catch (err) {
         console.error('delete period error:', err);
+        setDeleteConfirm({ isOpen: false, type: null, payload: null });
+        setSelectedPeriodIds([]);
+        await onRefresh?.();
         showToast(t('خطا در حذف. احتمالاً رکورد وابسته وجود دارد.', 'Delete failed. The record may have dependencies.'), 'error');
       }
     };
@@ -537,15 +528,6 @@
     const isEditingPeriodRow = useCallback((row) => {
       return inlinePeriodEdit.id && String(row?.id) === String(inlinePeriodEdit.id);
     }, [inlinePeriodEdit.id]);
-
-    const updateExceptionMarker = useCallback((periodId, hasActive) => {
-      setExceptionPeriodIds(prev => {
-        const next = new Set(prev);
-        if (hasActive) next.add(String(periodId));
-        else next.delete(String(periodId));
-        return next;
-      });
-    }, []);
 
     const periodColumns = [
       {
@@ -620,17 +602,6 @@
       }
     ];
 
-    const AccessPanelComponent = window.FiscalPeriodAccess || (() => null);
-
-    const openAccessPanel = async (periodRow) => {
-      if (!periodRow) return;
-      if (periodRow.status !== status.CLOSED) {
-        showToast(t('استثنا فقط برای دوره‌های بسته شده قابل تعریف است.', 'Exceptions are only available for closed periods.'), 'warning');
-        return;
-      }
-      setAccessPanelPeriod(periodRow);
-    };
-
     return (
       <>
         <div className="flex flex-col h-[80vh] bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
@@ -643,14 +614,13 @@
           </div>
 
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
-            <div className={`flex flex-col bg-white dark:bg-slate-900 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm ${accessPanelPeriod ? 'w-full md:w-7/12' : 'w-full'}`}>
+            <div className="flex flex-col w-full bg-white dark:bg-slate-900 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
               <div className="flex-1 min-h-0">
                 <DataGrid
                   data={periodGridData}
                   columns={periodColumns}
                   language={language}
                   selectable={true}
-                  activeRowId={accessPanelPeriod?.id || null}
                   selectedIds={selectedPeriodIds}
                   onSelectChange={setSelectedPeriodIds}
                   isLoading={isLoading}
@@ -692,18 +662,6 @@
                       className: 'text-slate-400 hover:text-indigo-600'
                     },
                     {
-                      icon: Shield,
-                      tooltip: t('استثناهای دسترسی', 'Access Exceptions'),
-                      hidden: (row) => String(row.id) === '__new__',
-                      onClick: (row) => openAccessPanel(row),
-                      className: (row) => {
-                        const hasActiveException = row?.status === status.CLOSED && exceptionPeriodIds.has(String(row?.id));
-                        return hasActiveException
-                          ? 'text-amber-500 hover:text-amber-600'
-                          : 'text-slate-400 hover:text-blue-600';
-                      }
-                    },
-                    {
                       icon: Trash2,
                       tooltip: t('حذف', 'Delete'),
                       hidden: (row) => String(row.id) === '__new__' || isEditingPeriodRow(row),
@@ -724,13 +682,10 @@
                       icon: Trash2,
                       variant: 'danger-outline',
                       onClick: (ids) => {
-                        const rows = periodRows.filter(p => ids.includes(p.id));
-                        for (const row of rows) {
-                          const check = canDeletePeriod(row);
-                          if (!check.ok) {
-                            showToast(check.message, 'error');
-                            return;
-                          }
+                        const check = validatePeriodDeletion(ids);
+                        if (!check.ok) {
+                          showToast(check.message, 'error');
+                          return;
                         }
                         setDeleteConfirm({ isOpen: true, type: 'period_bulk', payload: ids });
                       }
@@ -739,23 +694,6 @@
                 />
               </div>
             </div>
-
-            {accessPanelPeriod && (
-              <AccessPanelComponent
-                language={language}
-                formCode={formCode}
-                period={accessPanelPeriod}
-                status={status}
-                supabase={supabase}
-                users={users}
-                userGroups={userGroups}
-                showToast={showToast}
-                t={t}
-                isRtl={isRtl}
-                onClose={() => setAccessPanelPeriod(null)}
-                onExceptionMarkerChange={updateExceptionMarker}
-              />
-            )}
           </div>
         </div>
 
@@ -768,6 +706,32 @@
               <div className="flex gap-2 w-full mt-2 px-4">
                 <Button variant="outline" size="sm" className="flex-1" onClick={() => setDeleteConfirm({ isOpen: false, type: null, payload: null })}>{t('انصراف', 'Cancel')}</Button>
                 <Button variant="danger" size="sm" className="flex-1" onClick={executeDelete}>{t('حذف', 'Delete')}</Button>
+              </div>
+            }
+          />
+        </Modal>
+
+        <Modal isOpen={statusConfirm.isOpen} onClose={() => setStatusConfirm({ isOpen: false, type: null })} title={statusConfirm.type === 'close_period' ? t('تایید بستن دوره', 'Confirm Period Closure') : t('تایید بازکردن دوره', 'Confirm Period Opening')} width="max-w-sm" language={language}>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: عملیات غیرقابل بازگشت', 'Warning: Irreversible Operation')}
+            description={statusConfirm.type === 'close_period'
+              ? t('پس از بستن دوره، امکان بازکردن یا بازگرداندن وضعیت آن وجود ندارد. آیا ادامه می‌دهید؟', 'After closing the period, it cannot be reopened or moved back to an earlier status. Continue?')
+              : t('پس از بازکردن دوره، امکان بازگرداندن آن به وضعیت «باز نشده» وجود ندارد. آیا ادامه می‌دهید؟', 'After opening the period, it cannot be returned to Not Opened status. Continue?')}
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setStatusConfirm({ isOpen: false, type: null })}>{t('انصراف', 'Cancel')}</Button>
+                <Button
+                  variant={statusConfirm.type === 'close_period' ? 'danger' : 'primary'}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    setStatusConfirm({ isOpen: false, type: null });
+                    saveInlinePeriod(true);
+                  }}
+                >
+                  {t('تایید و ادامه', 'Confirm and Continue')}
+                </Button>
               </div>
             }
           />

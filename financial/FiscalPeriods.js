@@ -65,7 +65,6 @@
     if (!from || from === to) return true;
     if (from === STATUS.NOT_OPENED && to === STATUS.OPEN) return true;
     if (from === STATUS.OPEN && to === STATUS.CLOSED) return true;
-    if (from === STATUS.CLOSED && to === STATUS.OPEN) return true;
     return false;
   };
 
@@ -143,13 +142,12 @@
 
     const [fiscalYears, setFiscalYears] = useState([]);
     const [periods, setPeriods] = useState([]);
-    const [users, setUsers] = useState([]);
-    const [userGroups, setUserGroups] = useState([]);
 
     const [yearGridState, setYearGridState] = useState(null);
 
     const [yearModal, setYearModal] = useState({ isOpen: false, record: null });
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, payload: null });
+    const [statusConfirm, setStatusConfirm] = useState({ isOpen: false, type: null });
     const [periodModal, setPeriodModal] = useState({ isOpen: false, year: null });
 
     const [yearForm, setYearForm] = useState({
@@ -203,15 +201,6 @@
       createdAt: r.created_at
     }));
 
-    const mapUsers = (rows) => (rows || []).map(r => ({
-      id: r.id,
-      username: r.username || '',
-      fullName: r.full_name || '',
-      email: r.email || '',
-      isActive: r.is_active !== false,
-      label: `${r.full_name || r.username || ''}`.trim() || (r.username || '-')
-    }));
-
     const logAction = useCallback(async (recordId, action, details = '', oldData = null, newData = null) => {
       try {
         if (!supabase) return;
@@ -235,29 +224,20 @@
       try {
         const [
           { data: yData, error: yErr },
-          { data: pData, error: pErr },
-          { data: uData, error: uErr },
-          { data: gData, error: gErr }
+          { data: pData, error: pErr }
         ] = await Promise.all([
           supabase.from('fm_fiscal_years').select('*').order('start_date', { ascending: false }),
-          supabase.from('fm_fiscal_periods').select('*').order('start_date', { ascending: true }),
-          supabase.from('sec_users').select('id, username, full_name, email, is_active').order('username', { ascending: true }),
-          supabase.from('sec_user_groups').select('id, code, title, is_active').order('title', { ascending: true })
+          supabase.from('fm_fiscal_periods').select('*').order('start_date', { ascending: true })
         ]);
 
         if (yErr) throw yErr;
         if (pErr) throw pErr;
-        if (uErr) throw uErr;
-        if (gErr) throw gErr;
 
         const mappedYears = mapFiscalYears(yData);
         const mappedPeriods = mapPeriods(pData);
-        const mappedUsers = mapUsers(uData);
 
         setFiscalYears(mappedYears);
         setPeriods(mappedPeriods);
-        setUsers(mappedUsers);
-        setUserGroups((gData || []).map(g => ({ id: g.id, code: g.code || '', title: g.title || '', isActive: g.is_active !== false })));
 
       } catch (err) {
         console.error('FiscalPeriods fetch error:', err);
@@ -353,14 +333,22 @@
         const oldYear = fiscalYears.find(y => String(y.id) === String(yearForm.id));
         if (oldYear && !canTransitionStatus(oldYear.status || STATUS.NOT_OPENED, yearForm.status)) {
           showToast(
-            t('تغییر وضعیت سال مالی مجاز نیست. فقط مسیرهای باز نشده→باز، باز→بسته و بسته→باز مجاز است.', 'Fiscal year status transition is not allowed. Allowed paths: Not Opened->Open, Open->Closed, Closed->Open.'),
+            t('تغییر وضعیت سال مالی مجاز نیست. وضعیت سال مالی قابل بازگشت نیست و فقط مسیرهای باز نشده→باز و باز→بسته مجاز است.', 'Fiscal year status cannot move backward. Only Not Opened->Open and Open->Closed are allowed.'),
+            'error'
+          );
+          return false;
+        }
+
+        const relatedPeriods = periods.filter(p => String(p.fiscalYearId) === String(yearForm.id));
+        if (yearForm.status === STATUS.NOT_OPENED && relatedPeriods.some(p => (p.status || STATUS.NOT_OPENED) !== STATUS.NOT_OPENED)) {
+          showToast(
+            t('سال مالی دارای دوره باز یا بسته را نمی‌توان به وضعیت «باز نشده» تغییر داد.', 'A fiscal year with an open or closed period cannot be changed to Not Opened.'),
             'error'
           );
           return false;
         }
 
         if (yearForm.status === STATUS.CLOSED) {
-          const relatedPeriods = periods.filter(p => String(p.fiscalYearId) === String(yearForm.id));
           const hasOpenOrNotOpened = relatedPeriods.some(p => (p.status || STATUS.NOT_OPENED) !== STATUS.CLOSED);
           if (hasOpenOrNotOpened) {
             showToast(
@@ -406,8 +394,17 @@
         });
     }, [fiscalYears, periods, yearForm.id]);
 
-    const saveYear = async () => {
+    const saveYear = async (statusChangeConfirmed = false) => {
       if (!validateYearForm()) return;
+
+      const oldYear = yearForm.id
+        ? fiscalYears.find(y => String(y.id) === String(yearForm.id))
+        : null;
+      const isClosing = oldYear && oldYear.status !== STATUS.CLOSED && yearForm.status === STATUS.CLOSED;
+      if (isClosing && !statusChangeConfirmed) {
+        setStatusConfirm({ isOpen: true, type: 'close_year' });
+        return;
+      }
 
       setIsLoading(true);
       try {
@@ -422,7 +419,7 @@
         };
 
         if (yearForm.id) {
-          const oldRec = fiscalYears.find(y => String(y.id) === String(yearForm.id)) || null;
+          const oldRec = oldYear || null;
           const { error } = await supabase.from('fm_fiscal_years').update(payload).eq('id', yearForm.id);
           if (error) throw error;
           await logAction(yearForm.id, 'update', `ویرایش سال مالی ${payload.year_code}`, oldRec, payload);
@@ -606,8 +603,6 @@
             getMonthRangeGregorianForJalali={getMonthRangeGregorianForJalali}
             getMonthRangeGregorianForGregorian={getMonthRangeGregorianForGregorian}
             supabase={supabase}
-            users={users}
-            userGroups={userGroups}
             showToast={showToast}
             t={t}
             isRtl={isRtl}
@@ -699,7 +694,7 @@
 
             <div className="flex justify-end gap-2 mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
               <Button variant="outline" size="sm" onClick={() => setYearModal({ isOpen: false, record: null })}>{t('انصراف', 'Cancel')}</Button>
-              <Button variant="primary" size="sm" icon={Save} onClick={saveYear} isLoading={isLoading}>{t('ذخیره', 'Save')}</Button>
+              <Button variant="primary" size="sm" icon={Save} onClick={() => saveYear()} isLoading={isLoading}>{t('ذخیره', 'Save')}</Button>
             </div>
           </div>
         </Modal>
@@ -722,6 +717,39 @@
                 </Button>
                 <Button variant="danger" size="sm" className="flex-1" onClick={executeDeleteYear} isLoading={isLoading}>
                   {t('حذف', 'Delete')}
+                </Button>
+              </div>
+            }
+          />
+        </Modal>
+
+        <Modal
+          isOpen={statusConfirm.isOpen}
+          onClose={() => setStatusConfirm({ isOpen: false, type: null })}
+          title={t('تایید بستن سال مالی', 'Confirm Fiscal Year Closure')}
+          width="max-w-sm"
+          language={language}
+        >
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('هشدار: عملیات غیرقابل بازگشت', 'Warning: Irreversible Operation')}
+            description={t('پس از بستن سال مالی، امکان بازکردن یا بازگرداندن وضعیت آن وجود ندارد. آیا ادامه می‌دهید؟', 'After closing the fiscal year, it cannot be reopened or moved back to an earlier status. Continue?')}
+            action={
+              <div className="flex gap-2 w-full mt-2 px-4">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setStatusConfirm({ isOpen: false, type: null })}>
+                  {t('انصراف', 'Cancel')}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    setStatusConfirm({ isOpen: false, type: null });
+                    saveYear(true);
+                  }}
+                  isLoading={isLoading}
+                >
+                  {t('بستن سال مالی', 'Close Fiscal Year')}
                 </Button>
               </div>
             }
