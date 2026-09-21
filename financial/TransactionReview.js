@@ -735,7 +735,7 @@
       },
       {
         name: 'summary_currency',
-        label: t('خلاصه ارزی', 'Currency Summary'),
+        label: t('خلاصه ارزی اقلام', 'Currency Summary'),
         type: 'toggle',
       },
       {
