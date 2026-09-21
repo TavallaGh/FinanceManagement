@@ -27,6 +27,7 @@
   const Button = Core.Button || FallbackComponent;
   const Modal = Feedback.Modal || FallbackComponent;
   const Toast = Feedback.Toast || FallbackComponent;
+  const Alert = Feedback.Alert || FallbackComponent;
   const DataGrid = DSGridMod.DataGrid || FallbackComponent;
   const AdvancedFilter = DSGridMod.AdvancedFilter || FallbackComponent;
   const Tabs = Core.Tabs || FallbackComponent;
@@ -534,21 +535,21 @@
           if (row._type === 'leaf') {
             const bal = val.nat ?? 0;
             if (showMovements) {
+              const opening = val.opening ?? 0;
               const dep = val.dep ?? 0;
               const wid = val.wid ?? 0;
-              content = React.createElement('div', { className: 'flex flex-col gap-0.5 leading-4 whitespace-nowrap' },
-                React.createElement('span', {
-                  className: 'font-sans text-emerald-700 dark:text-emerald-400 tabular-nums text-[11px]',
-                  dir: 'rtl'
-                }, fmt(dep)),
-                React.createElement('span', {
-                  className: 'font-sans text-rose-600 dark:text-rose-400 tabular-nums text-[11px]',
-                  dir: 'rtl'
-                }, fmt(-Math.abs(wid))),
-                React.createElement('span', {
-                  className: 'font-sans text-slate-800 dark:text-slate-200 tabular-nums text-[11px] font-semibold',
-                  dir: 'rtl'
-                }, fmt(bal))
+              const movementLine = (label, amount, className) => React.createElement('span', {
+                className: `flex items-center justify-between gap-1 font-sans tabular-nums text-[10px] ${className}`,
+                dir: isRtl ? 'rtl' : 'ltr'
+              },
+                React.createElement('span', { className: 'font-medium opacity-80' }, label),
+                React.createElement('span', { dir: 'rtl' }, fmt(amount))
+              );
+              content = React.createElement('div', { className: 'flex flex-col gap-0.5 leading-4 whitespace-nowrap w-full' },
+                movementLine(t('اول دوره', 'Opening'), opening, 'text-slate-500 dark:text-slate-400'),
+                movementLine(t('واریز', 'Deposit'), dep, 'text-emerald-700 dark:text-emerald-400'),
+                movementLine(t('برداشت', 'Withdrawal'), -Math.abs(wid), 'text-rose-600 dark:text-rose-400'),
+                movementLine(t('پایان دوره', 'Closing'), bal, 'text-slate-800 dark:text-slate-200 font-semibold')
               );
             } else {
               const clr = bal === 0
@@ -595,7 +596,7 @@
           if (!val) return '';
           if (row._type === 'leaf') {
             if (showMovements) {
-              return `dep:${fmt(val.dep || 0)} | wid:${fmt(-Math.abs(val.wid || 0))} | bal:${fmt(val.nat || 0)}`;
+              return `opening:${fmt(val.opening || 0)} | dep:${fmt(val.dep || 0)} | wid:${fmt(-Math.abs(val.wid || 0))} | closing:${fmt(val.nat || 0)}`;
             }
             return String(val.nat ?? '');
           }
@@ -761,7 +762,35 @@
 
     const renderGrid = () => {
       if (!reportData) return null;
+      const getGridHeaderMessage = (index) => {
+        if (index === 0) {
+          return t(
+            'با انتخاب ردیف در تب‌های قبلی، اطلاعات تب‌های بعدی فیلتر می‌شود. بدون انتخاب، همه موارد دامنه قبلی نمایش داده می‌شوند.',
+            'Select rows in earlier tabs to filter the following tabs. No selection means all rows in the previous scope.'
+          );
+        }
+        const appliedTabs = reportTabs.slice(0, index)
+          .map((tab, tabIndex) => tabSelections[tabIndex].length
+            ? `${tab.label} (${tabSelections[tabIndex].length})`
+            : null)
+          .filter(Boolean);
+        if (!appliedTabs.length) return null;
+        return t(
+          `اطلاعات این تب بر اساس انتخاب‌های تب‌های پیشین فیلتر شده است: ${appliedTabs.join('، ')}`,
+          `This tab is filtered by selections in earlier tabs: ${appliedTabs.join(', ')}`
+        );
+      };
       return React.createElement('div', { className: 'h-full flex flex-col min-h-0' },
+        React.createElement('div', { className: 'mx-2 mt-2 mb-1 shrink-0' },
+          React.createElement(Alert, {
+            type: 'info',
+            title: t('مبنای محاسبه', 'Calculation Basis'),
+            message: t(
+            'مانده پایان هر دوره = مانده ابتدای دوره + واریز دوره − برداشت دوره. معادل‌های USD و IRR در همه سطوح فقط با تبدیل کل مانده پایان دوره و آخرین نرخ معتبر تا روز پایانی همان دوره محاسبه می‌شوند؛ نرخ روز ثبت تک‌تراکنش‌ها در تبدیل بالانس ماهیانه استفاده نمی‌شود.',
+            'Period ending balance = opening balance + period deposits − period withdrawals. At every level, USD and IRR equivalents are calculated only by revaluing the entire ending balance at the latest valid rates through the period end date; transaction-day rates are not used for monthly balance conversion.'
+            )
+          })
+        ),
         React.createElement(Tabs, {
           tabs: reportTabs.map((tab, index) => ({
             id: tab.id,
@@ -771,31 +800,33 @@
           onChange: setActiveReportTab,
           className: 'mb-0',
         }),
-        reportTabs.map((tab, index) => React.createElement('div', {
-          key: tab.id,
-          style: { display: activeReportTab === tab.id ? 'flex' : 'none' },
-          className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden',
-        }, React.createElement(DataGrid, {
-          data: tab.rows,
-          columns: tabColumns[index],
-          defaultPinnedCols: index === 0 ? ['_title'] : ['_path', '_title'],
-          defaultHiddenCols: index === 0 ? ['_path'] : [],
-          selectable: index < 4,
-          selectedRowIds: tabSelections[index],
-          onSelectionChange: ids => changeTabSelection(index, ids),
-          language,
-          formCode,
-          hideImport: true,
-          hideExport: true,
-          gridState: tabGridStates[index],
-          onGridStateChange: state => setGridState(previous => ({
-            ...previous, tabs: { ...previous?.tabs, [tab.id]: { ...state, layoutVersion: 2 } },
-          })),
-          toolbarContent: index === 0 ? React.createElement('span', {
-            className: 'text-[12px] text-slate-500 dark:text-slate-400 whitespace-normal',
-          }, t('با انتخاب ردیف در تب‌های قبلی، اطلاعات تب‌های بعدی فیلتر می‌شود. بدون انتخاب، همه موارد دامنه قبلی نمایش داده می‌شوند.', 'Select rows in earlier tabs to filter the following tabs. No selection means all rows in the previous scope.')) : null,
-
-        })))
+        reportTabs.map((tab, index) => {
+          const gridHeaderMessage = getGridHeaderMessage(index);
+          return React.createElement('div', {
+            key: tab.id,
+            style: { display: activeReportTab === tab.id ? 'flex' : 'none' },
+            className: 'flex-1 min-h-0 min-w-0 w-full flex-col overflow-hidden',
+          }, React.createElement(DataGrid, {
+            data: tab.rows,
+            columns: tabColumns[index],
+            defaultPinnedCols: index === 0 ? ['_title'] : ['_path', '_title'],
+            defaultHiddenCols: index === 0 ? ['_path'] : [],
+            selectable: index < 4,
+            selectedRowIds: tabSelections[index],
+            onSelectionChange: ids => changeTabSelection(index, ids),
+            language,
+            formCode,
+            hideImport: true,
+            hideExport: true,
+            gridState: tabGridStates[index],
+            onGridStateChange: state => setGridState(previous => ({
+              ...previous, tabs: { ...previous?.tabs, [tab.id]: { ...state, layoutVersion: 2 } },
+            })),
+            toolbarContent: gridHeaderMessage ? React.createElement('span', {
+              className: 'text-[12px] text-slate-500 dark:text-slate-400 whitespace-normal',
+            }, gridHeaderMessage) : null,
+          }));
+        })
       );
     };
 

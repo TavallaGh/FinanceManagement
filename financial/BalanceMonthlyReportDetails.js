@@ -24,6 +24,9 @@
     periodFrom: '',
     periodTo: '',
     balance: null,
+    balanceUsd: null,
+    balanceIrr: null,
+    showCellBalance: false,
     items: []
   });
 
@@ -122,6 +125,9 @@
       periodFrom,
       periodTo,
       balance: balanceValue,
+      balanceUsd: val?.usd ?? null,
+      balanceIrr: val?.irr ?? null,
+      showCellBalance: isCurrency || isLeaf,
       items,
     };
   };
@@ -183,6 +189,7 @@
     const drillCurrencyCode = cellDrillModal.currencyCode || '';
     const drillCurrencyLabel = cellDrillModal.currencyLabel || drillCurrencyCode || '-';
     const cellBalance = cellDrillModal.balance;
+    const showCellBalance = !!cellDrillModal.showCellBalance;
     const balanceCurrencyCode = String(accountCurrency || drillCurrencyCode || '').toUpperCase();
     const itemsCount = selectedItems.length;
     const drillConversionCache = new Map();
@@ -224,8 +231,12 @@
     const balanceToIrrRate = balanceCurrencyCode
       ? resolveConversionRate(reportData?.rateLookup || new Map(), balanceCurrencyCode, 'IRR', String(cellDrillModal.periodTo || cellDrillModal.date || ''), drillConversionCache)
       : 0;
-    const balanceUsd = (cellBalance === null || cellBalance === undefined) ? null : (parseFloat(cellBalance || 0) || 0) * balanceToUsdRate;
-    const balanceIrr = (cellBalance === null || cellBalance === undefined) ? null : (parseFloat(cellBalance || 0) || 0) * balanceToIrrRate;
+    const balanceUsd = cellDrillModal.balanceUsd !== null && cellDrillModal.balanceUsd !== undefined
+      ? cellDrillModal.balanceUsd
+      : ((cellBalance === null || cellBalance === undefined) ? null : (parseFloat(cellBalance || 0) || 0) * balanceToUsdRate);
+    const balanceIrr = cellDrillModal.balanceIrr !== null && cellDrillModal.balanceIrr !== undefined
+      ? cellDrillModal.balanceIrr
+      : ((cellBalance === null || cellBalance === undefined) ? null : (parseFloat(cellBalance || 0) || 0) * balanceToIrrRate);
 
     const modalColumns = [
       { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '90px', render: (val) => React.createElement('span', { className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px]' }, val || '-') },
@@ -291,8 +302,8 @@
             drillKind === 'currency' && React.createElement(Badge, { variant: 'indigo', size: 'sm' }, drillCurrencyCode || '-')
           )
         ),
-        React.createElement('div', { className: 'grid grid-cols-6 gap-2 shrink-0' },
-          React.createElement('div', { className: 'rounded-lg border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/70 dark:bg-indigo-900/20 px-3 py-2' }, React.createElement('div', { className: 'text-[10px] font-bold text-indigo-600 dark:text-indigo-400' }, t('بالانس سلول', 'Cell Balance')), React.createElement('div', { className: 'mt-0.5 text-[13px] font-black text-indigo-700 dark:text-indigo-300 tabular-nums font-sans', dir: 'ltr' }, fmtDecimal(cellBalance, 6))),
+        React.createElement('div', { className: `grid ${showCellBalance ? 'grid-cols-6' : 'grid-cols-5'} gap-2 shrink-0` },
+          showCellBalance ? React.createElement('div', { className: 'rounded-lg border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/70 dark:bg-indigo-900/20 px-3 py-2' }, React.createElement('div', { className: 'text-[10px] font-bold text-indigo-600 dark:text-indigo-400' }, t('بالانس سلول', 'Cell Balance')), React.createElement('div', { className: 'mt-0.5 text-[13px] font-black text-indigo-700 dark:text-indigo-300 tabular-nums font-sans', dir: 'ltr' }, fmtDecimal(cellBalance, 6))) : null,
           React.createElement('div', { className: 'rounded-lg border border-sky-100 dark:border-sky-900/40 bg-sky-50/70 dark:bg-sky-900/20 px-3 py-2' }, React.createElement('div', { className: 'text-[10px] font-bold text-sky-600 dark:text-sky-400' }, t('بالانس USD', 'USD Balance')), React.createElement('div', { className: 'mt-0.5 text-[13px] font-black text-sky-700 dark:text-sky-300 tabular-nums font-sans', dir: 'ltr' }, fmtDecimal(balanceUsd, 6))),
           React.createElement('div', { className: 'rounded-lg border border-amber-100 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-900/20 px-3 py-2' }, React.createElement('div', { className: 'text-[10px] font-bold text-amber-600 dark:text-amber-400' }, t('بالانس IRR', 'IRR Balance')), React.createElement('div', { className: 'mt-0.5 text-[13px] font-black text-amber-700 dark:text-amber-300 tabular-nums font-sans', dir: 'ltr' }, fmtDecimal(balanceIrr, 6))),
           React.createElement('div', { className: 'rounded-lg border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/70 dark:bg-emerald-900/20 px-3 py-2' }, React.createElement('div', { className: 'text-[10px] font-bold text-emerald-600 dark:text-emerald-400' }, t('کل واریز', 'Total Deposit')), React.createElement('div', { className: 'mt-0.5 text-[13px] font-black text-emerald-700 dark:text-emerald-300 tabular-nums font-sans', dir: 'ltr' }, fmtDecimal(itemTotals.deposit, 6))),
@@ -320,7 +331,7 @@
                 hideToolbar: false,
                 gridState: cellDrillGridState,
                 onGridStateChange: setCellDrillGridState,
-                defaultPinnedCols: ['_doc_code', '_tx_status'],
+                defaultPinnedCols: ['_doc_code'],
                 pageSizeOptions: [5, 10, 20, 50],
                 minVisibleRows: 5,
                 toolbarContent: React.createElement('div', { className: 'text-[12px] text-slate-500 dark:text-slate-400' }, t('مرور اقلام اسناد مرتبط با این دوره.', 'Review related transaction items for this period.'))

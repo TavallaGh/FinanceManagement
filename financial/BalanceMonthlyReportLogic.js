@@ -114,7 +114,8 @@
   const resolveRate = (lookup, fromCode, toCode, dateSlash, cache) => {
     const from = String(fromCode || '').toUpperCase();
     const to = String(toCode || '').toUpperCase();
-    if (!from || !to || from === to) return 1;
+    if (!from || !to) return 0;
+    if (from === to) return 1;
     const ck = `${dateSlash}|${from}|${to}`;
     if (cache.has(ck)) return cache.get(ck);
 
@@ -132,6 +133,43 @@
     const result = rate !== null ? (rate || 0) : 0;
     cache.set(ck, result);
     return result;
+  };
+
+  const resolvePeriodEndRates = (lookup, currencyCode, periodEndDate, cache) => {
+    const currency = String(currencyCode || '').toUpperCase();
+    if (!currency) return { toUsd: 0, usdToIrr: 0, toIrr: 0 };
+    const isIrr = currency === 'IRR' || currency === 'RIAL' || currency === 'RLS';
+
+    const toUsd = currency === 'USD'
+      ? 1
+      : resolveRate(lookup, currency, 'USD', periodEndDate, cache);
+    const usdToIrr = resolveRate(lookup, 'USD', 'IRR', periodEndDate, cache);
+    const toIrr = isIrr ? 1 : toUsd * usdToIrr;
+
+    return { toUsd, usdToIrr, toIrr };
+  };
+
+  const calculatePeriodBalance = (daily, periodFrom, periodTo) => {
+    let opening = 0;
+    let dep = 0;
+    let wid = 0;
+    const normalizedFrom = normalizeSlashDate(periodFrom);
+    const normalizedTo = normalizeSlashDate(periodTo);
+
+    Object.keys(daily || {})
+      .map((sourceDate) => ({ sourceDate, date: normalizeSlashDate(sourceDate) }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .forEach(({ sourceDate, date }) => {
+        const movement = daily[sourceDate] || {};
+        if (date < normalizedFrom) {
+          opening += (movement.dep || 0) - (movement.wid || 0);
+        } else if (date <= normalizedTo) {
+          dep += movement.dep || 0;
+          wid += movement.wid || 0;
+        }
+      });
+
+    return { opening, dep, wid, closing: opening + dep - wid };
   };
 
   const buildTree = (accounts) => {
@@ -667,31 +705,30 @@
     baseAccounts.forEach((acc) => {
       const aid = String(acc.id);
       const daily = dailyMap[aid] || {};
-      const dates = Object.keys(daily).sort();
       matrix[aid] = {};
 
       slots.forEach((s) => {
-        let bal = 0;
-        dates.forEach((d) => {
-          if (d <= s.targetDate) bal += (daily[d].dep || 0) - (daily[d].wid || 0);
-        });
-
-        let dep = 0;
-        let wid = 0;
-        dates.forEach((d) => {
-          if (d >= s.periodFrom && d <= s.periodTo) {
-            dep += daily[d].dep || 0;
-            wid += daily[d].wid || 0;
-          }
-        });
-
+        const { opening, dep, wid, closing } = calculatePeriodBalance(daily, s.periodFrom, s.periodTo);
         const currCode = acc.currency_code || '';
-        const usdR = resolveRate(rateLookup, currCode, 'USD', s.targetRateDate || s.targetDate, rateCache);
-        const irrR = resolveRate(rateLookup, currCode, 'IRR', s.targetRateDate || s.targetDate, rateCache);
-        const usd = bal * usdR;
-        const irr = bal * irrR;
+        const rateDate = s.targetRateDate || s.targetDate;
+        const periodEndRates = resolvePeriodEndRates(rateLookup, currCode, rateDate, rateCache);
+        // Monthly equivalents always revalue the entire closing balance at period-end rates.
+        // Transaction-day rates never participate in the monthly balance conversion.
+        const usd = closing * periodEndRates.toUsd;
+        const irr = closing * periodEndRates.toIrr;
 
-        matrix[aid][s.key] = { nat: bal, usd, irr, dep, wid };
+        matrix[aid][s.key] = {
+          opening,
+          dep,
+          wid,
+          nat: closing,
+          usd,
+          irr,
+          rateToUsd: periodEndRates.toUsd,
+          rateUsdToIrr: periodEndRates.usdToIrr,
+          rateToIrr: periodEndRates.toIrr,
+          rateDate,
+        };
         grandTotal[s.key].usd += usd;
         grandTotal[s.key].irr += irr;
       });
@@ -735,6 +772,8 @@
     fmtDecimal,
     buildRateLookup,
     resolveRate,
+    resolvePeriodEndRates,
+    calculatePeriodBalance,
     buildTree,
     buildGroupedRows,
     buildMonthlyAccountPaths,
