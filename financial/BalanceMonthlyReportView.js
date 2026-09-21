@@ -14,6 +14,7 @@
   const Minimize2 = LucideIcons.Minimize2 || FallbackIcon;
   const FileSpreadsheet = LucideIcons.FileSpreadsheet || FallbackIcon;
   const Check = LucideIcons.Check || FallbackIcon;
+  const HelpCircle = LucideIcons.CircleHelp || LucideIcons.HelpCircle || LucideIcons.Info || FallbackIcon;
 
   const DS = window.DesignSystem || {};
   const Core = window.DSCore || DS || {};
@@ -274,6 +275,8 @@
     openCellDrill,
     viewConfig,
   }) => {
+    const [calculationGuideOpen, setCalculationGuideOpen] = useState(false);
+
     const accountFilterTypeOptions = useMemo(() => ([
       { value: 'balance_group', label: t('گروه بالانس', 'Balance Group') },
       { value: 'account', label: t('انتخاب حساب', 'Select Account') },
@@ -781,25 +784,30 @@
         );
       };
       return React.createElement('div', { className: 'h-full flex flex-col min-h-0' },
-        React.createElement('div', { className: 'mx-2 mt-2 mb-1 shrink-0' },
-          React.createElement(Alert, {
-            type: 'info',
-            title: t('مبنای محاسبه', 'Calculation Basis'),
-            message: t(
-            'مانده پایان هر دوره = مانده ابتدای دوره + واریز دوره − برداشت دوره. معادل‌های USD و IRR در همه سطوح فقط با تبدیل کل مانده پایان دوره و آخرین نرخ معتبر تا روز پایانی همان دوره محاسبه می‌شوند؛ نرخ روز ثبت تک‌تراکنش‌ها در تبدیل بالانس ماهیانه استفاده نمی‌شود.',
-            'Period ending balance = opening balance + period deposits − period withdrawals. At every level, USD and IRR equivalents are calculated only by revaluing the entire ending balance at the latest valid rates through the period end date; transaction-day rates are not used for monthly balance conversion.'
-            )
+        React.createElement('div', {
+          className: 'flex items-end gap-2 border-b border-slate-200 dark:border-slate-700 shrink-0'
+        },
+          React.createElement(Tabs, {
+            tabs: reportTabs.map((tab, index) => ({
+              id: tab.id,
+              label: tab.label + (tabSelections[index].length ? ' (' + tabSelections[index].length + ')' : ''),
+            })),
+            activeTab: activeReportTab,
+            onChange: setActiveReportTab,
+            className: 'mb-0 border-b-0 flex-1 min-w-0',
+          }),
+          React.createElement(Button, {
+            variant: 'ghost',
+            size: 'sm',
+            icon: HelpCircle,
+            className: 'mb-1 mx-1',
+            onClick: () => setCalculationGuideOpen(true),
+            title: t('راهنمای مبنای محاسبه', 'Calculation basis help'),
+            'aria-label': t('نمایش راهنمای مبنای محاسبه', 'Show calculation basis help'),
+            'aria-haspopup': 'dialog',
+            'aria-expanded': calculationGuideOpen,
           })
         ),
-        React.createElement(Tabs, {
-          tabs: reportTabs.map((tab, index) => ({
-            id: tab.id,
-            label: tab.label + (tabSelections[index].length ? ' (' + tabSelections[index].length + ')' : ''),
-          })),
-          activeTab: activeReportTab,
-          onChange: setActiveReportTab,
-          className: 'mb-0',
-        }),
         reportTabs.map((tab, index) => {
           const gridHeaderMessage = getGridHeaderMessage(index);
           return React.createElement('div', {
@@ -852,6 +860,23 @@
       Modal,
       formCode
     });
+
+    const renderCalculationGuide = () => React.createElement(Modal, {
+      isOpen: calculationGuideOpen,
+      onClose: () => setCalculationGuideOpen(false),
+      title: t('مبنای محاسبه', 'Calculation Basis'),
+      showMaximize: false,
+      width: 'max-w-lg',
+      language,
+    }, React.createElement('div', { className: 'p-4' },
+      React.createElement(Alert, {
+        type: 'info',
+        message: t(
+          'مانده پایان هر دوره = مانده ابتدای دوره + واریز دوره − برداشت دوره. معادل‌های USD و IRR در همه سطوح فقط با تبدیل کل مانده پایان دوره و آخرین نرخ معتبر تا روز پایانی همان دوره محاسبه می‌شوند؛ نرخ روز ثبت تک‌تراکنش‌ها در تبدیل بالانس ماهیانه استفاده نمی‌شود.',
+          'Period ending balance = opening balance + period deposits − period withdrawals. At every level, USD and IRR equivalents are calculated only by revaluing the entire ending balance at the latest valid rates through the period end date; transaction-day rates are not used for monthly balance conversion.'
+        )
+      })
+    ));
 
     return React.createElement('div', {
       className: 'h-full flex flex-col font-sans',
@@ -932,6 +957,8 @@
       renderSettings(),
 
       renderCellDrillModal(),
+
+      renderCalculationGuide(),
 
       React.createElement(Toast, {
         isVisible: toast.isVisible,
