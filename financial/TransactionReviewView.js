@@ -634,7 +634,7 @@
       },
     ]), [itemsColumns, openGroupDrill, t]);
 
-    const groupDrillColumns = useMemo(() => itemsColumns.filter(col => col.field !== '_tx_type').map(col =>
+    const groupDrillColumns = useMemo(() => itemsColumns.filter(col => !['_tx_type', 'exchange_rate_to_usd'].includes(col.field)).map(col =>
       col.field !== '_doc_code' ? col : {
         ...col,
         render: (val, row) => React.createElement('button', {
@@ -645,6 +645,10 @@
         }, val || '-'),
       }
     ), [itemsColumns, openDocumentTab, t]);
+
+    const totalRowClassName = useCallback((row) => row._nodeType === 'total'
+      ? 'bg-slate-100 dark:bg-slate-700/70 hover:bg-slate-100 dark:hover:bg-slate-700/70'
+      : '', []);
 
     const groupedAccountColumns = useMemo(() => groupedItemsColumns.filter(col => col.field !== 'remained_amount').map(col =>
       col.field === '_treeLabel' ? { ...col, header_fa: 'حساب', header_en: 'Account' } : col
@@ -854,7 +858,13 @@
                     defaultHiddenCols: documentsDefaultHiddenCols,
                     gridState: documentsGridState,
                     onGridStateChange: setDocumentsGridState,
-                    actions: [{ id: 'attach', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), onClick: (row) => openAttachments(row), className: 'text-indigo-500 hover:text-indigo-600' }],
+                    actions: [{
+                      id: 'attach',
+                      icon: Paperclip,
+                      tooltip: t('پیوست‌ها', 'Attachments'),
+                      onClick: (row) => openAttachments(row),
+                      className: (row) => row._hasAttachments ? 'text-indigo-500 hover:text-indigo-600' : '',
+                    }],
                     onRowDoubleClick: (row) => setDrillDoc(row),
                     onSelectionChange: handleDocumentSelectionChange,
                   })
@@ -913,6 +923,7 @@
                     isLoading,
                     hideImport: true,
                     selectable: false,
+                    rowClassName: totalRowClassName,
                     gridState: costsGridState,
                     onGridStateChange: setCostsGridState,
                     toolbarContent: selectedDocumentIds.length > 0
@@ -935,6 +946,7 @@
                     isLoading,
                     hideImport: true,
                     selectable: false,
+                    rowClassName: totalRowClassName,
                     gridState: incomesGridState,
                     onGridStateChange: setIncomesGridState,
                     toolbarContent: selectedDocumentIds.length > 0
@@ -957,6 +969,7 @@
                     isLoading,
                     hideImport: true,
                     selectable: false,
+                    rowClassName: totalRowClassName,
                     gridState: centersGridState,
                     onGridStateChange: setCentersGridState,
                     toolbarContent: selectedDocumentIds.length > 0

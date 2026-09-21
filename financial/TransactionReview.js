@@ -596,7 +596,26 @@
           );
         }
 
-        setTransactions(txList);
+        const transactionIds = txList.map(tx => String(tx.id)).filter(Boolean);
+        let attachmentIds = new Set();
+        if (transactionIds.length > 0) {
+          const attachmentRows = [];
+          for (let index = 0; index < transactionIds.length; index += 200) {
+            const { data: attachmentData, error: attachmentError } = await supabase
+              .from('fm_attachments')
+              .select('entity_id')
+              .eq('entity_type', 'TRANSACTION')
+              .in('entity_id', transactionIds.slice(index, index + 200));
+            if (attachmentError) throw attachmentError;
+            attachmentRows.push(...(attachmentData || []));
+          }
+          attachmentIds = new Set(attachmentRows.map(file => String(file.entity_id)));
+        }
+
+        setTransactions(txList.map(tx => ({
+          ...tx,
+          _hasAttachments: attachmentIds.has(String(tx.id)),
+        })));
       } catch (err) {
         console.error('TransactionReview: fetch error', err);
         showToast(t('خطا در دریافت داده‌ها', 'Error fetching data'), 'error');
@@ -713,12 +732,12 @@
             })
           );
         },
-      },   
+      },
       {
         name: 'summary_currency',
         label: t('خلاصه ارزی', 'Currency Summary'),
         type: 'toggle',
-      },      
+      },
       {
         name: 'account_filter_type',
         label: t('نوع فیلتر حساب', 'Account Filter Type'),
@@ -762,7 +781,7 @@
               { field: 'title_fa', header_fa: 'عنوان گروه بالانس', header_en: 'Balance Group', width: '165px' },
             ],
             dropdownWidth: 'min-w-[255px]',
-          },               
+          },
       { name: 'cost_type_ids', label: t('نوع هزینه', 'Cost Type'), type: 'lov', multiple: true, lovData: lookups.costTypes, lovColumns: typeLovColumns, dropdownWidth: 'min-w-[420px]' },
       { name: 'income_type_ids', label: t('نوع درآمد', 'Income Type'), type: 'lov', multiple: true, lovData: lookups.incomeTypes, lovColumns: typeLovColumns, dropdownWidth: 'min-w-[420px]' },
       { name: 'center_ids', label: t('مرکز هزینه/درآمد', 'Cost/Income Center'), type: 'lov', multiple: true, lovData: lookups.costBenefitCenters, lovColumns: centerLovColumns, dropdownWidth: 'min-w-[495px]' },
