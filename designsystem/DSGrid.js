@@ -320,7 +320,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [], defaultPinnedCols = [], pageSizeOptions = [10, 20, 50, 100], toolbarContent = null, onSelectionChange = null, selectedRowIds, summaryRow = null, minVisibleRows = 0, reserveMiddleSpace = true }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [], defaultPinnedCols = [], pageSizeOptions = [10, 20, 50, 100], toolbarContent = null, compactBulkToolbar = false, onSelectionChange = null, selectedRowIds, summaryRow = null, minVisibleRows = 0, reserveMiddleSpace = true, rowClassName = null }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -714,7 +714,7 @@
           </div>
 
           {toolbarContent ? (
-            <div className="flex-1 flex items-center gap-2 min-w-0 overflow-hidden">
+            <div className={`${compactBulkToolbar && selectedRows.length > 0 && filteredBulkActions.length > 0 ? 'flex-none max-w-full' : 'flex-1'} flex items-center gap-2 min-w-0 overflow-hidden`}>
               {toolbarContent}
             </div>
           ) : (
@@ -973,6 +973,10 @@
                 const isActive = activeRowId !== null && activeRowId === row.id;
                 const isHighlighted = isSelected || isActive;
                 const isDragging = rowReorderable && draggableRowIndex === rowIndex;
+                const customRowClassName = typeof rowClassName === 'function' ? rowClassName(row, rowIndex) : (rowClassName || '');
+                const rowBackgroundClass = customRowClassName || (isHighlighted
+                  ? 'bg-indigo-50 dark:bg-indigo-900'
+                  : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700');
 
                 return (
                   <tr 
@@ -981,7 +985,7 @@
                     onClick={() => onRowClick && onRowClick(row)}
                     draggable={isDragging}
                     onDragStart={(e) => handleRowDragStart(e, rowIndex)} onDragEnter={(e) => handleRowDragEnter(e, rowIndex)} onDragEnd={handleRowDragEnd} onDragOver={(e) => e.preventDefault()}
-                    className={`border-b border-slate-100 dark:border-slate-700/50 transition-colors group ${isHighlighted ? 'bg-indigo-50 dark:bg-indigo-900' : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'} ${isDragging ? 'opacity-50' : ''}`}
+                    className={`border-b border-slate-100 dark:border-slate-700/50 transition-colors group ${rowBackgroundClass} ${isDragging ? 'opacity-50' : ''}`}
                   >
                     {rowReorderable && (
                       <td style={{...getStickyStyles('ROW_REORDER_COL', false), backgroundColor: 'inherit'}} className={`p-0 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
@@ -996,7 +1000,8 @@
                     )}
                     {selectable && (
                       <td style={{...getStickyStyles('SELECT_COL', false), backgroundColor: 'inherit'}} className={`p-1.5 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
-                        <input type="checkbox" checked={isSelected} onChange={() => handleSelectRow(row.id)} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700/40 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer" />
+                        <input type="checkbox" checked={isSelected} onClick={(event) => event.stopPropagation()}
+                          onChange={() => handleSelectRow(row.id)} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700/40 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer" />
                       </td>
                     )}
                     {visibleColumns.map((col) => (

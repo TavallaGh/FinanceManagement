@@ -596,8 +596,10 @@
           return (
             <button
               key={tab.id}
-              onClick={() => onChange(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-[12px] font-bold transition-all border-b-2 outline-none whitespace-nowrap ${isActive ? 'border-indigo-600 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-t-lg' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-t-lg'}`}
+              onClick={() => { if (!tab.disabled) onChange(tab.id); }}
+              disabled={tab.disabled === true}
+              aria-disabled={tab.disabled === true}
+              className={`flex items-center gap-2 px-4 py-2.5 text-[12px] font-bold transition-all border-b-2 outline-none whitespace-nowrap ${tab.disabled ? 'border-transparent text-slate-300 dark:text-slate-600 cursor-not-allowed' : isActive ? 'border-indigo-600 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-t-lg' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-t-lg'}`}
             >
               {Icon && <Icon size={16} />}
               {tab.label}
