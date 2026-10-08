@@ -243,6 +243,7 @@
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const savingRef = useRef(false);
+    const originalPlanRef = useRef(null);
     const requestRef = useRef(0);
     const canEditFields = isNew ? access.canCreate
       : access.canEdit && logic.editableStatuses.has(plan.status);
@@ -270,18 +271,25 @@
       setLoading(true);
       try {
         if (!supabase) throw new Error('Supabase client is unavailable');
-        const [yearRows, currencyRows, record] = await Promise.all([
+        if (isNew && !window.AutoNumberingService) throw new Error(t('سرویس شماره‌گذاری در دسترس نیست', 'Auto numbering is unavailable'));
+        const [yearRows, currencyRows, record, numberPreview] = await Promise.all([
           loadAll('fm_fiscal_years', 'id,year_code,start_date,end_date,is_active'),
           loadAll('fm_currencies', 'id,code,decimal_places,system_role'),
           mode === 'EDIT'
             ? supabase.from('fm_budget_setup_plans').select('*').eq('id', sourcePlan.id).eq('plan_kind', 'MAIN').single()
-            : Promise.resolve({ data: null, error: null })
+            : Promise.resolve({ data: null, error: null }),
+          isNew ? window.AutoNumberingService.previewNext('BUDGET_PLAN') : Promise.resolve(null)
         ]);
         if (record.error) throw record.error;
         if (request !== requestRef.current) return;
         setYears(yearRows);
         setCurrencies(currencyRows);
-        if (record.data) setPlan(record.data);
+        if (record.data) { setPlan(record.data); originalPlanRef.current = record.data; }
+        if (isNew) {
+          const code = typeof numberPreview === 'string' ? numberPreview : numberPreview?.formattedCode;
+          if (!code) throw new Error(t('کد خودکار بودجه دریافت نشد', 'Automatic budget code was not received'));
+          setPlan(current => ({ ...current, code }));
+        }
         setLoadError(false);
       } catch (error) {
         if (request === requestRef.current) {
@@ -296,23 +304,8 @@
       loadData();
       return () => { requestRef.current += 1; };
     }, [mode, sourcePlan?.id]);
-    useEffect(() => {
-      if (!isNew || !window.AutoNumberingService) return;
-      let active = true;
-      window.AutoNumberingService.previewNext('BUDGET_PLAN').then(preview => {
-        const code = typeof preview === 'string' ? preview : preview?.formattedCode || '';
-        if (active && code) setPlan(current => current.code ? current : { ...current, code, generatedCode: code });
-      }).catch(error => console.error('Budget plan numbering preview failed:', error));
-      return () => { active = false; };
-    }, [mode]);
-
-    const logAction = async (id, action, details) => {
-      const { error } = await supabase.from('fm_record_logs').insert([{
-        entity_type: 'تنظیم بودجه', record_id: String(id), action,
-        user_name: window.NavigationSystem?.currentUser?.name || 'system', details
-      }]);
-      if (error) console.error('Budget plan audit log failed:', error);
-    };
+    const logAction = (id, action, details, oldData, newData) => window.BudgetSetupSupport.writeAudit(supabase,
+      [{ entity: 'تنظیم بودجه', id, action, details, oldData, newData }]);
     const validate = () => {
       if (!String(plan.code || '').trim() || !String(plan.title || '').trim())
         return t('کد و عنوان الزامی هستند', 'Code and title are required');
@@ -336,8 +329,12 @@
       savingRef.current = true;
       setSaving(true);
       try {
+        const number = isNew ? await window.AutoNumberingService.consumeNext('BUDGET_PLAN') : null;
+        const code = isNew ? (typeof number === 'string' ? number : number?.formattedCode) : originalPlanRef.current?.code;
+        if (!code) throw new Error(t('کد خودکار بودجه دریافت نشد', 'Automatic budget code was not received'));
+        if (isNew) setPlan(current => ({ ...current, code }));
         const payload = canEditFields ? {
-          code: logic.englishDigits(plan.code).trim(), title: String(plan.title).trim(),
+          code: logic.englishDigits(code).trim(), title: String(plan.title).trim(),
           period_type: plan.period_type,
           fiscal_year_id: plan.period_type === 'CUSTOM' ? null : plan.fiscal_year_id,
           fiscal_period_id: null,
@@ -348,6 +345,7 @@
           is_active: plan.is_active !== false
         } : { is_active: plan.is_active !== false };
         let id = plan.id;
+        let copyAuditRows = [];
         if (isNew && mode === 'COPY') {
           if (String(sourcePlan.base_currency_id) !== String(baseCurrency.id))
             throw new Error(t('ارز پایه بودجه مبدا با ارز پایه فعلی متفاوت است', 'Source base currency differs from current base currency'));
@@ -362,8 +360,9 @@
               const batch = copiedLines.slice(offset, offset + 100).map(row => ({
                 ...logic.toLine(logic.fromLine(row)), plan_id: id
               }));
-              const { error: copyError } = await supabase.from('fm_budget_setup_lines').insert(batch);
+              const { data: inserted, error: copyError } = await supabase.from('fm_budget_setup_lines').insert(batch).select(logic.lineColumns);
               if (copyError) throw copyError;
+              copyAuditRows.push(...(inserted || []));
             }
           } catch (copyError) {
             const { error: cleanupError } = await supabase.from('fm_budget_setup_plans').delete().eq('id', id);
@@ -381,13 +380,12 @@
           const { error } = await query.select('id').single();
           if (error) throw error;
         }
-        if (isNew && window.AutoNumberingService && plan.generatedCode && payload.code === plan.generatedCode) {
-          try { await window.AutoNumberingService.consumeNext('BUDGET_PLAN'); }
-          catch (error) { console.error('Budget plan numbering consume failed:', error); }
-        }
-        await logAction(id, isNew ? 'create' : 'update',
-          `${isNew ? 'ایجاد' : 'ویرایش'} سربرگ بودجه: ${payload.code || plan.code}`);
-        onSaved({ ...plan, ...payload, id, status: isNew ? 'DRAFT' : plan.status }, mode);
+        const saved = { ...plan, ...payload, id, status: isNew ? 'DRAFT' : plan.status };
+        const headerError = await logAction(id, isNew ? 'create' : 'update',
+          `${isNew ? 'ایجاد' : 'ویرایش'} سربرگ بودجه: ${payload.code || plan.code}`, originalPlanRef.current,
+          { ...originalPlanRef.current, ...payload, id, plan_kind: 'MAIN', status: saved.status });
+        const auditError = await window.BudgetSetupSupport.auditChanges(supabase, 'ردیف تنظیم بودجه', [], copyAuditRows, `کپی ردیف‌های بودجه ${saved.code}`) || headerError;
+        onSaved(saved, mode, auditError);
       } catch (error) {
         showToast(error?.message || t('ذخیره سربرگ انجام نشد', 'Failed to save budget header'), 'error');
       } finally {
@@ -409,8 +407,8 @@
             : <div className="p-4 flex flex-col gap-4 max-h-[75vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50">
                 <div className="grid grid-cols-2 gap-3">
                   <TextField size="sm" formCode={formCode} label={t('کد برنامه', 'Plan Code')} required
-                    value={logic.englishDigits(plan.code)} disabled={!canEditFields} dir="ltr" isRtl={false}
-                    onChange={event => update('code', logic.englishDigits(event.target.value))} />
+                    value={logic.englishDigits(plan.code)} disabled dir="ltr" isRtl={false}
+                    placeholder={t('تولید خودکار', 'Auto')} />
                   <TextField size="sm" formCode={formCode}
                     label={t('عنوان برنامه', 'Plan Title')} required value={plan.title || ''}
                     disabled={!canEditFields} isRtl={isRtl}
@@ -471,7 +469,7 @@
     List = FallbackIcon, Sigma = FallbackIcon,
     Trash2 = FallbackIcon, AlertTriangle = FallbackIcon, FileText = FallbackIcon,
     CheckSquare = FallbackIcon, CheckCircle = FallbackIcon,
-    MessageSquare = FallbackIcon, Paperclip = FallbackIcon } = window.LucideIcons || {};
+    MessageSquare = FallbackIcon, Paperclip = FallbackIcon, Clock = FallbackIcon } = window.LucideIcons || {};
 
   const BudgetSetup = ({ language = 'fa', formCode = 'BUD_SETUP' }) => {
     const Empty = () => null;
@@ -498,6 +496,7 @@
     const [selected, setSelected] = useState(null);
     const [commentPlan, setCommentPlan] = useState(null);
     const [attachmentPlan, setAttachmentPlan] = useState(null);
+    const [logPlan, setLogPlan] = useState(null);
     const [headerModal, setHeaderModal] = useState(null);
     const [summaryPlan, setSummaryPlan] = useState(null);
     const [summaryGroup, setSummaryGroup] = useState('CENTER');
@@ -680,26 +679,25 @@
         : t(`سالانه ${yearCode}`, `Annual / ${yearCode}`);
     };
 
-    const logAction = async (id, action, details) => {
-      const { error } = await supabase.from('fm_record_logs').insert([{
-        entity_type: 'تنظیم بودجه', record_id: String(id), action,
-        user_name: window.NavigationSystem?.currentUser?.name || 'system', details
-      }]);
-      if (error) console.error('Budget plan audit log failed:', error);
-    };
+    const logAction = (id, action, details, oldData, newData) => window.BudgetSetupSupport.writeAudit(supabase,
+      [{ entity: 'تنظیم بودجه', id, action, details, oldData, newData }]);
 
     const confirmDelete = async () => {
       const row = deletePlan;
       if (!row || row.status !== 'DRAFT' || !access.canDelete || saving) return;
       setSaving(true);
       try {
+        const oldLines = await loadByIds('fm_budget_setup_lines', logic.lineColumns, 'plan_id', [row.id]);
+        const oldPlans = await loadByIds('fm_budget_setup_plans', '*', 'id', [row.id]);
         const { error } = await supabase.from('fm_budget_setup_plans').delete()
           .eq('id', row.id).eq('plan_kind', 'MAIN').eq('status', 'DRAFT').select('id').single();
         if (error) throw error;
-        await logAction(row.id, 'delete', `حذف برنامه بودجه: ${row.code}`);
+        const headerError = await logAction(row.id, 'delete', `حذف برنامه بودجه: ${row.code}`, oldPlans[0] || row);
+        const auditError = await window.BudgetSetupSupport.auditChanges(supabase, 'ردیف تنظیم بودجه', oldLines, [], `حذف بودجه ${row.code}`) || headerError;
         setDeletePlan(null);
         setSelectedIds(current => current.filter(id => id !== row.id));
-        if (await fetchData()) showToast(t('برنامه بودجه حذف شد', 'Budget plan deleted'));
+        if (await fetchData()) showToast(auditError ? t('بودجه حذف شد، اما ثبت لاگ کامل نشد.', 'Deleted, but audit logging was incomplete.')
+          : t('برنامه بودجه حذف شد', 'Budget plan deleted'), auditError ? 'warning' : 'success');
       } catch (error) {
         showToast(t('حذف برنامه بودجه انجام نشد', 'Failed to delete budget plan'), 'error');
       } finally {
@@ -721,6 +719,8 @@
       setSaving(true);
       try {
         const ids = eligible.map(row => row.id);
+        const oldPlans = await loadByIds('fm_budget_setup_plans', '*', 'id', ids);
+        const oldLines = bulkAction.target === 'DELETE' ? await loadByIds('fm_budget_setup_lines', logic.lineColumns, 'plan_id', ids) : [];
         if (bulkAction.target === 'TEMPORARY') {
           for (const plan of eligible) await logic.validateTemporary({ client: supabase, plan, t });
         }
@@ -739,15 +739,18 @@
           ? supabase.from('fm_budget_setup_plans').delete().in('id', ids).eq('status', 'DRAFT')
           : supabase.from('fm_budget_setup_plans').update({ status: bulkAction.target, ...window.BudgetSetupSupport.statusMetadata(bulkAction.target) })
               .in('id', ids).in('status', bulkAction.fromStatuses);
-        const { data, error } = await query.eq('plan_kind', 'MAIN').select('id');
+        const { data, error } = await query.eq('plan_kind', 'MAIN').select('*');
         if (error) throw error;
+        const changed = new Set((data || []).map(row => String(row.id)));
+        const headerError = await window.BudgetSetupSupport.auditChanges(supabase, 'تنظیم بودجه', oldPlans.filter(row => changed.has(String(row.id))),
+          bulkAction.target === 'DELETE' ? [] : data, `عملیات گروهی برنامه بودجه: ${bulkAction.target}`);
+        const auditError = await window.BudgetSetupSupport.auditChanges(supabase, 'ردیف تنظیم بودجه',
+          oldLines.filter(row => changed.has(String(row.plan_id))), [], 'حذف گروهی بودجه و ردیف‌ها') || headerError;
         if (data?.length !== ids.length) throw new Error(t('تعداد برنامه‌های تغییر یافته با انتخاب‌ها برابر نیست؛ فهرست را بازخوانی کنید', 'Some plans were not changed; refresh the list'));
-        for (const row of eligible) await logAction(row.id,
-          bulkAction.target === 'DELETE' ? 'delete' : 'update',
-          `عملیات گروهی برنامه بودجه: ${bulkAction.target}`);
         setBulkAction(null);
         setSelectedIds([]);
-        if (await fetchData()) showToast(t('عملیات گروهی انجام شد', 'Bulk action completed'));
+        if (await fetchData()) showToast(auditError ? t('عملیات انجام شد، اما ثبت لاگ کامل نشد.', 'Completed, but audit logging was incomplete.')
+          : t('عملیات گروهی انجام شد', 'Bulk action completed'), auditError ? 'warning' : 'success');
       } catch (error) {
         showToast(error?.message || t('عملیات گروهی انجام نشد', 'Bulk action failed'), 'error');
         await fetchData();
@@ -860,7 +863,7 @@
                     action={<Button size="sm" onClick={fetchData}>{t('تلاش دوباره', 'Retry')}</Button>} /> :
                   <DataGrid key={JSON.stringify(filters)} data={filteredPlans} columns={columns} language={language}
                     formCode={formCode} gridState={gridState} onGridStateChange={setGridState}
-                    hideImport hideExport defaultHiddenCols={window.BudgetSetupSupport.hiddenStatusColumns} actionWidth="190px" selectable selectedRowIds={selectedIds}
+                    hideImport hideExport defaultHiddenCols={window.BudgetSetupSupport.hiddenStatusColumns} actionWidth="220px" selectable selectedRowIds={selectedIds}
                     onSelectionChange={setSelectedIds} bulkActions={bulkActions}
                     onAdd={access.canCreate ? () => setHeaderModal({ mode: 'CREATE', plan: null }) : undefined}
                     onRowClick={row => setHeaderModal({ mode: 'EDIT', plan: row })}
@@ -875,6 +878,7 @@
                         onClick: setCommentPlan, requiredAccess: 'view' },
                       { id: 'attachments', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'),
                         onClick: setAttachmentPlan, requiredAccess: 'view' },
+                      { id: 'view_log', icon: Clock, tooltip: t('لاگ سیستم', 'System Log'), onClick: setLogPlan, requiredAccess: 'view' },
                       { id: 'copy', icon: Copy, tooltip: t('کپی برنامه', 'Copy Plan'),
                         onClick: row => setHeaderModal({ mode: 'COPY', plan: row }), requiredAccess: 'create' },
                       { id: 'delete', icon: Trash2, tooltip: t('حذف یادداشت', 'Delete Draft'),
@@ -910,11 +914,12 @@
         {Header && headerModal && <Header key={`${headerModal.mode}-${headerModal.plan?.id || 'new'}`}
           mode={headerModal.mode} sourcePlan={headerModal.plan} language={language} formCode={formCode}
           onClose={() => setHeaderModal(null)}
-          onSaved={(record, mode) => {
+          onSaved={(record, mode, auditError) => {
             const original = headerModal.plan;
             setHeaderModal(null);
             fetchData();
             if (mode !== 'EDIT') setSelected({ plan: record, copyNotice: mode === 'COPY' ? original : null });
+            if (auditError) showToast(t('بودجه ذخیره شد، اما ثبت لاگ کامل نشد.', 'Budget saved, but audit logging was incomplete.'), 'warning');
           }} />}
         {commentPlan && CommentModal &&
           <CommentModal isOpen onClose={() => setCommentPlan(null)}
@@ -951,6 +956,8 @@
             </div>
           </div>
         </Modal>
+        {logPlan && <window.BudgetSetupSupport.LogModal entity="تنظیم بودجه" recordId={logPlan.id}
+          language={language} formCode={formCode} onClose={() => setLogPlan(null)} />}
         {Attachments && attachmentPlan && <Attachments key={attachmentPlan.id} entityType="BUDGET_SETUP"
           recordTable="fm_budget_setup_plans" recordId={attachmentPlan.id} recordTitle={`${attachmentPlan.code} - ${attachmentPlan.title}`}
           storageFolder="budget_setup" auditEntityType="تنظیم بودجه" formCode={formCode} language={language}

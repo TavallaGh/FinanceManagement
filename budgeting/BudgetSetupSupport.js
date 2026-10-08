@@ -12,6 +12,75 @@
       return { id: String(stored.id || current.id || ''), name: current.name || current.full_name || stored.name || 'system' };
     } catch (_error) { return { id: String(current.id || ''), name: current.name || current.full_name || 'system' }; }
   };
+  const writeAudit = async (client, entries) => {
+    try {
+      for (let offset = 0; offset < entries.length; offset += 100) {
+        const result = await client.from('fm_record_logs').insert(entries.slice(offset, offset + 100).map(entry => ({
+          entity_type: entry.entity, record_id: String(entry.id), action: entry.action,
+          user_name: currentUser().name, details: entry.details,
+          old_data: entry.oldData ?? null, new_data: entry.newData ?? null
+        })));
+        if (result.error) throw result.error;
+      }
+      return null;
+    } catch (error) { return error; }
+  };
+  const auditChanges = async (client, entity, before, after, details) => {
+    const oldRows = new Map(before.map(row => [String(row.id), row]));
+    const newRows = new Map(after.map(row => [String(row.id), row]));
+    const entries = [];
+    for (const id of new Set([...oldRows.keys(), ...newRows.keys()])) {
+      const oldData = oldRows.get(id), newData = newRows.get(id);
+      if (JSON.stringify(oldData) === JSON.stringify(newData)) continue;
+      entries.push({ entity, id, action: !oldData ? 'create' : !newData ? 'delete' : 'update', details, oldData, newData });
+    }
+    return writeAudit(client, entries);
+  };
+  const LogModal = ({ entity, recordId, language = 'fa', formCode, onClose }) => {
+    const { Modal, LogTimeline } = window.DSFeedback;
+    const { EmptyState, Button } = window.DSCore;
+    const security = window.SecurityManager?.useSecurity?.();
+    const canView = security?.getActions(formCode)?.canView;
+    const [logs, setLogs] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState(null);
+    const [retry, setRetry] = React.useState(0);
+    const t = (fa, en) => language === 'fa' ? fa : en;
+    const fieldLabels = { code: t('کد', 'Code'), plan_id: t('بودجه مرتبط', 'Reference Budget'),
+      amendment_id: t('متمم مرتبط', 'Amendment'), cost_benefit_center_id: t('مرکز هزینه / درآمد', 'Cost / Income Center'),
+      cost_type_id: t('نوع هزینه', 'Cost Type'), income_type_id: t('نوع درآمد', 'Income Type'),
+      funding_source_id: t('منبع تأمین', 'Funding Source'), amount: t('مبلغ', 'Amount'),
+      description: t('توضیحات', 'Description'), status: t('وضعیت', 'Status'), cadence: t('نوع تسهیم', 'Allocation Method'),
+      buckets: t('مبالغ دوره‌های تسهیم', 'Allocation Bucket Amounts'), row_kind: t('منشأ ردیف', 'Line Origin'),
+      effective_start_date: t('تاریخ مؤثر شروع', 'Effective Start Date') };
+    React.useEffect(() => {
+      let active = true;
+      setLoading(true); setError(null); setLogs([]);
+      (async () => {
+        try {
+          if (!canView) throw new Error(t('دسترسی مشاهده ندارید', 'View access denied'));
+          const rows = [];
+          for (let offset = 0; ; offset += 500) {
+            const result = await window.supabase.from('fm_record_logs').select('*')
+              .eq('entity_type', entity).eq('record_id', String(recordId))
+              .order('timestamp', { ascending: false }).order('id', { ascending: false }).range(offset, offset + 499);
+            if (result.error) throw result.error;
+            if (!active) return;
+            rows.push(...(result.data || []));
+            if (!result.data || result.data.length < 500) break;
+          }
+          if (active) setLogs(rows);
+        } catch (failure) { if (active) setError(failure.message); }
+        finally { if (active) setLoading(false); }
+      })();
+      return () => { active = false; };
+    }, [entity, recordId, canView, retry, language]);
+    return <Modal isOpen onClose={onClose} title={t('لاگ‌های سیستمی رکورد', 'System Logs')} language={language} width="max-w-xl">
+      {error ? <EmptyState title={t('دریافت تاریخچه انجام نشد', 'Could not load history')} description={error}
+        action={canView && <Button size="sm" onClick={() => setRetry(value => value + 1)}>{t('تلاش دوباره', 'Retry')}</Button>} />
+        : <LogTimeline logs={logs} isLoading={loading} language={language} fieldLabels={fieldLabels} />}
+    </Modal>;
+  };
   const statusMetadata = (target, timestamp = new Date().toISOString()) => {
     const actor = currentUser();
     const approval = { approved_by: null, approved_by_name: null, approved_at: null };
@@ -146,5 +215,6 @@
       formTitle={language === 'fa' ? 'تنظیم بودجه' : 'Budget Setup'} formComponent="BudgetSetup" /> : null;
   };
   window.BudgetSetupSupport = { loadCreators, loadAllocationPlans, allocationColumns, Comments,
-    statusFields, hiddenStatusColumns, statusMetadata, currentUser, lifecycleColumns, LifecycleFields, BudgetTotals, HeaderSection };
+    statusFields, hiddenStatusColumns, statusMetadata, currentUser, lifecycleColumns, LifecycleFields, BudgetTotals, HeaderSection,
+    writeAudit, auditChanges, LogModal };
 })();

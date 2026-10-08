@@ -9,7 +9,7 @@
   const { FilePlus = FallbackIcon,
     Save = FallbackIcon, Plus = FallbackIcon, Trash2 = FallbackIcon, Edit = FallbackIcon,
     RefreshCw = FallbackIcon, AlertTriangle = FallbackIcon, Sigma = FallbackIcon,
-    MessageSquare = FallbackIcon, Paperclip = FallbackIcon,
+    MessageSquare = FallbackIcon, Paperclip = FallbackIcon, Clock = FallbackIcon,
     ChevronRight = FallbackIcon, ChevronLeft = FallbackIcon } = window.LucideIcons || {};
   const BudgetAmendment = ({ language = 'fa', formCode = 'BUD_AMENDMENT' }) => {
     const { PageHeader, Button, Badge, Tabs, Skeleton, EmptyState, Card } = window.DSCore;
@@ -31,6 +31,7 @@
     const [doc, setDoc] = useState(null);
     const [context, setContext] = useState(null);
     const [rows, setRows] = useState([]);
+    const [persistedLineIds, setPersistedLineIds] = useState(new Set());
     const [dirty, setDirty] = useState(false);
     const [activeTab, setActiveTab] = useState('INCOME');
     const [loading, setLoading] = useState(false);
@@ -48,10 +49,10 @@
     const [summaryTarget, setSummaryTarget] = useState(null);
     const [commentTarget, setCommentTarget] = useState(null);
     const [attachmentTarget, setAttachmentTarget] = useState(null);
+    const [logTarget, setLogTarget] = useState(null);
     const [toast, setToast] = useState({ isVisible: false, type: 'success', message: '' });
     const requestRef = useRef(0);
     const savingRef = useRef(false);
-    const codeRef = useRef(null);
     const writable = doc && logic.editable.has(doc.status) && (doc.persisted ? access.canEdit : access.canCreate);
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -107,29 +108,29 @@
         setDoc({ ...loaded.doc, persisted: true });
         setContext(loaded.context);
         setRows(loaded.lines);
+        setPersistedLineIds(new Set(loaded.lines.map(row => String(row.id))));
         setActiveTab(loaded.lines.some(row => logic.typeOf(row) === 'INCOME') ? 'INCOME' : 'COST');
       } catch (error) { if (request === requestRef.current) setLoadError(errorText(error)); }
       finally { if (request === requestRef.current) setLoading(false); }
     };
     const create = async () => {
       if (!access.canCreate || savingRef.current) return;
-      ++requestRef.current;
-      setDoc({ id: logic.uuid(), code: '', title: '', plan_id: null, status: 'DRAFT', persisted: false, revision: 0,
-        created_at: new Date().toISOString(), created_by_name: logic.user().name, effective_start_date: '' });
-      setRows([]);
-      setContext(null);
-      setDirty(false);
+      const request = ++requestRef.current;
+      setLoading(true);
       setLoadError(null);
-      setLoading(false);
-      codeRef.current = null;
-      const request = requestRef.current;
-      if (window.AutoNumberingService) {
-        try {
-          const preview = await window.AutoNumberingService.previewNext('BUDGET_AMENDMENT');
-          const code = typeof preview === 'string' ? preview : preview?.code || preview?.formattedCode;
-          if (request === requestRef.current && code) { codeRef.current = code; setDoc(current => ({ ...current, code })); }
-        } catch (error) { if (request === requestRef.current) showToast(errorText(error), 'warning'); }
-      }
+      try {
+        const preview = await window.AutoNumberingService?.previewNext('BUDGET_AMENDMENT');
+        const code = typeof preview === 'string' ? preview : preview?.formattedCode;
+        if (!code) throw new Error(t('شماره‌گذاری خودکار متمم بودجه در دسترس نیست', 'Budget amendment auto numbering is unavailable'));
+        if (request !== requestRef.current) return;
+        setDoc({ id: logic.uuid(), code, title: '', plan_id: null, status: 'DRAFT', persisted: false, revision: 0,
+          created_at: new Date().toISOString(), created_by_name: logic.user().name, effective_start_date: '' });
+        setRows([]);
+        setPersistedLineIds(new Set());
+        setContext(null);
+        setDirty(false);
+      } catch (error) { if (request === requestRef.current) showToast(errorText(error), 'error'); }
+      finally { if (request === requestRef.current) setLoading(false); }
     };
     const choosePlan = async (plan, confirmed = false) => {
       if (!doc || doc.persisted || !writable || savingRef.current) return;
@@ -166,18 +167,25 @@
       savingRef.current = true;
       setSaving(true);
       try {
-        const result = await logic.save({ client, doc, rows: candidateRows, access, scope, language });
+        let document = doc;
+        if (!doc.persisted) {
+          logic.effectiveDate(context, doc.effective_start_date);
+          logic.validate(context, candidateRows, false, doc.id);
+          const number = await window.AutoNumberingService.consumeNext('BUDGET_AMENDMENT');
+          const code = typeof number === 'string' ? number : number?.formattedCode;
+          if (!code) throw new Error(t('کد خودکار متمم دریافت نشد', 'Automatic amendment code was not received'));
+          document = { ...doc, code };
+          setDoc(document);
+        }
+        const result = await logic.save({ client, doc: document, rows: candidateRows, access, scope, language });
         setDoc({ ...result.doc, persisted: true });
         setContext(result.context);
         setRows(result.lines);
+        setPersistedLineIds(new Set(result.lines.map(row => String(row.id))));
         setDirty(false);
-        let numberingError = false;
-        if (!doc.persisted && codeRef.current === doc.code && window.AutoNumberingService) {
-          try { await window.AutoNumberingService.consumeNext('BUDGET_AMENDMENT'); } catch (_error) { numberingError = true; }
-        }
-        showToast(result.auditError || numberingError
-          ? t('متمم ذخیره شد، اما ثبت سابقه یا شماره‌گذاری کامل نشد.', 'Saved, but audit or numbering was incomplete.')
-          : t('متمم ذخیره شد', 'Amendment saved'), result.auditError || numberingError ? 'warning' : 'success');
+        showToast(result.auditError
+          ? t('متمم ذخیره شد، اما ثبت سابقه کامل نشد.', 'Saved, but audit logging was incomplete.')
+          : t('متمم ذخیره شد', 'Amendment saved'), result.auditError ? 'warning' : 'success');
         return true;
       } catch (error) {
         if (error.recoveryRequired) {
@@ -372,7 +380,7 @@
           <div className="flex-1 min-h-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             {loading ? <div className="p-4"><Skeleton height="12rem" /></div> : loadError ? <EmptyState title={loadError}
               action={<Button size="sm" onClick={loadIndex}>{t('تلاش دوباره', 'Retry')}</Button>} /> :
-              <DataGrid key={JSON.stringify(filters)} data={filteredRecords} language={language} formCode={formCode} hideImport hideExport actionWidth="200px"
+              <DataGrid key={JSON.stringify(filters)} data={filteredRecords} language={language} formCode={formCode} hideImport hideExport actionWidth="230px"
                 defaultHiddenCols={window.BudgetSetupSupport.hiddenStatusColumns}
                 onAdd={access.canCreate ? create : undefined} onRowClick={open} columns={[
                   { field: 'code', header_fa: 'کد متمم', header_en: 'Amendment Code', width: '120px' },
@@ -398,6 +406,8 @@
                   { id: 'summary', icon: Sigma, tooltip: t('نمایش تجمیع', 'Summary'), requiredAccess: 'view', onClick: record => setSummaryTarget({ record }) },
                   { id: 'comments', icon: MessageSquare, tooltip: t('کامنت‌ها', 'Comments'), requiredAccess: 'view', onClick: setCommentTarget },
                   { id: 'attachments', icon: Paperclip, tooltip: t('پیوست‌ها', 'Attachments'), requiredAccess: 'view', onClick: setAttachmentTarget },
+                  { id: 'view_log', icon: Clock, tooltip: t('لاگ سیستم', 'System Log'), requiredAccess: 'view',
+                    onClick: row => setLogTarget({ entity: 'متمم بودجه', id: row.id }) },
                   { id: 'delete', icon: Trash2, tooltip: t('حذف یادداشت', 'Delete Draft'), requiredAccess: 'delete', hidden: row => row.status !== 'DRAFT', onClick: setDeleteTarget }
                 ]} />}
           </div>
@@ -432,7 +442,7 @@
             <LOVField size="sm" formCode={formCode} isRtl={isRtl} label={t('بودجه مرجع تأییدشده', 'Approved Reference Budget')} data={plans} columns={budgetColumns}
               disabled={doc.persisted || !writable || saving} displayValue={context ? `${context.plan.code} - ${context.plan.title}` : ''} onChange={choosePlan} />
             <TextField size="sm" formCode={formCode} isRtl={isRtl} required label={t('کد متمم', 'Amendment Code')} value={doc.code}
-              disabled={!writable || saving} onChange={event => { setDoc(current => ({ ...current, code: event.target.value })); setDirty(true); }} />
+              disabled dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
             <TextField size="sm" formCode={formCode} isRtl={isRtl} required label={t('عنوان متمم', 'Amendment Title')} value={doc.title}
               disabled={!writable || saving} onChange={event => { setDoc(current => ({ ...current, title: event.target.value })); setDirty(true); }} />
             <TextField size="sm" formCode={formCode} isRtl={isRtl} label={t('تاریخ ثبت', 'Registered At')} disabled
@@ -463,17 +473,22 @@
                     <Button size="sm" variant="outline" icon={FilePlus} disabled={saving} onClick={() => {
                       setNewLine({ cadence: chosenCadence }); setAddTarget('NEW');
                     }}>{t('افزودن ردیف جدید', 'Add New Line')}</Button>
-                  </div>} actions={writable ? [
+                  </div>} actionWidth="150px" actions={[...(writable ? [
                     { id: 'edit', icon: Edit, requiredAccess: doc.persisted ? 'edit' : 'create', tooltip: t('ویرایش ردیف', 'Edit Line'),
                       onClick: row => !savingRef.current && setEditingRow({ ...row, values: { ...row.values } }) },
                     { id: 'save', icon: Save, requiredAccess: doc.persisted ? 'edit' : 'create', tooltip: t('ذخیره تغییرات متمم', 'Save Amendment Changes'),
                       onClick: () => save(rows, true) },
                     { id: 'delete', icon: Trash2, requiredAccess: doc.persisted ? 'edit' : 'create',
-                    tooltip: t('حذف از متمم', 'Remove from Amendment'), onClick: row => !savingRef.current && setRemoveTarget(row) }] : []} />
+                    tooltip: t('حذف از متمم', 'Remove from Amendment'), onClick: row => !savingRef.current && setRemoveTarget(row) }] : []),
+                    { id: 'view_log', icon: Clock, requiredAccess: 'view', tooltip: t('لاگ سیستم', 'System Log'),
+                      hidden: row => !doc.persisted || !persistedLineIds.has(String(row.id)),
+                      onClick: row => setLogTarget({ entity: 'ردیف متمم بودجه', id: row.id }) }]} />
               </div>
             </>}
         </div>
       </>}
+      {logTarget && <window.BudgetSetupSupport.LogModal entity={logTarget.entity} recordId={logTarget.id}
+        formCode={formCode} language={language} onClose={() => setLogTarget(null)} />}
       <Modal isOpen={!!editingRow} onClose={() => !saving && setEditingRow(null)} title={t('ویرایش ردیف متمم', 'Edit Amendment Line')} language={language} width="max-w-3xl">
         {editingRow && context && <div className="p-4 flex flex-col gap-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

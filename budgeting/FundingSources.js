@@ -21,6 +21,7 @@
     }, [securityCtx, formCode]);
     const requestIdRef = useRef(0);
     const savingRef = useRef(false);
+    const editorRequestRef = useRef(0);
     const [sources, setSources] = useState([]);
     const [gridState, setGridState] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -86,6 +87,7 @@
 
     const openEditor = async (row = null) => {
       if (loadError || (row ? !access.canEdit : !access.canCreate)) return;
+      const request = ++editorRequestRef.current;
       if (row) {
         setEditor({ isOpen: true, data: { ...row } });
         return;
@@ -94,11 +96,14 @@
       try {
         const preview = await window.AutoNumberingService?.previewNext('FUNDING_SOURCE');
         code = typeof preview === 'string' ? preview : (preview?.formattedCode || '');
+        if (!code) throw new Error(t('شماره‌گذاری خودکار منبع تأمین اعتبار در دسترس نیست', 'Funding source auto numbering is unavailable'));
       } catch (error) {
-        console.error('Funding source auto-number preview failed:', error);
+        if (request === editorRequestRef.current) showToast(error.message, 'error');
+        return;
       }
+      if (request !== editorRequestRef.current) return;
       setEditor({ isOpen: true, data: {
-        code, generatedCode: code, titleFa: '', titleEn: '', effectiveFrom: '', effectiveTo: '',
+        code, titleFa: '', titleEn: '', effectiveFrom: '', effectiveTo: '',
         isActive: true
       } });
     };
@@ -110,18 +115,24 @@
     const saveSource = async () => {
       const data = editor.data;
       if (savingRef.current || loadError || !supabase || (data.id ? !access.canEdit : !access.canCreate)) return;
-      const code = String(data.code || '').trim();
+      let code = String(data.code || '').trim();
       const titleFa = String(data.titleFa || '').trim();
       if (!code || !titleFa) return showToast(t('کد و عنوان منبع الزامی هستند', 'Code and source title are required'), 'error');
       const from = normalizeDate(data.effectiveFrom);
       const to = normalizeDate(data.effectiveTo);
       if (from && to && from > to) return showToast(t('تاریخ پایان باید پس از تاریخ شروع باشد', 'End date must follow start date'), 'error');
-      if (sources.some(row => row.code === code && String(row.id) !== String(data.id || ''))) {
+      if (data.id && sources.some(row => row.code === code && String(row.id) !== String(data.id))) {
         return showToast(t('کد منبع تکراری است', 'Source code is already used'), 'error');
       }
       savingRef.current = true;
       setIsSaving(true);
       try {
+        if (!data.id) {
+          const number = await window.AutoNumberingService.consumeNext('FUNDING_SOURCE');
+          code = typeof number === 'string' ? number : number?.formattedCode;
+          if (!code) throw new Error(t('کد خودکار منبع دریافت نشد', 'Automatic funding source code was not received'));
+          updateEditor('code', code);
+        }
         const payload = {
           code, title_fa: titleFa, title_en: String(data.titleEn || '').trim() || null,
           effective_from: from || null, effective_to: to || null,
@@ -136,10 +147,6 @@
           const { data: inserted, error } = await supabase.from('fm_funding_sources').insert([payload]).select('id').single();
           if (error) throw error;
           id = inserted.id;
-          if (window.AutoNumberingService && data.generatedCode && code === data.generatedCode) {
-            try { await window.AutoNumberingService.consumeNext('FUNDING_SOURCE'); }
-            catch (error) { console.error('Funding source auto-number consume failed:', error); }
-          }
           await logAction(id, 'create', `ایجاد منبع تأمین اعتبار: ${code} - ${titleFa}`);
         }
         setEditor({ isOpen: false, data: {} });
@@ -222,7 +229,7 @@
           <div className="p-4 flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <TextField size="sm" formCode={formCode} label={t('کد', 'Code')} required dir="ltr" isRtl={isRtl}
-                value={editor.data.code || ''} onChange={event => updateEditor('code', event.target.value)} />
+                value={editor.data.code || ''} disabled placeholder={t('تولید خودکار', 'Auto')} />
               <TextField size="sm" formCode={formCode} label={t('عنوان منبع', 'Source Title')} required isRtl={isRtl}
                 value={editor.data.titleFa || ''} onChange={event => updateEditor('titleFa', event.target.value)} />
               <TextField size="sm" formCode={formCode} label={t('عنوان انگلیسی', 'English Title')} dir="ltr" isRtl={isRtl}

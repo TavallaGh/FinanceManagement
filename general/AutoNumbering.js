@@ -374,3 +374,46 @@
 
   window.AutoNumbering = AutoNumbering;
 })();
+
+/* Shared numbering API used by existing forms; configuration stays in fm_auto_numbering. */
+(() => {
+  if (window.AutoNumberingService) return;
+  const readConfig = async entityCode => {
+    if (!window.supabase) throw new Error('Supabase client is unavailable');
+    const result = await window.supabase.from('fm_auto_numbering')
+      .select('id,entity_code,prefix,suffix,number_length,start_number,current_number,is_active')
+      .eq('entity_code', entityCode).maybeSingle();
+    if (result.error) throw result.error;
+    if (!result.data || !result.data.is_active) throw new Error(`Auto numbering is missing or inactive: ${entityCode}`);
+    return result.data;
+  };
+  const nextCode = config => {
+    const current = Number(config.current_number);
+    const start = Number(config.start_number);
+    const length = Number(config.number_length);
+    if (config.current_number == null || !Number.isSafeInteger(current) || current < 0 ||
+      !Number.isSafeInteger(start) || start < 1 || !Number.isInteger(length) || length < 1 || length > 64)
+      throw new Error(`Invalid auto numbering configuration: ${config.entity_code}`);
+    const number = Math.max(start, current + 1);
+    if (!Number.isSafeInteger(number)) throw new Error('Auto numbering range exhausted');
+    return { number, formattedCode: `${config.prefix || ''}${String(number).padStart(length, '0')}${config.suffix || ''}` };
+  };
+  const previewNext = async entityCode => nextCode(await readConfig(entityCode));
+  const consumeNext = async entityCode => {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const config = await readConfig(entityCode);
+      const next = nextCode(config);
+      let query = window.supabase.from('fm_auto_numbering')
+        .update({ current_number: next.number, updated_at: new Date().toISOString() })
+        .eq('id', config.id).eq('current_number', config.current_number).eq('is_active', true)
+        .eq('start_number', config.start_number).eq('number_length', config.number_length);
+      for (const field of ['prefix', 'suffix'])
+        query = config[field] == null ? query.is(field, null) : query.eq(field, config[field]);
+      const result = await query.select('id');
+      if (result.error) throw result.error;
+      if (result.data?.length === 1) return next;
+    }
+    throw new Error('Could not reserve an automatic number; check configuration and access, then retry');
+  };
+  window.AutoNumberingService = { previewNext, consumeNext };
+})();

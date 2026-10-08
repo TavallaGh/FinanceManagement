@@ -48,14 +48,8 @@
     if (!access?.canView || !access[operation] || (scope?.own_data_only && doc?.id && String(doc.created_by) !== user().id))
       throw new Error('Access denied');
   };
-  const audit = async (client, id, action, details) => {
-    try {
-      const result = await client.from('fm_record_logs').insert([{
-        entity_type: 'متمم بودجه', record_id: String(id), action, user_name: user().name, details
-      }]);
-      return result.error || null;
-    } catch (error) { return error; }
-  };
+  const audit = (client, id, action, details, oldData = null, newData = null) =>
+    window.BudgetSetupSupport.writeAudit(client, [{ entity: 'متمم بودجه', id, action, details, oldData, newData }]);
   const loadIndex = async (client, access, scope, language = 'fa') => {
     assertAccess(access, 'canView');
     const headers = await readAll(client, tables.headers, '*', query =>
@@ -291,6 +285,13 @@
     cost_benefit_center_id: row.cost_benefit_center_id, cost_type_id: row.cost_type_id ?? null,
     income_type_id: row.income_type_id ?? null, funding_source_id: row.funding_source_id ?? null,
     cadence: row.cadence, description: row.description || null });
+  const auditLines = (client, before, after, doc, precision) => {
+    const snapshot = row => ({ ...linePayload(row, doc), buckets: Object.fromEntries(Object.entries(row.values || {})
+      .map(([slot, value]) => [Number(slot), amount(signed(value, precision), precision)])
+      .filter(([, value]) => signed(value, precision) !== 0n).sort((a, b) => a[0] - b[0])) });
+    return window.BudgetSetupSupport.auditChanges(client, 'ردیف متمم بودجه', before.map(snapshot), after.map(snapshot),
+      `متمم ${doc.code}؛ تغییر ردیف و مبالغ تسهیم`);
+  };
   const signature = (rows, deltas, precision) => JSON.stringify({
     lines: rows.map(row => [String(row.id), row.row_kind, rootKey(row), dimensionKey(row), row.cadence, row.description || ''])
       .sort((a, b) => a[0].localeCompare(b[0])),
@@ -402,7 +403,9 @@
       if (signature(saved.lines, saved.deltas, context.precision) !== signature(rows, deltas, context.precision))
         throw new Error('Amendment save could not be confirmed');
       committed = true;
-      const auditError = await audit(client, doc.id, creating ? 'create' : 'update', `متمم بودجه ${doc.code}`);
+      const headerError = await audit(client, doc.id, creating ? 'create' : 'update', `متمم بودجه ${doc.code}`,
+        previous?.doc || null, saved.doc);
+      const auditError = await auditLines(client, previous?.lines || [], saved.lines, saved.doc, context.precision) || headerError;
       return { ...saved, auditError };
     } catch (failure) {
       if (mutated && !committed) {
@@ -443,7 +446,7 @@
       const record = check(await client.from(tables.headers).update({ status: target, revision: doc.revision + 1,
         ...window.BudgetSetupSupport.statusMetadata(target) })
         .eq('id', doc.id).eq('status', doc.status).eq('revision', doc.revision).select('*').single());
-      const auditError = await audit(client, doc.id, 'update', `تغییر وضعیت متمم: ${doc.status} -> ${target}`);
+      const auditError = await audit(client, doc.id, 'update', `تغییر وضعیت متمم: ${doc.status} -> ${target}`, fresh.doc, record);
       return { doc: record, auditError };
     } finally { await lease.release().catch(error => window.console?.error('Budget amendment lease release failed', error.message)); }
   };
@@ -452,8 +455,10 @@
     if (doc.status !== 'DRAFT') throw new Error('Only draft amendments can be deleted');
     const lease = await acquire(client, doc.plan_id);
     try {
+      const fresh = await loadDocument(client, doc.id, access, scope);
       check(await client.from(tables.headers).delete().eq('id', doc.id).eq('status', 'DRAFT').eq('revision', doc.revision).select('id').single());
-      return { auditError: await audit(client, doc.id, 'delete', `حذف متمم ${doc.code}`) };
+      const headerError = await audit(client, doc.id, 'delete', `حذف متمم ${doc.code}`, fresh.doc);
+      return { auditError: await auditLines(client, fresh.lines, [], fresh.doc, fresh.context.precision) || headerError };
     } finally { await lease.release().catch(error => window.console?.error('Budget amendment lease release failed', error.message)); }
   };
   const effectiveBuckets = context => context.items.flatMap(item => item.slots.map((slot, index) => ({

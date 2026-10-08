@@ -7,7 +7,7 @@
     Plus = FallbackIcon, Edit = FallbackIcon, X = FallbackIcon, Trash2 = FallbackIcon,
     AlertTriangle = FallbackIcon, RefreshCw = FallbackIcon,
     CheckSquare = FallbackIcon, CheckCircle = FallbackIcon, FileText = FallbackIcon,
-    Paperclip = FallbackIcon, Sigma = FallbackIcon } = window.LucideIcons || {};
+    Paperclip = FallbackIcon, Sigma = FallbackIcon, Clock = FallbackIcon } = window.LucideIcons || {};
   const logic = window.BudgetSetupLogic;
 
   const BudgetSetupDetails = ({ sourcePlan, copyNotice = null, onBack, onAttachments, onSummary,
@@ -39,6 +39,7 @@
     const [selectedLineIds, setSelectedLineIds] = useState([]);
     const [statusTarget, setStatusTarget] = useState(null);
     const [removeLine, setRemoveLine] = useState(null);
+    const [logLine, setLogLine] = useState(null);
     const [bulkLineDelete, setBulkLineDelete] = useState([]);
     const [exitConfirm, setExitConfirm] = useState(false);
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
@@ -114,13 +115,16 @@
       return () => { requestRef.current += 1; };
     }, [loadData]);
 
-    const logAction = async details => {
-      const { error } = await supabase.from('fm_record_logs').insert([{
-        entity_type: 'تنظیم بودجه', record_id: String(plan.id), action: 'update',
-        user_name: window.NavigationSystem?.currentUser?.name || 'system', details
-      }]);
-      if (error) console.error('Budget plan audit log failed:', error);
-    };
+    const lineSnapshot = row => ({ id: row.id, plan_id: plan.id, ...logic.toLine(row) });
+    const lineAudit = (row, before, action) => ({ entity: 'ردیف تنظیم بودجه', id: row.id, action,
+      details: `بودجه ${plan.code}؛ ردیف ${row.id}`, oldData: before ? lineSnapshot(before) : null,
+      newData: action === 'delete' ? null : lineSnapshot(row) });
+    const logAction = (details, entries = []) => window.BudgetSetupSupport.writeAudit(supabase, [
+      { entity: 'تنظیم بودجه', id: plan.id, action: 'update', details }, ...entries
+    ]);
+    const savedNotice = (message, auditError) => showToast(auditError
+      ? t('عملیات انجام شد، اما ثبت لاگ کامل نشد.', 'Operation completed, but audit logging was incomplete.') : message,
+      auditError ? 'warning' : 'success');
     const addMatrix = () => {
       if (!canWriteLines || loading || loadError || savingRef.current) return;
       if (editingLine) return showToast(t('ابتدا ویرایش ردیف جاری را ثبت کنید', 'Apply the current line edit first'), 'warning');
@@ -202,6 +206,7 @@
       savingRef.current = true;
       setSaving(true);
       let savedCount = 0;
+      let auditError = null;
       try {
         const linePayload = logic.toLine;
         for (const row of lines) {
@@ -217,13 +222,15 @@
                 .eq('id', row.id).eq('plan_id', plan.id);
           const { data, error } = await query.select('id').single();
           if (error) throw error;
+          auditError = await window.BudgetSetupSupport.writeAudit(supabase,
+            [lineAudit({ ...row, id: data.id }, persisted, isNew ? 'create' : 'update')]) || auditError;
           persistedLinesRef.current.set(String(data.id), { ...row, id: data.id });
           // Keep returned IDs immediately so a retry after partial failure cannot insert again.
           setLines(current => current.map(item => String(item.id) === String(row.id)
             ? { ...item, id: data.id, plan_id: plan.id } : item));
           savedCount += 1;
         }
-        await logAction(`ذخیره ${savedCount} ردیف بودجه`);
+        auditError = await logAction(`ذخیره ${savedCount} ردیف بودجه`) || auditError;
         const rawSaved = await loadAll('fm_budget_setup_lines',
           logic.lineColumns,
           'plan_id', plan.id);
@@ -232,7 +239,7 @@
         setLines(saved.map(row => ({ ...row, amount: String(row.amount) })));
         setSelectedLineIds([]);
         setLineDirty(false);
-        showToast(t('ردیف‌های بودجه ذخیره شدند', 'Budget lines saved'));
+        savedNotice(t('ردیف‌های بودجه ذخیره شدند', 'Budget lines saved'), auditError);
       } catch (error) {
         if (savedCount) await logAction(`ذخیره ناقص ردیف‌های بودجه: ${savedCount} ردیف ثبت شد`);
         showToast(error?.message || t('ذخیره ردیف‌ها انجام نشد', 'Failed to save budget lines'), 'error');
@@ -259,8 +266,10 @@
         setLines(current => current.filter(item => item.id !== row.id));
         setSelectedLineIds(current => current.filter(id => id !== row.id));
         setRemoveLine(null);
-        await logAction(`حذف ردیف بودجه: ${logic.lineKey(row, headingTypes)}`);
-        showToast(t('ردیف حذف شد', 'Line deleted'));
+        const auditError = await logAction(`حذف ردیف بودجه: ${logic.lineKey(row, headingTypes)}`,
+          [lineAudit(persistedLinesRef.current.get(String(row.id)) || row, persistedLinesRef.current.get(String(row.id)) || row, 'delete')]);
+        persistedLinesRef.current.delete(String(row.id));
+        savedNotice(t('ردیف حذف شد', 'Line deleted'), auditError);
       } catch (error) {
         showToast(error?.message || t('حذف ردیف انجام نشد', 'Failed to delete line'), 'error');
       } finally {
@@ -275,18 +284,23 @@
       savingRef.current = true;
       setSaving(true);
       try {
+        let auditError = null;
         if (ids.length) {
           const { data, error } = await supabase.from('fm_budget_setup_lines').delete()
             .eq('plan_id', plan.id).in('id', ids).select('id');
           if (error) throw error;
+          const deletedIds = new Set((data || []).map(row => String(row.id)));
+          const deleted = ids.filter(id => deletedIds.has(String(id))).map(id => persistedLinesRef.current.get(String(id))).filter(Boolean);
+          auditError = await logAction(`حذف گروهی ${deleted.length} ردیف بودجه`, deleted.map(row => lineAudit(row, row, 'delete')));
+          setLines(current => current.filter(row => !deletedIds.has(String(row.id))));
+          deletedIds.forEach(id => persistedLinesRef.current.delete(id));
           if (data?.length !== ids.length) throw new Error(t('برخی ردیف‌ها حذف نشدند؛ بازخوانی کنید', 'Some lines were not deleted; refresh'));
         }
         const selected = new Set(bulkLineDelete.map(String));
         setLines(current => current.filter(row => !selected.has(String(row.id))));
         setSelectedLineIds([]);
         setBulkLineDelete([]);
-        await logAction(`حذف گروهی ${bulkLineDelete.length} ردیف بودجه`);
-        showToast(t('ردیف‌های انتخاب‌شده حذف شدند', 'Selected lines deleted'));
+        savedNotice(t('ردیف‌های انتخاب‌شده حذف شدند', 'Selected lines deleted'), auditError);
       } catch (error) {
         showToast(error?.message || t('حذف گروهی انجام نشد', 'Bulk deletion failed'), 'error');
       } finally {
@@ -333,10 +347,12 @@
         const { error } = await supabase.from('fm_budget_setup_plans').update({ status: target, ...metadata })
           .eq('id', plan.id).eq('status', plan.status).select('id').single();
         if (error) throw error;
-        await logAction(`تغییر وضعیت بودجه: ${plan.status} -> ${target}`);
+        const auditError = await window.BudgetSetupSupport.writeAudit(supabase, [{ entity: 'تنظیم بودجه', id: plan.id,
+          action: 'update', details: `تغییر وضعیت بودجه: ${plan.status} -> ${target}`,
+          oldData: plan, newData: { ...plan, status: target, ...metadata } }]);
         setPlan(current => ({ ...current, status: target, ...metadata }));
         setStatusTarget(null);
-        showToast(t('وضعیت بودجه تغییر کرد', 'Budget status updated'));
+        savedNotice(t('وضعیت بودجه تغییر کرد', 'Budget status updated'), auditError);
       } catch (error) {
         showToast(error?.message || t('تغییر وضعیت انجام نشد', 'Failed to change status'), 'error');
       } finally {
@@ -528,7 +544,7 @@
                   }} />
                   <div className="flex-1 min-h-[300px] p-1">
                     <DataGrid key={`${activeTab}-${gridVersion}`} data={visibleLines} columns={lineColumns} language={language} formCode={formCode}
-                      hideImport hideExport hideToolbar={!canWriteLines} compactBulkToolbar actionWidth="80px"
+                      hideImport hideExport hideToolbar={!canWriteLines} compactBulkToolbar actionWidth="150px"
                       toolbarContent={canWriteLines && <div className="flex flex-wrap items-center gap-2">
                         <Button size="sm" variant="primary" icon={Plus}
                           disabled={!!editingLine || saving || lines.length >= 5000} onClick={addLine}>
@@ -542,7 +558,7 @@
                       selectable={canWriteLines} selectedRowIds={selectedLineIds}
                       onSelectionChange={setSelectedLineIds} bulkActions={lineBulkActions}
                       onRowDoubleClick={beginEditLine}
-                      actions={canWriteLines ? [
+                      actions={[...(canWriteLines ? [
                         { id: 'save', icon: Save, tooltip: t('ثبت ویرایش ردیف', 'Apply Line Edit'),
                           hidden: row => editingLine?.id !== row.id, onClick: commitLineEdit, requiredAccess: 'edit' },
                         { id: 'cancel', icon: X, tooltip: t('انصراف از ویرایش', 'Cancel Line Edit'),
@@ -551,11 +567,14 @@
                           hidden: () => !!editingLine, onClick: beginEditLine, requiredAccess: 'edit' },
                         { id: 'delete', icon: Trash2, tooltip: t('حذف ردیف', 'Delete Line'),
                           hidden: () => !!editingLine || saving, onClick: setRemoveLine, requiredAccess: 'edit', className: 'text-red-500' }
-                      ] : []} />
+                      ] : []), { id: 'view_log', icon: Clock, tooltip: t('لاگ سیستم', 'System Log'), requiredAccess: 'view',
+                        hidden: row => String(row.id).startsWith('draft:'), onClick: setLogLine }]} />
                   </div>
                 </div>
               </>}
       </div>
+      {logLine && <window.BudgetSetupSupport.LogModal entity="ردیف تنظیم بودجه" recordId={logLine.id}
+        language={language} formCode={formCode} onClose={() => setLogLine(null)} />}
       <Modal isOpen={matrixOpen} onClose={() => setMatrixOpen(false)}
         title={t('ایجاد ردیف از ترکیب انتخابی', 'Create Lines from Selection')} language={language} width="max-w-lg">
         <div className="p-4 flex flex-col gap-4">
