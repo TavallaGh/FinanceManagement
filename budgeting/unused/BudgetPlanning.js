@@ -150,15 +150,12 @@
     const t = (fa, en) => isRtl ? fa : en;
     const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
     const access = securityCtx?.getActions(formCode) || { canView: false, canCreate: false, canEdit: false };
-    const isNew = mode !== 'EDIT';
-    const initialKind = mode === 'SUPPLEMENT_INCREASE' ? 'INCREASE'
-      : mode === 'SUPPLEMENT_DECREASE' ? 'DECREASE' : 'MAIN';
+    const isNew = mode === 'CREATE' || mode === 'COPY';
     const [plan, setPlan] = useState(() => ({
       code: '', title: mode === 'COPY' ? `${sourcePlan?.title || ''} - ${t('کپی', 'Copy')}` : '',
-      plan_kind: initialKind, period_type: sourcePlan?.period_type || 'ANNUAL',
+      plan_kind: 'MAIN', period_type: sourcePlan?.period_type || 'ANNUAL',
       fiscal_year_id: sourcePlan?.fiscal_year_id || '', quarter: sourcePlan?.quarter || '',
       start_date: sourcePlan?.start_date || '', end_date: sourcePlan?.end_date || '',
-      parent_plan_id: mode.startsWith('SUPPLEMENT') ? sourcePlan?.id : null,
       fiscal_period_id: null,
       base_currency_id: sourcePlan?.base_currency_id || null,
       status: 'DRAFT', is_active: true
@@ -171,7 +168,6 @@
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
     const savingRef = useRef(false);
     const requestRef = useRef(0);
-    const isSupplement = plan.plan_kind !== 'MAIN';
     const canEditFields = isNew ? access.canCreate
       : access.canEdit && logic.editableStatuses.has(plan.status);
     const baseCurrency = currencies.find(row => String(row.id) === String(plan.base_currency_id))
@@ -202,7 +198,7 @@
           loadAll('fm_fiscal_years', 'id,year_code,start_date,end_date,is_active'),
           loadAll('fm_currencies', 'id,code,decimal_places,system_role'),
           mode === 'EDIT'
-            ? supabase.from('fm_budget_plans').select('*').eq('id', sourcePlan.id).single()
+            ? supabase.from('fm_budget_plans').select('*').eq('id', sourcePlan.id).eq('plan_kind', 'MAIN').single()
             : Promise.resolve({ data: null, error: null })
         ]);
         if (record.error) throw record.error;
@@ -257,6 +253,7 @@
       return null;
     };
     const save = async () => {
+      if (!['CREATE', 'COPY', 'EDIT'].includes(mode)) return;
       if (!access.canView || !(canEditFields || (!isNew && access.canEdit)) || loadError || savingRef.current) return;
       const problem = canEditFields ? validate() : null;
       if (problem) return showToast(problem, 'error');
@@ -265,13 +262,12 @@
       try {
         const payload = canEditFields ? {
           code: logic.englishDigits(plan.code).trim(), title: String(plan.title).trim(),
-          plan_kind: plan.plan_kind, period_type: plan.period_type,
+          period_type: plan.period_type,
           fiscal_year_id: plan.period_type === 'CUSTOM' ? null : plan.fiscal_year_id,
           fiscal_period_id: null,
           quarter: plan.period_type === 'QUARTERLY' ? Number(plan.quarter) : null,
           start_date: plan.period_type === 'CUSTOM' ? logic.normalizeDate(plan.start_date) : null,
           end_date: plan.period_type === 'CUSTOM' ? logic.normalizeDate(plan.end_date) : null,
-          parent_plan_id: plan.parent_plan_id || null,
           base_currency_id: plan.base_currency_id || baseCurrency.id,
           is_active: plan.is_active !== false
         } : { is_active: plan.is_active !== false };
@@ -289,11 +285,11 @@
           id = data;
         } else if (isNew) {
           const { data, error } = await supabase.from('fm_budget_plans')
-            .insert([{ ...payload, status: 'DRAFT' }]).select('id').single();
+            .insert([{ ...payload, plan_kind: 'MAIN', status: 'DRAFT' }]).select('id').single();
           if (error) throw error;
           id = data.id;
         } else {
-          let query = supabase.from('fm_budget_plans').update(payload).eq('id', id);
+          let query = supabase.from('fm_budget_plans').update(payload).eq('id', id).eq('plan_kind', 'MAIN');
           if (canEditFields) query = query.in('status', ['DRAFT', 'TEMPORARY']);
           const { error } = await query.select('id').single();
           if (error) throw error;
@@ -317,17 +313,13 @@
       .map(row => ({ value: row.id, label: logic.englishDigits(row.year_code) }));
     const title = mode === 'EDIT' ? t('ویرایش سربرگ بودجه', 'Edit Budget Header')
       : mode === 'COPY' ? t('کپی برنامه بودجه', 'Copy Budget Plan')
-        : isSupplement ? t('تعریف متمم بودجه', 'New Budget Supplement')
-          : t('تعریف برنامه بودجه', 'New Budget Plan');
+        : t('تعریف برنامه بودجه', 'New Budget Plan');
     return <>
       <Modal isOpen onClose={onClose} title={title} language={language} width="max-w-2xl">
         {loading ? <div className="p-4 flex flex-col gap-3"><Skeleton height="2rem" /><Skeleton height="12rem" /></div>
           : loadError ? <EmptyState title={t('دریافت اطلاعات انجام نشد', 'Failed to load data')}
               action={<Button size="sm" onClick={loadData}>{t('تلاش دوباره', 'Retry')}</Button>} />
             : <div className="p-4 flex flex-col gap-4 max-h-[75vh] overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50">
-                {mode.startsWith('SUPPLEMENT') && <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                  {t('بودجه اصلی', 'Main Budget')}: {logic.englishDigits(sourcePlan?.code)} - {sourcePlan?.title}
-                </div>}
                 <div className="grid grid-cols-2 gap-3">
                   <TextField size="sm" formCode={formCode} label={t('کد برنامه', 'Plan Code')} required
                     value={logic.englishDigits(plan.code)} disabled={!canEditFields} dir="ltr" isRtl={false}
@@ -337,7 +329,7 @@
                     disabled={!canEditFields} isRtl={isRtl}
                     onChange={event => update('title', event.target.value)} />
                   <SelectField size="sm" formCode={formCode} label={t('نوع دوره', 'Period Type')} required
-                    value={plan.period_type || 'ANNUAL'} disabled={!canEditFields || isSupplement} isRtl={isRtl}
+                    value={plan.period_type || 'ANNUAL'} disabled={!canEditFields} isRtl={isRtl}
                     options={[{ value: 'ANNUAL', label: t('سالیانه', 'Annual') },
                       { value: 'QUARTERLY', label: t('فصلی', 'Quarterly') },
                       { value: 'CUSTOM', label: t('دوره‌ای', 'Custom Period') }]}
@@ -348,20 +340,20 @@
                     onChange={value => update('is_active', value)} />
                   {plan.period_type !== 'CUSTOM' && <SelectField size="sm" formCode={formCode}
                     label={t('سال مالی', 'Fiscal Year')} required value={plan.fiscal_year_id || ''}
-                    options={yearOptions} disabled={!canEditFields || isSupplement} isRtl={isRtl}
+                    options={yearOptions} disabled={!canEditFields} isRtl={isRtl}
                     onChange={event => update('fiscal_year_id', event.target.value)} />}
                   {plan.period_type === 'QUARTERLY' && <SelectField size="sm" formCode={formCode}
                     label={t('فصل', 'Quarter')} required value={String(plan.quarter || '')}
                     options={[1, 2, 3, 4].map(value => ({ value: String(value), label: t(`فصل ${value}`, `Q${value}`) }))}
-                    disabled={!canEditFields || isSupplement} isRtl={isRtl}
+                    disabled={!canEditFields} isRtl={isRtl}
                     onChange={event => update('quarter', event.target.value)} />}
                   {plan.period_type === 'CUSTOM' && <>
                     <DatePicker size="sm" formCode={formCode} label={t('تاریخ شروع', 'Start Date')} required
-                      value={plan.start_date || ''} disabled={!canEditFields || isSupplement}
+                      value={plan.start_date || ''} disabled={!canEditFields}
                       language={language} isRtl={isRtl}
                       onChange={value => update('start_date', logic.englishDigits(value))} />
                     <DatePicker size="sm" formCode={formCode} label={t('تاریخ پایان', 'End Date')} required
-                      value={plan.end_date || ''} disabled={!canEditFields || isSupplement}
+                      value={plan.end_date || ''} disabled={!canEditFields}
                       language={language} isRtl={isRtl}
                       onChange={value => update('end_date', logic.englishDigits(value))} />
                   </>}
@@ -389,7 +381,7 @@
   const { useState, useEffect, useMemo, useCallback, useRef } = React;
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const { ClipboardList = FallbackIcon, Edit = FallbackIcon, Copy = FallbackIcon,
-    Plus = FallbackIcon, Minus = FallbackIcon, List = FallbackIcon, Sigma = FallbackIcon,
+    List = FallbackIcon, Sigma = FallbackIcon,
     Trash2 = FallbackIcon, AlertTriangle = FallbackIcon, FileText = FallbackIcon,
     CheckSquare = FallbackIcon, CheckCircle = FallbackIcon,
     MessageSquare = FallbackIcon } = window.LucideIcons || {};
@@ -440,11 +432,11 @@
       window.setTimeout(() => setToast(value => ({ ...value, isVisible: false })), 3500);
     }, []);
 
-    const loadAll = useCallback(async (table, columns, orderField = 'id') => {
+    const loadAll = useCallback(async (table, columns, orderField = 'id', configure = query => query) => {
       const result = [];
       const pageSize = 500;
       for (let from = 0; ; from += pageSize) {
-        let query = supabase.from(table).select(columns)
+        let query = configure(supabase.from(table).select(columns))
           .order(orderField, { ascending: true });
         if (orderField !== 'id') query = query.order('id', { ascending: true });
         const { data, error } = await query.range(from, from + pageSize - 1);
@@ -477,7 +469,8 @@
       try {
         if (!supabase) throw new Error('Supabase client is unavailable');
         const [planRows, yearRows, currencyRows, activeCenters, activeHeadings, headingStructures, activeSources] = await Promise.all([
-          loadAll('fm_budget_plans', 'id,code,title,plan_kind,period_type,fiscal_year_id,quarter,start_date,end_date,parent_plan_id,base_currency_id,status,is_active,created_at', 'created_at'),
+          loadAll('fm_budget_plans', 'id,code,title,period_type,fiscal_year_id,quarter,start_date,end_date,base_currency_id,status,is_active,created_at',
+            'created_at', query => query.eq('plan_kind', 'MAIN')),
           loadAll('fm_fiscal_years', 'id,year_code,start_date,end_date,is_active', 'start_date'),
           loadAll('fm_currencies', 'id,code,decimal_places,system_role'),
           supabase.from('fm_budget_centers').select('id,code,title_fa,title_en,is_active').eq('is_active', true).order('id', { ascending: true }),
@@ -599,10 +592,6 @@
     const statusLabel = value => ({
       DRAFT: t('یادداشت', 'Draft'), TEMPORARY: t('موقت', 'Temporary'),
       FINAL: t('بررسی شده', 'Reviewed'), APPROVED: t('تأیید شده', 'Approved')
-    }[value] || value);
-    const kindLabel = value => ({
-      MAIN: t('اصلی', 'Main'), INCREASE: t('متمم افزایشی', 'Increase Supplement'),
-      DECREASE: t('متمم کاهشی', 'Decrease Supplement')
     }[value] || value);
     const periodLabel = row => {
       if (row.period_type === 'CUSTOM') return `${logic.englishDigits(row.start_date || '-')} – ${logic.englishDigits(row.end_date || '-')}`;
@@ -739,8 +728,6 @@
       { field: 'code', header_fa: 'کد', header_en: 'Code', width: '100px',
         render: value => <span className="font-bold text-indigo-600 dark:text-indigo-400" dir="ltr">{logic.englishDigits(value)}</span> },
       { field: 'title', header_fa: 'عنوان برنامه', header_en: 'Plan Title', width: '220px' },
-      { field: 'plan_kind', header_fa: 'نوع', header_en: 'Kind', width: '80px',
-        render: value => kindLabel(value) },
       { field: 'period_type', header_fa: 'بازه', header_en: 'Period', width: '150px',
         render: (_value, row) => periodLabel(row) },
       { field: 'status', header_fa: 'وضعیت گردش', header_en: 'Workflow Status', width: '130px',
@@ -774,7 +761,7 @@
         ) : (
           <>
             <PageHeader title={t('مدیریت بودجه', 'Budget Planning')} icon={ClipboardList} language={language}
-              description={t('تعریف برنامه‌های اصلی و متمم بودجه', 'Manage main budgets and supplements')}
+              description={t('تعریف برنامه‌های بودجه', 'Manage budget plans')}
               breadcrumbs={[{ label: t('بودجه‌ریزی', 'Budgeting') }, { label: t('مدیریت بودجه', 'Budget Planning') }]} />
             <div className="flex-1 min-h-0 mt-4 flex flex-col gap-2 overflow-hidden">
               <AdvancedFilter fields={filterFields} language={language} initialValues={filters}
@@ -787,7 +774,7 @@
                     action={<Button size="sm" onClick={fetchData}>{t('تلاش دوباره', 'Retry')}</Button>} /> :
                   <DataGrid key={JSON.stringify(filters)} data={filteredPlans} columns={columns} language={language}
                     formCode={formCode} gridState={gridState} onGridStateChange={setGridState}
-                    hideImport hideExport actionWidth="220px" selectable selectedRowIds={selectedIds}
+                    hideImport hideExport actionWidth="160px" selectable selectedRowIds={selectedIds}
                     onSelectionChange={setSelectedIds} bulkActions={bulkActions}
                     onAdd={access.canCreate ? () => setHeaderModal({ mode: 'CREATE', plan: null }) : undefined}
                     onRowClick={row => setHeaderModal({ mode: 'EDIT', plan: row })}
@@ -802,14 +789,6 @@
                         onClick: setCommentPlan, requiredAccess: 'view' },
                       { id: 'copy', icon: Copy, tooltip: t('کپی برنامه', 'Copy Plan'),
                         onClick: row => setHeaderModal({ mode: 'COPY', plan: row }), requiredAccess: 'create' },
-                      { id: 'increase', icon: Plus, tooltip: t('متمم افزایشی', 'Increase Supplement'),
-                        hidden: row => row.plan_kind !== 'MAIN' || row.status !== 'APPROVED' || !row.is_active,
-                        onClick: row => setHeaderModal({ mode: 'SUPPLEMENT_INCREASE', plan: row }),
-                        requiredAccess: 'create' },
-                      { id: 'decrease', icon: Minus, tooltip: t('متمم کاهشی', 'Decrease Supplement'),
-                        hidden: row => row.plan_kind !== 'MAIN' || row.status !== 'APPROVED' || !row.is_active,
-                        onClick: row => setHeaderModal({ mode: 'SUPPLEMENT_DECREASE', plan: row }),
-                        requiredAccess: 'create' },
                       { id: 'delete', icon: Trash2, tooltip: t('حذف یادداشت', 'Delete Draft'),
                         hidden: row => row.status !== 'DRAFT',
                         onClick: setDeletePlan,

@@ -85,7 +85,7 @@
       const lowerSearch = searchTerm.toLowerCase();
       return data.filter(row => {
          return columns.some(col => {
-           const val = row[col.field];
+           const val = col.searchAccessor ? col.searchAccessor(row[col.field], row) : row[col.field];
            return val && String(val).toLowerCase().includes(lowerSearch);
          });
       });

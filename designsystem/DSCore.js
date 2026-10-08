@@ -587,7 +587,7 @@
     );
   };
 
-  const Tabs = ({ tabs = [], activeTab, onChange, className = '' }) => {
+  const Tabs = ({ tabs = [], activeTab, onChange, className = '', trailingContent = null }) => {
     return (
       <div className={`flex items-center gap-1 border-b border-slate-200 dark:border-slate-700 mb-4 overflow-x-auto custom-scrollbar ${className}`}>
         {tabs.map(tab => {
@@ -606,6 +606,7 @@
             </button>
           );
         })}
+        {trailingContent && <div className="ms-auto shrink-0 px-3 flex items-center">{trailingContent}</div>}
       </div>
     );
   };

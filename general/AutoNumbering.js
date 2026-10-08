@@ -66,6 +66,9 @@
       { value: 'BALANCE_GROUP', label: t('گروه‌های بالانس', 'Balance Groups') },
       { value: 'BROKER', label: t('بروکرها', 'Brokers') },
       { value: 'PAYMENT_SOURCE', label: t('منابع پرداخت', 'Payment Sources') },
+      { value: 'FUNDING_SOURCE', label: t('منابع تأمین اعتبار', 'Funding Sources') },
+      { value: 'BUDGET_PLAN', label: t('برنامه بودجه', 'Budget Plan') },
+      { value: 'BUDGET_AMENDMENT', label: t('متمم بودجه', 'Budget Amendment') },
       { value: 'BUG_TRACKER', label: t('رهگیری مشکلات', 'Bug Tracker') }
     ];
 

@@ -61,11 +61,12 @@
     );
   };
 
-  const SelectField = ({ label, error, options = [], value, onChange, disabled = false, required = false, className = '', wrapperClassName = '', id, name, size = 'md', isRtl = true, placeholder = '', formCode }) => {
+  const SelectField = ({ label, error, options = [], value, onChange, disabled = false, required = false, className = '', wrapperClassName = '', id, name, size = 'md', isRtl = true, placeholder = '', formCode, labelPosition = 'top' }) => {
     const isDisabled = useSecureField(formCode, disabled);
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
+    const controlRef = useRef(null);
     const inputRef = useRef(null);
     const dropdownRef = useRef(null);
     const [rect, setRect] = useState(null);
@@ -96,8 +97,9 @@
 
     useEffect(() => {
       const updateRect = () => {
-        if (containerRef.current) {
-          setRect(containerRef.current.getBoundingClientRect());
+        const anchor = labelPosition === 'inline' ? controlRef.current : containerRef.current;
+        if (anchor) {
+          setRect(anchor.getBoundingClientRect());
         }
       };
       if (isOpen) {
@@ -109,7 +111,7 @@
         window.removeEventListener('scroll', updateRect, true);
         window.removeEventListener('resize', updateRect);
       };
-    }, [isOpen]);
+    }, [isOpen, labelPosition]);
 
     const filteredOptions = options.filter(o => 
       o.label.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -141,9 +143,9 @@
     );
 
     return (
-      <div ref={containerRef} className={`flex flex-col ${isXs ? 'gap-0.5' : size === 'sm' ? 'gap-1' : 'gap-1.5'} w-full relative ${isOpen ? 'z-[9999]' : 'z-10'} ${wrapperClassName}`}>
+      <div ref={containerRef} className={`${labelPosition === 'inline' ? 'grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1' : `flex flex-col ${isXs ? 'gap-0.5' : size === 'sm' ? 'gap-1' : 'gap-1.5'}`} w-full relative ${isOpen ? 'z-[9999]' : 'z-10'} ${wrapperClassName}`}>
         {label && <label htmlFor={selectId} className="text-[12px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">{label} {required && <span className="text-red-500 dark:text-red-400">*</span>}</label>}
-        <div 
+        <div ref={controlRef}
           className={`relative w-full ${inputHeights[size] || inputHeights.md} bg-white dark:bg-slate-700/40 border rounded-lg text-slate-800 dark:text-slate-100 transition-all flex items-center ${isDisabled ? 'bg-slate-100/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-500 cursor-not-allowed border-slate-200 dark:border-slate-700' : 'cursor-pointer border-slate-300 dark:border-slate-500 focus-within:border-indigo-400 dark:focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-400/20 hover:border-slate-400 dark:hover:border-slate-400'} ${className}`}
           onClick={() => !isDisabled && setIsOpen(true)}
         >
@@ -168,19 +170,21 @@
           ReactDOM ? ReactDOM.createPortal(
             <div 
               ref={dropdownRef}
-              style={{ position: 'fixed', top: rect.bottom + 4, left: isRtl ? undefined : rect.left, right: isRtl ? (window.innerWidth - rect.right) : undefined, width: containerRef.current ? containerRef.current.offsetWidth : 'auto', zIndex: 999999 }}
+              style={{ position: 'fixed', top: rect.bottom + 4, left: isRtl ? undefined : rect.left, right: isRtl ? (window.innerWidth - rect.right) : undefined, width: labelPosition === 'inline' ? rect.width : containerRef.current ? containerRef.current.offsetWidth : 'auto', zIndex: 999999 }}
               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
             >
               {dropdownContent}
             </div>,
             document.body
           ) : (
-            <div ref={dropdownRef} className={`absolute top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ${isRtl ? 'right-0' : 'left-0'}`}>
+            <div ref={dropdownRef}
+              style={labelPosition === 'inline' ? { width: rect.width, left: controlRef.current?.offsetLeft, right: 'auto' } : undefined}
+              className={`absolute top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ${isRtl ? 'right-0' : 'left-0'}`}>
               {dropdownContent}
             </div>
           )
         )}
-        {error && <div className="flex items-center gap-1 text-red-500 dark:text-red-400 text-[10px] font-bold mt-0.5"><AlertCircle size={10} /><span>{error}</span></div>}
+        {error && <div className={`flex items-center gap-1 text-red-500 dark:text-red-400 text-[10px] font-bold mt-0.5 ${labelPosition === 'inline' ? 'col-span-2' : ''}`}><AlertCircle size={10} /><span>{error}</span></div>}
       </div>
     );
   };
@@ -214,9 +218,9 @@
   };
 
   const CurrencyField = (props) => {
-    const { value, onChange, label, error, size = 'md', isRtl = true, formCode } = props;
+    const { value, onChange, label, error, size = 'md', isRtl = true, formCode, allowNegative = false } = props;
     const restProps = Object.assign({}, props);
-    ['value', 'onChange', 'label', 'error', 'size', 'isRtl', 'formCode'].forEach(k => delete restProps[k]);
+    ['value', 'onChange', 'label', 'error', 'size', 'isRtl', 'formCode', 'allowNegative'].forEach(k => delete restProps[k]);
 
     const format = (v) => {
       if (!v && v !== 0) return '';
@@ -226,7 +230,7 @@
 
     const handleInputChange = (e) => {
       const raw = e.target.value.replace(/,/g, '');
-      if (!isNaN(raw) || raw === '') {
+      if (!isNaN(raw) || raw === '' || (allowNegative && raw === '-')) {
         onChange(raw);
       }
     };
