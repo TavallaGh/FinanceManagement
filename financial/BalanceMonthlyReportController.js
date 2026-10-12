@@ -368,6 +368,7 @@
             periodFrom: normalizeSlashDate(p.startDate),
             periodTo: normalizeSlashDate(p.endDate),
             label: periodTitle,
+            status: p.status,
           };
         });
     }, [fYears, fiscalPeriods, t]);

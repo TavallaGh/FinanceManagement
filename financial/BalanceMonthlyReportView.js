@@ -35,6 +35,12 @@
   const BarChart2 = LucideIcons.BarChart2 || LucideIcons.TrendingUp || FallbackIcon;
   const BalanceMonthlyReportDetailsModal = window.BalanceMonthlyReportDetailsModal || window.BalanceReportDrillModal || FallbackComponent;
 
+  const getPeriodStatusBadge = (status, t) => ({
+    NOT_OPENED: { variant: 'slate', label: t('باز نشده', 'Not Opened') },
+    OPEN: { variant: 'emerald', label: t('باز', 'Open') },
+    CLOSED: { variant: 'red', label: t('بسته شده', 'Closed') }
+  }[status] || { variant: 'slate', label: t('نامشخص', 'Unknown') });
+
   const TreeNode = ({ node, depth, selectedIds, onToggle, isRtl, resetToken = 0, expandMode = 'collapse', inheritedInactive = false }) => {
     const [open, setOpen] = useState(false);
     const hasKids = (node.children || []).length > 0;
@@ -199,7 +205,11 @@
                     React.createElement('span', {
                       className: `w-4 h-4 rounded border flex items-center justify-center ${checked ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 dark:border-slate-500 text-transparent'}`
                     }, React.createElement(Check, { size: 10 })),
-                    React.createElement('span', { className: 'truncate text-start' }, opt.label)
+                    React.createElement('span', { className: 'truncate text-start' }, opt.label),
+                    opt.badge && React.createElement(Badge, {
+                      variant: opt.badge.variant,
+                      className: 'ms-auto shrink-0 !px-1.5 !py-0 text-[10px]'
+                    }, opt.badge.label)
                   );
                 })
               )
@@ -322,7 +332,11 @@
       [fiscalYears, t]
     );
 
-    const monthOptions = useMemo(() => availableMonths.map((m) => ({ value: m.key, label: m.label })), [availableMonths]);
+    const monthOptions = useMemo(() => availableMonths.map((m) => ({
+      value: m.key,
+      label: m.label,
+      badge: getPeriodStatusBadge(m.status, t)
+    })), [availableMonths, t]);
     const yearSummary = useMemo(() => fYears.size > 0 ? t(`${fYears.size} سال انتخاب شده`, `${fYears.size} years selected`) : t('انتخاب سال‌ها', 'Select years'), [fYears, t]);
     const monthSummary = useMemo(() => fMonths.size > 0 ? t(`${fMonths.size} دوره انتخاب شده`, `${fMonths.size} periods selected`) : t('انتخاب دوره‌ها', 'Select periods'), [fMonths, t]);
 
@@ -530,6 +544,13 @@
         field: slot.key,
         header_fa: slot.label,
         header_en: slot.label,
+        // Trial: remove renderHeader to revert header colors; filter badges stay.
+        renderHeader: () => {
+          const className = slot.status === 'OPEN'
+            ? 'text-emerald-600 dark:text-emerald-400'
+            : slot.status === 'CLOSED' ? 'text-red-600 dark:text-red-400' : '';
+          return React.createElement('span', { className, title: getPeriodStatusBadge(slot.status, t).label }, slot.label);
+        },
         width: '130px',
         render: (val, row) => {
           if (!val) return React.createElement('span', { className: 'text-slate-200 dark:text-slate-700 text-[11px]' }, '—');
