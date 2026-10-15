@@ -184,6 +184,7 @@
       secondary: "bg-slate-800 text-white hover:bg-slate-900 focus:ring-slate-700 shadow-sm dark:bg-slate-700 dark:hover:bg-slate-600",
       outline: "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 focus:ring-slate-200 dark:focus:ring-slate-700",
       danger: "bg-red-500 text-white hover:bg-red-600 focus:ring-red-500 shadow-sm shadow-red-200 dark:shadow-none dark:bg-red-600 dark:hover:bg-red-700",
+      success: "bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500 shadow-sm shadow-emerald-200 dark:shadow-none dark:bg-emerald-600 dark:hover:bg-emerald-500",
       'danger-outline': "bg-white dark:bg-slate-800 text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20 focus:ring-red-100 dark:focus:ring-red-900",
       ghost: "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus:ring-slate-200 dark:focus:ring-slate-700"
     };
@@ -249,7 +250,7 @@
     return <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[12px] font-black tracking-wide ${variants[variant] || variants.gray} ${className}`}>{children}</span>;
   };
 
-  const PageHeader = ({ title, icon: Icon, breadcrumbs = [], language = 'fa', actions, viewConfig, notifFilter }) => {
+  const PageHeader = ({ title, icon: Icon, breadcrumbs = [], language = 'fa', actions, viewConfig, notifFilter, actionsPlacement = 'end' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const [views, setViews] = useState([]);
@@ -439,7 +440,8 @@
 
     return (
       <div className="flex flex-col mb-3 shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3" dir={isRtl ? 'rtl' : 'ltr'}>
+        <div className={actionsPlacement === 'center' ? 'flex flex-col xl:grid xl:items-center gap-3' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-3'}
+          style={actionsPlacement === 'center' ? { gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)' } : undefined} dir={isRtl ? 'rtl' : 'ltr'}>
           <div className="flex flex-col gap-1.5">
             {breadcrumbs.length > 0 && (
               <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-bold overflow-hidden whitespace-nowrap">
@@ -461,7 +463,7 @@
             </div>
           </div>
           
-          <div className="flex items-center gap-2 shrink-0">
+          <div className={`flex items-center gap-2 ${actionsPlacement === 'center' ? 'justify-center min-w-0' : 'shrink-0'}`}>
             {notifFilter && notifFilter.isActive && (
               <div className="flex items-center gap-1.5 px-3 h-8 rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50 text-[12px] font-bold text-amber-700 dark:text-amber-300">
                 <span>{isRtl ? 'فیلتر اعلان' : 'Notif Filter'}</span>
@@ -587,7 +589,7 @@
     );
   };
 
-  const Tabs = ({ tabs = [], activeTab, onChange, className = '', trailingContent = null }) => {
+  const Tabs = ({ tabs = [], activeTab, onChange, className = '', trailingContent = null, middleContent = null }) => {
     return (
       <div className={`flex items-center gap-1 border-b border-slate-200 dark:border-slate-700 mb-4 overflow-x-auto custom-scrollbar ${className}`}>
         {tabs.map(tab => {
@@ -606,6 +608,7 @@
             </button>
           );
         })}
+        {middleContent && <div className="flex-1 min-w-max px-2 flex items-center justify-center">{middleContent}</div>}
         {trailingContent && <div className="ms-auto shrink-0 px-3 flex items-center">{trailingContent}</div>}
       </div>
     );

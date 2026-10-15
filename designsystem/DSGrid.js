@@ -876,7 +876,7 @@
                       <div className="flex items-center justify-between gap-1 group">
                         <div className="flex items-center gap-1.5 cursor-pointer flex-1 overflow-hidden" onClick={() => handleSort(col.field)}>
                           <GripVertical size={12} className="text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing shrink-0" />
-                          <span className="truncate">{t(col.header_fa, col.header_en)}</span>
+                          <span className="truncate">{typeof col.renderHeader === 'function' ? col.renderHeader({ column: col, language, isRtl }) : t(col.header_fa, col.header_en)}</span>
                           {sortConfig.field === col.field && <span className="text-indigo-500 dark:text-indigo-400 shrink-0">{sortConfig.direction === 'asc' ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}</span>}
                         </div>
                         <button onClick={() => togglePin(col.field)} className={`p-0.5 rounded shrink-0 transition-colors ${isPinned ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 opacity-100' : 'text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 hover:text-slate-600 dark:hover:text-slate-300'}`} title={t('سنجاق کردن', 'Pin Column')}>

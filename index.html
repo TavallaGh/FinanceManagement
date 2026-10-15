@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>سیستم یکپارچه سازمانی (جدید)</title>
-    <link rel="icon" href="data:,">
+    <link rel="icon" type="image/png" href="./assets/accounting-logo-sigma.png">
+    <link rel="preload" as="image" href="./assets/accounting-logo-sigma.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
@@ -72,12 +73,14 @@
     <script type="text/babel" data-presets="react" src="./designsystem/DSCore.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSForms.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSFeedback.js"></script>
+    <script type="text/babel" data-presets="react" src="./designsystem/DSStartupMotion.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSGrid.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSRecordAttachments.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSTree.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSOverlays.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSCharts.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSComments.js"></script>    
+    <script type="text/babel" data-presets="react" src="./designsystem/DSCalendar.js"></script>
     <script type="text/babel" data-presets="react" src="./DesignSystem.js"></script>
     
     <script type="text/babel" data-presets="react" src="./NotificationSidebar.js"></script>
@@ -152,6 +155,22 @@
     <script type="text/babel" data-presets="react" src="./budgeting/BudgetSetupAllocation.js"></script>
     <script type="text/babel" data-presets="react" src="./budgeting/BudgetAmendmentLogic.js"></script>
     <script type="text/babel" data-presets="react" src="./budgeting/BudgetAmendment.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/BudgetControl.js"></script>
+  
+    /* کارکنان */
+    <script type="text/babel" data-presets="react" src="./employee/EmployeeLogic.js"></script>
+    <script type="text/babel" data-presets="react" src="./employee/EmployeeDetails.js"></script>
+    <script type="text/babel" data-presets="react" src="./employee/Employee.js"></script>
+
+    /* حضور و غیاب */
+    <script type="text/babel" data-presets="react" src="./employee/EmployeeDashboardLogic.js"></script>
+    <script type="text/babel" data-presets="react" src="./employee/EmployeeDashboardDetails.js"></script>
+    <script type="text/babel" data-presets="react" src="./attendance/WorkCalendars.js"></script>
+    <script type="text/babel" data-presets="react" src="./employee/EmployeeDashboard.js"></script>
+
+
+    /* تشکیلات سازمانی */
+
 
     /* تنظیمات -اطلاعات پایه*/
     <script type="text/babel" data-presets="react" src="./general/OrgChartMain.js"></script>
@@ -184,7 +203,7 @@
     <script type="text/babel" data-presets="react" src="./workflow/WorkflowCartable.js"></script>
     <script type="text/babel" data-presets="react" src="./workflow/WorkflowTasks.js"></script>
 
-    <script type="text/babel" data-presets="react" src="./budgeting/BudgetRequest.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetRequest.js"></script>
     
     /*امکانات عمومی سیستم*/
     <script type="text/babel" data-presets="react" src="./NavigationDocs.js"></script>
