@@ -13,6 +13,7 @@
     const [language, setLanguage] = useState('fa');
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [userSession, setUserSession] = useState(null);
+    const [showStartupMotion, setShowStartupMotion] = useState(true);
 
     useEffect(() => {
       localStorage.removeItem('fm_user_session');
@@ -41,17 +42,18 @@
       try {
         const isReachable = await window.isSupabaseReachable?.();
         if (isReachable === false) {
-          setError(language === 'fa' ? 'اتصال به سرور دیتابیس برقرار نیست. لطفاً شبکه یا VPN را بررسی کنید.' : 'Database server is not reachable. Check your network or VPN.');
-          return;
+          console.warn('Supabase reachability check failed. Continuing with login query.');
         }
 
         const hashedInput = await hashPassword(loginData.password);
         
-        const { data, error: dbError } = await window.supabase
-          .from('sec_users')
-          .select('*')
-          .ilike('username', loginData.identifier.trim())
-          .single();
+        const { data, error: dbError } = await window.supabaseWithRetry(
+          () => window.supabase
+            .from('sec_users')
+            .select('*')
+            .ilike('username', loginData.identifier.trim())
+            .single()
+        );
 
         if (dbError || !data) {
            setError(language === 'fa' ? 'نام کاربری در سیستم یافت نشد.' : 'Username not found.');
@@ -82,6 +84,11 @@
         
       } catch (err) {
         console.error('Login Error:', err);
+        if (window.isLikelyNetworkError?.(err)) {
+          setError(language === 'fa' ? 'اتصال به سرور دیتابیس برقرار نیست. لطفاً شبکه یا VPN را بررسی کنید.' : 'Database server is not reachable. Check your network or VPN.');
+          return;
+        }
+
         setError(language === 'fa' ? 'خطا در ارتباط با دیتابیس.' : 'Database connection error.');
       }
     };
@@ -89,6 +96,24 @@
     const toggleLanguage = () => {
       setLanguage(prev => prev === 'fa' ? 'en' : 'fa');
     };
+
+    const StartupMotion = window.DSStartupMotion?.StartupMotion;
+    if (showStartupMotion && StartupMotion) {
+      return (
+        <StartupMotion
+          logoSrc="./assets/accounting-logo-sigma.png"
+          logoMotion={{
+            flowPath: 'M 590 630 L 230 215 H 870 Q 1075 215 1075 420 V 845 Q 1075 1035 870 1035 H 220 Z',
+            aggregationPath: 'M 800 215 H 230 L 590 630 L 220 1035 H 770'
+          }}
+          title={language === 'fa' ? 'سیستم یکپارچه سازمانی' : 'Integrated Enterprise System'}
+          subtitle={language === 'fa' ? 'یکپارچگی اطلاعات، دقت در تحلیل' : 'Connected information. Precise analysis.'}
+          language={language}
+          duration={3000}
+          onComplete={() => setShowStartupMotion(false)}
+        />
+      );
+    }
 
     if (isCheckingSession) {
       return (

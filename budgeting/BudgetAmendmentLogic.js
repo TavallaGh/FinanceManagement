@@ -106,10 +106,10 @@
     return lines.length > 0 && (!cost || lines.some(row => row.cost_type_id != null && setup.typeKey('COST', row.cost_type_id) === String(cost))) &&
       (!income || lines.some(row => row.income_type_id != null && setup.typeKey('INCOME', row.income_type_id) === String(income)));
   };
-  const loadContext = async (client, planId, language = 'fa') => {
+  const loadContext = async (client, planId, language = 'fa', options = {}) => {
     const load = (table, columns, configure, order) => readAll(client, table, columns, configure, order);
     const plan = check(await client.from('fm_budget_setup_plans').select('*').eq('id', planId).eq('plan_kind', 'MAIN').single());
-    if (!plan || plan.status !== 'APPROVED' || !plan.is_active) throw new Error('The reference budget must be active and approved');
+    if (!plan || plan.status !== 'APPROVED' || (!options.includeInactive && !plan.is_active)) throw new Error('The reference budget must be active and approved');
     const [baseLines, baseAllocations, methods, periods, years, currencies, centers, headings, sources, approved] = await Promise.all([
       load('fm_budget_setup_lines', setup.lineColumns, query => query.eq('plan_id', planId)),
       load('fm_budget_setup_allocations', 'plan_id,line_id,slot_no,amount,period_start_id,period_end_id',
@@ -137,7 +137,7 @@
       allocationsByLine.get(key).push(allocation);
     }
     const bucketSlots = cadence => math.slots(periods, plan, cadence, years);
-    for (const line of baseLines.filter(row => row.is_active !== false)) {
+    for (const line of baseLines.filter(row => options.includeInactive || row.is_active !== false)) {
       const cadence = cadenceByType[typeOf(line)];
       const slots = bucketSlots(cadence);
       if (!slots.length) throw new Error('The original budget allocation method or periods are missing');
