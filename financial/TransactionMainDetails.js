@@ -427,11 +427,21 @@
             const fetchRates = async () => {
                 try {
                     const formattedDate = headerData.document_date.replace(/\//g, '-');
-                    const { data } = await supabase.from('fm_currency_rates')
-                        .select('base_currency, target_currency, rate, rate_date, created_at')
-                        .lte('rate_date', formattedDate)
-                        .order('rate_date', { ascending: false });
-                    const sorted = (data || []).slice().sort((a, b) => {
+                    const batchSize = 1000;
+                    const allRates = [];
+                    for (let offset = 0; ; offset += batchSize) {
+                        const { data, error } = await supabase
+                            .from('fm_currency_rates')
+                            .select('base_currency, target_currency, rate, rate_date, created_at')
+                            .lte('rate_date', formattedDate)
+                            .order('rate_date', { ascending: false })
+                            .order('created_at', { ascending: false })
+                            .range(offset, offset + batchSize - 1);
+                        if (error) throw error;
+                        if (data && data.length) allRates.push(...data);
+                        if (!data || data.length < batchSize) break;
+                    }
+                    const sorted = (allRates || []).slice().sort((a, b) => {
                         if (a.rate_date > b.rate_date) return -1;
                         if (a.rate_date < b.rate_date) return  1;
                         const ca = a.created_at || '', cb = b.created_at || '';
@@ -450,27 +460,55 @@
     }, [headerData.document_date, supabase]);
 
     const getExchangeRates = useCallback((currency) => {
-        let toUsd = 1;
-        if (currency !== 'USD') {
-            const direct = parseFloat(currencyRates[`${currency}_USD`] || 0);
-            if (direct > 0) {
-                toUsd = direct;
-            } else {
-                const inverse = parseFloat(currencyRates[`USD_${currency}`] || 0);
-                if (inverse > 0) toUsd = 1 / inverse;
-            }
-        }
-        
-        let usdToIrr = 1;
-        const directIrr = parseFloat(currencyRates['USD_IRR'] || 0);
-        if (directIrr > 0) {
-            usdToIrr = directIrr;
-        } else {
-            const inverseIrr = parseFloat(currencyRates['IRR_USD'] || 0);
-            if (inverseIrr > 0) usdToIrr = 1 / inverseIrr;
-        }
-        
-        return { toUsd, usdToIrr };
+        const toPositiveRate = (value) => {
+            const parsed = parseFloat(value);
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+        };
+
+        const resolveRateBetween = (ratesMap, fromCurrency, toCurrency) => {
+            const from = String(fromCurrency || '').trim().toUpperCase();
+            const to = String(toCurrency || '').trim().toUpperCase();
+            if (!from || !to) return 1;
+            if (from === to) return 1;
+
+            const graph = new Map();
+            Object.entries(ratesMap || {}).forEach(([key, rawRate]) => {
+                const rate = toPositiveRate(rawRate);
+                if (!rate) return;
+                const [base, target] = String(key || '').split('_');
+                const baseCurrency = String(base || '').trim().toUpperCase();
+                const targetCurrency = String(target || '').trim().toUpperCase();
+                if (!baseCurrency || !targetCurrency) return;
+                if (!graph.has(baseCurrency)) graph.set(baseCurrency, new Map());
+                if (!graph.has(targetCurrency)) graph.set(targetCurrency, new Map());
+                graph.get(baseCurrency).set(targetCurrency, rate);
+                graph.get(targetCurrency).set(baseCurrency, 1 / rate);
+            });
+
+            const direct = graph.get(from)?.get(to);
+            if (direct) return direct;
+
+            const walk = (currentCurrency, accumulatedRate, visited = new Set()) => {
+                if (currentCurrency === to) return accumulatedRate;
+                const nextVisited = new Set(visited);
+                nextVisited.add(currentCurrency);
+                const neighbors = graph.get(currentCurrency);
+                if (!neighbors) return null;
+                for (const [nextCurrency, edgeRate] of neighbors.entries()) {
+                    if (nextVisited.has(nextCurrency)) continue;
+                    const resolved = walk(nextCurrency, accumulatedRate * edgeRate, nextVisited);
+                    if (resolved) return resolved;
+                }
+                return null;
+            };
+
+            return walk(from, 1) || 1;
+        };
+
+        return {
+            toUsd: resolveRateBetween(currencyRates, String(currency || 'USD').trim().toUpperCase() || 'USD', 'USD'),
+            usdToIrr: resolveRateBetween(currencyRates, 'USD', 'IRR'),
+        };
     }, [currencyRates]);
 
     const summaryStats = useMemo(() => {
@@ -694,7 +732,11 @@
                         if (e1) {
                             // Graceful retry without center_id if the column doesn't exist in DB yet
                             console.warn('fm_transaction_items insert failed, retrying without center_id:', e1.message);
-                            const payloadWithoutCenter = itemsPayload.map(({ center_id, ...rest }) => rest);
+                            const payloadWithoutCenter = itemsPayload.map(item => {
+                                const nextItem = { ...item };
+                                delete nextItem.center_id;
+                                return nextItem;
+                            });
                             const { data: d2, error: e2 } = await supabase.from('fm_transaction_items').insert(payloadWithoutCenter).select();
                             if (e2) throw e2;
                             newItems = d2;

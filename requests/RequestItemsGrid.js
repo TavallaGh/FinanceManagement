@@ -501,7 +501,7 @@
                 data={lookups.partiesList || []} columns={partyLovCols} dropdownWidth="min-w-[500px]"
                 displayValue={
                   inlineItemEdit.data.party_obj
-                    ? `${inlineItemEdit.data.party_obj.code ? inlineItemEdit.data.party_obj.code + ' - ' : ''}${inlineItemEdit.data.party_obj.displayLabel || ''}`
+                    ? `${inlineItemEdit.data.party_obj.displayLabel || ''}`
                     : ''
                 }
                 onChange={r => {
@@ -514,7 +514,7 @@
         }
         const party = (lookups.partiesList || []).find(p => String(p.id) === String(val));
         return party
-          ? <div className="flex flex-col"><span className="text-[12px] font-bold truncate">{party.displayLabel}</span><span className="text-[10px] text-slate-400 font-sans">{party.code || ''}</span></div>
+          ? <div className="flex flex-col"><span className="text-[12px] font-bold truncate">{party.displayLabel}</span></div>
           : <span className="text-[12px] text-slate-400">-</span>;
       },
     };

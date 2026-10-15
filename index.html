@@ -23,7 +23,7 @@
                         mono: ['Fira Code', 'monospace']
                     }
                 }
-            }
+            } 
         }
     </script>
 
@@ -73,6 +73,7 @@
     <script type="text/babel" data-presets="react" src="./designsystem/DSForms.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSFeedback.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSGrid.js"></script>
+    <script type="text/babel" data-presets="react" src="./designsystem/DSRecordAttachments.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSTree.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSOverlays.js"></script>
     <script type="text/babel" data-presets="react" src="./designsystem/DSCharts.js"></script>
@@ -80,14 +81,22 @@
     <script type="text/babel" data-presets="react" src="./DesignSystem.js"></script>
     
     <script type="text/babel" data-presets="react" src="./NotificationSidebar.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/WorkflowNotificationUtils.js"></script>
     
     <script type="text/babel" data-presets="react" src="./general/AutoNumbering.js"></script>
     
     /*درخواست ها*/
     <script type="text/babel" data-presets="react" src="./requests/RequestItemsGrid.js"></script>
+    <script type="text/babel" data-presets="react" src="./requests/RequestWorkFlow.js"></script>
+    <script type="text/babel" data-presets="react" src="./requests/RequestDetailsPersistence.js"></script>
     <script type="text/babel" data-presets="react" src="./requests/RequestDetails.js"></script>
     <script type="text/babel" data-presets="react" src="./requests/RequestSummary.js"></script>
+    <script type="text/babel" data-presets="react" src="./requests/RequestManagementWorkflow.js"></script>
     <script type="text/babel" data-presets="react" src="./requests/RequestManagement.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/StateMachineSettings.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/StateMachineCanvas.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/StateMachineController.js"></script>
+    <script type="text/babel" data-presets="react" src="./workflow/StateMachineManagement.js"></script>
 
     /*مالی - اطلاعات پایه */
     <script type="text/babel" data-presets="react" src="./financial/CostTypes.js"></script>
@@ -97,9 +106,10 @@
     <script type="text/babel" data-presets="react" src="./financial/ChartOfAccountsMain.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/ChartOfAccounts.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/CostBenefitCenters.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/FiscalPeriodDetails.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/FiscalPeriods.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/GatewayTypes.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/BrokerContract.js"></script>
-    <script type="text/babel" data-presets="react" src="./financial/BrokerDetails.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/BrokerManagement.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/PaymentSourcesDetails.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/PaymentSources.js"></script>
@@ -108,13 +118,40 @@
     /*مالی - عملیات */
     <script type="text/babel" data-presets="react" src="./financial/TransactionPrint.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/TransactionSummary.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/TransactionMainExcel.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/TransactionMainGrid.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/TransactionMainDetails.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/TransactionActions.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/TransactionMain.js"></script>
 
     /*مالی - گزارشات */
+    <script type="text/babel" data-presets="react" src="./financial/BalanceReportTotal.js"></script>
     <script type="text/babel" data-presets="react" src="./financial/BalanceReport.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/BalanceMonthlyReportLogic.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/BalanceMonthlyReportDetails.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/BalanceMonthlyReportController.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/BalanceMonthlyReportView.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/TransactionReviewViewAnalytics.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/TransactionReviewView.js"></script>
+    <script type="text/babel" data-presets="react" src="./financial/TransactionReview.js"></script>
+
+    /* بودجه - اطلاعات پایه */
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetCentersDetails.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetCenters.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetHeadingsDetails.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetHeadings.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/FundingSources.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetPlanning.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetPlanningDetails.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/BudgetSetup.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/BudgetSetupSupport.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/BudgetSetupDetails.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetAllocationLogic.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetAllocationSummary.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/unused/BudgetAllocation.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/BudgetSetupAllocation.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/BudgetAmendmentLogic.js"></script>
+    <script type="text/babel" data-presets="react" src="./budgeting/BudgetAmendment.js"></script>
 
     /* تنظیمات -اطلاعات پایه*/
     <script type="text/babel" data-presets="react" src="./general/OrgChartMain.js"></script>
@@ -127,7 +164,9 @@
     <script type="text/babel" data-presets="react" src="./general/ProjectResources.js"></script>
     <script type="text/babel" data-presets="react" src="./general/ProjectManagement.js"></script>
     <script type="text/babel" data-presets="react" src="./general/ComponentShowcase.js"></script>
-
+    <script type="text/babel" data-presets="react" src="./BugTrackerPanels.js"></script>
+    <script type="text/babel" data-presets="react" src="./BugTracker.js"></script>
+    
     /*حقوق دسترسی و امنیت سیستم*/
     <script type="text/babel" data-presets="react" src="./security/SystemLog.js"></script>
     <script type="text/babel" data-presets="react" src="./security/RoleAccess.js"></script>

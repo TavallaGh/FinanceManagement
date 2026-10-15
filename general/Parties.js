@@ -62,20 +62,6 @@
       }, 5000);
     };
 
-    const viewConfig = {
-      pageId: FORM_CODE,
-      currentState: () => ({ 
-        gridState
-      }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.gridState) setGridState(state.gridState);
-        } else {
-          setGridState(null);
-        }
-      }
-    };
-
     useEffect(() => {
       fetchData();
     }, []);
@@ -500,7 +486,6 @@
           description={t('مدیریت اطلاعات پایه اشخاص حقیقی و حقوقی', 'Manage data of real and legal entities')}
           language={language}
           breadcrumbs={[{ label: t('تنظیمات پایه', 'Base Setup') }, { label: t('اشخاص', 'Parties') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-3 animate-in fade-in duration-300">

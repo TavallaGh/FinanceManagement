@@ -10,13 +10,13 @@
     ListTree = FallbackIcon, FileText = FallbackIcon, Bell = FallbackIcon, Monitor = FallbackIcon, Clock = FallbackIcon,
     Settings = FallbackIcon, ArrowLeft = FallbackIcon, ArrowRight = FallbackIcon, ChevronDown = FallbackIcon, Folder = FallbackIcon, FolderOpen = FallbackIcon, Globe = FallbackIcon, Loader2 = FallbackIcon, FileWarning = FallbackIcon,
     Maximize2 = FallbackIcon, Minimize2 = FallbackIcon, FileSpreadsheet = FallbackIcon, Calendar = FallbackIcon, Moon = FallbackIcon, Sun = FallbackIcon,
-    HelpCircle = FallbackIcon, LogOut = FallbackIcon
+    LogOut = FallbackIcon
   } = LucideIcons;
 
   const FormLoader = ({ path, menuUniqueCode, language }) => {
     if (!path) return null;
 
-    const componentName = path.split('/').pop();
+    const componentName = path.split('/').pop().replace(/\.js$/i, '');
     const DynamicComponent = window[componentName];
 
     if (!DynamicComponent) {
@@ -72,7 +72,6 @@
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
-    const [docModalInfo, setDocModalInfo] = useState({ isOpen: false, type: 'user' });
     const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
     const calendarMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : 'jalali';
@@ -588,8 +587,6 @@
     );
 
     const NotificationSidebarComponent = window.NotificationSidebar;
-    const NavigationDocsComponent = window.NavigationDocs;
-
     return (
       <div className="h-screen w-full flex bg-[#f8fafc] dark:bg-slate-900 overflow-hidden font-sans" dir={isRtl ? 'rtl' : 'ltr'}>
         <nav className={`w-[60px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 flex flex-col items-center py-6 gap-4 shrink-0 z-40 shadow-sm relative ${isRtl ? 'border-l' : 'border-r'}`}>
@@ -686,19 +683,6 @@
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
-                {activeForm && (
-                  <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-1 mr-2 ml-2">
-                    <button onClick={() => setDocModalInfo({ isOpen: true, type: 'user' })} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors text-indigo-500 dark:text-indigo-400" title={t('راهنمای کاربری', 'User Guide')}>
-                      <HelpCircle size={14} />
-                    </button>
-                    <button onClick={() => setDocModalInfo({ isOpen: true, type: 'dev' })} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors text-amber-500 dark:text-amber-400" title={t('مستندات توسعه', 'Developer Docs')}>
-                      <FileText size={14} />
-                    </button>
-                  </div>
-                )}
-                {activeForm && <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>}
-                
-                
                 <button onClick={toggleTheme} className="flex items-center justify-center p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-600 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" title={t('تغییر تم', 'Change Theme')}>
                   {theme === 'dark' ? <Sun size={14} className="text-amber-500" /> : <Moon size={14} className="text-indigo-500" />}
                 </button>
@@ -742,18 +726,6 @@
             onClose={() => setIsNotifOpen(false)} 
             language={currentLanguage} 
             onUpdateUnread={setUnreadNotifCount}
-          />
-        )}
-        
-        {NavigationDocsComponent && (
-          <NavigationDocsComponent
-            isOpen={docModalInfo.isOpen}
-            onClose={() => setDocModalInfo({ ...docModalInfo, isOpen: false })}
-            pageKey={activeForm?.unique_code || activeForm?.id}
-            pageName={activeForm ? getLabel(activeForm) : ''}
-            docType={docModalInfo.type}
-            isAdmin={isAdmin}
-            language={currentLanguage}
           />
         )}
 

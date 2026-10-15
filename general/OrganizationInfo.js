@@ -53,20 +53,6 @@
     const [employees, setEmployees] = useState([]);
     const [orgIdsWithOffices, setOrgIdsWithOffices] = useState(new Set());
 
-    const viewConfig = {
-      pageId: FORM_CODE,
-      currentState: () => ({ 
-        gridState
-      }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.gridState) setGridState(state.gridState);
-        } else {
-          setGridState(null);
-        }
-      }
-    };
-
     useEffect(() => {
       fetchData();
     }, []);
@@ -306,7 +292,6 @@
           description={t('تنظیمات پایه و مدیریت ساختار شرکت', 'Base settings and company structure')}
           language={language}
           breadcrumbs={[{ label: t('تنظیمات پایه', 'Base Setup') }, { label: t('سازمان', 'Organization') }]}
-          viewConfig={viewConfig}
           notifFilter={filteredRecordId ? { isActive: true, onClear: () => setFilteredRecordId(null) } : null}
         />
 

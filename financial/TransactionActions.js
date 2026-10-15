@@ -25,22 +25,75 @@
   };
 
   /* ── محاسبه نرخ ارز ──────────────────────────────── */
-  const resolveRates = (ratesMap, currency) => {
-    let toUsd = 1;
-    if (currency !== 'USD') {
-      const direct = ratesMap[`${currency}_USD`];
-      if (direct) {
-        toUsd = parseFloat(direct);
-      } else {
-        const inverse = ratesMap[`USD_${currency}`];
-        if (inverse) toUsd = 1 / parseFloat(inverse);
+  const toPositiveRate = (value) => {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const resolveRateBetween = (ratesMap, fromCurrency, toCurrency) => {
+    const from = String(fromCurrency || '').trim().toUpperCase();
+    const to = String(toCurrency || '').trim().toUpperCase();
+    if (!from || !to) return 1;
+    if (from === to) return 1;
+
+    const graph = new Map();
+    Object.entries(ratesMap || {}).forEach(([key, rawRate]) => {
+      const rate = toPositiveRate(rawRate);
+      if (!rate) return;
+      const [base, target] = String(key || '').split('_');
+      const baseCurrency = String(base || '').trim().toUpperCase();
+      const targetCurrency = String(target || '').trim().toUpperCase();
+      if (!baseCurrency || !targetCurrency) return;
+      if (!graph.has(baseCurrency)) graph.set(baseCurrency, new Map());
+      if (!graph.has(targetCurrency)) graph.set(targetCurrency, new Map());
+      graph.get(baseCurrency).set(targetCurrency, rate);
+      graph.get(targetCurrency).set(baseCurrency, 1 / rate);
+    });
+
+    const direct = graph.get(from)?.get(to);
+    if (direct) return direct;
+
+    const walk = (currentCurrency, accumulatedRate, visited = new Set()) => {
+      if (currentCurrency === to) return accumulatedRate;
+      const nextVisited = new Set(visited);
+      nextVisited.add(currentCurrency);
+      const neighbors = graph.get(currentCurrency);
+      if (!neighbors) return null;
+      for (const [nextCurrency, edgeRate] of neighbors.entries()) {
+        if (nextVisited.has(nextCurrency)) continue;
+        const resolved = walk(nextCurrency, accumulatedRate * edgeRate, nextVisited);
+        if (resolved) return resolved;
       }
+      return null;
+    };
+
+    return walk(from, 1) || 1;
+  };
+
+  const resolveRates = (ratesMap, currency) => {
+    const normalizedCurrency = String(currency || 'USD').trim().toUpperCase() || 'USD';
+    return {
+      toUsd: resolveRateBetween(ratesMap, normalizedCurrency, 'USD'),
+      usdToIrr: resolveRateBetween(ratesMap, 'USD', 'IRR'),
+    };
+  };
+
+  const fetchAllCurrencyRatesUpToDate = async (supabase, formattedDate) => {
+    const batchSize = 1000;
+    const allRates = [];
+    for (let offset = 0; ; offset += batchSize) {
+      const { data, error } = await supabase
+        .from('fm_currency_rates')
+        .select('base_currency, target_currency, rate, rate_date, created_at')
+        .lte('rate_date', formattedDate)
+        .order('rate_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + batchSize - 1);
+      if (error) throw error;
+      if (data && data.length) allRates.push(...data);
+      if (!data || data.length < batchSize) break;
     }
-    let usdToIrr = parseFloat(ratesMap['USD_IRR'] || 1);
-    if (!ratesMap['USD_IRR'] && ratesMap['IRR_USD']) {
-      usdToIrr = 1 / parseFloat(ratesMap['IRR_USD']);
-    }
-    return { toUsd, usdToIrr };
+    return allRates;
   };
 
   /* ════════════════════════════════════════════════════
@@ -206,10 +259,7 @@
         const ratesByDate = {};
         for (const date of uniqueDates) {
           const formattedDate = date.replace(/\//g, '-');
-          const { data } = await supabase.from('fm_currency_rates')
-            .select('base_currency, target_currency, rate, rate_date, created_at')
-            .lte('rate_date', formattedDate)
-            .order('rate_date', { ascending: false });
+          const data = await fetchAllCurrencyRatesUpToDate(supabase, formattedDate);
           const sorted = (data || []).slice().sort((a, b) => {
             if (a.rate_date > b.rate_date) return -1;
             if (a.rate_date < b.rate_date) return  1;
@@ -271,7 +321,8 @@
       };
 
       const headerCols = [
-        t('کد تراکنش','Transaction Code'), t('تاریخ سند','Document Date'), t('زمان ثبت','Registered At'),
+        t('کد تراکنش','Transaction Code'), t('کد عطف','Ref Code'), t('شماره روزانه','Daily Number'),
+        t('تاریخ سند','Document Date'), t('زمان ثبت','Registered At'),
         t('نوع تراکنش','Type'), t('وضعیت','Status'), t('ثبت‌کننده','Registrar'), t('دپارتمان','Department'),
         t('شرح سربرگ','Description'), t('بررسی‌کننده','Reviewed By'), t('تاریخ بررسی','Reviewed At'),
         t('تاییدکننده','Approved By'), t('تاریخ تایید','Approved At'),
@@ -281,6 +332,7 @@
       const itemCols = [
         t('ردیف','Row'), t('حساب','Account'), t('نوع عملیات','Action'), t('گروه','Group'),
         t('نوع هزینه/درآمد','Cost/Income Type'), t('ارز','Currency'),
+        t('مرکز هزینه/درآمد','Cost/Income Center'),
         t('واریز','Deposit'), t('برداشت','Withdrawal'),
         t('معادل دلار','Amount USD'), t('معادل ریال','Amount IRR'), t('شرح قلم','Item Desc'),
       ];
@@ -291,6 +343,10 @@
       const rows = [];
       dataToExport.forEach(tx => {
         const txItems = tx.fm_transaction_items || [];
+        const centerTitle = (centerId) => {
+          const center = (lookups.costBenefitCenters || []).find(c => String(c.id) === String(centerId));
+          return center ? (isRtl ? center.titleFa : (center.titleEn || center.titleFa)) : '';
+        };
         let txDepUsd = 0, txWidUsd = 0, txDepIrr = 0, txWidIrr = 0;
         txItems.forEach(item => {
           const usd = parseFloat(item.amount_usd || 0);
@@ -299,7 +355,8 @@
           else                                       { txWidUsd += usd; txWidIrr += irr; }
         });
         const hdr = [
-          tx.document_code || '', tx.document_date || '', formatDT(tx.created_at),
+          tx.document_code || '', tx.reference_code || '', tx.daily_number || '',
+          tx.document_date || '', formatDT(tx.created_at),
           TX_TYPE[tx.transaction_type]   || tx.transaction_type   || '',
           TX_STATUS[tx.status]           || tx.status             || '',
           usersMap[tx.registrar_id]      || '',
@@ -312,7 +369,7 @@
         ];
         const items = tx.fm_transaction_items || [];
         if (items.length === 0) {
-          rows.push([...hdr, '', '', '', '', '', '', '', '', '', '', ''].map(esc).join(','));
+          rows.push([...hdr, '', '', '', '', '', '', '', '', '', '', '', ''].map(esc).join(','));
         } else {
           items.forEach(item => {
             const acc   = (lookups.accounts   || []).find(a => String(a.id) === String(item.account_id));
@@ -329,6 +386,7 @@
               TX_ACTION[item.transaction_action] || item.transaction_action || '',
               TX_GROUP[item.transaction_group]   || item.transaction_group  || '',
               subType, item.currency || '',
+              centerTitle(item.center_id),
               item.deposit_amount    || '0', item.withdrawal_amount || '0',
               item.amount_usd        || '0', item.amount_irr        || '0',
               item.description       || '',

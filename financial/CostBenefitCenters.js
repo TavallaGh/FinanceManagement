@@ -123,15 +123,6 @@
       }
     }, [supabase, currentUser]);
 
-    const viewConfig = {
-      pageId: 'cost_benefit_centers_main',
-      currentState: () => ({ gridState }),
-      onApplyState: (state) => {
-        if (state) { if (state.gridState) setGridState(state.gridState); }
-        else        { setGridState(null); }
-      },
-    };
-
     /* ── fetch employee managers from parties ── */
     const fetchManagers = useCallback(async () => {
       try {
@@ -618,6 +609,29 @@
       },
     ];
 
+    /* ── export handler with limit check ── */
+    const handleExport = useCallback(() => {
+      // if user has selected rows, export those; otherwise export full dataset
+      const count = (selectedIds && selectedIds.length > 0) ? selectedIds.length : (data ? data.length : 0);
+      if (count > 5000) {
+        showToast(t('حداکثر تعداد رکوردهای مجاز برای اکسپورت 5000 است. لطفا با مدیریت فیلترها، اطلاعات را در چند بخش دریافت کنید', 'Maximum allowed rows for export is 5000. Please use filters to obtain the data in smaller batches.'), 'error');
+        return;
+      }
+
+      // build CSV from columns and either selected rows or all data
+      const exportCols = columns; // use same columns definition
+      const rowsToExport = (selectedIds && selectedIds.length > 0) ? data.filter(d => selectedIds.includes(d.id)) : data;
+      const headers = exportCols.map(c => t(c.header_fa, c.header_en || c.header_fa)).join(',');
+      const rowsCsv = rowsToExport.map(row => exportCols.map(c => {
+        let val = c.exportValue ? c.exportValue(row[c.field], row) : row[c.field];
+        if (c.type === 'date' && window.DSCore && typeof window.DSCore.formatGlobalDate === 'function') val = window.DSCore.formatGlobalDate(val);
+        return `"${(val ?? '').toString().replace(/"/g, '""')}"`;
+      }).join(',')).join('\n');
+      const csv = '\uFEFF' + headers + '\n' + rowsCsv;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.setAttribute('download', `CostBenefitCenters_Export_${new Date().getTime()}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }, [data, selectedIds, columns, showToast, t]);
+
     /* ── LOV columns for office picker ── */
     const officelovColumns = [
       { field: 'label',   header_fa: 'عنوان دفتر', header_en: 'Office',       width: '200px' },
@@ -643,7 +657,6 @@
             { label: t('مالی', 'Financial') },
             { label: t('مراکز هزینه / درآمد', 'Cost & Benefit Centers') },
           ]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-4 animate-in fade-in duration-300">

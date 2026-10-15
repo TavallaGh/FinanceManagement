@@ -32,8 +32,8 @@
     const [groups, setGroups] = useState([]);
     const [coaAccounts, setCoaAccounts] = useState([]);
     const [rawUsers, setRawUsers] = useState([]);
-    const [userGroupsMaster, setUserGroupsMaster] = useState([]);
-    const [userGroupUsers, setUserGroupUsers] = useState([]);
+    const [userGroups, setUserGroups] = useState([]);
+    const [userGroupsMap, setUserGroupsMap] = useState([]);
     const [charts, setCharts] = useState([]);
     const [parties, setParties] = useState([]);
     const [currencies, setCurrencies] = useState([]);
@@ -52,20 +52,6 @@
     // Current Group
     const [currentGroup, setCurrentGroup] = useState({ id: null, code: '', title_fa: '', title_en: '', description: '', is_active: true });
 
-    const viewConfig = {
-      pageId: 'balance_group_main',
-      currentState: () => ({ gridState, filters }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.gridState) setGridState(state.gridState);
-          if (state.filters) setFilters(state.filters);
-        } else {
-          setGridState(null);
-          setFilters({});
-        }
-      }
-    };
-
     useEffect(() => {
       fetchInitialData();
     }, []);
@@ -73,14 +59,14 @@
     const fetchInitialData = async () => {
       setLoading(true);
       try {
-        const [groupsRes, accountsRes, usersRes, groupsLookupRes, groupUsersRes, chartsRes, partiesRes, currenciesRes] = await Promise.all([
+        const [groupsRes, accountsRes, usersRes, userGroupsRes, userGroupsMapRes, chartsRes, partiesRes, currenciesRes] = await Promise.all([
           supabase.from('fm_balance_groups')
             .select('*, accounts:fm_balance_group_accounts(id, account_id), access:fm_balance_group_access(grantee_type, grantee_id)')
             .order('created_at', { ascending: false }),
           supabase.from('fm_coa_accounts').select('id, code, title_fa, currency_id, parent_id, is_active, chart_id'),
           supabase.from('sec_users').select('*'),
-          supabase.from('sec_user_groups').select('id, code, title, description, is_active'),
-          supabase.from('sec_user_group_users').select('group_id, user_id'),
+          supabase.from('sec_user_groups').select('id, code, title, is_active'),
+          supabase.from('sec_user_group_users').select('user_id, group_id'),
           supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
           supabase.from('parties').select('id, first_name, last_name, company_name, party_type'),
           supabase.from('fm_currencies').select('id, code')
@@ -91,8 +77,8 @@
         setGroups(groupsRes.data || []);
         setCoaAccounts(accountsRes.data || []);
         setRawUsers(usersRes.data || []);
-        setUserGroupsMaster(groupsLookupRes.data || []);
-        setUserGroupUsers(groupUsersRes.data || []);
+        setUserGroups((userGroupsRes.data || []).filter(g => g.is_active !== false));
+        setUserGroupsMap(userGroupsMapRes.data || []);
         setCharts(chartsRes.data || []);
         setParties(partiesRes.data || []);
         setCurrencies(currenciesRes.data || []);
@@ -171,8 +157,11 @@
       if (filters.user_id && filters.user_id.id) {
         result = result.filter(g => g.access?.some(a => a.grantee_type?.toLowerCase() === 'user' && a.grantee_id === filters.user_id.id));
       }
-      if (filters.group_id && filters.group_id.id) {
-        result = result.filter(g => g.access?.some(a => a.grantee_type?.toLowerCase() === 'group' && a.grantee_id === filters.group_id.id));
+      if (filters.user_group_id && filters.user_group_id.id) {
+        result = result.filter(g => g.access?.some(a => {
+          const type = (a.grantee_type || '').toLowerCase();
+          return (type === 'user_group' || type === 'group' || type === 'role') && a.grantee_id === filters.user_group_id.id;
+        }));
       }
       return result;
     }, [groups, filters]);
@@ -305,7 +294,7 @@
     const filterFields = [
       { name: 'account_id', label: t('دارای حساب', 'Contains Account'), type: 'lov', lovData: leafAccounts, lovColumns: lovAccountColumns, dropdownWidth: 'min-w-[470px] max-w-[470px]' },
       { name: 'user_id', label: t('دسترسی کاربر', 'User Access'), type: 'lov', lovData: users, lovColumns: [{field: 'username', header_fa: 'نام کاربری'}, {field: 'full_name', header_fa: 'نام'}] },
-      { name: 'group_id', label: t('دسترسی گروه کاربری', 'User Group Access'), type: 'lov', lovData: userGroupsMaster, lovColumns: [{field: 'code', header_fa: 'کد گروه'}, {field: 'title', header_fa: 'عنوان گروه'}] }
+      { name: 'user_group_id', label: t('دسترسی گروه کاربری', 'User Group Access'), type: 'lov', lovData: userGroups, lovColumns: [{field: 'code', header_fa: 'کد گروه'}, {field: 'title', header_fa: 'عنوان گروه'}] }
     ];
 
     return (
@@ -316,7 +305,6 @@
           description={t('تعریف و مدیریت گروه‌های بالانس و دسترسی‌ها', 'Manage balance groups and their associated access permissions')}
           language={language}
           breadcrumbs={[{ label: t('ماژول مالی', 'Financial Module') }, { label: t('گروه‌های بالانس', 'Balance Groups') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">
@@ -387,7 +375,7 @@
                 setDetailsConfig({ isOpen: false, type: null, group: null });
                 fetchInitialData();
              }}
-             lookups={{ leafAccounts, users, userGroupsMaster, userGroupUsers, lovAccountColumns }}
+             lookups={{ leafAccounts, users, userGroups, userGroupsMap, lovAccountColumns }}
              language={language}
           />
         )}

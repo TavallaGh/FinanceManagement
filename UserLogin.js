@@ -9,7 +9,6 @@
     User = FallbackIcon, Lock = FallbackIcon, Mail = FallbackIcon, Smartphone = FallbackIcon, 
     ArrowRight = FallbackIcon, ArrowLeft = FallbackIcon, KeyRound = FallbackIcon, Building2 = FallbackIcon, 
     CheckCircle2 = FallbackIcon, ShieldCheck = FallbackIcon, Globe = FallbackIcon, Loader2 = FallbackIcon,
-    HelpCircle = FallbackIcon, FileText = FallbackIcon
   } = LucideIcons;
 
   const UserLogin = ({ 
@@ -21,10 +20,8 @@
     const [resetData, setResetData] = useState({ identifier: '', otp: '', newPassword: '', confirmPassword: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [toastState, setToastState] = useState({ isVisible: false, message: '', type: 'success' });
-    const [docModalInfo, setDocModalInfo] = useState({ isOpen: false, type: 'user' });
     
     const { Toast } = window.DSFeedback || {};
-    const NavigationDocsComponent = window.NavigationDocs;
     
     const showToast = (message, type = 'success') => {
       setToastState({ isVisible: true, message, type });
@@ -57,17 +54,18 @@
       try {
         const isReachable = await window.isSupabaseReachable?.();
         if (isReachable === false) {
-          showError(isRtl ? 'اتصال به سرور دیتابیس برقرار نیست. لطفاً شبکه یا VPN را بررسی کنید.' : 'Database server is not reachable. Check your network or VPN.');
-          return;
+          console.warn('Supabase reachability check failed. Continuing with reset flow query.');
         }
 
         const supabase = window.supabase;
         
-        const { data: userData, error: userErr } = await supabase
-          .from('sec_users')
-          .select('id')
-          .ilike('username', resetData.identifier.trim())
-          .single();
+        const { data: userData, error: userErr } = await window.supabaseWithRetry(
+          () => supabase
+            .from('sec_users')
+            .select('id')
+            .ilike('username', resetData.identifier.trim())
+            .single()
+        );
           
         if (userErr || !userData) {
            showError(isRtl ? 'نام کاربری در سیستم یافت نشد.' : 'Username not found.');
@@ -77,10 +75,12 @@
 
         const hashedPassword = await hashPassword(resetData.newPassword);
         
-        const { error: resetErr } = await supabase.rpc('reset_user_password', {
-           p_user_id: userData.id,
-           p_new_password: hashedPassword
-        });
+          const { error: resetErr } = await window.supabaseWithRetry(
+           () => supabase.rpc('reset_user_password', {
+             p_user_id: userData.id,
+             p_new_password: hashedPassword
+           })
+          );
         
         if (resetErr) {
            showError(isRtl ? 'خطا در تغییر رمز عبور. با مدیر سیستم تماس بگیرید.' : 'Error resetting password.');
@@ -91,7 +91,12 @@
         }
       } catch(err) {
          console.error(err);
-         showError(isRtl ? 'خطای ارتباط با سرور' : 'Server error');
+        if (window.isLikelyNetworkError?.(err)) {
+          showError(isRtl ? 'اتصال به سرور دیتابیس برقرار نیست. لطفاً شبکه یا VPN را بررسی کنید.' : 'Database server is not reachable. Check your network or VPN.');
+          return;
+        }
+
+        showError(isRtl ? 'خطای ارتباط با سرور' : 'Server error');
       } finally {
          setIsLoading(false);
       }
@@ -118,21 +123,6 @@
         </div>
 
         <div className={`absolute top-6 ${isRtl ? 'left-6' : 'right-6'} z-20 flex items-center gap-2`}>
-          <button 
-            onClick={() => setDocModalInfo({ isOpen: true, type: 'user' })} 
-            className="flex items-center justify-center bg-white/60 backdrop-blur-md border border-white/50 w-9 h-9 rounded-full shadow-sm text-indigo-600 hover:bg-white transition-all" 
-            title={isRtl ? 'راهنمای کاربری' : 'User Guide'}
-          >
-            <HelpCircle size={16} />
-          </button>
-          <button 
-            onClick={() => setDocModalInfo({ isOpen: true, type: 'dev' })} 
-            className="flex items-center justify-center bg-white/60 backdrop-blur-md border border-white/50 w-9 h-9 rounded-full shadow-sm text-amber-500 hover:bg-white transition-all" 
-            title={isRtl ? 'مستندات توسعه' : 'Developer Docs'}
-          >
-            <FileText size={16} />
-          </button>
-          <div className="w-px h-5 bg-slate-300 mx-1"></div>
           <button 
             onClick={toggleLanguage}
             className="flex items-center gap-2 bg-white/60 backdrop-blur-md border border-white/50 px-4 py-2 rounded-full shadow-sm text-[12px] font-bold text-slate-700 hover:bg-white transition-all"
@@ -419,18 +409,6 @@
         </div>
 
         {Toast && <Toast isVisible={toastState.isVisible} message={toastState.message} type={toastState.type} onClose={() => setToastState(prev => ({ ...prev, isVisible: false }))} />}
-        
-        {NavigationDocsComponent && (
-          <NavigationDocsComponent
-            isOpen={docModalInfo.isOpen}
-            onClose={() => setDocModalInfo({ ...docModalInfo, isOpen: false })}
-            pageKey="login_page"
-            pageName={isRtl ? 'صفحه ورود به سیستم' : 'Login Page'}
-            docType={docModalInfo.type}
-            isAdmin={true}
-            language={isRtl ? 'fa' : 'en'}
-          />
-        )}
       </div>
     );
   };

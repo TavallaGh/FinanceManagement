@@ -49,6 +49,7 @@
   const Paperclip      = safeIcon(LucideIcons, 'Paperclip');
   const DollarSign     = safeIcon(LucideIcons, 'DollarSign');
   const RefreshCw      = safeIcon(LucideIcons, 'RefreshCw');
+  const History        = safeIcon(LucideIcons, 'History');
 
   const REQUEST_TYPES = [
     { value: 'TRANSFER',   fa: 'انتقال وجه',  en: 'Transfer'   },
@@ -89,6 +90,11 @@
     const supabase = window.supabase;
 
     const currentUserId = getSessionUserId() || window.NavigationSystem?.currentUser?.id || null;
+    const useRequestManagementWorkflow = window.useRequestManagementWorkflow || (() => ({
+      workflowAssignments: { actionableSet: new Set(), assignedMap: {} },
+      actionableRequestIds: new Set(),
+      filteredData: [],
+    }));
 
     // Loaded from RequestDetails.js (must appear before this script in index.html)
     const RequestFormModal = safeComp(window, 'RequestFormModal');
@@ -98,6 +104,18 @@
       const a = secCtx ? secCtx.getActions(formCode) : null;
       return a || { canView: true, canCreate: true, canEdit: true, canDelete: true };
     }, [secCtx, formCode]);
+    const dataScope = useMemo(() => {
+      return secCtx ? (secCtx.getDataScope(formCode) || {}) : {};
+    }, [secCtx, formCode]);
+
+    const ownDataOnly = useMemo(() => {
+      const raw = dataScope?.own_data_only;
+      if (raw === true || raw === 1 || raw === '1' || raw === 'true') return true;
+      if (Array.isArray(raw)) {
+        return raw.some(v => v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true');
+      }
+      return false;
+    }, [dataScope]);
 
     const [requests,         setRequests]         = useState([]);
     const [usersMap,         setUsersMap]         = useState({});
@@ -107,6 +125,12 @@
     const [costTypes,        setCostTypes]        = useState([]);
     const [incomeTypes,      setIncomeTypes]      = useState([]);
     const [costBenefitCenters, setCostBenefitCenters] = useState([]);
+    const [stateMachineRows, setStateMachineRows] = useState([]);
+    const [userRoles,        setUserRoles]        = useState([]);
+    const [rolesMap,         setRolesMap]         = useState({});
+    const [usersList,        setUsersList]        = useState([]);
+    const [personnelRows,    setPersonnelRows]    = useState([]);
+    const [orgNodes,         setOrgNodes]         = useState([]);
     const [isLoading,        setIsLoading]        = useState(false);
     const [filters,          setFilters]          = useState({});
     const [gridState,        setGridState]        = useState(null);
@@ -117,26 +141,34 @@
     const [deleteConfirm,    setDeleteConfirm]    = useState({ isOpen: false, type: null, data: null });
     const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
     const [commentedIds,     setCommentedIds]     = useState(new Set());
+    const [filteredRecordId, setFilteredRecordId] = useState(null);
     const [attachmentCounts, setAttachmentCounts] = useState({});
     const [attachModal,      setAttachModal]      = useState({ isOpen: false, record: null, files: [] });
     const [isUploading,      setIsUploading]      = useState(false);
     const [toast,            setToast]            = useState({ isVisible: false, message: '', type: 'success' });
     const [summaryModal,     setSummaryModal]     = useState({ isOpen: false, record: null });
+    const [statusHistoryModal, setStatusHistoryModal] = useState({ isOpen: false, record: null, rows: [], isLoading: false });
 
     const showToast = useCallback((msg, type = 'success') => {
       setToast({ isVisible: true, message: msg, type });
       setTimeout(() => setToast(p => ({ ...p, isVisible: false })), 3000);
     }, []);
 
+    const parseAmount = useCallback((value) => parseFloat(String(value || '0').replace(/,/g, '')) || 0, []);
+
     const fetchMeta = useCallback(async () => {
       try {
-        const [uRes, pRes, nRes, costRes, incRes, cbcRes] = await Promise.all([
-          supabase.from('sec_users').select('id, full_name, username'),
+        const [uRes, pRes, nRes, costRes, incRes, cbcRes, smRes, urRes, rolesRes, personnelRes] = await Promise.all([
+          supabase.from('sec_users').select('id, full_name, username, party_id'),
           supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, mobile').eq('is_active', true),
-          supabase.from('fm_org_chart_nodes').select('id, title'),
+          supabase.from('fm_org_chart_nodes').select('id, title, parent_id'),
           supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
           supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
           supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
+          supabase.from('wf_state_machines').select('id, machine_code, entity_code, entry_condition, entry_condition_text, valid_from, valid_to, is_active, graph_json').eq('entity_code', 'REQ_REQUESTS').eq('is_active', true),
+          supabase.from('sec_user_roles').select('role_id').eq('user_id', currentUserId),
+          supabase.from('sec_roles').select('id, title, code').eq('is_active', true),
+          supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
         ]);
 
         const buildLeafs = (items) => {
@@ -149,6 +181,7 @@
 
         const uMap = {}; (uRes.data || []).forEach(u => { uMap[u.id] = u.full_name || u.username || ''; });
         setUsersMap(uMap);
+        setUsersList(uRes.data || []);
         const pMap = {};
         const pList = (pRes.data || []).map(p => {
           const label = p.party_type === 'legal' ? (p.company_name || '') : `${p.first_name || ''} ${p.last_name || ''}`.trim();
@@ -161,6 +194,19 @@
         setDeptsMap(dMap);
         setCostTypes(buildLeafs(costRes.data || []));
         setIncomeTypes(buildLeafs(incRes.data || []));
+        setStateMachineRows(smRes.error ? [] : (smRes.data || []));
+        if (smRes.error) {
+          const msg = String(smRes.error?.message || '').toLowerCase();
+          if (smRes.error?.code === '42P01' || msg.includes('wf_state_machines')) {
+            showToast(t('تنظیمات State Machine در این محیط کامل نیست. ابتدا اسکریپت‌های فاز ۲ و ۵ را اجرا کنید.', 'State machine setup is incomplete in this environment. Run Phase 2 and Phase 5 scripts first.'), 'warning');
+          }
+        }
+        setUserRoles((urRes.data || []).map(r => String(r.role_id)));
+        const rMap = {};
+        (rolesRes.data || []).forEach(r => { rMap[String(r.id)] = r.title || r.code || ''; });
+        setRolesMap(rMap);
+        setPersonnelRows(personnelRes.data || []);
+        setOrgNodes(nRes.data || []);
         setCostBenefitCenters((cbcRes.data || []).map(r => ({
           id: r.id,
           titleFa: r.title_fa || '',
@@ -173,7 +219,7 @@
           officeName: r.office?.title || '',
         })));
       } catch {}
-    }, [supabase, isRtl]);
+    }, [supabase, isRtl, currentUserId]);
 
     const fetchData = useCallback(async () => {
       setIsLoading(true);
@@ -212,6 +258,19 @@
     useEffect(() => {
       if (access.canView) { fetchMeta(); fetchData(); }
     }, [fetchMeta, fetchData, access.canView]);
+
+    useEffect(() => {
+      const handleFilterToRecord = (e) => {
+        const details = e?.detail || {};
+        const matchesForm = String(details.form_component || '') === 'RequestManagement';
+        const matchesEntity = String(details.entity_type || '').toLowerCase() === 'req_requests';
+        if ((matchesForm || matchesEntity) && details.entity_id) {
+          setFilteredRecordId(String(details.entity_id));
+        }
+      };
+      window.addEventListener('filterToRecord', handleFilterToRecord);
+      return () => window.removeEventListener('filterToRecord', handleFilterToRecord);
+    }, []);
 
     const loadAttachments = useCallback(async (recordId) => {
       if (!supabase || !recordId) return;
@@ -349,6 +408,33 @@
 
     const openSummary = (record) => setSummaryModal({ isOpen: true, record });
 
+    const openStatusHistory = useCallback(async (record) => {
+      if (!record?.id) return;
+      setStatusHistoryModal({ isOpen: true, record, rows: [], isLoading: true });
+      try {
+        const { data, error, status } = await supabase
+          .from('req_request_status_logs')
+          .select('*')
+          .eq('request_id', record.id)
+          .order('changed_at', { ascending: true });
+        if (error) {
+          const msg = String(error?.message || '').toLowerCase();
+          const missing = status === 404 || error?.code === '42P01' || msg.includes('req_request_status_logs');
+          if (missing) {
+            showToast(t('جدول تاریخچه وضعیت ایجاد نشده است. ابتدا اسکریپت SQL مربوطه را اجرا کنید.', 'Status history table is missing. Run its SQL migration first.'), 'warning');
+            setStatusHistoryModal({ isOpen: false, record: null, rows: [], isLoading: false });
+            return;
+          }
+          throw error;
+        }
+        const rows = (data || []).map((row, idx) => ({ ...row, row_no: idx + 1 }));
+        setStatusHistoryModal({ isOpen: true, record, rows, isLoading: false });
+      } catch {
+        showToast(t('خطا در دریافت تاریخچه تغییر وضعیت.', 'Error loading status history.'), 'error');
+        setStatusHistoryModal({ isOpen: true, record, rows: [], isLoading: false });
+      }
+    }, [supabase, showToast, t]);
+
     const handleOpenForm = (mode, record = null) => {
       setFormMode(mode);
       setCurrentRecord(record || {});
@@ -418,8 +504,12 @@
         ),
       },
       {
-        field: 'department_id', header_fa: 'دپارتمان', header_en: 'Department', width: '100px',
-        render: val => <span className="text-[12px] text-slate-500 dark:text-slate-400">{val ? (deptsMap[val] || val) : '-'}</span>,
+        field: 'assigned_to_display', header_fa: 'انجام دهنده', header_en: 'Assigned To', width: '120px',
+        render: (val, row) => (
+          <span className={`text-[12px] ${row.assigned_to_is_me ? 'font-bold text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
+            {val || '-'}
+          </span>
+        ),
       },
       {
         field: 'created_at', header_fa: 'تاریخ ثبت', header_en: 'Submitted', width: '100px',
@@ -433,7 +523,58 @@
         field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto',
         render: val => <span className="text-[12px] text-slate-500 dark:text-slate-400 truncate block max-w-xs" title={val}>{val || '-'}</span>,
       },
-    ], [usersMap, partiesMap, deptsMap, isRtl]);
+    ], [usersMap, partiesMap, isRtl]);
+
+    const historyColumns = useMemo(() => [
+      {
+        field: 'row_no', header_fa: 'ردیف', header_en: 'Row', width: '70px',
+        render: val => <span className="text-[12px] font-bold text-slate-600">{val}</span>,
+      },
+      {
+        field: 'changed_at', header_fa: 'تاریخ', header_en: 'Date', width: '110px',
+        render: val => {
+          if (!val) return '-';
+          try {
+            return new Intl.DateTimeFormat(isRtl ? 'fa-IR' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(val));
+          } catch { return '-'; }
+        },
+      },
+      {
+        field: 'changed_at_time', header_fa: 'زمان', header_en: 'Time', width: '90px',
+        render: (_, row) => {
+          if (!row.changed_at) return '-';
+          try {
+            return new Intl.DateTimeFormat(isRtl ? 'fa-IR' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(row.changed_at));
+          } catch { return '-'; }
+        },
+      },
+      {
+        field: 'from_status', header_fa: 'از وضعیت', header_en: 'From Status', width: '120px',
+        render: val => {
+          const s = getStatus(val);
+          return <Badge variant={s.color} size="sm">{isRtl ? s.fa : s.en}</Badge>;
+        },
+      },
+      {
+        field: 'to_status', header_fa: 'به وضعیت', header_en: 'To Status', width: '120px',
+        render: val => {
+          const s = getStatus(val);
+          return <Badge variant={s.color} size="sm">{isRtl ? s.fa : s.en}</Badge>;
+        },
+      },
+      {
+        field: 'actor_name', header_fa: 'انجام دهنده', header_en: 'Done By', width: '140px',
+        render: val => <span className="text-[12px] text-slate-700 dark:text-slate-300">{val || '-'}</span>,
+      },
+      {
+        field: 'next_assignee', header_fa: 'انجام دهنده بعدی', header_en: 'Next Assignee', width: '170px',
+        render: val => <span className="text-[12px] text-slate-600 dark:text-slate-300">{val || '-'}</span>,
+      },
+      {
+        field: 'description', header_fa: 'توضیحات', header_en: 'Description', width: 'auto',
+        render: val => <span className="text-[12px] text-slate-500 dark:text-slate-400 truncate block max-w-xs" title={val || ''}>{val || '-'}</span>,
+      },
+    ], [isRtl]);
 
     const ITEM_ACTIONS = [
       { value: 'DEPOSIT', label: t('واریز', 'Deposit') },
@@ -482,43 +623,21 @@
       },
     ];
 
-    const filteredData = useMemo(() => requests.filter(r => {
-      const hasItemFilters =
-        !!filters.transaction_action ||
-        !!filters.transaction_group ||
-        !!filters.sub_type_id ||
-        !!filters.party_id ||
-        !!filters.center_id ||
-        !!String(filters.project_id || '').trim();
-
-      if (!hasItemFilters) return true;
-
-      const hasMatchingItem = (r.req_request_items || []).some(item => {
-        if (filters.transaction_action && item.transaction_action !== filters.transaction_action) return false;
-        if (filters.transaction_group && item.transaction_group !== filters.transaction_group) return false;
-
-        if (filters.sub_type_id) {
-          const selected = filters.sub_type_id;
-          if (selected.subTypeGroup === 'COST') {
-            if (String(item.cost_type_id || '') !== String(selected.id)) return false;
-          } else if (selected.subTypeGroup === 'INCOME') {
-            if (String(item.income_type_id || '') !== String(selected.id)) return false;
-          }
-        }
-
-        if (filters.party_id && String(item.party_id || '') !== String(filters.party_id.id)) return false;
-        if (filters.center_id && String(item.center_id || '') !== String(filters.center_id.id)) return false;
-
-        if (String(filters.project_id || '').trim()) {
-          const q = String(filters.project_id).trim().toLowerCase();
-          if (!String(item.project_id || '').toLowerCase().includes(q)) return false;
-        }
-
-        return true;
-      });
-
-      return hasMatchingItem;
-    }), [requests, filters]);
+    const { filteredData } = useRequestManagementWorkflow({
+      currentUserId,
+      requests,
+      filteredRecordId,
+      filters,
+      ownDataOnly,
+      stateMachineRows,
+      userRoles,
+      rolesMap,
+      usersList,
+      usersMap,
+      orgNodes,
+      personnelRows,
+      parseAmount,
+    });
 
     const filterFields = [
       { name: 'transaction_action', label: t('نوع', 'Action'), type: 'select', options: ITEM_ACTIONS },
@@ -526,7 +645,7 @@
       { name: 'sub_type_id', label: t('نوع هزینه/درآمد', 'Cost/Income Type'), type: 'lov', lovData: mergedSubTypes, lovColumns: subTypeLovColumns, dropdownWidth: 'min-w-[420px]' },
       { name: 'party_id', label: t('طرف مقابل', 'Party'), type: 'lov', lovData: partiesList, lovColumns: partyLovColumns, dropdownWidth: 'min-w-[520px]' },
       { name: 'center_id', label: t('مرکز هزینه/درآمد', 'Cost/Income Center'), type: 'lov', lovData: costBenefitCenters, lovColumns: centerLovColumns, dropdownWidth: 'min-w-[580px]' },
-      { name: 'project_id', label: t('پروژه', 'Project'), type: 'text' },
+      { name: 'assigned_to_me', label: t('تخصیص به من', 'Assigned To Me'), type: 'toggle' },
     ];
 
     const viewConfig = useMemo(() => ({
@@ -549,6 +668,7 @@
               language={language}
               breadcrumbs={[{ label: t('گردش کار', 'Workflow') }, { label: t('درخواست‌ها', 'Requests') }]}
               viewConfig={viewConfig}
+              notifFilter={filteredRecordId ? { isActive: true, onClear: () => setFilteredRecordId(null) } : null}
             />
 
             <div className="flex-1 flex flex-col min-h-0 mt-2 animate-in fade-in duration-300">
@@ -561,7 +681,7 @@
                   formCode={formCode} isLoading={isLoading} hideImport={true}
                   selectable={true} selectedIds={selectedIds} onSelectChange={setSelectedIds}
                   gridState={gridState} onGridStateChange={setGridState}
-                  actionWidth="180px"
+                  actionWidth="240px"
                   onAdd={access.canCreate ? () => handleOpenForm('CREATE') : undefined}
                   onRowDoubleClick={row => handleOpenForm('EDIT', row)}
                   actions={[
@@ -570,6 +690,12 @@
                       tooltip: t('خلاصه ارزی', 'Currency Summary'),
                       onClick: row => openSummary(row),
                       className: 'text-indigo-500 hover:text-indigo-600',
+                    },
+                    {
+                      icon: History,
+                      tooltip: t('تاریخچه وضعیت', 'Status History'),
+                      onClick: row => openStatusHistory(row),
+                      className: 'text-violet-600 hover:text-violet-700',
                     },
                     {
                       icon: Paperclip,
@@ -709,6 +835,35 @@
             formCode={formCode}
           />
         ) : null; })()}
+
+        <Modal
+          isOpen={statusHistoryModal.isOpen}
+          onClose={() => setStatusHistoryModal({ isOpen: false, record: null, rows: [], isLoading: false })}
+          title={`${t('تاریخچه تغییر وضعیت درخواست', 'Request Status History')} | ${t('کد', 'Code')}: ${statusHistoryModal.record?.request_code || '-'}`}
+          language={language}
+          width="max-w-5xl"
+        >
+          <div className="p-4 h-[430px] bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg flex flex-col">
+            <div className="flex-1 min-h-0">
+              <DataGrid
+                data={statusHistoryModal.rows}
+                columns={historyColumns}
+                language={language}
+                formCode={formCode}
+                isLoading={statusHistoryModal.isLoading}
+                hideImport={true}
+                hideExport={true}
+                hideToolbar={true}
+                selectable={false}
+                actionWidth="0px"
+                minVisibleRows={5}
+              />
+            </div>
+          </div>
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
+            <Button variant="primary" size="sm" onClick={() => setStatusHistoryModal({ isOpen: false, record: null, rows: [], isLoading: false })}>{t('بستن', 'Close')}</Button>
+          </div>
+        </Modal>
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type}
           onClose={() => setToast(p => ({ ...p, isVisible: false }))} />

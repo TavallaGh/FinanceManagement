@@ -67,22 +67,6 @@
       is_active: true
     });
 
-    const viewConfig = {
-      pageId: 'user_group_management_main',
-      currentState: () => ({ groupGridState, userGridState, viewMode }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.groupGridState) setGroupGridState(state.groupGridState);
-          if (state.userGridState) setUserGridState(state.userGridState);
-          if (state.viewMode) setViewMode(state.viewMode);
-        } else {
-          setGroupGridState(null);
-          setUserGridState(null);
-          setViewMode('groups');
-        }
-      }
-    };
-
     useEffect(() => {
       fetchInitialData();
     }, []);
@@ -550,7 +534,6 @@
           description={t('تعریف گروه‌های کاربری، تخصیص کاربران به هر گروه و کنترل وضعیت فعال/غیرفعال', 'Define user groups, assign users to each group, and control active/inactive status')}
           language={language}
           breadcrumbs={[{ label: t('امنیت', 'Security') }, { label: t('گروه‌های کاربری', 'User Groups') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 flex flex-col min-h-0 mt-3 animate-in fade-in duration-300">

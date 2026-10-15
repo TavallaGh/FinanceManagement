@@ -50,6 +50,7 @@
     entityTitle,
     formTitle = null,
     formComponent = null,
+        onCommentAdded = null,
     language = 'fa' 
   }) => {
     const isRtl = language === 'fa';
@@ -232,6 +233,7 @@
     const handleSubmit = async () => {
         if (!newComment.trim()) return;
         setIsSubmitting(true);
+        const submittedContent = newComment;
         // read from ref to always get the latest entity props, avoiding stale closures
         const { entityId: eid, entityTitle: etitle, entityType: etype, formComponent: eform, formTitle: eformTitle } = entityRef.current;
         try {
@@ -285,6 +287,18 @@
             setReplyingTo(null);
             showToast(t('کامنت با موفقیت ثبت شد', 'Comment added successfully'));
             fetchComments();
+
+            if (typeof onCommentAdded === 'function') {
+                try {
+                    await onCommentAdded({
+                        entityType: etype,
+                        entityId: String(eid),
+                        content: submittedContent,
+                    });
+                } catch (callbackError) {
+                    console.error('CommentModal onCommentAdded callback error:', callbackError);
+                }
+            }
         } catch (error) {
             console.error(error);
             showToast(t('خطا در ثبت کامنت', 'Error saving comment'), 'error');

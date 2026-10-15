@@ -277,20 +277,6 @@
       { field: 'is_active', header_fa: 'وضعیت', header_en: 'Active', type: 'toggle', width: '120px', onToggle: (row, val) => handleToggleActive(row, val) }
     ];
 
-    const viewConfig = useMemo(() => ({
-      pageId: 'coa_charts_main_list',
-      currentState: () => ({ viewMode, chartsGridState }),
-      onApplyState: (state) => {
-        if (state) {
-          if (state.viewMode) setViewMode(state.viewMode);
-          if (state.chartsGridState) setChartsGridState(state.chartsGridState);
-        } else {
-          setViewMode('list');
-          setChartsGridState(null);
-        }
-      }
-    }), [viewMode, chartsGridState]);
-
     if (viewMode === 'designer') {
       const DesignerComponent = window.ChartOfAccountsMain;
       if (!DesignerComponent) {
@@ -311,7 +297,6 @@
           icon={Network} language={language}
           description={t('مدیریت مدل‌های کدینگ مالی و تخصیص سطوح دسترسی کاربران', 'Define accounting structures, levels, and access profiles')}
           breadcrumbs={[{ label: t('مدیریت مالی', 'Financial Setup') }, { label: t('کدینگ حساب‌ها', 'Chart of Accounts') }]}
-          viewConfig={viewConfig}
         />
 
         <div className="flex-1 min-h-0 flex flex-col gap-1 mt-2 animate-in fade-in duration-500">

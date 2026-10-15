@@ -29,6 +29,7 @@
   const Toast = DSFeedback.Toast || DS.Toast || (() => null);
 
   const supabase = window.supabase;
+  const AUTO_NUMBERING_TABLE = 'fm_auto_numbering';
 
   const AutoNumbering = ({ language = 'fa' }) => {
     const isRtl = language === 'fa';
@@ -46,12 +47,14 @@
     const [gridState, setGridState] = useState(null);
 
     const [formData, setFormData] = useState({
-      entity_type: '',
+      entity_code: '',
+      title_fa: '',
+      title_en: '',
       prefix: '',
       suffix: '',
-      current_value: 0,
-      step: 1,
-      pad_length: 4,
+      number_length: 4,
+      start_number: 1,
+      current_number: 0,
       is_active: true
     });
 
@@ -62,7 +65,11 @@
       { value: 'CHART_OF_ACCOUNTS', label: t('ساختار حساب‌ها', 'Chart of Accounts') },
       { value: 'BALANCE_GROUP', label: t('گروه‌های بالانس', 'Balance Groups') },
       { value: 'BROKER', label: t('بروکرها', 'Brokers') },
-      { value: 'PAYMENT_SOURCE', label: t('منابع پرداخت', 'Payment Sources') }
+      { value: 'PAYMENT_SOURCE', label: t('منابع پرداخت', 'Payment Sources') },
+      { value: 'FUNDING_SOURCE', label: t('منابع تأمین اعتبار', 'Funding Sources') },
+      { value: 'BUDGET_PLAN', label: t('برنامه بودجه', 'Budget Plan') },
+      { value: 'BUDGET_AMENDMENT', label: t('متمم بودجه', 'Budget Amendment') },
+      { value: 'BUG_TRACKER', label: t('رهگیری مشکلات', 'Bug Tracker') }
     ];
 
     const viewConfig = {
@@ -91,9 +98,9 @@
       try {
         if (!supabase) return;
         const { data: res, error } = await supabase
-          .from('sys_auto_numbering')
+          .from(AUTO_NUMBERING_TABLE)
           .select('*')
-          .order('entity_type', { ascending: true });
+          .order('entity_code', { ascending: true });
 
         if (error) throw error;
         setData(res || []);
@@ -106,32 +113,35 @@
     };
 
     const handleSave = async () => {
-      if (!formData.entity_type) {
+      if (!formData.entity_code) {
          showToast(t('انتخاب موجودیت الزامی است', 'Entity selection is required'), 'error');
          return;
       }
 
       setIsLoading(true);
       try {
+        const selectedEntity = ENTITY_OPTIONS.find(x => x.value === formData.entity_code);
         const payload = {
-          entity_type: formData.entity_type,
+          entity_code: formData.entity_code,
+          title_fa: (formData.title_fa || selectedEntity?.label || '').trim() || null,
+          title_en: (formData.title_en || '').trim() || null,
           prefix: formData.prefix || null,
           suffix: formData.suffix || null,
-          current_value: parseInt(formData.current_value) || 0,
-          step: parseInt(formData.step) || 1,
-          pad_length: parseInt(formData.pad_length) || 4,
+          number_length: parseInt(formData.number_length) || 4,
+          start_number: parseInt(formData.start_number) || 1,
+          current_number: parseInt(formData.current_number) || 0,
           is_active: formData.is_active
         };
 
         if (currentRecord?.id) {
-          const { error } = await supabase.from('sys_auto_numbering').update(payload).eq('id', currentRecord.id);
+          const { error } = await supabase.from(AUTO_NUMBERING_TABLE).update(payload).eq('id', currentRecord.id);
           if (error) {
             if (error.code === '23505') showToast(t('تنظیمات این موجودیت قبلاً ثبت شده است', 'Configuration for this entity already exists'), 'error');
             else throw error;
             return;
           }
         } else {
-          const { error } = await supabase.from('sys_auto_numbering').insert([payload]);
+          const { error } = await supabase.from(AUTO_NUMBERING_TABLE).insert([payload]);
           if (error) {
             if (error.code === '23505') showToast(t('تنظیمات این موجودیت قبلاً ثبت شده است', 'Configuration for this entity already exists'), 'error');
             else throw error;
@@ -153,7 +163,7 @@
     const handleToggleActive = async (row, newValue) => {
       try {
         const { error } = await supabase
-          .from('sys_auto_numbering')
+          .from(AUTO_NUMBERING_TABLE)
           .update({ is_active: newValue })
           .eq('id', row.id);
         
@@ -169,10 +179,10 @@
       setIsLoading(true);
       try {
         if (deleteConfirm.type === 'single') {
-          const { error } = await supabase.from('sys_auto_numbering').delete().eq('id', deleteConfirm.data.id);
+          const { error } = await supabase.from(AUTO_NUMBERING_TABLE).delete().eq('id', deleteConfirm.data.id);
           if (error) throw error;
         } else if (deleteConfirm.type === 'bulk') {
-          const { error } = await supabase.from('sys_auto_numbering').delete().in('id', deleteConfirm.data);
+          const { error } = await supabase.from(AUTO_NUMBERING_TABLE).delete().in('id', deleteConfirm.data);
           if (error) throw error;
         }
         
@@ -189,8 +199,16 @@
     };
 
     const handleOpenModal = (record = null) => {
-      setFormData(record ? { ...record } : { 
-        entity_type: '', prefix: '', suffix: '', current_value: 0, step: 1, pad_length: 4, is_active: true 
+      setFormData(record ? { ...record } : {
+        entity_code: '',
+        title_fa: '',
+        title_en: '',
+        prefix: '',
+        suffix: '',
+        number_length: 4,
+        start_number: 1,
+        current_number: 0,
+        is_active: true
       });
       setCurrentRecord(record);
       setIsModalOpen(true);
@@ -203,17 +221,19 @@
 
     const columns = [
       { 
-        field: 'entity_type', 
+        field: 'entity_code', 
         header_fa: 'موجودیت هدف', 
         header_en: 'Target Entity', 
         width: '200px',
         render: (val) => <span className="font-bold text-slate-700 dark:text-slate-200">{getEntityLabel(val)}</span>
       },
+      { field: 'title_fa', header_fa: 'عنوان فارسی', header_en: 'Persian Title', width: '170px', render: (val) => val || '-' },
+      { field: 'title_en', header_fa: 'عنوان انگلیسی', header_en: 'English Title', width: '170px', render: (val) => <span dir="ltr">{val || '-'}</span> },
       { field: 'prefix', header_fa: 'پیشوند', header_en: 'Prefix', width: '100px', render: (val) => <span dir="ltr">{val || '-'}</span> },
       { field: 'suffix', header_fa: 'پسوند', header_en: 'Suffix', width: '100px', render: (val) => <span dir="ltr">{val || '-'}</span> },
-      { field: 'current_value', header_fa: 'مقدار فعلی (آخرین شماره)', header_en: 'Current Value', width: '180px', render: (val) => <span className="font-mono text-[13px] font-bold" dir="ltr">{val}</span> },
-      { field: 'pad_length', header_fa: 'طول ارقام (Padding)', header_en: 'Pad Length', width: '150px' },
-      { field: 'step', header_fa: 'گام افزایش', header_en: 'Step', width: '100px' },
+      { field: 'start_number', header_fa: 'شماره شروع', header_en: 'Start Number', width: '120px', render: (val) => <span className="font-mono text-[13px]" dir="ltr">{val ?? 0}</span> },
+      { field: 'current_number', header_fa: 'مقدار فعلی (آخرین شماره)', header_en: 'Current Number', width: '180px', render: (val) => <span className="font-mono text-[13px] font-bold" dir="ltr">{val ?? 0}</span> },
+      { field: 'number_length', header_fa: 'طول ارقام', header_en: 'Number Length', width: '120px' },
       { 
         field: 'is_active', 
         header_fa: 'وضعیت', 
@@ -227,10 +247,9 @@
     const generatePreview = () => {
         const p = formData.prefix || '';
         const s = formData.suffix || '';
-        const val = parseInt(formData.current_value) || 0;
-        const step = parseInt(formData.step) || 1;
-        const pad = parseInt(formData.pad_length) || 1;
-        const nextVal = String(val + step).padStart(pad, '0');
+      const val = parseInt(formData.current_number) || 0;
+      const pad = parseInt(formData.number_length) || 1;
+      const nextVal = String(val + 1).padStart(pad, '0');
         return `${p}${nextVal}${s}`;
     };
 
@@ -282,8 +301,16 @@
               <SelectField 
                 size="sm" 
                 label={t('موجودیت هدف', 'Target Entity')} 
-                value={formData.entity_type} 
-                onChange={e => setFormData({...formData, entity_type: e.target.value})} 
+                value={formData.entity_code} 
+                onChange={e => {
+                  const selected = ENTITY_OPTIONS.find(x => x.value === e.target.value);
+                  setFormData({
+                    ...formData,
+                    entity_code: e.target.value,
+                    title_fa: formData.title_fa || selected?.label || '',
+                    title_en: formData.title_en || ''
+                  });
+                }} 
                 options={[
                   { value: '', label: t('انتخاب کنید...', 'Select...') },
                   ...ENTITY_OPTIONS
@@ -292,6 +319,9 @@
                 required
                 disabled={!!currentRecord}
               />
+                <TextField size="sm" label={t('عنوان فارسی', 'Persian Title')} value={formData.title_fa} onChange={e => setFormData({...formData, title_fa: e.target.value})} isRtl={isRtl} />
+                <TextField size="sm" label={t('عنوان انگلیسی', 'English Title')} value={formData.title_en} onChange={e => setFormData({...formData, title_en: e.target.value})} isRtl={isRtl} dir="ltr" />
+
               <div className="md:col-start-1">
                  <TextField size="sm" label={t('پیشوند (Prefix)', 'Prefix')} value={formData.prefix} onChange={e => setFormData({...formData, prefix: e.target.value})} isRtl={isRtl} dir="ltr" />
               </div>
@@ -299,9 +329,9 @@
                  <TextField size="sm" label={t('پسوند (Suffix)', 'Suffix')} value={formData.suffix} onChange={e => setFormData({...formData, suffix: e.target.value})} isRtl={isRtl} dir="ltr" />
               </div>
 
-              <TextField size="sm" type="number" label={t('آخرین مقدار ثبت شده', 'Current Value')} value={formData.current_value} onChange={e => setFormData({...formData, current_value: e.target.value})} isRtl={isRtl} dir="ltr" required />
-              <TextField size="sm" type="number" label={t('گام افزایش', 'Step')} value={formData.step} onChange={e => setFormData({...formData, step: e.target.value})} isRtl={isRtl} dir="ltr" required />
-              <TextField size="sm" type="number" label={t('طول ارقام (Padding)', 'Pad Length')} value={formData.pad_length} onChange={e => setFormData({...formData, pad_length: e.target.value})} isRtl={isRtl} dir="ltr" required />
+                <TextField size="sm" type="number" label={t('شماره شروع', 'Start Number')} value={formData.start_number} onChange={e => setFormData({...formData, start_number: e.target.value})} isRtl={isRtl} dir="ltr" required />
+                <TextField size="sm" type="number" label={t('آخرین مقدار ثبت شده', 'Current Number')} value={formData.current_number} onChange={e => setFormData({...formData, current_number: e.target.value})} isRtl={isRtl} dir="ltr" required />
+                <TextField size="sm" type="number" label={t('طول ارقام', 'Number Length')} value={formData.number_length} onChange={e => setFormData({...formData, number_length: e.target.value})} isRtl={isRtl} dir="ltr" required />
               
               <div className="md:col-span-2 flex items-center justify-between mt-2 pt-4 border-t border-slate-100 dark:border-slate-700/50">
                  <ToggleField size="sm" label={t('وضعیت فعال', 'Active Status')} checked={formData.is_active} onChange={v => setFormData({...formData, is_active: v})} isRtl={isRtl} />
@@ -343,4 +373,47 @@
   };
 
   window.AutoNumbering = AutoNumbering;
+})();
+
+/* Shared numbering API used by existing forms; configuration stays in fm_auto_numbering. */
+(() => {
+  if (window.AutoNumberingService) return;
+  const readConfig = async entityCode => {
+    if (!window.supabase) throw new Error('Supabase client is unavailable');
+    const result = await window.supabase.from('fm_auto_numbering')
+      .select('id,entity_code,prefix,suffix,number_length,start_number,current_number,is_active')
+      .eq('entity_code', entityCode).maybeSingle();
+    if (result.error) throw result.error;
+    if (!result.data || !result.data.is_active) throw new Error(`Auto numbering is missing or inactive: ${entityCode}`);
+    return result.data;
+  };
+  const nextCode = config => {
+    const current = Number(config.current_number);
+    const start = Number(config.start_number);
+    const length = Number(config.number_length);
+    if (config.current_number == null || !Number.isSafeInteger(current) || current < 0 ||
+      !Number.isSafeInteger(start) || start < 1 || !Number.isInteger(length) || length < 1 || length > 64)
+      throw new Error(`Invalid auto numbering configuration: ${config.entity_code}`);
+    const number = Math.max(start, current + 1);
+    if (!Number.isSafeInteger(number)) throw new Error('Auto numbering range exhausted');
+    return { number, formattedCode: `${config.prefix || ''}${String(number).padStart(length, '0')}${config.suffix || ''}` };
+  };
+  const previewNext = async entityCode => nextCode(await readConfig(entityCode));
+  const consumeNext = async entityCode => {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const config = await readConfig(entityCode);
+      const next = nextCode(config);
+      let query = window.supabase.from('fm_auto_numbering')
+        .update({ current_number: next.number, updated_at: new Date().toISOString() })
+        .eq('id', config.id).eq('current_number', config.current_number).eq('is_active', true)
+        .eq('start_number', config.start_number).eq('number_length', config.number_length);
+      for (const field of ['prefix', 'suffix'])
+        query = config[field] == null ? query.is(field, null) : query.eq(field, config[field]);
+      const result = await query.select('id');
+      if (result.error) throw result.error;
+      if (result.data?.length === 1) return next;
+    }
+    throw new Error('Could not reserve an automatic number; check configuration and access, then retry');
+  };
+  window.AutoNumberingService = { previewNext, consumeNext };
 })();

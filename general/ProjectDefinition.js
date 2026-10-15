@@ -162,7 +162,10 @@
       } else {
         let nextCode = '';
         (async () => {
-          try { nextCode = await window.AutoNumberingService.previewNext('PROJECT'); } catch {}
+          try {
+            const preview = await window.AutoNumberingService.previewNext('PROJECT');
+            nextCode = typeof preview === 'string' ? preview : preview?.formattedCode || '';
+          } catch {}
           setFormData({ ...EMPTY_FORM, code: nextCode });
         })();
       }

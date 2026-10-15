@@ -37,10 +37,11 @@
     }
   };
 
-  const LOVField = ({ label, displayValue, onChange, data = [], columns = [], disabled = false, required = false, wrapperClassName = '', size = 'md', isRtl = true, placeholder = '', formCode, dropdownWidth = 'min-w-[300px] max-w-[500px]' }) => {
+  const LOVField = ({ label, displayValue, onChange, data = [], columns = [], multiple = false, selectedValues = [], disabled = false, required = false, wrapperClassName = '', size = 'md', isRtl = true, placeholder = '', formCode, dropdownWidth = 'min-w-[300px] max-w-[500px]' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
+    const dropdownRef = useRef(null);
     const inputRef = useRef(null);
     const [rect, setRect] = useState(null);
     const t = (fa, en) => isRtl ? fa : en;
@@ -50,7 +51,7 @@
     
     useEffect(() => {
       const handleClickOutside = (e) => {
-        if (containerRef.current && !containerRef.current.contains(e.target)) {
+        if (containerRef.current && !containerRef.current.contains(e.target) && !dropdownRef.current?.contains(e.target)) {
           setIsOpen(false);
         }
       };
@@ -84,20 +85,37 @@
       const lowerSearch = searchTerm.toLowerCase();
       return data.filter(row => {
          return columns.some(col => {
-           const val = row[col.field];
+           const val = col.searchAccessor ? col.searchAccessor(row[col.field], row) : row[col.field];
            return val && String(val).toLowerCase().includes(lowerSearch);
          });
       });
     }, [data, columns, searchTerm]);
 
     const heights = { xs: 'h-6 text-[10px]', sm: 'h-8 text-[12px]', md: 'h-10 text-[14px]', lg: 'h-12 text-[14px]' };
+    const selectedIds = new Set(selectedValues.map(value => String(value?.id ?? value)));
+    const toggleRow = (row) => {
+      if (multiple) {
+        onChange(selectedIds.has(String(row.id))
+          ? selectedValues.filter(value => String(value?.id ?? value) !== String(row.id))
+          : [...selectedValues, row]);
+      } else {
+        onChange(row);
+        setIsOpen(false);
+        setSearchTerm('');
+      }
+    };
 
     const dropdownContentBox = (
-      <div className="max-h-64 overflow-y-auto custom-scrollbar">
+      <div ref={dropdownRef} className="max-h-64 overflow-y-auto custom-scrollbar">
+        {multiple && <div className="flex justify-between p-2 border-b border-slate-200 dark:border-slate-700">
+          <button type="button" className="text-[12px] text-indigo-600" onClick={() => onChange([...selectedValues, ...filteredData.filter(row => !selectedIds.has(String(row.id)))])}>{t('انتخاب همه نتایج', 'Select all results')}</button>
+          <button type="button" className="text-[12px] text-rose-500" onClick={() => onChange([])}>{t('پاک کردن', 'Clear')}</button>
+        </div>}
         {filteredData.length > 0 ? (
           <table className="w-full text-start border-collapse" style={{ tableLayout: 'fixed' }}>
             <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm z-10">
               <tr>
+                {multiple && <th className="w-10" aria-label={t('انتخاب', 'Select')} />}
                 {columns.map((col, idx) => (
                   <th key={idx} className={`p-2.5 text-[12px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 overflow-hidden ${isRtl ? 'text-right' : 'text-left'}`} style={{ width: col.width || 'auto' }}>
                     {t(col.header_fa, col.header_en)}
@@ -109,9 +127,10 @@
               {filteredData.map((row, rIdx) => (
                 <tr 
                   key={rIdx} 
-                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onChange(row); setIsOpen(false); setSearchTerm(''); }}
+                  onClick={() => toggleRow(row)}
                   className="cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 border-b border-slate-100 dark:border-slate-700/50 last:border-0 transition-colors"
                 >
+                  {multiple && <td className="p-2"><input type="checkbox" checked={selectedIds.has(String(row.id))} aria-label={t('انتخاب ردیف', 'Select row')} onClick={e => e.stopPropagation()} onChange={() => toggleRow(row)} /></td>}
                   {columns.map((col, cIdx) => (
                     <td key={cIdx} className="p-2.5 text-[12px] text-slate-700 dark:text-slate-300 overflow-hidden" style={{ maxWidth: col.width || 'auto', overflow: 'hidden' }}>
                       {col.render ? col.render(row[col.field], row) : (row[col.field] || '-')}
@@ -159,7 +178,8 @@
           
           {displayValue && !isOpen && !isDisabled && (
             <button 
-              onClick={(e) => { e.stopPropagation(); onChange(null); }}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange(multiple ? [] : null); }}
               className={`absolute ${isRtl ? 'left-8' : 'right-8'} text-slate-400 hover:text-red-500 transition-colors p-1`}
               title={t('پاک کردن', 'Clear')}
             >
@@ -202,7 +222,7 @@
     );
   };
 
-  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, language = 'fa', defaultOpen = false, initialValues, children }) => {
+  const AdvancedFilter = ({ title, fields = [], onFilter, onClear, onSearch, language = 'fa', defaultOpen = false, initialValues, children, inlineChildren = false, footerStartContent = null, actionContent = null, searchDisabled = false, gridClassName = 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -243,12 +263,28 @@
         </div>
         {isOpen && (
           <div className="p-3 border-t border-slate-100 dark:border-slate-700/50 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+            <div className={gridClassName}>
               {fields.map((f, idx) => {
-                if (f.type === 'select') return <SelectField key={idx} size="sm" label={f.label} isRtl={isRtl} options={f.options} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} />;
+                if (f.type === 'custom' && typeof f.render === 'function') {
+                  return f.render({
+                    key: idx,
+                    value: values[f.name],
+                    values,
+                    setValue: (val) => handleChange(f.name, val),
+                    handleChange,
+                    isRtl,
+                    language,
+                    t,
+                  });
+                }
+                if (f.type === 'select') return <SelectField key={idx} size="sm" label={f.label} required={f.required} isRtl={isRtl} options={f.options} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} />;
                 if (f.type === 'toggle') return <ToggleField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
                 if (f.type === 'checkbox') return <CheckboxField key={idx} size="sm" label={f.label} isRtl={isRtl} checked={values[f.name]} onChange={(v) => handleChange(f.name, v)} wrapperClassName="mt-5" />;
                 if (f.type === 'lov') {
+                  if (f.multiple) {
+                    const selected = Array.isArray(values[f.name]) ? values[f.name] : values[f.name] ? [values[f.name]] : [];
+                    return <LOVField key={idx} size="sm" label={f.label} isRtl={isRtl} data={f.lovData} columns={f.lovColumns} multiple selectedValues={selected} displayValue={selected.length ? `${selected.length} ${t('انتخاب شده', 'selected')}` : ''} placeholder={t('همه', 'All')} onChange={rows => handleChange(f.name, rows)} dropdownWidth={f.dropdownWidth} />;
+                  }
                   let displayStr = values[f.name];
                   if (values[f.name] && typeof values[f.name] === 'object') {
                       const v = values[f.name];
@@ -256,17 +292,26 @@
                   }
                   return <LOVField key={idx} size="sm" label={f.label} isRtl={isRtl} data={f.lovData} columns={f.lovColumns} displayValue={displayStr} onChange={(row) => handleChange(f.name, row)} dropdownWidth={f.dropdownWidth} />;
                 }
-                if (f.type === 'date') return <DatePicker key={idx} size="sm" label={f.label} isRtl={isRtl} language={language} value={values[f.name] || ''} onChange={(val) => handleChange(f.name, val)} />;
+                if (f.type === 'date') return <DatePicker key={idx} size="sm" label={f.label} required={f.required} isRtl={isRtl} language={language} value={values[f.name] || ''} onChange={(val) => handleChange(f.name, val)} />;
                 return <TextField key={idx} size="sm" label={f.label} isRtl={isRtl} type={f.type} placeholder={f.type === 'date' ? 'YYYY/MM/DD' : ''} value={values[f.name] || ''} onChange={(e) => handleChange(f.name, e.target.value)} dir={f.type === 'date' || !isRtl ? 'ltr' : 'rtl'} />;
               })}
+              {inlineChildren && children}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-              <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                {children}
-              </div>
+            <div className={`flex flex-wrap items-center gap-4 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 ${(!inlineChildren || footerStartContent) ? 'justify-between' : 'justify-end'}`}>
+              {(!inlineChildren || footerStartContent) && (
+                <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                  {!inlineChildren && children}
+                  {footerStartContent}
+                </div>
+              )}
               <div className="flex items-center gap-2 shrink-0 mr-auto">
                 <Button variant="ghost" size="sm" icon={Trash2} onClick={handleClear}>{t('پاک کردن', 'Clear')}</Button>
-                <Button variant="primary" size="sm" icon={Search} onClick={() => onFilter && onFilter(values)}>{t('جستجو', 'Search')}</Button>
+                <Button variant="primary" size="sm" icon={Search} disabled={searchDisabled} onClick={() => {
+                  const latestValues = lastSyncValues.current || values;
+                  if (onSearch) onSearch(latestValues);
+                  else if (onFilter) onFilter(latestValues);
+                }}>{t('جستجو', 'Search')}</Button>
+                {actionContent}
               </div>
             </div>
           </div>
@@ -275,7 +320,7 @@
     );
   };
 
-  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [] }) => {
+  const DataGrid = ({ data = [], columns = [], actions = [], language = 'fa', onAdd, onRowClick, onRowDoubleClick, selectable = false, activeRowId = null, bulkActions = [], headerMenus = [], rowReorderable = false, onRowReorder, onDownloadSample, showSummaryRow = false, gridState, onGridStateChange, hideImport = false, hideExport = false, hideToolbar = false, onImport, onExport, formCode, actionWidth = '120px', groupable = false, defaultHiddenCols = [], defaultPinnedCols = [], pageSizeOptions = [10, 20, 50, 100], toolbarContent = null, compactBulkToolbar = false, onSelectionChange = null, selectedRowIds, summaryRow = null, minVisibleRows = 0, reserveMiddleSpace = true, rowClassName = null }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const globalMode = useCalendarMode();
@@ -339,7 +384,7 @@
     const [gridData, setGridData] = useState(data);
     const [columnOrder, setColumnOrder] = useState(columns.map(c => c.field));
     const [hiddenCols, setHiddenCols] = useState(defaultHiddenCols);
-    const [pinnedCols, setPinnedCols] = useState([]);
+    const [pinnedCols, setPinnedCols] = useState(defaultPinnedCols);
     const [filters, setFilters] = useState({});
     const [localFilters, setLocalFilters] = useState({});
     const [sortConfig, setSortConfig] = useState({ field: null, direction: 'asc' });
@@ -347,15 +392,21 @@
     const [collapsedGroups, setCollapsedGroups] = useState([]);
     
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(20);
+    const [pageSize, setPageSize] = useState(() => gridState?.pageSize || 20);
     const [showColMenu, setShowColMenu] = useState(false);
     const [activeHeaderMenu, setActiveHeaderMenu] = useState(null);
-    const [selectedRows, setSelectedRows] = useState([]);
+    const [localSelectedRows, setLocalSelectedRows] = useState([]);
+    const selectedRows = selectedRowIds === undefined ? localSelectedRows : selectedRowIds;
+    const setSelectedRows = (ids) => {
+      if (selectedRowIds === undefined) setLocalSelectedRows(ids);
+      else if (onSelectionChange) onSelectionChange(ids);
+    };
     const [draggableRowIndex, setDraggableRowIndex] = useState(null);
     
     const colMenuRef = useRef(null);
     const headerMenuRef = useRef(null);
     const colMenuPortalRef = useRef(null);
+    const importInputRef = useRef(null);
     const [colMenuPosition, setColMenuPosition] = useState(null);
     const ReactDOM = window.ReactDOM;
     const dragColItem = useRef(); const dragOverColItem = useRef();
@@ -372,7 +423,8 @@
           
           setColumnOrder(gridState.columnOrder || columns.map(c => c.field));
           setHiddenCols(gridState.hiddenCols || defaultHiddenCols);
-          setPinnedCols(gridState.pinnedCols || []);
+          setPinnedCols(gridState.pinnedCols || defaultPinnedCols);
+          setPageSize(gridState.pageSize || 20);
           setFilters(gridState.filters || {});
           setLocalFilters(gridState.filters || {});
           setSortConfig(gridState.sortConfig || { field: null, direction: 'asc' });
@@ -382,17 +434,18 @@
         lastSyncState.current = null;
         setColumnOrder(columns.map(c => c.field));
         setHiddenCols(defaultHiddenCols);
-        setPinnedCols([]);
+        setPinnedCols(defaultPinnedCols);
+        setPageSize(20);
         setFilters({});
         setLocalFilters({});
         setSortConfig({ field: null, direction: 'asc' });
         setGroupCols([]);
       }
-    }, [gridState, columns]);
+    }, [gridState, columns, defaultPinnedCols]);
 
     useEffect(() => {
       if (onGridStateChange) {
-        const currentState = { columnOrder, hiddenCols, pinnedCols, filters, sortConfig, groupCols };
+        const currentState = { columnOrder, hiddenCols, pinnedCols, filters, sortConfig, groupCols, pageSize };
         const stateStr = JSON.stringify(currentState);
         
         if (stateStr !== JSON.stringify(lastSyncState.current || {})) {
@@ -400,7 +453,7 @@
           onGridStateChange(currentState);
         }
       }
-    }, [columnOrder, hiddenCols, pinnedCols, filters, sortConfig, groupCols, onGridStateChange]);
+    }, [columnOrder, hiddenCols, pinnedCols, filters, sortConfig, groupCols, pageSize, onGridStateChange]);
 
     useEffect(() => {
       const handleClickOutside = (e) => { 
@@ -413,7 +466,15 @@
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    useEffect(() => { setGridData(data); setSelectedRows([]); }, [data]);
+    useEffect(() => {
+      setGridData(data);
+      setLocalSelectedRows([]);
+      if (selectedRowIds !== undefined) setPage(1);
+    }, [data]);
+
+    useEffect(() => {
+      if (selectedRowIds === undefined && onSelectionChange) onSelectionChange(localSelectedRows);
+    }, [localSelectedRows, selectedRowIds, onSelectionChange]);
 
     const visibleColumns = useMemo(() => {
       const visibleFields = columnOrder.filter(f => !hiddenCols.includes(f));
@@ -478,6 +539,9 @@
       const start = (page - 1) * pageSize;
       return processedData.slice(start, start + pageSize);
     }, [processedData, page, pageSize]);
+
+    const visibleRowCount = useMemo(() => paginatedData.filter(row => !row.isGroupHeader).length, [paginatedData]);
+    const spacerRows = Math.max(0, (Number(minVisibleRows) || 0) - visibleRowCount);
 
     const summaryData = useMemo(() => {
       if (!showSummaryRow) return null;
@@ -649,9 +713,17 @@
             )}
           </div>
 
+          {toolbarContent ? (
+            <div className={`${compactBulkToolbar && selectedRows.length > 0 && filteredBulkActions.length > 0 ? 'flex-none max-w-full' : 'flex-1'} flex items-center gap-2 min-w-0 overflow-hidden`}>
+              {toolbarContent}
+            </div>
+          ) : (
+            <div className="hidden" />
+          )}
+
           {selectedRows.length > 0 && filteredBulkActions.length > 0 ? (
-            <div className="flex-1 flex items-center gap-3 px-4 py-1 border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/30 rounded-md transition-all animate-in fade-in">
-              <span className="text-[12px] font-black text-indigo-800 dark:text-indigo-300">{selectedRows.length} {t('مورد انتخاب شده', 'Items selected')}</span>
+            <div className="flex-1 min-w-0 flex items-center gap-3 px-4 py-1 border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/30 rounded-md transition-all animate-in fade-in overflow-hidden">
+              <span className="text-[12px] font-black text-indigo-800 dark:text-indigo-300 whitespace-nowrap shrink-0">{selectedRows.length} {t('مورد انتخاب شده', 'Items selected')}</span>
               <div className="w-px h-4 bg-indigo-200 dark:bg-indigo-800/50 mx-1"></div>
               {filteredBulkActions.map((act, i) => (
                 <Button key={i} size="sm" variant={act.variant || 'outline'} icon={act.icon} onClick={() => {act.onClick(selectedRows); setSelectedRows([]);}} className={`!h-7 text-[10px] ${act.className || ''}`}>
@@ -660,7 +732,7 @@
               ))}
             </div>
           ) : groupable ? (
-            <div className={`flex-1 flex items-center gap-2 px-3 py-1 border border-dashed rounded-md transition-colors overflow-x-auto custom-scrollbar ${groupCols.length > 0 ? 'bg-indigo-50/30 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'}`} onDragOver={(e) => e.preventDefault()} onDrop={handleGroupDrop}>
+            <div className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-1 border border-dashed rounded-md transition-colors overflow-x-auto custom-scrollbar ${groupCols.length > 0 ? 'bg-indigo-50/30 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'}`} onDragOver={(e) => e.preventDefault()} onDrop={handleGroupDrop}>
               <Layers size={14} className={groupCols.length > 0 ? 'text-indigo-500 dark:text-indigo-400 shrink-0' : 'text-slate-400 dark:text-slate-500 shrink-0'} />
               {groupCols.length === 0 ? (
                 <span className="text-[12px] text-slate-400 dark:text-slate-500 font-medium whitespace-nowrap">{t('هدر ستون را برای گروه‌بندی اینجا رها کنید', 'Drop column header here to group')}</span>
@@ -688,9 +760,9 @@
                 </div>
               )}
             </div>
-          ) : (
+          ) : reserveMiddleSpace ? (
             <div className="flex-1" />
-          )}
+          ) : null}
 
           <div className="flex items-center gap-1 shrink-0">
             {filteredHeaderMenus && filteredHeaderMenus.length > 0 && (
@@ -754,7 +826,7 @@
                 >
                   <div className="text-[12px] font-black text-slate-800 dark:text-slate-100 mb-2 pb-2 border-b border-slate-100 dark:border-slate-700 px-1">{t('نمایش / مخفی‌سازی', 'Show / Hide')}</div>
                   <div className="max-h-[250px] overflow-y-auto custom-scrollbar space-y-0.5">
-                    {columns.map(c => (
+                    {columns.filter(c => !c.exportOnly).map(c => (
                       <label key={c.field} className="flex items-center gap-2.5 cursor-pointer p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-md text-[12px] font-bold text-slate-600 dark:text-slate-300 transition-colors">
                         <input type="checkbox" checked={!hiddenCols.includes(c.field)} onChange={() => toggleVisibility(c.field)} className="rounded border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700/40 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 w-3.5 h-3.5" />
                         {t(c.header_fa, c.header_en)}
@@ -767,16 +839,16 @@
             })()}
             <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
             {onDownloadSample && access.canCreate && (
-              <button onClick={onDownloadSample} title={t('دانلود نمونه فایل اکسل', 'Download Excel Sample')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileDown size={16} /></button>
+              <button type="button" onClick={onDownloadSample} title={t('دانلود نمونه فایل اکسل', 'Download Excel Sample')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileDown size={16} /></button>
             )}
             {!hideImport && access.canCreate && (
               <>
-                <button onClick={() => document.getElementById('grid-import-input').click()} title={t('ورود اطلاعات', 'Import')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><Upload size={16} /></button>
-                <input id="grid-import-input" type="file" className="hidden" accept=".csv" onChange={(e) => { if (onImport && e.target.files.length > 0) { onImport(e.target.files[0]); e.target.value = ''; } }} />
+                <button type="button" onClick={() => importInputRef.current?.click()} title={t('ورود اطلاعات', 'Import')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><Upload size={16} /></button>
+                <input ref={importInputRef} type="file" className="hidden" accept=".csv,.xlsx,.xls" onChange={(e) => { if (onImport && e.target.files.length > 0) { onImport(e.target.files[0]); e.target.value = ''; } }} />
               </>
             )}
             {!hideExport && access.canPrint && (
-              <button onClick={onExport || exportCSV} title={t('خروجی اکسل', 'Export')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileSpreadsheet size={16} /></button>
+              <button type="button" onClick={onExport || exportCSV} title={t('خروجی اکسل', 'Export')} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-md transition-all h-full flex items-center justify-center"><FileSpreadsheet size={16} /></button>
             )}
           </div>
         </div>}
@@ -901,6 +973,10 @@
                 const isActive = activeRowId !== null && activeRowId === row.id;
                 const isHighlighted = isSelected || isActive;
                 const isDragging = rowReorderable && draggableRowIndex === rowIndex;
+                const customRowClassName = typeof rowClassName === 'function' ? rowClassName(row, rowIndex) : (rowClassName || '');
+                const rowBackgroundClass = customRowClassName || (isHighlighted
+                  ? 'bg-indigo-50 dark:bg-indigo-900'
+                  : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700');
 
                 return (
                   <tr 
@@ -909,10 +985,10 @@
                     onClick={() => onRowClick && onRowClick(row)}
                     draggable={isDragging}
                     onDragStart={(e) => handleRowDragStart(e, rowIndex)} onDragEnter={(e) => handleRowDragEnter(e, rowIndex)} onDragEnd={handleRowDragEnd} onDragOver={(e) => e.preventDefault()}
-                    className={`bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700/50 transition-colors group ${isHighlighted ? 'bg-indigo-50/80 dark:bg-indigo-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'} ${isDragging ? 'opacity-50' : ''}`}
+                    className={`border-b border-slate-100 dark:border-slate-700/50 transition-colors group ${rowBackgroundClass} ${isDragging ? 'opacity-50' : ''}`}
                   >
                     {rowReorderable && (
-                      <td style={{...getStickyStyles('ROW_REORDER_COL', false), backgroundColor: 'inherit'}} className={`p-0 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
+                      <td style={{...getStickyStyles('ROW_REORDER_COL', false), backgroundColor: 'inherit'}} className={`p-0 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
                         <div 
                           onMouseDown={() => setDraggableRowIndex(rowIndex)}
                           onMouseUp={() => setDraggableRowIndex(null)}
@@ -923,18 +999,19 @@
                       </td>
                     )}
                     {selectable && (
-                      <td style={{...getStickyStyles('SELECT_COL', false), backgroundColor: 'inherit'}} className={`p-1.5 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
-                        <input type="checkbox" checked={isSelected} onChange={() => handleSelectRow(row.id)} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700/40 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer" />
+                      <td style={{...getStickyStyles('SELECT_COL', false), backgroundColor: 'inherit'}} className={`p-1.5 text-center bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
+                        <input type="checkbox" checked={isSelected} onClick={(event) => event.stopPropagation()}
+                          onChange={() => handleSelectRow(row.id)} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700/40 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer" />
                       </td>
                     )}
                     {visibleColumns.map((col) => (
-                      <td key={`${row.id || rowIndex}-${col.field}`} style={{...getStickyStyles(col.field), backgroundColor: 'inherit'}} className={`p-1.5 text-[12px] text-slate-700 dark:text-slate-300 bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
+                      <td key={`${row.id || rowIndex}-${col.field}`} style={{...getStickyStyles(col.field), backgroundColor: 'inherit'}} className={`p-1.5 text-[12px] text-slate-700 dark:text-slate-300 bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700' : ''} ${isRtl ? 'border-l border-slate-100 dark:border-slate-700/50' : 'border-r border-slate-100 dark:border-slate-700/50'}`}>
                         {renderCellContent(col, row, rowIndex)}
                       </td>
                     ))}
                     
                     {filteredActions.length > 0 && (
-                      <td style={{...getStickyStyles('ACTIONS', true), backgroundColor: 'inherit', width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className={`p-1 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.01)] dark:shadow-none bg-inherit ${!isHighlighted ? 'group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50' : ''} border-slate-100 dark:border-slate-700/50`}>
+                      <td style={{...getStickyStyles('ACTIONS', true), width: actionWidth, minWidth: actionWidth, maxWidth: actionWidth}} className={`p-1 text-center shadow-[-4px_0_10px_rgba(0,0,0,0.03)] dark:shadow-none border-slate-100 dark:border-slate-700/50 ${isHighlighted ? 'bg-indigo-50 dark:bg-indigo-900' : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700'}`}>
                         <div className="flex items-center justify-center gap-0.5">
                           {filteredActions.map((act, i) => {
                             if (act.hidden && act.hidden(row)) return null;
@@ -962,16 +1039,27 @@
                   <td colSpan={visibleColumns.length + (filteredActions.length > 0 ? 1 : 0) + (selectable ? 1 : 0) + (rowReorderable ? 1 : 0)} className="border-0 bg-transparent p-0"></td>
                 </tr>
               )}
+              {spacerRows > 0 && (
+                <>
+                  {Array.from({ length: spacerRows }).map((_, idx) => (
+                    <tr key={`spacer-${idx}`} aria-hidden="true" className="pointer-events-none select-none">
+                      <td colSpan={visibleColumns.length + (filteredActions.length > 0 ? 1 : 0) + (selectable ? 1 : 0) + (rowReorderable ? 1 : 0)} className="border-0 bg-transparent p-0" style={{ height: '34px' }}></td>
+                    </tr>
+                  ))}
+                </>
+              )}
             </tbody>
             
-            {showSummaryRow && summaryData && (
+            {((showSummaryRow && summaryData) || summaryRow) && (
               <tfoot className="sticky bottom-0 z-20 bg-slate-100 dark:bg-slate-900 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] border-t-2 border-slate-200 dark:border-slate-700">
                 <tr>
                   {rowReorderable && <td style={getStickyStyles('ROW_REORDER_COL', false, false, true)} className={`p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 ${isRtl ? 'border-l' : 'border-r'}`}></td>}
                   {selectable && <td style={getStickyStyles('SELECT_COL', false, false, true)} className={`p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 ${isRtl ? 'border-l' : 'border-r'}`}></td>}
                   {visibleColumns.map((col, idx) => {
                     const isFirstVisible = idx === 0;
-                    const cellValue = col.summarizable && summaryData[col.field] !== undefined 
+                    const cellValue = summaryRow
+                      ? (col.render ? col.render(summaryRow[col.field], summaryRow) : (summaryRow[col.field] ?? ''))
+                      : col.summarizable && summaryData[col.field] !== undefined
                       ? (col.formatSummary ? col.formatSummary(summaryData[col.field]) : summaryData[col.field].toLocaleString()) 
                       : (isFirstVisible && !col.summarizable ? t('جمع کل:', 'Total:') : '');
                     return (
@@ -991,7 +1079,7 @@
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400">{t('تعداد در صفحه:', 'Rows per page:')}</span>
             <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="text-[12px] font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-slate-700 dark:text-slate-200 cursor-pointer">
-              {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+              {pageSizeOptions.map(size => <option key={size} value={size}>{size}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2">
