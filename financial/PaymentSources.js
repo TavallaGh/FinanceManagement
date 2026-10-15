@@ -98,6 +98,14 @@
         .map(String);
     }, [data]);
 
+    const viewConfig = {
+      pageId: 'payment_sources_main',
+      currentState: () => ({ gridState }),
+      onApplyState: (state) => {
+        if (state) { if (state.gridState) setGridState(state.gridState); }
+        else setGridState(null);
+      }
+    };
 
     // ── Derived: responsible parties (real persons) for cash box ───────────
     const responsiblePartiesDropdown = useMemo(() =>
