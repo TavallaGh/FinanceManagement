@@ -14,10 +14,12 @@
   } = window.LucideIcons || {};
   const supabase = window.supabase;
 
-  const UserManagement = ({ language = 'fa' }) => {
+  const UserManagement = ({ language = 'fa', formCode = 'UserManagement' }) => {
     const isRtl = language === 'fa';
     const t = (fa, en) => isRtl ? fa : en;
     const calendarMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : 'jalali';
+    const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
+    const canResetPassword = securityCtx?.getActions(formCode)?.canEdit === true;
     
     const [data, setData] = useState([]);
     const [allParties, setAllParties] = useState([]);
@@ -315,13 +317,53 @@
       }
     };
 
-    const executeResetPassword = () => {
-      const username = resetConfirm.data?.username || '';
-      setResetConfirm({ isOpen: false, data: null });
-      showToast(
-        t(`ایمیل بازیابی رمز عبور برای کاربر "${username}" ارسال شد.`, `A password recovery email was sent to user "${username}".`),
-        'success'
-      );
+    const executeResetPassword = async () => {
+      const user = resetConfirm.data;
+      if (isLoading || !user?.id) return;
+      if (!canResetPassword) {
+        showToast(t('دسترسی بازنشانی رمز عبور ندارید.', 'You do not have permission to reset passwords.'), 'error');
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const { data: updatedUser, error } = await supabase
+          .from('sec_users')
+          .update({
+            password_hash: await hashPassword('123456'),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id)
+          .select('id')
+          .single();
+
+        if (error || updatedUser?.id !== user.id) {
+          showToast(t('بازنشانی رمز عبور ذخیره نشد. دوباره تلاش کنید.', 'Password reset was not saved. Please try again.'), 'error');
+          return;
+        }
+
+        setResetConfirm({ isOpen: false, data: null });
+        try {
+          const session = JSON.parse(sessionStorage.getItem('fm_user_session') || '{}');
+          const { error: logError } = await supabase.from('fm_record_logs').insert([{
+            entity_type: 'sec_users',
+            record_id: String(user.id),
+            action: 'update',
+            user_name: session.username || '',
+            details: 'Password reset by user management'
+          }]);
+          if (logError) throw logError;
+        } catch {
+          showToast(t('رمز عبور به 123456 تغییر کرد، اما ثبت سابقه عملیات ناموفق بود.', 'Password was reset to 123456, but the audit log could not be saved.'), 'warning');
+          return;
+        }
+
+        showToast(t(`رمز عبور کاربر "${user.username}" به 123456 تغییر کرد.`, `Password for user "${user.username}" was reset to 123456.`), 'success');
+      } catch {
+        showToast(t('خطا در بازنشانی رمز عبور. دوباره تلاش کنید.', 'Error resetting password. Please try again.'), 'error');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     const handleOpenModal = (record = null) => {
@@ -589,7 +631,7 @@
               actions={[
                 { icon: Edit, tooltip: t('ویرایش', 'Edit'), onClick: (row) => handleOpenModal(row), className: 'text-slate-400 hover:text-indigo-600' },
                 { icon: Shield, tooltip: t('دسترسی‌ها', 'Permissions'), onClick: (row) => setAccessModal({ isOpen: true, user: row }), className: (row) => hasAccess(row.id) ? '!text-indigo-600 dark:!text-indigo-400 hover:!text-indigo-800' : 'text-slate-400 hover:text-indigo-600' },
-                { icon: RefreshCw, tooltip: t('بازنشانی رمز عبور', 'Reset Password'), onClick: (row) => setResetConfirm({ isOpen: true, data: row }), className: 'text-slate-400 hover:text-amber-600' },
+                ...(canResetPassword ? [{ icon: RefreshCw, tooltip: t('بازنشانی رمز عبور', 'Reset Password'), onClick: (row) => setResetConfirm({ isOpen: true, data: row }), className: 'text-slate-400 hover:text-amber-600' }] : []),
                 { icon: Trash2, tooltip: t('حذف', 'Delete'), onClick: (row) => setDeleteConfirm({ isOpen: true, type: 'single', data: row }), className: 'text-slate-400 hover:text-red-600' }
               ]}
               bulkActions={[
