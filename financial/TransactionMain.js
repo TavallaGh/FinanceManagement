@@ -593,8 +593,6 @@
     const columns = useMemo(() => [
         { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-300" }, val || '-') },
         { field: 'document_code', header_fa: 'کد تراکنش', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: "text-indigo-600 dark:text-indigo-400 font-bold" }, val) },
-        { field: 'request_reference_code', header_fa: 'مرجع تراکنش', header_en: 'Transaction Reference', width: '150px',
-            render: (value, row) => React.createElement('span', { dir: value ? 'ltr' : undefined }, value || (row.request_id ? t('خارج از دسترس', 'Unavailable') : '-')) },
         { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
         { field: 'document_date', header_fa: 'تاریخ تراکنش', header_en: 'Date', width: '90px', type: 'date' },
         { field: 'created_at', header_fa: 'زمان ثبت', header_en: 'Registered At', width: '100px', render: (val) => {
@@ -672,6 +670,8 @@
                 widIrr > 0 ? React.createElement('span', { className: 'text-[12px] font-medium text-rose-500 dark:text-rose-400' }, formatNumber(widIrr)) : null
             );
         }},
+        { field: 'request_reference_code', header_fa: 'مرجع تراکنش', header_en: 'Transaction Reference', width: '150px',
+            render: (value, row) => React.createElement('span', { dir: value ? 'ltr' : undefined }, value || (row.request_id ? t('خارج از دسترس', 'Unavailable') : '-')) },        
         { field: 'approval_date', header_fa: 'تاریخ موثر گزارشدهی', header_en: 'Effective Reporting Date', width: '150px', type: 'date' }
     ], [usersMap, deptsMap, t, dateLocale]);
 
