@@ -595,6 +595,7 @@
         { field: 'document_code', header_fa: 'کد تراکنش', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: "text-indigo-600 dark:text-indigo-400 font-bold" }, val) },
         { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
         { field: 'document_date', header_fa: 'تاریخ تراکنش', header_en: 'Date', width: '90px', type: 'date' },
+        { field: 'approval_date', header_fa: 'تاریخ موثر گزارشدهی', header_en: 'Effective Reporting Date', width: '150px', type: 'date' },
         { field: 'created_at', header_fa: 'زمان ثبت', header_en: 'Registered At', width: '100px', render: (val) => {
             if (!val) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
             try {
@@ -671,8 +672,7 @@
             );
         }},
         { field: 'request_reference_code', header_fa: 'مرجع تراکنش', header_en: 'Transaction Reference', width: '150px',
-            render: (value, row) => React.createElement('span', { dir: value ? 'ltr' : undefined }, value || (row.request_id ? t('خارج از دسترس', 'Unavailable') : '-')) },        
-        { field: 'approval_date', header_fa: 'تاریخ موثر گزارشدهی', header_en: 'Effective Reporting Date', width: '150px', type: 'date' }
+            render: (value, row) => React.createElement('span', { dir: value ? 'ltr' : undefined }, value || (row.request_id ? t('خارج از دسترس', 'Unavailable') : '-')) }
     ], [usersMap, deptsMap, t, dateLocale]);
 
     const accountLovColumns = [
@@ -766,19 +766,22 @@
 
     const viewConfig = useMemo(() => ({
       pageId: 'transactions_main_list',
-      currentState: () => ({ filters, gridState, reportingDateColumnVersion: 1 }),
+      currentState: () => ({ filters, gridState, reportingDateColumnVersion: 2 }),
       onApplyState: (state) => {
         if (state) {
           if (state.filters) setFilters(state.filters);
           if (state.gridState) {
             const restored = state.gridState;
-            if (state.reportingDateColumnVersion === 1) {
+            if (state.reportingDateColumnVersion === 2) {
               setGridState(restored);
             } else {
+              const order = (restored.columnOrder || columns.map(column => column.field))
+                .filter(field => field !== 'approval_date');
+              const dateIndex = order.indexOf('document_date');
+              order.splice(dateIndex >= 0 ? dateIndex + 1 : order.length, 0, 'approval_date');
               setGridState({
                 ...restored,
-                columnOrder: [...(restored.columnOrder || columns.map(column => column.field))
-                  .filter(field => field !== 'approval_date'), 'approval_date'],
+                columnOrder: order,
                 pinnedCols: (restored.pinnedCols || []).filter(field => field !== 'approval_date')
               });
             }

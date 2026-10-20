@@ -866,6 +866,8 @@
                             <div className="relative z-[90]">
                                 <DatePicker size="sm" formCode={formCode} label={t('تاریخ تراکنش', 'Transaction Date')} value={headerData.document_date || ''} onChange={val => { setHeaderData({...headerData, document_date: val}); setIsDirty(true); }} isRtl={isRtl} disabled={isReadOnly} required />
                             </div>
+                            <DatePicker size="sm" formCode={formCode} label={t('تاریخ موثر گزارشدهی', 'Effective Reporting Date')}
+                              value={(headerData.approval_date || '').replace(/-/g, '/')} disabled isRtl={isRtl} language={language} />
                             <TextField size="sm" formCode={formCode} label={t('تاریخ و ساعت ثبت', 'Registered At')} value={headerData.created_at ? new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.created_at)) : t('پس از ذخیره', 'After save')} disabled isRtl={isRtl} />
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
@@ -885,8 +887,6 @@
                                     <TextField size="sm" formCode={formCode} label={t('تاریخ بررسی', 'Reviewed At')} value={headerData.reviewed_at ? new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.reviewed_at)) : '-'} disabled isRtl={isRtl} />
                                 </>
                             )}
-                            {headerData.approval_date && <DatePicker size="sm" label={t('تاریخ موثر گزارشدهی', 'Effective Reporting Date')}
-                              value={headerData.approval_date.replace(/-/g, '/')} disabled isRtl={isRtl} language={language} />}
                             {(headerData.approved_by || headerData.approved_by_name) && (
                                 <>
                                     <TextField size="sm" formCode={formCode} label={t('تایید کننده', 'Approved By')} value={headerData.approved_by_name || lookups.usersMap[headerData.approved_by] || '-'} disabled isRtl={isRtl} />

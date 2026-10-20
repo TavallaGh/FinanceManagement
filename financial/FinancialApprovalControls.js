@@ -120,8 +120,8 @@
           value={date.replace(/-/g, '/')} onChange={setDate} minDate={L.earliestClosingDate()} maxDate={L.today()}
           disabled={!settings || !canEdit || busy} isRtl={isRtl} language={language} formCode={formCode} />
         <Tooltip position="bottom" align={isRtl ? 'left' : 'right'} multiline
-          text={t('این روز و روزهای قبل بسته‌اند. انتخاب تا سه روز کاری قبل از امروز مجاز است؛ پنجشنبه و جمعه روز کاری نیستند. تاریخ‌های قدیمی‌تر برای حفظ گزارش‌های نهایی قابل انتخاب نیستند.',
-            'This day and earlier days are closed. You may select up to three working days before today, excluding Thursday and Friday. Earlier dates are unavailable to protect finalized reports.')}>
+          text={t('این روز و روزهای قبل بسته‌اند. انتخاب از هفت روز تقویمی قبل تا امروز مجاز است. تاریخ‌های قدیمی‌تر برای حفظ گزارش‌های نهایی قابل انتخاب نیستند.',
+            'This day and earlier days are closed. You may select from seven calendar days ago through today. Earlier dates are unavailable to protect finalized reports.')}>
           <Button variant="ghost" size="sm" icon={HelpCircle} className="!px-1.5 !h-8"
             aria-label={t('راهنمای تاریخ بسته‌شده', 'Closing date help')} />
         </Tooltip>
