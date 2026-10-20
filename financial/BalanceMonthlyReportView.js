@@ -649,7 +649,9 @@
     const tabGridStates = useMemo(() => reportTabs.map((tab, index) => {
       const state = gridState?.tabs?.[tab.id];
       if (!state) return null;
-      const { layoutVersion, ...savedState } = state;
+      // Object rest would hoist Babel's _excluded constant into the shared script scope.
+      const savedState = Object.assign({}, state);
+      delete savedState.layoutVersion;
       const fields = tabColumns[index].map(column => column.field);
       const savedOrder = (state.columnOrder || fields).filter(field => fields.includes(field));
       const order = state.layoutVersion === 2 ? savedOrder : [
@@ -893,8 +895,8 @@
       React.createElement(Alert, {
         type: 'info',
         message: t(
-          'مانده پایان هر دوره = مانده ابتدای دوره + واریز دوره − برداشت دوره. معادل‌های USD و IRR در همه سطوح فقط با تبدیل کل مانده پایان دوره و آخرین نرخ معتبر تا روز پایانی همان دوره محاسبه می‌شوند؛ نرخ روز ثبت تک‌تراکنش‌ها در تبدیل بالانس ماهیانه استفاده نمی‌شود.',
-          'Period ending balance = opening balance + period deposits − period withdrawals. At every level, USD and IRR equivalents are calculated only by revaluing the entire ending balance at the latest valid rates through the period end date; transaction-day rates are not used for monthly balance conversion.'
+          'فقط تراکنش‌های تأییدشده، بر اساس تاریخ مؤثر تأیید، محاسبه می‌شوند. مانده پایان هر دوره = مانده ابتدای دوره + واریز دوره − برداشت دوره. معادل‌های USD و IRR در همه سطوح فقط با تبدیل کل مانده پایان دوره و آخرین نرخ معتبر تا روز پایانی همان دوره محاسبه می‌شوند؛ نرخ روز ثبت تک‌تراکنش‌ها در تبدیل بالانس ماهیانه استفاده نمی‌شود.',
+          'Only approved transactions are included, using their effective approval dates. Period ending balance = opening balance + period deposits − period withdrawals. At every level, USD and IRR equivalents are calculated only by revaluing the entire ending balance at the latest valid rates through the period end date; transaction-day rates are not used for monthly balance conversion.'
         )
       })
     ));

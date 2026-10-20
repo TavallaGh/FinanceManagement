@@ -33,7 +33,7 @@
       return parts[1] === '00' ? parts[0] : parts.join('.');
   };
 
-  const TransactionMainDetails = ({ isOpen, onClose, onSuccess, formMode, initialRecord, language = 'fa', formCode }) => {
+  const TransactionMainDetails = ({ isOpen, onClose, onSuccess, formMode, initialRecord, sourceRequest = null, returnToRequests = false, language = 'fa', formCode = 'FIN_TRANSACTION_MAIN' }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const calendarMode = window.DSCore?.useCalendarMode ? window.DSCore.useCalendarMode() : (isRtl ? 'jalali' : 'gregorian');
@@ -55,7 +55,7 @@
     const securityCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
     const access = useMemo(() => {
       const rawActions = securityCtx ? securityCtx.getActions(formCode) : null;
-      return rawActions || { canView: true, canCreate: true, canEdit: true, canDelete: true, canPrint: true };
+      return rawActions || { canView: false, canCreate: false, canEdit: false, canDelete: false, canPrint: false };
     }, [securityCtx, formCode]);
 
     const TRANSACTION_TYPES = [
@@ -99,6 +99,25 @@
     const [isRatesUpdating, setIsRatesUpdating] = useState(false);
 
     const [currencyRates, setCurrencyRates] = useState({});
+    const [ratesDate, setRatesDate] = useState(null);
+    const [requestRecord, setRequestRecord] = useState(sourceRequest);
+    const [requestLoading, setRequestLoading] = useState(!!sourceRequest || !!initialRecord?.request_id);
+    const savingRef = useRef(false);
+    const requestId = formMode === 'COPY' ? null : (sourceRequest?.id || initialRecord?.request_id || headerData.request_id);
+    const requestLocked = !!requestId && (requestLoading || !requestRecord || requestRecord.status !== 'IN_PROGRESS');
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!requestId) { setRequestRecord(null); setRequestLoading(false); return; }
+        setRequestLoading(true);
+        window.RequestTransactionLogic.readRequest(supabase, requestId, true).then(record => {
+            window.RequestTransactionLogic.assertScope(record, securityCtx, 'REQ_REQUEST_MNGMT', currentUserId, t);
+            if (!cancelled) setRequestRecord(record);
+        }).catch(error => {
+            if (!cancelled) { setRequestRecord(null); setToast({ isVisible: true, message: error.message, type: 'error' }); }
+        }).finally(() => { if (!cancelled) setRequestLoading(false); });
+        return () => { cancelled = true; };
+    }, [requestId, supabase, securityCtx, currentUserId, t]);
 
     const gridRef = useRef(null);
     const hasInitialized = useRef(false);
@@ -116,15 +135,15 @@
     });
 
     const isReadOnly = useMemo(() => {
-        if (formMode === 'CREATE' || formMode === 'COPY') return false;
+        if (requestLocked || !access.canView || !(headerData.id ? access.canEdit : access.canCreate)) return true;
         if (!headerData.status) return false;
         // وضعیت بررسی شده (FINAL) یا تایید شده (APPROVED) قابل ویرایش نیست
         return headerData.status === 'FINAL' || headerData.status === 'APPROVED';
-    }, [headerData.status, formMode]);
+    }, [headerData.status, headerData.id, formMode, requestLocked, access]);
 
     const isAttachReadOnly = useMemo(() => {
-        return attachModal.record && (attachModal.record.status === 'FINAL' || attachModal.record.status === 'APPROVED');
-    }, [attachModal.record]);
+        return isReadOnly || (attachModal.record && (attachModal.record.status === 'FINAL' || attachModal.record.status === 'APPROVED'));
+    }, [attachModal.record, isReadOnly]);
 
     const showToast = useCallback((message, type = 'success') => {
       setToast({ isVisible: true, message, type });
@@ -134,14 +153,15 @@
     const logAction = useCallback(async (action, recordId, details = '') => {
       try {
         if (!supabase) return;
-        await supabase.from('fm_record_logs').insert([{
+        const result = await supabase.from('fm_record_logs').insert([{
           entity_type: 'تراکنش‌ها',
           record_id: String(recordId || 'SYSTEM'),
           action: action,
           user_name: currentUserName,
           details: details
         }]);
-      } catch (err) {}
+        if (result.error) throw result.error;
+      } catch (err) { throw err; }
     }, [supabase, currentUserName]);
 
     const fetchDependencies = useCallback(async () => {
@@ -160,6 +180,9 @@
                 supabase.from('fm_coa_permissions').select('account_id, grantee_type, grantee_id, access_level'),
                 supabase.from('sec_user_roles').select('role_id').eq('user_id', currentUserId || '00000000-0000-0000-0000-000000000000')
             ]);
+            for (const result of [accRes, chartRes, costRes, incRes, usersRes, personnelRes, nodesRes, currRes, cbcRes, permsRes, userRolesRes]) {
+                if (result.error) throw result.error;
+            }
             
             const uMap = {};
             let myDeptId = '';
@@ -305,9 +328,10 @@
 
     const loadAttachments = async (recordId) => {
         try {
-            const { data } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
+            const { data, error } = await supabase.from('fm_attachments').select('*').eq('entity_type', 'TRANSACTION').eq('entity_id', recordId);
+            if (error) throw error;
             setAttachModal(prev => ({ ...prev, files: data || [] }));
-        } catch (err) {}
+        } catch (err) { showToast(t('خطا در دریافت پیوست‌ها.', 'Could not load attachments.'), 'error'); }
     };
 
     useEffect(() => {
@@ -322,7 +346,7 @@
         fetchDependencies().then(async (newLookups) => {
             if (!newLookups) return;
 
-            const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/');
+            const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, '/');
             setCopyWarning(null);
 
             let safeFinalRegistrar = currentUserId;
@@ -354,55 +378,62 @@
                 setHeaderData({
                     document_code: nextDocCode,
                     document_date: todayStr,
-                    transaction_type: 'GENERAL',
-                    department_id: newLookups.currentUserDeptId,
-                    department_title: newLookups.currentUserDeptTitle,
-                    description: '',
+                    transaction_type: sourceRequest?.request_type === 'TRANSFER' ? 'TRANSFER' : 'GENERAL',
+                    department_id: sourceRequest?.department_id || newLookups.currentUserDeptId,
+                    department_title: newLookups.departmentsMap[sourceRequest?.department_id] || newLookups.currentUserDeptTitle,
+                    description: sourceRequest?.description || '',
+                    ...(sourceRequest ? { request_id: sourceRequest.id } : {}),
                     status: 'DRAFT',
                     registrar_id: safeFinalRegistrar,
                     registered_at: new Date().toISOString()
                 });
-                setItemsData([]);
+                setItemsData(sourceRequest ? window.RequestTransactionLogic.buildItems(sourceRequest, newLookups.currencies, t) : []);
                 setAttachModal({ isOpen: false, record: null, files: [] });
-                setIsDirty(false);
+                setIsDirty(!!sourceRequest);
                 setHasSaved(false);
             } else if ((formMode === 'EDIT' || formMode === 'COPY') && initialRecord) {
+                const savedRecord = initialRecord.request_id
+                    ? await window.RequestTransactionLogic.readTransaction(supabase, initialRecord.id) : initialRecord;
+                window.RequestTransactionLogic.assertScope(savedRecord, securityCtx, formCode, currentUserId, t);
                 if (formMode === 'COPY') {
-                    setCopyWarning(t(`هشدار: این سند کپی از سند ${initialRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of transaction ${initialRecord.document_code} and requires review.`));
+                    setCopyWarning(t(`هشدار: این سند کپی از سند ${savedRecord.document_code} می‌باشد و نیازمند بررسی و تغییرات است.`, `Warning: This is a copy of transaction ${savedRecord.document_code} and requires review.`));
                 }
                 
-                const parsedDate = formMode === 'COPY' ? todayStr : (initialRecord.document_date ? initialRecord.document_date.replace(/-/g, '/') : todayStr);
-                const finalDeptId = formMode === 'COPY' ? newLookups.currentUserDeptId : initialRecord.department_id;
-                const finalDeptTitle = formMode === 'COPY' ? newLookups.currentUserDeptTitle : (newLookups.departmentsMap[initialRecord.department_id] || initialRecord.department_id || '');
+                const parsedDate = formMode === 'COPY' ? todayStr : (savedRecord.document_date ? savedRecord.document_date.replace(/-/g, '/') : todayStr);
+                const finalDeptId = formMode === 'COPY' ? newLookups.currentUserDeptId : savedRecord.department_id;
+                const finalDeptTitle = formMode === 'COPY' ? newLookups.currentUserDeptTitle : (newLookups.departmentsMap[savedRecord.department_id] || savedRecord.department_id || '');
 
                 setHeaderData({
-                    ...initialRecord,
-                    id: formMode === 'COPY' ? undefined : initialRecord.id,
-                    document_code: formMode === 'COPY' ? nextDocCode : initialRecord.document_code,
-                    status: formMode === 'COPY' ? 'DRAFT' : initialRecord.status,
-                    reference_code: formMode === 'COPY' ? '' : initialRecord.reference_code,
-                    daily_number: formMode === 'COPY' ? '' : initialRecord.daily_number,
+                    ...savedRecord,
+                    request_id: formMode === 'COPY' ? null : savedRecord.request_id,
+                    id: formMode === 'COPY' ? undefined : savedRecord.id,
+                    document_code: formMode === 'COPY' ? nextDocCode : savedRecord.document_code,
+                    status: formMode === 'COPY' ? 'DRAFT' : savedRecord.status,
+                    reference_code: formMode === 'COPY' ? '' : savedRecord.reference_code,
+                    daily_number: formMode === 'COPY' ? '' : savedRecord.daily_number,
                     document_date: parsedDate,
-                    registered_at: formMode === 'COPY' ? new Date().toISOString() : initialRecord.registered_at,
+                    registered_at: formMode === 'COPY' ? new Date().toISOString() : savedRecord.registered_at,
                     department_id: finalDeptId,
                     department_title: finalDeptTitle,
-                    registrar_id: formMode === 'COPY' ? safeFinalRegistrar : initialRecord.registrar_id,
+                    registrar_id: formMode === 'COPY' ? safeFinalRegistrar : savedRecord.registrar_id,
                     // در حالت کپی، اطلاعات ثبت/بررسی/تایید سند قبلی باید پاک شوند
-                    created_at: formMode === 'COPY' ? null : initialRecord.created_at,
-                    reviewed_by: formMode === 'COPY' ? null : initialRecord.reviewed_by,
-                    reviewed_by_name: formMode === 'COPY' ? null : initialRecord.reviewed_by_name,
-                    reviewed_at: formMode === 'COPY' ? null : initialRecord.reviewed_at,
-                    approved_by: formMode === 'COPY' ? null : initialRecord.approved_by,
-                    approved_by_name: formMode === 'COPY' ? null : initialRecord.approved_by_name,
-                    approved_at: formMode === 'COPY' ? null : initialRecord.approved_at
+                    created_at: formMode === 'COPY' ? null : savedRecord.created_at,
+                    reviewed_by: formMode === 'COPY' ? null : savedRecord.reviewed_by,
+                    reviewed_by_name: formMode === 'COPY' ? null : savedRecord.reviewed_by_name,
+                    reviewed_at: formMode === 'COPY' ? null : savedRecord.reviewed_at,
+                    approved_by: formMode === 'COPY' ? null : savedRecord.approved_by,
+                    approved_by_name: formMode === 'COPY' ? null : savedRecord.approved_by_name,
+                    approved_at: formMode === 'COPY' ? null : savedRecord.approved_at,
+                    approval_date: formMode === 'COPY' ? null : savedRecord.approval_date
                 });
                 
-                const mappedItems = (initialRecord.fm_transaction_items || []).map(item => {
+                const mappedItems = (savedRecord.fm_transaction_items || []).map(item => {
                     return {
                         ...item,
                         _tempId: crypto.randomUUID(),
                         id: formMode === 'COPY' ? undefined : item.id,
                         transaction_id: formMode === 'COPY' ? undefined : item.transaction_id,
+                        request_item_id: formMode === 'COPY' ? null : item.request_item_id,
                         deposit_amount: item.deposit_amount != null ? parseFloat(item.deposit_amount) : 0,
                         withdrawal_amount: item.withdrawal_amount != null ? parseFloat(item.withdrawal_amount) : 0
                     };
@@ -413,16 +444,18 @@
                 setHasSaved(false);
 
                 if (formMode === 'EDIT') {
-                    loadAttachments(initialRecord.id);
-                    setAttachModal(prev => ({ ...prev, record: initialRecord }));
+                    loadAttachments(savedRecord.id);
+                    setAttachModal(prev => ({ ...prev, record: savedRecord }));
                 } else {
                     setAttachModal({ isOpen: false, record: null, files: [] });
                 }
             }
-        });
+        }).catch(error => showToast(error.message, 'error'));
     }, [isOpen, formMode, initialRecord, fetchDependencies, currentUserId, currentUserName, currentUserUsername, t]);
 
     useEffect(() => {
+        let cancelled = false;
+        setRatesDate(null);
         if (headerData.document_date && supabase) {
             const fetchRates = async () => {
                 try {
@@ -452,11 +485,12 @@
                         const key = `${r.base_currency}_${r.target_currency}`;
                         if (!latestRates[key]) latestRates[key] = r.rate;
                     });
-                    setCurrencyRates(latestRates);
-                } catch (e) {}
+                    if (!cancelled) { setCurrencyRates(latestRates); setRatesDate(headerData.document_date); }
+                } catch (e) { if (!cancelled) showToast(t('خطا در دریافت نرخ ارز.', 'Could not load exchange rates.'), 'error'); }
             };
             fetchRates();
         }
+        return () => { cancelled = true; };
     }, [headerData.document_date, supabase]);
 
     const getExchangeRates = useCallback((currency) => {
@@ -557,234 +591,18 @@
         };
     }, [summaryStats, headerData.transaction_type, isReadOnly, itemsData, getExchangeRates, lookups.currencies]);
 
-    const validateTransactionLogic = (targetStatus) => {
-        if (targetStatus === 'DRAFT') return true;
-
-        if (!itemsData || itemsData.length === 0) {
-            showToast(t('سند باید حداقل دارای یک قلم باشد.', 'Transaction must have at least one item.'), 'warning');
-            return false;
-        }
-
-        let hasZeroItem = false;
-        itemsData.forEach(i => {
-            const dep = parseFloat(String(i.deposit_amount || '0').replace(/,/g, '')) || 0;
-            const wid = parseFloat(String(i.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-            if (dep === 0 && wid === 0) hasZeroItem = true;
-        });
-
-        if (hasZeroItem) {
-            showToast(t('مبلغ تمام اقلام سند باید پر شود و نمی‌تواند صفر باشد.', 'All items must have a valid amount.'), 'warning');
-            return false;
-        }
-
-        if (summaryStats.totalDepUsd === 0 && summaryStats.totalWidUsd === 0) {
-            showToast(t('جمع مبالغ سند صفر است و قابلیت تغییر وضعیت ندارد.', 'Total transaction amount cannot be zero.'), 'warning');
-            return false;
-        }
-
-        if (headerData.transaction_type === 'TRANSFER' && summaryStats.isUnbalanced) {
-            showToast(t('تراکنش انتقال غیرتراز است. مجموع واریز و برداشت ارزی باید برابر باشد.', 'Transfer transactions must be balanced.'), 'warning');
-            return false;
-        }
-
-        return true;
-    };
-
-    const handleSaveTransaction = async (overrideStatus) => {
-        const statusToSave = typeof overrideStatus === 'string' ? overrideStatus : headerData.status;
-
-        // بررسی تغییر وضعیت - ترتیب وضعیت باید رعایت شود
-        if (typeof overrideStatus === 'string' && overrideStatus !== headerData.status) {
-            if (!canTransitionTo(headerData.status, overrideStatus)) {
-                return showToast(t('تغییر وضعیت به دلیل رعایت نشدن ترتیب امکانپذیر نیست.', 'Status transition is not allowed.'), 'warning');
-            }
-        }
-
-        if (document.getElementById('grid-inline-edit-marker')) {
-            return showToast(t('لطفاً ابتدا با زدن دکمه Enter یا دکمه تایید تغییرات سطر باز را در اقلام ذخیره کنید.', 'Please save inline edits first.'), 'warning');
-        }
-
-        if (!headerData.document_date || !headerData.transaction_type || !headerData.description) {
-            return showToast(t('تکمیل فیلدهای اجباری سربرگ (تاریخ، نوع، شرح) الزامی است.', 'Header required fields missing.'), 'warning');
-        }
-        
-        if (!validateTransactionLogic(statusToSave)) return;
-
-        setIsLoading(true);
-        try {
-            let txId = headerData.id;
-            const validDeptId = (headerData.department_id && String(headerData.department_id).trim() !== '') ? headerData.department_id : null;
-
-            const now = new Date().toISOString();
-
-            // آیدی مطمئن کاربر جاری - با fallback به usersList
-            const actorId = (() => {
-                if (currentUserId && currentUserId !== '00000000-0000-0000-0000-000000000000') return currentUserId;
-                const matched = (lookups.usersList || []).find(u =>
-                    u.username === currentUserUsername || u.full_name === currentUserName
-                );
-                return matched ? matched.id : null;
-            })();
-            // نام کاربر را از usersMap می‌گیریم تا دقیقاً با مقدار sec_users یکسان باشد
-            const actorName = (actorId && lookups.usersMap && lookups.usersMap[actorId])
-                ? lookups.usersMap[actorId]
-                : currentUserName;
-
-            // فیلدهای metadata بررسی/تایید - جداگانه ارسال می‌شوند تا در صورت نبود ستون‌ها، عملیات اصلی fail نشود
-            const metaPayload = {};
-            if (statusToSave === 'FINAL' && headerData.status !== 'FINAL') {
-                metaPayload.reviewed_by = actorId;
-                metaPayload.reviewed_at = now;
-                metaPayload.reviewed_by_name = actorName;
-            } else if (statusToSave === 'APPROVED' && headerData.status !== 'APPROVED') {
-                metaPayload.approved_by = actorId;
-                metaPayload.approved_at = now;
-                metaPayload.approved_by_name = actorName;
-            } else if (statusToSave === 'TEMPORARY' && headerData.status === 'FINAL') {
-                metaPayload.reviewed_by = null;
-                metaPayload.reviewed_at = null;
-                metaPayload.reviewed_by_name = null;
-            }
-
-            const txPayload = {
-                document_code: headerData.document_code,
-                document_date: headerData.document_date.replace(/\//g, '-'),
-                registrar_id: headerData.registrar_id || null,
-                transaction_type: headerData.transaction_type,
-                department_id: validDeptId,
-                status: statusToSave || 'DRAFT',
-                description: headerData.description || ''
-            };
-
-            if (!txId) {
-                const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id, created_at');
-                if (error) throw error;
-                txId = data[0].id;
-                setHeaderData(prev => ({ ...prev, id: txId, created_at: data[0].created_at }));
-                setAttachModal(prev => ({ ...prev, record: { id: txId, document_code: headerData.document_code, status: statusToSave } }));
-                
-                if (window.AutoNumberingService) {
-                    try {
-                        await window.AutoNumberingService.consumeNext('TRANSACTIONS');
-                    } catch(err) {
-                        console.error('AutoNumbering consume error:', err);
-                    }
-                }
-
-                await logAction('create_transaction', txId, `ایجاد تراکنش: ${headerData.document_code}`);
-            } else {
-                const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
-                if (error) throw error;
-
-                // آپدیت جداگانه فیلدهای بررسی/تایید (در صورت نبود ستون در DB، عملیات اصلی مختل نمی‌شود)
-                if (Object.keys(metaPayload).length > 0) {
-                    const { error: metaError } = await supabase.from('fm_transactions').update(metaPayload).eq('id', txId);
-                    if (metaError) {
-                        console.warn('متادیتای بررسی/تایید ذخیره نشد (ستون‌های DB ممکن است اضافه نشده باشند):', metaError.message);
-                    }
-                }
-
-                if (statusToSave !== headerData.status) {
-                    const statusLabels = { DRAFT: 'یادداشت', TEMPORARY: 'موقت', FINAL: 'بررسی شده', APPROVED: 'تایید شده' };
-                    await logAction('status_update', txId, `تغییر وضعیت از ${statusLabels[headerData.status] || headerData.status} به ${statusLabels[statusToSave] || statusToSave} - توسط ${currentUserName}`);
-                } else if (isDirty) {
-                    await logAction('update_transaction', txId, `ویرایش تراکنش: ${headerData.document_code} - توسط ${currentUserName}`);
-                }
-            }
-
-            if (isDirty || !headerData.id) {
-                await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
-                
-                if (itemsData.length > 0) {
-                    const itemsPayload = itemsData.map((item, index) => {
-                        const dep = parseFloat(String(item.deposit_amount || '0').replace(/,/g, '')) || 0;
-                        const wid = parseFloat(String(item.withdrawal_amount || '0').replace(/,/g, '')) || 0;
-                        const cur = item.currency || 'IRR';
-                        
-                        const { toUsd, usdToIrr } = getExchangeRates(cur);
-                        const val = dep > 0 ? dep : wid;
-                        const amtUsd = val * toUsd;
-                        const amtIrr = amtUsd * usdToIrr;
-                        
-                        return {
-                            transaction_id: txId,
-                            row_number: index + 1,
-                            account_id: (item.account_id && String(item.account_id).trim() !== '') ? item.account_id : null,
-                            transaction_action: item.transaction_action || 'DEPOSIT',
-                            transaction_group: (item.transaction_group && String(item.transaction_group).trim() !== '') ? item.transaction_group : null,
-                            cost_type_id: (item.cost_type_id && String(item.cost_type_id).trim() !== '') ? item.cost_type_id : null,
-                            income_type_id: (item.income_type_id && String(item.income_type_id).trim() !== '') ? item.income_type_id : null,
-                            center_id: (item.center_id && String(item.center_id).trim() !== '') ? item.center_id : null,
-                            currency: cur,
-                            deposit_amount: dep,
-                            withdrawal_amount: wid,
-                            exchange_rate_to_usd: toUsd,
-                            exchange_rate_usd_to_irr: usdToIrr,
-                            amount_usd: amtUsd,
-                            amount_irr: amtIrr,
-                            description: item.description || null
-                        };
-                    });
-
-                    let newItems;
-                    {
-                        const { data: d1, error: e1 } = await supabase.from('fm_transaction_items').insert(itemsPayload).select();
-                        if (e1) {
-                            // Graceful retry without center_id if the column doesn't exist in DB yet
-                            console.warn('fm_transaction_items insert failed, retrying without center_id:', e1.message);
-                            const payloadWithoutCenter = itemsPayload.map(item => {
-                                const nextItem = { ...item };
-                                delete nextItem.center_id;
-                                return nextItem;
-                            });
-                            const { data: d2, error: e2 } = await supabase.from('fm_transaction_items').insert(payloadWithoutCenter).select();
-                            if (e2) throw e2;
-                            newItems = d2;
-                        } else {
-                            newItems = d1;
-                        }
-                    }
-                    await logAction('update_items', txId, `بروزرسانی ${itemsPayload.length} قلم سند ${headerData.document_code} - توسط ${currentUserName}`);
-
-                    const mappedItems = newItems.map(item => {
-                        return {
-                            ...item,
-                            _tempId: crypto.randomUUID(),
-                            deposit_amount: item.deposit_amount != null ? parseFloat(item.deposit_amount) : 0,
-                            withdrawal_amount: item.withdrawal_amount != null ? parseFloat(item.withdrawal_amount) : 0
-                        };
-                    }).sort((a, b) => (a.row_number || 0) - (b.row_number || 0));
-                    
-                    setItemsData(mappedItems);
-                }
-            }
-
-            setHeaderData(prev => ({ 
-                ...prev, 
-                status: statusToSave,
-                // بهروزرسانی مختصر برای نمایش در اینترفیس
-                ...(statusToSave === 'FINAL' && headerData.status !== 'FINAL' ? { reviewed_by: actorId, reviewed_at: new Date().toISOString(), reviewed_by_name: actorName } : {}),
-                ...(statusToSave === 'APPROVED' && headerData.status !== 'APPROVED' ? { approved_by: actorId, approved_at: new Date().toISOString(), approved_by_name: actorName } : {}),
-                ...(statusToSave === 'TEMPORARY' && headerData.status === 'FINAL' ? { reviewed_by: null, reviewed_at: null, reviewed_by_name: null } : {})
-            }));
-            setIsDirty(false);
-            setHasSaved(true);
-            setCopyWarning(null);
-            
-            if (typeof overrideStatus === 'string') {
-                showToast(t('وضعیت سند با موفقیت تغییر کرد.', 'Transaction status updated successfully.'));
-            } else {
-                showToast(t('سند با موفقیت ثبت شد.', 'Transaction saved successfully.'));
-            }
-        } catch (error) {
-            showToast(t('خطا در عملیات. لطفاً مجدداً تلاش کنید.', 'Operation failed. Please try again.'), 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const approvalDateControl = window.FinancialApprovalControls.useApprovalDate(language);
+    const handleSaveTransaction = window.TransactionPersistence.makeSaveHandler({
+      supabase, headerData, itemsData, summaryStats, canTransitionTo, getExchangeRates,
+      currentUserId, currentUserName, currentUserUsername, lookups, isDirty, access, securityCtx,
+      formCode, requestRecord, requestLoading, currencyRates, ratesDate, savingRef, showToast, t, logAction, setIsLoading,
+      setHeaderData, setAttachModal, setItemsData, setIsDirty, setHasSaved, setCopyWarning, setRequestRecord,
+      requestApprovalDate: approvalDateControl.request
+    });
 
     const handleFileUpload = async (files) => {
         if (!files || files.length === 0 || !attachModal.record) return;
+        if (isAttachReadOnly) return;
         // بلوک آپلود برای تراکنش‌های بررسی شده / تایید شده
         if (attachModal.record.status === 'FINAL' || attachModal.record.status === 'APPROVED') {
             return showToast(t('تراکنش‌های بررسی شده / تایید شده امکان افزودن پیوست ندارند.', 'Finalized/approved transactions cannot have attachments added.'), 'warning');
@@ -793,6 +611,7 @@
 
         setIsUploading(true);
         try {
+            await window.RequestTransactionLogic.assertMutable(supabase, headerData, t);
             const fileExt = file.name.split('.').pop();
             const fileName = `${attachModal.record.id}_${Date.now()}.${fileExt}`;
             const filePath = `transactions/${fileName}`;
@@ -831,11 +650,13 @@
     };
 
     const handleDeleteAttachment = async (fileId) => {
+        if (isAttachReadOnly) return;
         // بلوک حذف برای تراکنش‌های بررسی شده / تایید شده
         if (attachModal.record && (attachModal.record.status === 'FINAL' || attachModal.record.status === 'APPROVED')) {
             return showToast(t('تراکنش‌های بررسی شده / تایید شده امکان حذف پیوست ندارند.', 'Finalized/approved transactions cannot have attachments deleted.'), 'warning');
         }
         try {
+            await window.RequestTransactionLogic.assertMutable(supabase, headerData, t);
             const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
             if (error) throw error;
             showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
@@ -847,6 +668,7 @@
     };
 
     const handleCloseModal = () => {
+        if (savingRef.current || isUploading) return;
         if (hasSaved && onSuccess) {
             onSuccess();
         } else {
@@ -855,6 +677,7 @@
     };
 
     const handleUpdateRates = async () => {
+        if (isReadOnly) return;
         if (!headerData.id || !['DRAFT', 'TEMPORARY'].includes(headerData.status)) {
             return showToast(t('فقط سندهای یادداشت یا موقت امکان بروزرسانی نرخ ارز دارند.', 'Only Draft or Temporary transactions can have exchange rates updated.'), 'warning');
         }
@@ -864,6 +687,7 @@
         }
         setIsRatesUpdating(true);
         try {
+            await window.RequestTransactionLogic.assertMutable(supabase, headerData, t);
             let updatedCount = 0;
             for (const item of savedItems) {
                 const cur = item.currency || 'IRR';
@@ -879,7 +703,8 @@
                     amount_usd: amtUsd,
                     amount_irr: amtIrr
                 }).eq('id', item.id);
-                if (!error) updatedCount++;
+                if (error) throw error;
+                updatedCount++;
             }
             showToast(t(`${updatedCount} قلم با آخرین نرخ‌های ارز بروز شد.`, `${updatedCount} items updated with latest exchange rates.`));
             await logAction('update_rates', headerData.id, `بروزرسانی نرخ ارز ${updatedCount} قلم سند ${headerData.document_code}`);
@@ -907,13 +732,13 @@
     const headerCardAction = (
         <div className="flex items-center gap-2 pr-2" onClick={e => e.stopPropagation()}>
             {/* وضعیت یادداشت -> موقت */}
-            {currentStatus === 'DRAFT' && headerData.id && access.canEdit && (
+            {currentStatus === 'DRAFT' && headerData.id && access.canEdit && !requestLocked && (
                 <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                     {t('تبدیل به موقت', 'Set Temporary')}
                 </Button>
             )}
             {/* وضعیت موقت: برگشت به یادداشت یا تبدیل به بررسی شده */}
-            {currentStatus === 'TEMPORARY' && access.canEdit && (
+            {currentStatus === 'TEMPORARY' && access.canEdit && !requestLocked && (
                 <>
                     <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('DRAFT')} className="!text-slate-600 !border-slate-500 hover:!bg-slate-50 dark:hover:!bg-slate-800 !py-0.5 !h-6">
                         {t('برگشت به یادداشت', 'Revert to Draft')}
@@ -924,7 +749,7 @@
                 </>
             )}
             {/* وضعیت بررسی شده: برگشت به موقت یا تایید */}
-            {currentStatus === 'FINAL' && access.canEdit && (
+            {currentStatus === 'FINAL' && access.canEdit && !requestLocked && (
                 <>
                     <Button variant="outline" size="sm" onClick={() => handleSaveTransaction('TEMPORARY')} className="!text-orange-500 !border-orange-500 hover:!bg-orange-50 dark:hover:!bg-orange-900/30 !py-0.5 !h-6">
                         {t('برگشت به موقت', 'Revert to Temporary')}
@@ -973,7 +798,7 @@
         <div className="flex-1 min-h-0 flex flex-col font-sans bg-slate-50/50 dark:bg-slate-900 text-[12px] animate-in fade-in duration-300" dir={isRtl ? 'rtl' : 'ltr'}>
             <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between shrink-0 shadow-sm z-30 relative">
                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" icon={isRtl ? ChevronRight : ChevronLeft} onClick={handleCloseModal}>{t('بازگشت به لیست', 'Back to List')}</Button>
+                    <Button variant="ghost" size="sm" icon={isRtl ? ChevronRight : ChevronLeft} onClick={handleCloseModal}>{returnToRequests ? t('بازگشت به لیست درخواست‌ها', 'Back to Requests') : t('بازگشت به لیست', 'Back to List')}</Button>
                     <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 shrink-0"></div>
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">
@@ -991,7 +816,7 @@
                     {headerData.id && (
                         <Button variant="ghost" size="sm" icon={DollarSign} onClick={() => setSummaryModal({ isOpen: true })} title={t('خلاصه ارزی', 'Currency Summary')} />
                     )}
-                    {headerData.id && (headerData.status === 'DRAFT' || headerData.status === 'TEMPORARY') && itemsData.some(i => i.id) && (
+                    {headerData.id && !isReadOnly && (headerData.status === 'DRAFT' || headerData.status === 'TEMPORARY') && itemsData.some(i => i.id) && (
                         <Button variant="ghost" size="sm" icon={RefreshCw} onClick={handleUpdateRates} isLoading={isRatesUpdating} title={t('بروزرسانی نرخ ارز', 'Update Exchange Rates')} />
                     )}
                     {headerData.id && window.TransactionPrint && (
@@ -1010,7 +835,7 @@
                     )}
                     {headerData.id && <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5"></div>}
                     <Button variant="outline" size="sm" className="!px-5" onClick={handleCloseModal}>{t('انصراف', 'Cancel')}</Button>
-                    {!isReadOnly && access.canEdit && (
+                    {!isReadOnly && (
                         <Button variant="primary" size="sm" className="!px-5" icon={Check} onClick={() => handleSaveTransaction()} isLoading={isLoading} disabled={!isDirty}>{t('ذخیره', 'Save')}</Button>
                     )}
                 </div>
@@ -1035,6 +860,7 @@
                     >
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 p-3 bg-white dark:bg-slate-800 overflow-visible">
                             <TextField size="sm" formCode={formCode} label={t('کد تراکنش', 'Transaction Code')} value={headerData.document_code || ''} disabled isRtl={isRtl} dir="ltr" />
+                            <TextField size="sm" formCode={formCode} label={t('مرجع درخواست', 'Request Reference')} value={requestRecord?.request_code || ''} disabled isRtl={isRtl} dir="ltr" />
                             <TextField size="sm" formCode={formCode} label={t('کد عطف', 'Ref Code')} value={headerData.reference_code || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <TextField size="sm" formCode={formCode} label={t('شماره روزانه', 'Daily Number')} value={headerData.daily_number || ''} disabled isRtl={isRtl} dir="ltr" placeholder={t('تولید خودکار', 'Auto')} />
                             <div className="relative z-[90]">
@@ -1044,7 +870,7 @@
                             <TextField size="sm" formCode={formCode} label={t('ثبت کننده', 'Registrar')} value={lookups.usersMap[headerData.registrar_id] || ''} disabled isRtl={isRtl} />
                             
                             <div className="relative z-[80]">
-                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => { setHeaderData({...headerData, transaction_type: e.target.value}); setIsDirty(true); }} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly} required />
+                                <SelectField size="sm" formCode={formCode} label={t('نوع تراکنش', 'Transaction Type')} value={headerData.transaction_type || 'GENERAL'} onChange={e => { setHeaderData({...headerData, transaction_type: e.target.value}); setIsDirty(true); }} options={TRANSACTION_TYPES} isRtl={isRtl} disabled={isReadOnly || !!requestId} required />
                             </div>
                             <TextField size="sm" formCode={formCode} label={t('دپارتمان', 'Department')} value={headerData.department_title || lookups.currentUserDeptTitle || ''} disabled isRtl={isRtl} />
                             
@@ -1059,6 +885,8 @@
                                     <TextField size="sm" formCode={formCode} label={t('تاریخ بررسی', 'Reviewed At')} value={headerData.reviewed_at ? new Intl.DateTimeFormat(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(headerData.reviewed_at)) : '-'} disabled isRtl={isRtl} />
                                 </>
                             )}
+                            {headerData.approval_date && <DatePicker size="sm" label={t('تاریخ موثر گزارشدهی', 'Effective Reporting Date')}
+                              value={headerData.approval_date.replace(/-/g, '/')} disabled isRtl={isRtl} language={language} />}
                             {(headerData.approved_by || headerData.approved_by_name) && (
                                 <>
                                     <TextField size="sm" formCode={formCode} label={t('تایید کننده', 'Approved By')} value={headerData.approved_by_name || lookups.usersMap[headerData.approved_by] || '-'} disabled isRtl={isRtl} />
@@ -1133,6 +961,7 @@
                 formCode: formCode
             })}
 
+            {approvalDateControl.modal}
             <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
         </div>
     );

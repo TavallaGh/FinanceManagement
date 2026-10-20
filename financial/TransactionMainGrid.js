@@ -171,7 +171,7 @@
 
     const handleRemoveItem = (row) => {
         if (isReadOnly) return;
-        const newItems = itemsData.filter(item => item._tempId !== row._tempId && item.id !== row.id);
+        const newItems = itemsData.filter(item => (item._tempId || item.id) !== (row._tempId || row.id));
         onItemsChange(newItems.map((item, idx) => ({ ...item, row_number: idx + 1 })));
     };
 

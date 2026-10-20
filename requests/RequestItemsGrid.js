@@ -43,14 +43,6 @@
   const TYPES_WITH_EXCHANGE = ['EXCHANGE'];
   const TYPES_BALANCED = ['TRANSFER', 'EXCHANGE'];
 
-  const PROJECT_STATUS_LABELS = {
-    PLANNING:    { fa: 'در دست برنامه‌ریزی', en: 'Planning'    },
-    IN_PROGRESS: { fa: 'در حال اجرا',           en: 'In Progress' },
-    ON_HOLD:     { fa: 'متوقف',                 en: 'On Hold'     },
-    COMPLETED:   { fa: 'تکمیل شده',             en: 'Completed'   },
-    CANCELLED:   { fa: 'لغو شده',               en: 'Cancelled'   },
-  };
-
   const formatNumberSafe = (val, forDisplay = false) => {
     if (val === null || val === undefined || val === '') return forDisplay ? '0' : '';
     const s = String(val).replace(/,/g, '');
@@ -75,6 +67,11 @@
     const isExchange = TYPES_WITH_EXCHANGE.includes(requestType);
     const isBalanced = TYPES_BALANCED.includes(requestType);
     const isBudget = requestType === 'BUDGET';
+    const exchange = window.RequestExchangeLogic;
+    const updateItem = patch => setInlineItemEdit(previous => {
+      const data = { ...previous.data, ...patch };
+      return { ...previous, data: isExchange ? exchange.recalculate(data, lookups.currencies) : data };
+    });
 
     const getCurrencyDecimals = useCallback((currencyCode) => {
       const currency = (lookups.currencies || []).find(item => item.code === currencyCode);
@@ -92,7 +89,7 @@
     useImperativeHandle(ref, () => ({
       cancelEdit: () => setInlineItemEdit(null),
       triggerBalanceRow: ({ diffAmount = 0, currency = 'USD' } = {}) => {
-        if (isReadOnly) return;
+        if (isReadOnly || isExchange) return;
         if (inlineItemEdit) {
           showToast(t('ابتدا با Enter سطر جاری را ذخیره کنید.', 'Save current row first.'), 'warning');
           return;
@@ -108,10 +105,10 @@
           data: {
             row_number: itemsData.length + 1,
             currency: suggestedCurrency,
+            related_account_id: '',
             transaction_action: isDebit ? 'DEPOSIT' : 'WITHDRAWAL',
             party_id: '', party_obj: null,
             center_id: '',
-            project_id: '',
             transaction_group: showGroup ? 'BALANCE' : null,
             cost_type_id: '', income_type_id: '',
             deposit_amount: isDebit ? roundedAmount : '0',
@@ -145,7 +142,7 @@
     const handleAmountChange = (e, field) => {
       const raw = e.target.value.replace(/,/g, '');
       if (raw === '' || !isNaN(raw))
-        setInlineItemEdit(prev => ({ ...prev, data: { ...prev.data, [field]: raw } }));
+        updateItem({ [field]: raw });
     };
 
     const handleAddItemClick = () => {
@@ -164,13 +161,14 @@
         data: {
           row_number: itemsData.length + 1,
           currency: suggestedCurrency,
-          transaction_action: isTransfer ? (itemsData.length % 2 === 0 ? 'WITHDRAWAL' : 'DEPOSIT') : 'DEPOSIT',          
+          related_account_id: '',
+          ...(isExchange ? { destination_account_id: '', destination_currency: '', exchange_rate: '' } : {}),
+          transaction_action: isExchange ? 'WITHDRAWAL' : isTransfer ? (itemsData.length % 2 === 0 ? 'WITHDRAWAL' : 'DEPOSIT') : 'DEPOSIT',
           party_id: '', party_obj: null,
           center_id: '',
-          project_id: '',
           transaction_group: showGroup ? 'COST' : null,
           cost_type_id: '', income_type_id: '',
-          deposit_amount: '0', withdrawal_amount: '0',
+          deposit_amount: isExchange ? '' : '0', withdrawal_amount: '0',
           approved_amount: '0', remaining_amount: '0',
           description: '',
         },
@@ -186,8 +184,7 @@
           ...row,
           party_obj: partyObj,
           center_id: row.center_id || '',
-          project_id: row.project_id || '',
-          deposit_amount:    row.deposit_amount    != null ? String(row.deposit_amount)    : '0',
+          deposit_amount: isExchange && !Number(row.deposit_amount) ? '' : row.deposit_amount != null ? String(row.deposit_amount) : '0',
           withdrawal_amount: row.withdrawal_amount != null ? String(row.withdrawal_amount) : '0',
           approved_amount:   row.approved_amount   != null ? String(row.approved_amount)   : '0',
           remaining_amount:  row.remaining_amount  != null ? String(row.remaining_amount)  : '0',
@@ -197,7 +194,11 @@
 
     const handleSaveItemInline = () => {
       if (!inlineItemEdit) return;
-      const form = inlineItemEdit.data;
+      const form = isExchange ? exchange.recalculate(inlineItemEdit.data, lookups.currencies) : inlineItemEdit.data;
+      if (isExchange) {
+        try { exchange.validate([form], t, { accounts: lookups.leafAccounts || [] }); }
+        catch (error) { return showToast(error.message, 'warning'); }
+      }
       const numDep = parseFloat(String(form.deposit_amount    || '0').replace(/,/g, '')) || 0;
       const numWid = parseFloat(String(form.withdrawal_amount || '0').replace(/,/g, '')) || 0;
 
@@ -221,6 +222,7 @@
 
       const dataToSave = {
         ...form,
+        ...(isExchange ? { transaction_action: 'WITHDRAWAL' } : {}),
         deposit_amount:    String(form.deposit_amount    || '0').replace(/,/g, ''),
         withdrawal_amount: String(form.withdrawal_amount || '0').replace(/,/g, ''),
       };
@@ -303,22 +305,6 @@
       { field: 'officeName', header_fa: 'محل مرکز', header_en: 'Location', width: '150px' },
     ];
 
-    const projectLovCols = [
-      { field: 'code',        header_fa: 'کد پروژه',    header_en: 'Code',    width: '110px' },
-      { field: 'title',       header_fa: 'عنوان پروژه', header_en: 'Title',   width: 'auto'  },
-      { field: 'managerName', header_fa: 'مدیر پروژه',  header_en: 'Manager', width: '150px' },
-      {
-        field: 'status',
-        header_fa: 'وضعیت',
-        header_en: 'Status',
-        width: '130px',
-        render: (val) => {
-          const lbl = PROJECT_STATUS_LABELS[val];
-          return <span>{lbl ? (isRtl ? lbl.fa : lbl.en) : (val || '-')}</span>;
-        },
-      },
-    ];
-
     // ── column definitions ────────────────────────────────────────────────
     const baseColumns = [
       {
@@ -370,8 +356,34 @@
       },
     ];
 
-    const currencyColumn = {
-      field: 'currency', header_fa: 'ارز', header_en: 'Currency', width: '110px',
+    const accountLovColumns = [
+      { field: 'chart_name', header_fa: 'ساختار حساب', header_en: 'Chart', width: '110px' },
+      { field: 'code', header_fa: 'کد حساب', header_en: 'Code', width: '100px' },
+      { field: 'pathTitle', header_fa: 'عنوان حساب', header_en: 'Account', width: '260px' },
+      { field: 'currency_code', header_fa: 'ارز', header_en: 'Currency', width: '80px' },
+    ];
+    const accountColumn = (field, fa, en, currencyField) => ({
+      field, header_fa: fa, header_en: en, width: '220px',
+      searchAccessor: value => {
+        const account = (lookups.leafAccounts || []).find(row => String(row.id) === String(value));
+        return account ? `${account.code} - ${account.displayLabel}` : '-';
+      },
+      render: (value, row) => {
+        const account = (lookups.leafAccounts || []).find(candidate => String(candidate.id) === String(
+          isEditingRow(row) ? inlineItemEdit.data[field] : value));
+        const label = account ? `${account.code} - ${account.displayLabel}` : '';
+        if (!isEditingRow(row)) return <span className="text-[12px] truncate block">{label || '-'}</span>;
+        return <div onKeyDown={handleInlineKeyDown} onClick={event => event.stopPropagation()} className="relative z-[100]">
+          <LOVField size="sm" formCode={formCode} data={lookups.leafAccounts || []} columns={accountLovColumns}
+            dropdownWidth="min-w-[650px]" displayValue={label} isRtl={isRtl} wrapperClassName="m-0"
+            placeholder={t('انتخاب حساب (اختیاری)', 'Select account (optional)')}
+            onChange={selected => updateItem({ [field]: selected?.id || '',
+              ...(selected?.currency_code ? { [currencyField]: selected.currency_code } : {}) })} />
+        </div>;
+      },
+    });
+    const currencyColumn = (field, fa, en) => ({
+      field, header_fa: fa, header_en: en, width: '110px',
       render: (val, row) => {
         if (isEditingRow(row)) {
           const currLovCols = [
@@ -383,11 +395,16 @@
               <LOVField size="sm" formCode={formCode}
                 data={lookups.currencies || []} columns={currLovCols} dropdownWidth="min-w-[300px]"
                 displayValue={
-                  inlineItemEdit.data.currency
-                    ? `${inlineItemEdit.data.currency} - ${(lookups.currencies || []).find(c => c.code === inlineItemEdit.data.currency)?.title || ''}`
+                  inlineItemEdit.data[field]
+                    ? `${inlineItemEdit.data[field]} - ${(lookups.currencies || []).find(c => c.code === inlineItemEdit.data[field])?.title || ''}`
                     : ''
                 }
-                onChange={r => setInlineItemEdit(p => ({ ...p, data: { ...p.data, currency: r ? r.code : '' } }))}
+                onChange={selected => {
+                  const accountField = field === 'currency' ? 'related_account_id' : 'destination_account_id';
+                  const account = (lookups.leafAccounts || []).find(row => String(row.id) === String(inlineItemEdit.data[accountField]));
+                  updateItem({ [field]: selected?.code || '',
+                    ...(account?.currency_code && account.currency_code !== selected?.code ? { [accountField]: '' } : {}) });
+                }}
                 isRtl={isRtl} wrapperClassName="m-0"
               />
             </div>
@@ -395,6 +412,17 @@
         }
         return <span dir="ltr" className="text-[12px] font-sans">{val || '-'}</span>;
       },
+    });
+
+    const rateColumn = {
+      field: 'exchange_rate', header_fa: 'نرخ تبدیل', header_en: 'Exchange Rate', width: '180px',
+      render: (value, row) => isEditingRow(row)
+        ? <div onKeyDown={handleInlineKeyDown} onClick={event => event.stopPropagation()}>
+            <TextField size="sm" value={formatNumberSafe(inlineItemEdit.data.exchange_rate)}
+              onChange={event => handleAmountChange(event, 'exchange_rate')} dir="ltr" isRtl={isRtl}
+              placeholder={t('اختیاری', 'Optional')} wrapperClassName="m-0" />
+          </div>
+        : <span dir="ltr" className="text-[12px]">{exchange.hasValue(value) ? formatNumberSafe(value) : '-'}</span>,
     };
 
     const groupColumns = [
@@ -453,11 +481,11 @@
 
     const amountColumns = [
       {
-        field: 'deposit_amount', header_fa: isBudget ? 'مبلغ' : 'واریز', header_en: isBudget ? 'Amount' : 'Deposit', width: '110px',
+        field: 'deposit_amount', header_fa: isExchange ? 'به مبلغ' : isBudget ? 'مبلغ' : 'واریز', header_en: isExchange ? 'To Amount' : isBudget ? 'Amount' : 'Deposit', width: '110px',
         render: (val, row) => {
           const raw = row.deposit_amount !== undefined ? row.deposit_amount : val;
           if (isEditingRow(row)) {
-            const disabled = !isBudget && inlineItemEdit.data.transaction_action !== 'DEPOSIT';
+            const disabled = isExchange ? exchange.hasValue(inlineItemEdit.data.exchange_rate) : !isBudget && inlineItemEdit.data.transaction_action !== 'DEPOSIT';
             return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}>
               <TextField size="sm" type="text" disabled={disabled}
                 value={formatNumberSafe(inlineItemEdit.data.deposit_amount)}
@@ -465,15 +493,15 @@
                 isRtl={isRtl} dir="ltr" wrapperClassName="m-0" />
             </div>;
           }
-          return <span dir="ltr" className="block w-full text-right text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{formatNumberSafe(raw, true)}</span>;
+          return <span dir="ltr" className="block w-full text-right text-[12px] font-medium text-emerald-600 dark:text-emerald-500">{isExchange && !Number(raw) ? '-' : formatNumberSafe(raw, true)}</span>;
         },
       },
       {
-        field: 'withdrawal_amount', header_fa: 'برداشت', header_en: 'Withdrawal', width: '110px',
+        field: 'withdrawal_amount', header_fa: isExchange ? 'از مبلغ' : 'برداشت', header_en: isExchange ? 'From Amount' : 'Withdrawal', width: '110px',
         render: (val, row) => {
           const raw = row.withdrawal_amount !== undefined ? row.withdrawal_amount : val;
           if (isEditingRow(row)) {
-            const disabled = inlineItemEdit.data.transaction_action !== 'WITHDRAWAL';
+            const disabled = !isExchange && inlineItemEdit.data.transaction_action !== 'WITHDRAWAL';
             return <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()}>
               <TextField size="sm" type="text" disabled={disabled}
                 value={formatNumberSafe(inlineItemEdit.data.withdrawal_amount)}
@@ -541,13 +569,13 @@
       width: '170px',
       render: (val, row) => {
         const group = isEditingRow(row) ? inlineItemEdit?.data?.transaction_group : row.transaction_group;
-        const isCenterGroup = group === 'COST' || group === 'INCOME';
+        const isCenterGroup = isTransfer || group === 'COST' || group === 'INCOME';
         if (isEditingRow(row)) {
           if (!isCenterGroup) {
             return <div className="h-8 w-full bg-slate-100 dark:bg-slate-800 rounded opacity-40" />;
           }
           const activeCenters = (lookups.costBenefitCenters || []).filter(c =>
-            c.isActive && (group === 'COST' ? c.isCostCenter : c.isBenefitCenter)
+            c.isActive && (isTransfer ? (c.isCostCenter || c.isBenefitCenter) : (group === 'COST' ? c.isCostCenter : c.isBenefitCenter))
           );
           const selectedCenter = activeCenters.find(c => String(c.id) === String(inlineItemEdit.data.center_id));
           const displayValue = selectedCenter ? (isRtl ? selectedCenter.titleFa : (selectedCenter.titleEn || selectedCenter.titleFa)) : '';
@@ -571,45 +599,23 @@
       },
     };
 
-    // ── project column ────────────────────────────────────────────────────
-    const projectColumn = {
-      field: 'project_id',
-      header_fa: t('پروژه', 'Project'),
-      header_en: 'Project',
-      width: '160px',
-      render: (val, row) => {
-        if (isEditingRow(row)) {
-          const selectedProject = (lookups.projects || []).find(p => String(p.id) === String(inlineItemEdit.data.project_id));
-          return (
-            <div onKeyDown={handleInlineKeyDown} onClick={e => e.stopPropagation()} className="w-full relative z-[50]">
-              <LOVField size="sm" formCode={formCode}
-                data={lookups.projects || []} columns={projectLovCols} dropdownWidth="min-w-[580px]"
-                displayValue={selectedProject ? `${selectedProject.code} - ${selectedProject.title}` : ''}
-                onChange={r => setInlineItemEdit(p => ({ ...p, data: { ...p.data, project_id: r ? r.id : '' } }))}
-                isRtl={isRtl} wrapperClassName="m-0" placeholder={t('انتخاب پروژه', 'Select Project')}
-              />
-            </div>
-          );
-        }
-        const proj = (lookups.projects || []).find(p => String(p.id) === String(val));
-        return proj
-          ? <div className="flex flex-col"><span className="text-[12px] font-bold truncate">{proj.title}</span><span className="text-[10px] text-slate-400 font-sans" dir="ltr">{proj.code}</span></div>
-          : <span className="text-[12px] text-slate-400">-</span>;
-      },
-    };
-
     // ترتیب یکپارچه ستون‌ها در همه انواع درخواست (فقط نمایش برخی تغییر می‌کند)
     const itemColumns = [
       baseColumns[0], // ردیف
-      ...(isBudget ? [] : [baseColumns[1]]), // نوع (واریز/برداشت) - مخفی در BUDGET
+      accountColumn('related_account_id', isExchange ? 'از حساب' : 'حساب مرتبط', isExchange ? 'From Account' : 'Related Account', 'currency'),
+      ...(isBudget || isExchange ? [] : [baseColumns[1]]),
       ...(showGroup ? [groupColumns[0]] : []), // گروه
       ...(showGroup ? [groupColumns[1]] : []), // نوع هزینه/درآمد
       ...(isExchange || isBudget ? [] : [partyColumn]), // طرف مقابل - مخفی در EXCHANGE و BUDGET
-      ...((isTransfer || isExchange) ? [] : [centerColumn]), // مرکز هزینه/درآمد - مخفی در TRANSFER و EXCHANGE
-      ...(isExchange ? [] : [projectColumn]), // پروژه - مخفی در EXCHANGE
-      currencyColumn, // ارز
-      amountColumns[0], // مبلغ واریز
-      ...(isBudget ? [] : [amountColumns[1]]), // مبلغ برداشت - مخفی در BUDGET
+      ...(isExchange ? [] : [centerColumn]), // مرکز هزینه/درآمد - مخفی در EXCHANGE
+      currencyColumn('currency', isExchange ? 'از ارز' : 'ارز', isExchange ? 'From Currency' : 'Currency'),
+      ...(isExchange ? [
+        amountColumns[1],
+        accountColumn('destination_account_id', 'به حساب', 'To Account', 'destination_currency'),
+        currencyColumn('destination_currency', 'به ارز', 'To Currency'),
+        rateColumn,
+        amountColumns[0],
+      ] : [amountColumns[0], ...(isBudget ? [] : [amountColumns[1]])]),
       descriptionColumn, // شرح
     ];
 

@@ -2,7 +2,7 @@
 /* Request form & items grid live in RequestDetails.js which must load first */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo, useCallback } = React;
+  const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
   function FallbackComponent() { return null; }
   const FallbackIcon = ({ size = 16 }) =>
@@ -50,6 +50,8 @@
   const DollarSign     = safeIcon(LucideIcons, 'DollarSign');
   const RefreshCw      = safeIcon(LucideIcons, 'RefreshCw');
   const History        = safeIcon(LucideIcons, 'History');
+  const FilePlus       = safeIcon(LucideIcons, 'FilePlus');
+  const FileText       = safeIcon(LucideIcons, 'FileText');
 
   const REQUEST_TYPES = [
     { value: 'TRANSFER',   fa: 'انتقال وجه',  en: 'Transfer'   },
@@ -90,23 +92,18 @@
     const supabase = window.supabase;
 
     const currentUserId = getSessionUserId() || window.NavigationSystem?.currentUser?.id || null;
-    const useRequestManagementWorkflow = window.useRequestManagementWorkflow || (() => ({
-      workflowAssignments: { actionableSet: new Set(), assignedMap: {} },
-      actionableRequestIds: new Set(),
-      filteredData: [],
-    }));
-
     // Loaded from RequestDetails.js (must appear before this script in index.html)
     const RequestFormModal = safeComp(window, 'RequestFormModal');
 
     const secCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
     const access = useMemo(() => {
       const a = secCtx ? secCtx.getActions(formCode) : null;
-      return a || { canView: true, canCreate: true, canEdit: true, canDelete: true };
+      return a || { canView: false, canCreate: false, canEdit: false, canDelete: false, raw_actions: [] };
     }, [secCtx, formCode]);
     const dataScope = useMemo(() => {
       return secCtx ? (secCtx.getDataScope(formCode) || {}) : {};
     }, [secCtx, formCode]);
+    const transactionAccess = secCtx?.getActions('FIN_TRANSACTION_MAIN') || {};
 
     const ownDataOnly = useMemo(() => {
       const raw = dataScope?.own_data_only;
@@ -125,17 +122,12 @@
     const [costTypes,        setCostTypes]        = useState([]);
     const [incomeTypes,      setIncomeTypes]      = useState([]);
     const [costBenefitCenters, setCostBenefitCenters] = useState([]);
-    const [stateMachineRows, setStateMachineRows] = useState([]);
-    const [userRoles,        setUserRoles]        = useState([]);
-    const [rolesMap,         setRolesMap]         = useState({});
-    const [usersList,        setUsersList]        = useState([]);
-    const [personnelRows,    setPersonnelRows]    = useState([]);
-    const [orgNodes,         setOrgNodes]         = useState([]);
     const [isLoading,        setIsLoading]        = useState(false);
     const [filters,          setFilters]          = useState({});
     const [gridState,        setGridState]        = useState(null);
     const [selectedIds,      setSelectedIds]      = useState([]);
     const [currentView,      setCurrentView]      = useState('list');
+    const [initialStatusAction, setInitialStatusAction] = useState(null);
     const [formMode,         setFormMode]         = useState('CREATE');
     const [currentRecord,    setCurrentRecord]    = useState(null);
     const [deleteConfirm,    setDeleteConfirm]    = useState({ isOpen: false, type: null, data: null });
@@ -147,30 +139,32 @@
     const [isUploading,      setIsUploading]      = useState(false);
     const [toast,            setToast]            = useState({ isVisible: false, message: '', type: 'success' });
     const [summaryModal,     setSummaryModal]     = useState({ isOpen: false, record: null });
+    const historyRequest = useRef(0);
+    const transactionOpen = useRef(0);
+    const [transactionView, setTransactionView] = useState(null);
     const [statusHistoryModal, setStatusHistoryModal] = useState({ isOpen: false, record: null, rows: [], isLoading: false });
 
     const showToast = useCallback((msg, type = 'success') => {
       setToast({ isVisible: true, message: msg, type });
       setTimeout(() => setToast(p => ({ ...p, isVisible: false })), 3000);
     }, []);
-
-    const parseAmount = useCallback((value) => parseFloat(String(value || '0').replace(/,/g, '')) || 0, []);
+    const transactionActor = window.RequestAssignmentLogic.useActor(supabase, currentUserId, showToast, t);
+    const today = window.RequestStatusActions.useTodayKey();
 
     const fetchMeta = useCallback(async () => {
       try {
-        const [uRes, pRes, nRes, costRes, incRes, cbcRes, smRes, urRes, rolesRes, personnelRes] = await Promise.all([
+        const [uRes, pRes, nRes, costRes, incRes, cbcRes] = await Promise.all([
           supabase.from('sec_users').select('id, full_name, username, party_id'),
           supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, mobile').eq('is_active', true),
           supabase.from('fm_org_chart_nodes').select('id, title, parent_id'),
           supabase.from('fm_cost_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
           supabase.from('fm_income_types').select('id, title_fa, title_en, code, parent_id').eq('is_active', true),
           supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
-          supabase.from('wf_state_machines').select('id, machine_code, entity_code, entry_condition, entry_condition_text, valid_from, valid_to, is_active, graph_json').eq('entity_code', 'REQ_REQUESTS').eq('is_active', true),
-          supabase.from('sec_user_roles').select('role_id').eq('user_id', currentUserId),
-          supabase.from('sec_roles').select('id, title, code').eq('is_active', true),
-          supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
         ]);
 
+        for (const result of [uRes, pRes, nRes, costRes, incRes, cbcRes]) {
+          if (result.error) throw result.error;
+        }
         const buildLeafs = (items) => {
           const parentIds = new Set((items || []).map(i => i.parent_id).filter(Boolean));
           return (items || []).filter(i => !parentIds.has(i.id)).map(i => ({
@@ -181,7 +175,6 @@
 
         const uMap = {}; (uRes.data || []).forEach(u => { uMap[u.id] = u.full_name || u.username || ''; });
         setUsersMap(uMap);
-        setUsersList(uRes.data || []);
         const pMap = {};
         const pList = (pRes.data || []).map(p => {
           const label = p.party_type === 'legal' ? (p.company_name || '') : `${p.first_name || ''} ${p.last_name || ''}`.trim();
@@ -194,19 +187,6 @@
         setDeptsMap(dMap);
         setCostTypes(buildLeafs(costRes.data || []));
         setIncomeTypes(buildLeafs(incRes.data || []));
-        setStateMachineRows(smRes.error ? [] : (smRes.data || []));
-        if (smRes.error) {
-          const msg = String(smRes.error?.message || '').toLowerCase();
-          if (smRes.error?.code === '42P01' || msg.includes('wf_state_machines')) {
-            showToast(t('تنظیمات State Machine در این محیط کامل نیست. ابتدا اسکریپت‌های فاز ۲ و ۵ را اجرا کنید.', 'State machine setup is incomplete in this environment. Run Phase 2 and Phase 5 scripts first.'), 'warning');
-          }
-        }
-        setUserRoles((urRes.data || []).map(r => String(r.role_id)));
-        const rMap = {};
-        (rolesRes.data || []).forEach(r => { rMap[String(r.id)] = r.title || r.code || ''; });
-        setRolesMap(rMap);
-        setPersonnelRows(personnelRes.data || []);
-        setOrgNodes(nRes.data || []);
         setCostBenefitCenters((cbcRes.data || []).map(r => ({
           id: r.id,
           titleFa: r.title_fa || '',
@@ -218,8 +198,8 @@
           managerName: r.manager ? `${r.manager.first_name || ''} ${r.manager.last_name || ''}`.trim() : '',
           officeName: r.office?.title || '',
         })));
-      } catch {}
-    }, [supabase, isRtl, currentUserId]);
+      } catch { showToast(t('خطا در دریافت اطلاعات پایه.', 'Error loading dependencies.'), 'error'); }
+    }, [supabase, isRtl, currentUserId, showToast, t]);
 
     const fetchData = useCallback(async () => {
       setIsLoading(true);
@@ -410,13 +390,15 @@
 
     const openStatusHistory = useCallback(async (record) => {
       if (!record?.id) return;
-      setStatusHistoryModal({ isOpen: true, record, rows: [], isLoading: true });
+      const requestId = ++historyRequest.current;
+      setStatusHistoryModal({ isOpen: true, record, rows: [], isLoading: true, error: '' });
       try {
         const { data, error, status } = await supabase
           .from('req_request_status_logs')
           .select('*')
           .eq('request_id', record.id)
           .order('changed_at', { ascending: true });
+        if (requestId !== historyRequest.current) return;
         if (error) {
           const msg = String(error?.message || '').toLowerCase();
           const missing = status === 404 || error?.code === '42P01' || msg.includes('req_request_status_logs');
@@ -430,18 +412,66 @@
         const rows = (data || []).map((row, idx) => ({ ...row, row_no: idx + 1 }));
         setStatusHistoryModal({ isOpen: true, record, rows, isLoading: false });
       } catch {
-        showToast(t('خطا در دریافت تاریخچه تغییر وضعیت.', 'Error loading status history.'), 'error');
-        setStatusHistoryModal({ isOpen: true, record, rows: [], isLoading: false });
+        if (requestId !== historyRequest.current) return;
+        const message = t('خطا در دریافت تاریخچه تغییر وضعیت.', 'Error loading status history.');
+        showToast(message, 'error');
+        setStatusHistoryModal({ isOpen: true, record, rows: [], isLoading: false, error: message });
       }
     }, [supabase, showToast, t]);
 
-    const handleOpenForm = (mode, record = null) => {
+    const handleOpenForm = (mode, record = null, statusAction = null) => {
+      setInitialStatusAction(statusAction);
       setFormMode(mode);
       setCurrentRecord(record || {});
       setCurrentView('form');
     };
 
     const handleFormSuccess = () => {
+      if (initialStatusAction) setSelectedIds(ids => ids.filter(id => id !== currentRecord?.id));
+      setInitialStatusAction(null);
+      setCurrentView('list');
+      fetchData();
+    };
+
+    const openTransaction = async (row, create = false) => {
+      const sequence = ++transactionOpen.current;
+      setIsLoading(true);
+      try {
+        const logic = window.RequestTransactionLogic;
+        const request = await logic.readRequest(supabase, row.id, true);
+        logic.assertScope(request, secCtx, formCode, currentUserId, t);
+        if (!transactionAccess.canView || (create && !transactionAccess.canCreate)) {
+          throw new Error(t('مجوز مشاهده یا ثبت تراکنش ندارید.', 'Transaction view/create access is required.'));
+        }
+        const existing = await logic.findTransaction(supabase, request.id);
+        if (sequence !== transactionOpen.current) return;
+        if (existing) {
+          if (!request.transaction_id && !logic.same(existing.registrar_id, currentUserId)) {
+            throw new Error(t('ثبت تراکنش توسط کاربر دیگری شروع شده است؛ پس از تکمیل، آن را مشاهده کنید.',
+              'Another user has started this transaction. View it after saving is complete.'));
+          }
+          const record = await logic.readTransaction(supabase, existing.id);
+          logic.assertScope(record, secCtx, 'FIN_TRANSACTION_MAIN', currentUserId, t);
+          if (sequence !== transactionOpen.current) return;
+          setTransactionView({ request, record, mode: 'EDIT' });
+        } else {
+          if (!create) throw new Error(t('تراکنش مرتبط یافت نشد.', 'Linked transaction was not found.'));
+          logic.assertInProgress(request, t);
+          await window.RequestAssignmentLogic.assertCanCreate(supabase, request, currentUserId, t);
+          if (sequence !== transactionOpen.current) return;
+          setTransactionView({ request, record: null, mode: 'CREATE' });
+        }
+        setCurrentView('transaction');
+      } catch (error) {
+        if (sequence === transactionOpen.current) showToast(error.message, 'error');
+      } finally {
+        if (sequence === transactionOpen.current) setIsLoading(false);
+      }
+    };
+
+    const closeTransaction = () => {
+      ++transactionOpen.current;
+      setTransactionView(null);
       setCurrentView('list');
       fetchData();
     };
@@ -475,55 +505,62 @@
       catch { return v; }
     };
 
-    const columns = useMemo(() => [
-      {
-        field: 'request_code', header_fa: 'کد درخواست', header_en: 'Request Code', width: '130px',
-        render: val => <span className="font-bold text-indigo-600 dark:text-indigo-400" dir="ltr">{val}</span>,
-      },
-      {
-        field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '115px',
-        render: val => { const s = getStatus(val); return <Badge variant={s.color} size="sm">{isRtl ? s.fa : s.en}</Badge>; },
-      },
-      {
-        field: 'request_type', header_fa: 'نوع درخواست', header_en: 'Type', width: '100px',
-        render: val => <span className="text-[12px] text-slate-600 dark:text-slate-400">{getTypeLabel(val, isRtl)}</span>,
-      },      
-      {
-        field: 'payment_type', header_fa: 'نوع پرداخت', header_en: 'Payment', width: '100px',
-        render: val => {
-          const types = { CASH: t('نقد', 'Cash'), CHECK: t('چک', 'Check'), CRYPTO: t('کریپتو', 'Crypto'), BANK: t('بانک', 'Bank'), TC: 'TC' };
-          return <span className="text-[12px] text-slate-600 dark:text-slate-400">{val ? (types[val] || val) : '-'}</span>;
+    const columns = useMemo(() => {
+      const paymentTypes = { CASH: t('نقد', 'Cash'), CHECK: t('چک', 'Check'), CRYPTO: t('کریپتو', 'Crypto'), BANK: t('بانک', 'Bank'), TC: 'TC' };
+      const display = {
+        request_code: value => value ?? '',
+        status: value => { const status = getStatus(value); return isRtl ? status.fa : status.en; },
+        request_type: value => getTypeLabel(value, isRtl),
+        payment_type: value => value ? (paymentTypes[value] || value) : '-',
+        requester_party_id: (value, row) => value
+          ? (partiesMap[value] || value)
+          : (row.registrar_id ? (usersMap[row.registrar_id] || '-') : '-'),
+        created_at: fmtDate,
+        need_date: fmtDate,
+        description: value => value || '-',
+      };
+      return [
+        {
+          field: 'request_code', header_fa: 'کد درخواست', header_en: 'Request Code', width: '130px',
+          render: val => <span className="font-bold text-indigo-600 dark:text-indigo-400" dir="ltr">{display.request_code(val)}</span>,
         },
-      },
-      {
-        field: 'requester_party_id', header_fa: 'درخواست دهنده', header_en: 'Requester', width: '100px',
-        render: (val, row) => (
-          <span className="text-[12px] font-medium text-slate-700 dark:text-slate-300">
-            {val ? (partiesMap[val] || val) : (row.registrar_id ? (usersMap[row.registrar_id] || '-') : '-')}
-          </span>
-        ),
-      },
-      {
-        field: 'assigned_to_display', header_fa: 'انجام دهنده', header_en: 'Assigned To', width: '120px',
-        render: (val, row) => (
-          <span className={`text-[12px] ${row.assigned_to_is_me ? 'font-bold text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
-            {val || '-'}
-          </span>
-        ),
-      },
-      {
-        field: 'created_at', header_fa: 'تاریخ ثبت', header_en: 'Submitted', width: '100px',
-        render: val => <span className="text-[12px] text-slate-500">{fmtDate(val)}</span>,
-      },
-      {
-        field: 'need_date', header_fa: 'تاریخ نیاز', header_en: 'Need Date', width: '100px',
-        render: val => <span className="text-[12px] text-slate-500">{val ? fmtDate(val) : '-'}</span>,
-      },
-      {
-        field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto',
-        render: val => <span className="text-[12px] text-slate-500 dark:text-slate-400 truncate block max-w-xs" title={val}>{val || '-'}</span>,
-      },
-    ], [usersMap, partiesMap, isRtl]);
+        {
+          field: 'status', header_fa: 'وضعیت', header_en: 'Status', width: '115px',
+          render: val => <Badge variant={getStatus(val).color} size="sm">{display.status(val)}</Badge>,
+        },
+        {
+          field: 'request_type', header_fa: 'نوع درخواست', header_en: 'Type', width: '100px',
+          render: val => <span className="text-[12px] text-slate-600 dark:text-slate-400">{display.request_type(val)}</span>,
+        },
+        {
+          field: 'payment_type', header_fa: 'نوع پرداخت', header_en: 'Payment', width: '100px',
+          render: val => <span className="text-[12px] text-slate-600 dark:text-slate-400">{display.payment_type(val)}</span>,
+        },
+        {
+          field: 'requester_party_id', header_fa: 'درخواست دهنده', header_en: 'Requester', width: '100px',
+          render: (val, row) => (
+            <span className="text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              {display.requester_party_id(val, row)}
+            </span>
+          ),
+        },
+        {
+          field: 'created_at', header_fa: 'تاریخ ثبت', header_en: 'Submitted', width: '100px',
+          render: val => <span className="text-[12px] text-slate-500">{display.created_at(val)}</span>,
+        },
+        {
+          field: 'need_date', header_fa: 'تاریخ نیاز', header_en: 'Need Date', width: '165px',
+          render: (val, row) => <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-[12px] text-slate-500 dark:text-slate-400">{display.need_date(val)}</span>
+            {window.RequestStatusActions.isOverdue(row, today) && <Badge variant="red" size="sm">{t('نیاز به رسیدگی فوری', 'Urgent attention')}</Badge>}
+          </div>,
+        },
+        {
+          field: 'description', header_fa: 'شرح', header_en: 'Description', width: 'auto',
+          render: val => <span className="text-[12px] text-slate-500 dark:text-slate-400 truncate block max-w-xs" title={val}>{display.description(val)}</span>,
+        },
+      ].map(column => ({ ...column, searchAccessor: display[column.field] }));
+    }, [usersMap, partiesMap, isRtl, today]);
 
     const historyColumns = useMemo(() => [
       {
@@ -623,20 +660,49 @@
       },
     ];
 
-    const { filteredData } = useRequestManagementWorkflow({
-      currentUserId,
-      requests,
-      filteredRecordId,
-      filters,
-      ownDataOnly,
-      stateMachineRows,
-      userRoles,
-      rolesMap,
-      usersList,
-      usersMap,
-      orgNodes,
-      personnelRows,
-      parseAmount,
+    const filteredData = useMemo(() => {
+      return (requests || []).filter(r => {
+        if (filteredRecordId && String(r.id) !== String(filteredRecordId)) return false;
+
+        const hasItemFilters =
+          !!filters.transaction_action ||
+          !!filters.transaction_group ||
+          !!filters.sub_type_id ||
+          !!filters.party_id ||
+          !!filters.center_id;
+
+        if (ownDataOnly && String(r.registrar_id || '') !== String(currentUserId || '')) return false;
+
+        if (!hasItemFilters) return true;
+
+        const hasMatchingItem = (r.req_request_items || []).some(item => {
+          if (filters.transaction_action && item.transaction_action !== filters.transaction_action) return false;
+          if (filters.transaction_group && item.transaction_group !== filters.transaction_group) return false;
+
+          if (filters.sub_type_id) {
+            const selected = filters.sub_type_id;
+            if (selected.subTypeGroup === 'COST') {
+              if (String(item.cost_type_id || '') !== String(selected.id)) return false;
+            } else if (selected.subTypeGroup === 'INCOME') {
+              if (String(item.income_type_id || '') !== String(selected.id)) return false;
+            }
+          }
+
+          if (filters.party_id && String(item.party_id || '') !== String(filters.party_id.id)) return false;
+          if (filters.center_id && String(item.center_id || '') !== String(filters.center_id.id)) return false;
+
+          return true;
+        });
+
+        return hasMatchingItem;
+      });
+    }, [requests, filteredRecordId, filters, ownDataOnly, currentUserId]);
+
+    const bulkStatus = window.useRequestBulkStatusActions({
+      records: filteredData, selectedIds, access, dataScope, currentUserId, supabase, language, t,
+      currentUserName: usersMap[currentUserId] || window.NavigationSystem?.currentUser?.full_name || '',
+      showToast, setSelectedIds, isLoading, onSaved: fetchData,
+      onOpenSingle: (record, action) => handleOpenForm('EDIT', record, action),
     });
 
     const filterFields = [
@@ -645,14 +711,20 @@
       { name: 'sub_type_id', label: t('نوع هزینه/درآمد', 'Cost/Income Type'), type: 'lov', lovData: mergedSubTypes, lovColumns: subTypeLovColumns, dropdownWidth: 'min-w-[420px]' },
       { name: 'party_id', label: t('طرف مقابل', 'Party'), type: 'lov', lovData: partiesList, lovColumns: partyLovColumns, dropdownWidth: 'min-w-[520px]' },
       { name: 'center_id', label: t('مرکز هزینه/درآمد', 'Cost/Income Center'), type: 'lov', lovData: costBenefitCenters, lovColumns: centerLovColumns, dropdownWidth: 'min-w-[580px]' },
-      { name: 'assigned_to_me', label: t('تخصیص به من', 'Assigned To Me'), type: 'toggle' },
     ];
 
     const viewConfig = useMemo(() => ({
       pageId: 'request_management_list',
       currentState: () => ({ filters, gridState }),
       onApplyState: (state) => {
-        if (state) { if (state.filters) setFilters(state.filters); if (state.gridState) setGridState(state.gridState); }
+        if (state) {
+          if (state.filters) setFilters(state.filters);
+          if (state.gridState) {
+            const restoredFilters = { ...state.gridState.filters };
+            delete restoredFilters.can_change_status;
+            setGridState({ ...state.gridState, filters: restoredFilters });
+          }
+        }
         else { setFilters({}); setGridState(null); }
       },
     }), [filters, gridState]);
@@ -679,12 +751,24 @@
                 <DataGrid
                   data={filteredData} columns={columns} language={language}
                   formCode={formCode} isLoading={isLoading} hideImport={true}
-                  selectable={true} selectedIds={selectedIds} onSelectChange={setSelectedIds}
+                  selectable={true} selectedRowIds={selectedIds} onSelectionChange={setSelectedIds}
                   gridState={gridState} onGridStateChange={setGridState}
-                  actionWidth="240px"
+                  actionWidth="280px"
                   onAdd={access.canCreate ? () => handleOpenForm('CREATE') : undefined}
                   onRowDoubleClick={row => handleOpenForm('EDIT', row)}
                   actions={[
+                    {
+                      icon: FilePlus, tooltip: t('ثبت تراکنش', 'Create Transaction'),
+                      hidden: row => !transactionAccess.canView || !transactionAccess.canCreate || row.status !== 'IN_PROGRESS' || !!row.transaction_id || !window.RequestAssignmentLogic.mayCreate(row, transactionActor),
+                      onClick: row => openTransaction(row, true),
+                      className: 'text-emerald-600 hover:text-emerald-700',
+                    },
+                    {
+                      icon: FileText, tooltip: t('مشاهده تراکنش مرتبط', 'View Linked Transaction'),
+                      hidden: row => !transactionAccess.canView || !row.transaction_id,
+                      onClick: row => openTransaction(row),
+                      className: 'text-indigo-600 hover:text-indigo-700',
+                    },
                     {
                       icon: DollarSign,
                       tooltip: t('خلاصه ارزی', 'Currency Summary'),
@@ -731,14 +815,17 @@
                     },
                   ]}
                   bulkActions={[
+                    ...bulkStatus.actions,
                     {
                       label: t('بروزرسانی نرخ ارز', 'Update Exchange Rates'),
                       icon: RefreshCw, variant: 'outline',
+                      disabled: bulkStatus.busy,
                       onClick: ids => handleBulkUpdateRates(ids),
                       className: 'text-indigo-600 dark:text-indigo-400',
                     },
                     {
                       label: t('حذف گروهی', 'Delete Selected'), icon: Trash2, variant: 'danger-outline',
+                      disabled: bulkStatus.busy,
                       onClick: ids => {
                         const ok = requests.filter(r => ids.includes(r.id) && isDeletable(r)).map(r => r.id);
                         if (!ok.length) { showToast(t('هیچ‌کدام قابل حذف نیستند.', 'None can be deleted.'), 'warning'); return; }
@@ -760,10 +847,21 @@
             onSuccess={handleFormSuccess}
             formMode={formMode}
             initialRecord={currentRecord}
+            initialStatusAction={initialStatusAction}
             language={language}
             formCode={formCode}
           />
         )}
+
+        {bulkStatus.modal}
+
+        {currentView === 'transaction' && transactionView && React.createElement(window.TransactionMainDetails, {
+          key: `${transactionView.request.id}-${transactionView.record?.id || 'new'}`,
+          isOpen: true, formMode: transactionView.mode, initialRecord: transactionView.record,
+          sourceRequest: transactionView.mode === 'CREATE' ? transactionView.request : null,
+          returnToRequests: true, language, formCode: 'FIN_TRANSACTION_MAIN',
+          onClose: closeTransaction, onSuccess: closeTransaction,
+        })}
 
         <Modal isOpen={deleteConfirm.isOpen}
           onClose={() => setDeleteConfirm({ isOpen: false, type: null, data: null })}
@@ -838,14 +936,15 @@
 
         <Modal
           isOpen={statusHistoryModal.isOpen}
-          onClose={() => setStatusHistoryModal({ isOpen: false, record: null, rows: [], isLoading: false })}
+          onClose={() => { historyRequest.current++; setStatusHistoryModal({ isOpen: false, record: null, rows: [], isLoading: false }); }}
           title={`${t('تاریخچه تغییر وضعیت درخواست', 'Request Status History')} | ${t('کد', 'Code')}: ${statusHistoryModal.record?.request_code || '-'}`}
           language={language}
           width="max-w-5xl"
         >
           <div className="p-4 h-[430px] bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg flex flex-col">
+            {statusHistoryModal.error && <div role="alert" className="text-red-600 dark:text-red-400">{statusHistoryModal.error}</div>}
             <div className="flex-1 min-h-0">
-              <DataGrid
+              {!statusHistoryModal.error && <DataGrid
                 data={statusHistoryModal.rows}
                 columns={historyColumns}
                 language={language}
@@ -857,11 +956,11 @@
                 selectable={false}
                 actionWidth="0px"
                 minVisibleRows={5}
-              />
+              />}
             </div>
           </div>
           <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-end rounded-b-lg">
-            <Button variant="primary" size="sm" onClick={() => setStatusHistoryModal({ isOpen: false, record: null, rows: [], isLoading: false })}>{t('بستن', 'Close')}</Button>
+            <Button variant="primary" size="sm" onClick={() => { historyRequest.current++; setStatusHistoryModal({ isOpen: false, record: null, rows: [], isLoading: false }); }}>{t('بستن', 'Close')}</Button>
           </div>
         </Modal>
 

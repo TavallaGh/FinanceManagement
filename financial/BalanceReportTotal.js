@@ -436,6 +436,7 @@
     const balanceIrr = (cellBalance === null || cellBalance === undefined) ? null : (parseFloat(cellBalance || 0) || 0) * balanceToIrrRate;
 
     const modalColumns = [
+      { field: '_approval_date', header_fa: 'تاریخ تأیید', header_en: 'Approval Date', width: '110px', type: 'date' },
       { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px]' }, val || '-') },
       { field: '_tx_status', header_fa: 'وضعیت سند', header_en: 'Document Status', width: '95px', render: (val) => React.createElement(Badge, { variant: statusColors[val] || 'gray', size: 'sm' }, statusLabels[val] || val || '-') },
       { field: '_tx_type', header_fa: 'نوع سند', header_en: 'Document Type', width: '100px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block', title: val }, txTypes[val] || val || '-') },

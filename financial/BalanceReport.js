@@ -256,6 +256,8 @@
     const [balanceGroups, setBalanceGroups] = useState([]);
     const [currencies,   setCurrencies]   = useState([]);
     const [reportData,   setReportData]   = useState(null);
+    const reportRequest = React.useRef(0);
+    useEffect(() => () => { reportRequest.current++; }, []);
     const [activeTab,    setActiveTab]    = useState('details');
     const [reportGridStates, setReportGridStates] = useState({ details: null, currency: null, rates: null, baseAmounts: null });
     const [cellDrillGridStates, setCellDrillGridStates] = useState({
@@ -444,7 +446,7 @@
       const accountLabel = `${account.code || ''} - ${isRtl ? (account.title_fa || account.title_en || '') : (account.title_en || account.title_fa || '')}`.trim();
       const targetDate = String(dateIso || '');
       const items = (reportData.detailItems || [])
-        .filter(item => String(item.account_id || '') === accountId && String(item._doc_date || '') === targetDate)
+        .filter(item => String(item.account_id || '') === accountId && String(item._approval_date || '') === targetDate)
         .sort((a, b) => {
           const docCmp = String(a._doc_code || '').localeCompare(String(b._doc_code || ''));
           if (docCmp !== 0) return docCmp;
@@ -475,7 +477,7 @@
 
       const targetDate = String(dateIso || '');
       const items = (reportData.detailItems || [])
-        .filter(item => String(item._doc_date || '') === targetDate)
+        .filter(item => String(item._approval_date || '') === targetDate)
         .filter(item => String(item._account_currency_code || item._account?.currency_code || '').toUpperCase() === currencyCode)
         .sort((a, b) => {
           const accCmp = String(a._account_code || '').localeCompare(String(b._account_code || ''));
@@ -522,6 +524,8 @@
 
       setGenerating(true);
       setReportData(null);
+      const request = ++reportRequest.current;
+      const publish = result => { if (request === reportRequest.current) setReportData(result); };
 
       try {
         const currencyMap = new Map(currencies.map(c => [String(c.id), c]));
@@ -539,7 +543,7 @@
 
         if (gaErr) throw gaErr;
         if (!groupAccs || groupAccs.length === 0) {
-          setReportData({ dates: [], accounts: [], leafAccounts: [], detailItems: [], matrix: {}, currencyAccounts: [], currencyMatrix: {}, currencyRateMatrix: {}, groupName: selGroup.title_fa || '', showMovements, leafCount: 0 });
+          publish({ dates: [], accounts: [], leafAccounts: [], detailItems: [], matrix: {}, currencyAccounts: [], currencyMatrix: {}, currencyRateMatrix: {}, groupName: selGroup.title_fa || '', showMovements, leafCount: 0 });
           return;
         }
 
@@ -597,7 +601,7 @@
         const accountById = new Map(filteredAccounts.map(acc => [String(acc.id), acc]));
 
         if (dates.length === 0) {
-          setReportData({ dates: [], dateFrom: isoFrom, dateTo: isoTo, accounts: filteredAccounts, leafAccounts: filteredAccounts, detailItems: detailedItems, matrix: {}, currencyAccounts: [], currencyMatrix: {}, currencyRateMatrix: {}, openingBalances: {}, groupName: selGroup.title_fa || '', showMovements, leafCount: filteredAccounts.length });
+          publish({ dates: [], dateFrom: isoFrom, dateTo: isoTo, accounts: filteredAccounts, leafAccounts: filteredAccounts, detailItems: detailedItems, matrix: {}, currencyAccounts: [], currencyMatrix: {}, currencyRateMatrix: {}, openingBalances: {}, groupName: selGroup.title_fa || '', showMovements, leafCount: filteredAccounts.length });
           return;
         }
 
@@ -621,33 +625,29 @@
         const rateLookup = buildRateLookup(await fetchAllCurrencyRatesUpToDate(isoTo));
         const conversionCache = new Map();
 
-        const { data: userData } = await supabase
+        const { data: userData, error: userError } = await supabase
           .from('sec_users')
           .select('id, full_name, username');
+        if (userError) throw userError;
         const userNameMap = {};
         (userData || []).forEach(user => {
           const label = `${user.full_name || user.username || ''}`.trim();
           if (label) userNameMap[String(user.id)] = label;
         });
 
-        // ── 2. Transactions (TEMPORARY / FINAL / APPROVED) up to dateTo ───
-        //    document_date stored as YYYY/MM/DD — compare with slashes
-        const isoToSlash = isoTo.replace(/-/g, '/');
-        const { data: txData } = await supabase
-          .from('fm_transactions')
-          .select('id, document_code, document_date, status, transaction_type, reference_code, description, created_at, registrar_id, reviewed_at, approved_at, department_id, reviewed_by_name, approved_by_name')
-          .in('status', ['TEMPORARY', 'FINAL', 'APPROVED'])
-          .lte('document_date', isoToSlash);
+        // Approved transactions are assigned to their effective approval day.
+        const txData = await window.FinancialApprovalLogic.readApprovedTransactions(supabase, isoTo);
 
         // Build a map: txId → ISO date
         const txDateMap = {};
         const txMetaMap = {};
         (txData || []).forEach(tx => {
-          txDateMap[String(tx.id)] = toIso(tx.document_date);
+          txDateMap[String(tx.id)] = toIso(tx.approval_date);
           txMetaMap[String(tx.id)] = {
             id: tx.id,
             document_code: tx.document_code || '',
             document_date: toIso(tx.document_date) || '',
+            approval_date: toIso(tx.approval_date),
             status: tx.status || '',
             transaction_type: tx.transaction_type || '',
             reference_code: tx.reference_code || '',
@@ -669,10 +669,7 @@
           const BATCH = 400;
           for (let i = 0; i < accountIds.length; i += BATCH) {
             const batch = accountIds.slice(i, i + BATCH);
-            const { data: items } = await supabase
-              .from('fm_transaction_items')
-              .select('*')
-              .in('account_id', batch);
+            const items = await window.FinancialApprovalLogic.readApprovedItems(supabase, batch, isoTo);
 
             (items || []).forEach(item => {
               if (validTxIds.has(String(item.transaction_id))) {
@@ -704,6 +701,7 @@
                   _doc_id: txMeta.id || item.transaction_id,
                   _doc_code: txMeta.document_code || '',
                   _doc_date: txMeta.document_date || txDateMap[String(item.transaction_id)] || '',
+                  _approval_date: txDateMap[String(item.transaction_id)],
                   _tx_type: txMeta.transaction_type || '',
                   _tx_status: txMeta.status || '',
                   _tx_reference_code: txMeta.reference_code || '',
@@ -854,14 +852,14 @@
             });
           });
 
-        setReportData({
+        publish({
           dates,
           dateFrom: isoFrom,
           dateTo: isoTo,
           accounts:  displayRows,
           leafAccounts: filteredAccounts,
           matrix:    displayMatrix,
-          detailItems: detailedItems,
+          detailItems: window.FinancialApprovalLogic.withApprovalBalances(detailedItems),
           currencyAccounts,
           currencyMatrix,
             currencyRateMatrix,
@@ -874,9 +872,9 @@
 
       } catch (e) {
         console.error('BalanceReport: error generating', e);
-        showToast(t('خطا در تولید گزارش', 'Error generating report'), 'error');
+        if (request === reportRequest.current) showToast(t('خطا در تولید گزارش: ', 'Error generating report: ') + e.message, 'error');
       } finally {
-        setGenerating(false);
+        if (request === reportRequest.current) setGenerating(false);
       }
     }, [currencies, filters, showToast, t, isRtl]);
 
@@ -1094,8 +1092,8 @@
           language,
           viewConfig,
           description: t(
-            'نمایش موجودی روزانه حساب‌ها به‌ازای هر گروه بالانس (ماتریس حساب × تاریخ)',
-            'Daily account balance matrix per balance group (accounts × dates)'
+            'موجودی روزانه حساب‌ها بر اساس تاریخ مؤثر تأیید؛ فقط تراکنش‌های تأییدشده',
+            'Daily account balances by effective approval date; approved transactions only'
           ),
           breadcrumbs: [
             { label: t('مدیریت مالی', 'Financial Management') },
@@ -1111,7 +1109,7 @@
             initialValues: filters,
             onFilter:      setFilters,
             onSearch:      handleGenerate,
-            onClear:       () => { setFilters(getDefaultFilters()); setReportData(null); setActiveTab('details'); setReportGridStates({ details: null, currency: null, rates: null, baseAmounts: null }); setCellDrillGridStates({ account: { pageSize: 5 }, currency: { pageSize: 5 } }); setCellDrillModal({ isOpen: false, kind: 'account', accountId: '', accountLabel: '', currencyCode: '', currencyLabel: '', date: '', items: [] }); },
+            onClear:       () => { reportRequest.current++; setGenerating(false); setFilters(getDefaultFilters()); setReportData(null); setActiveTab('details'); setReportGridStates({ details: null, currency: null, rates: null, baseAmounts: null }); setCellDrillGridStates({ account: { pageSize: 5 }, currency: { pageSize: 5 } }); setCellDrillModal({ isOpen: false, kind: 'account', accountId: '', accountLabel: '', currencyCode: '', currencyLabel: '', date: '', items: [] }); },
             language,
             defaultOpen:   true
           }),

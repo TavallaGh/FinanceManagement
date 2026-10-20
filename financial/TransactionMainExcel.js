@@ -599,6 +599,10 @@
 
           let insertedCount = 0;
           let updatedCount = 0;
+          if (docsToSave.some(doc => doc.documentStatus === 'APPROVED')) {
+            throw new Error(t('تأیید از طریق اکسل مجاز نیست؛ تراکنش‌ها را وارد کرده و با انتخاب تاریخ در فرم تأیید کنید.',
+              'Excel cannot approve transactions. Import them first, then approve with a date in the form.'));
+          }
           for (const doc of docsToSave) {
             const documentCode = doc.masterRow.documentCode;
 
@@ -612,11 +616,19 @@
               description: doc.masterRow.description || '',
             };
 
-            const { data: existingTx } = await supabase.from('fm_transactions').select('id').eq('document_code', documentCode).maybeSingle();
+            const { data: existingTx, error: existingError } = await supabase.from('fm_transactions')
+              .select('id, status').eq('document_code', documentCode).maybeSingle();
+            if (existingError) throw existingError;
+            if (existingTx && ['FINAL', 'APPROVED'].includes(existingTx.status)) {
+              throw new Error(t('سند بررسی‌شده یا تأییدشده از طریق اکسل قابل بازنویسی نیست: ',
+                'Excel cannot overwrite reviewed or approved documents: ') + documentCode);
+            }
             let txId = existingTx?.id || null;
             if (txId) {
-              const { error } = await supabase.from('fm_transactions').update(txPayload).eq('id', txId);
+              const { data: updated, error } = await supabase.from('fm_transactions').update(txPayload)
+                .eq('id', txId).eq('status', existingTx.status).select('id').single();
               if (error) throw error;
+              if (!updated) throw new Error(t('تراکنش تغییر کرده است.', 'Transaction changed.'));
               updatedCount++;
             } else {
               const { data, error } = await supabase.from('fm_transactions').insert([txPayload]).select('id');
@@ -628,7 +640,8 @@
               }
             }
 
-            await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
+            const removed = await supabase.from('fm_transaction_items').delete().eq('transaction_id', txId);
+            if (removed.error) throw removed.error;
             const itemsPayload = doc.items.map(item => ({
               transaction_id: txId,
               row_number: item.row_number,
@@ -702,7 +715,7 @@
         t('تاریخ سند', 'Document Date'), t('زمان ثبت', 'Registered At'),
         t('نوع تراکنش', 'Type'), t('وضعیت', 'Status'), t('ثبت‌کننده', 'Registrar'), t('دپارتمان', 'Department'),
         t('شرح سربرگ', 'Description'), t('بررسی‌کننده', 'Reviewed By'), t('تاریخ بررسی', 'Reviewed At'),
-        t('تاییدکننده', 'Approved By'), t('تاریخ تایید', 'Approved At'),
+        t('تاییدکننده', 'Approved By'), t('زمان انجام تأیید', 'Approved At'), t('تاریخ موثر گزارشدهی', 'Effective Reporting Date'),
         t('ردیف', 'Row'), t('حساب', 'Account'), t('نوع عملیات', 'Action'), t('گروه', 'Group'),
         t('نوع هزینه/درآمد', 'Cost/Income Type'), t('ارز', 'Currency'), t('مرکز هزینه/درآمد', 'Cost/Income Center'),
         t('واریز', 'Deposit'), t('برداشت', 'Withdrawal'), t('شرح قلم', 'Item Desc'),
@@ -721,6 +734,7 @@
           tx.description || '',
           tx.reviewed_by_name || '', formatDT(tx.reviewed_at),
           tx.approved_by_name || '', formatDT(tx.approved_at),
+          tx.approval_date || '',
         ];
 
         if (txItems.length === 0) {

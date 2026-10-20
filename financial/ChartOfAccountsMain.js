@@ -53,6 +53,7 @@
     const [nodeDepth, setNodeDepth] = useState(1);
     const [currencyRates, setCurrencyRates] = useState([]);
     const [nodeBalanceSnapshot, setNodeBalanceSnapshot] = useState({ balance: 0, usd: 0, balanceDate: '' });
+    const balanceRequest = React.useRef(0);
 
     const [lookups, setLookups] = useState({
       currencies: [],
@@ -703,73 +704,45 @@
     }, [isRtl, lookups.currencies, selectedNodeRecord]);
 
     const loadNodeBalanceSnapshot = useCallback(async (node) => {
+      const token = ++balanceRequest.current;
       if (!supabase || !node?.id) {
         setNodeBalanceSnapshot({ balance: 0, usd: 0, balanceDate: '' });
         return;
       }
 
+      setNodeBalanceSnapshot({ balance: null, usd: null, balanceDate: '', loading: true });
       try {
-        const { data, error } = await supabase
-          .from('fm_transaction_items')
-          .select('id, remained_amount, deposit_amount, withdrawal_amount, row_number, created_at, transaction_id, fm_transactions(id, document_date, created_at)')
-          .eq('account_id', node.id);
-        if (error) throw error;
-
-        const sortedItems = (data || [])
-          .map(item => {
-            const tx = Array.isArray(item.fm_transactions) ? item.fm_transactions[0] : item.fm_transactions;
-            return {
-              ...item,
-              _tx_date: String(tx?.document_date || '').replace(/\//g, '-'),
-              _tx_created_at: String(tx?.created_at || item.created_at || ''),
-            };
-          })
-          .sort((a, b) => {
-            const dateCmp = String(a._tx_date || '').localeCompare(String(b._tx_date || ''));
-            if (dateCmp !== 0) return dateCmp;
-            const createdCmp = String(a._tx_created_at || '').localeCompare(String(b._tx_created_at || ''));
-            if (createdCmp !== 0) return createdCmp;
-            const rowCmp = (parseInt(a.row_number || 0, 10) || 0) - (parseInt(b.row_number || 0, 10) || 0);
-            if (rowCmp !== 0) return rowCmp;
-            return String(a.id || '').localeCompare(String(b.id || ''));
-          });
-
-        let computedBalance = 0;
-        let lastKnownBalance = 0;
-        let lastKnownDate = '';
-
-        sortedItems.forEach(item => {
-          const dep = parseFloat(item.deposit_amount || 0) || 0;
-          const wid = parseFloat(item.withdrawal_amount || 0) || 0;
-          computedBalance += dep > 0 ? dep : -wid;
-          const persistedBalance = item.remained_amount !== null && item.remained_amount !== undefined && item.remained_amount !== ''
-            ? parseFloat(item.remained_amount)
-            : null;
-          lastKnownBalance = !isNaN(persistedBalance) && persistedBalance !== null ? persistedBalance : computedBalance;
-          if (item._tx_date) lastKnownDate = item._tx_date;
-        });
+        const logic = window.FinancialApprovalLogic;
+        const data = await logic.readApprovedItems(supabase, [node.id], logic.today());
+        const { balance, balanceDate } = logic.accountBalance(data);
+        if (token !== balanceRequest.current) return;
 
         const currencyCode = getSelectedNodeCurrencyCode();
         const usdRate = resolveConversionRate(buildRateLookup(currencyRates), currencyCode, 'USD', '9999-12-31');
 
         setNodeBalanceSnapshot({
-          balance: lastKnownBalance || 0,
-          usd: (lastKnownBalance || 0) * (usdRate || 1),
-          balanceDate: lastKnownDate,
+          balance,
+          usd: balance * (usdRate || 1),
+          balanceDate,
         });
       } catch (err) {
         console.error('Error loading node balance snapshot:', err);
-        setNodeBalanceSnapshot({ balance: 0, usd: 0, balanceDate: '' });
+        if (token === balanceRequest.current) {
+          setNodeBalanceSnapshot({ balance: null, usd: null, balanceDate: '', error: err.message });
+          showToast(t('خطا در دریافت مانده حساب: ', 'Unable to load account balance: ') + err.message, 'error');
+        }
       }
     }, [currencyRates, getSelectedNodeCurrencyCode, supabase]);
 
     useEffect(() => {
       if (!selectedNodeId || isCreatingNode) {
+        balanceRequest.current++;
         setNodeBalanceSnapshot({ balance: 0, usd: 0, balanceDate: '' });
         return;
       }
       if (!selectedNodeRecord) return;
       loadNodeBalanceSnapshot(selectedNodeRecord);
+      return () => { balanceRequest.current++; };
     }, [isCreatingNode, loadNodeBalanceSnapshot, selectedNodeId, selectedNodeRecord]);
 
     const tabOptions = [
@@ -937,11 +910,11 @@
                                 <div className="flex flex-col justify-center flex-1">
                                     <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 truncate">{t(`بالانس در لحظه (به ${getSelectedNodeCurrencyName()})`, `Real-time Balance (${getSelectedNodeCurrencyName()})`)}</span>
                                     <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right truncate">
-                                      {formatAmount(nodeBalanceSnapshot.balance)} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">{getSelectedNodeCurrencyCode()}</span>
+                                      {nodeBalanceSnapshot.loading ? '…' : nodeBalanceSnapshot.error ? t('خطا', 'Error') : formatAmount(nodeBalanceSnapshot.balance)} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">{getSelectedNodeCurrencyCode()}</span>
                                     </div>
                                     {nodeBalanceSnapshot.balanceDate && (
                                       <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
-                                        {t(`آخرین تراکنش: ${nodeBalanceSnapshot.balanceDate}`, `Latest transaction: ${nodeBalanceSnapshot.balanceDate}`)}
+                                        {t(`آخرین تاریخ تأیید: ${nodeBalanceSnapshot.balanceDate}`, `Latest approval date: ${nodeBalanceSnapshot.balanceDate}`)}
                                       </span>
                                     )}
                                 </div>
@@ -949,7 +922,7 @@
                                 <div className="flex-col justify-center hidden sm:flex flex-1">
                                     <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-0.5 truncate">{t('معادل ارزی پایه (دلار)', 'Base Currency Eq (USD)')}</span>
                                     <div className="text-[14px] font-black text-slate-800 dark:text-slate-200 dir-ltr text-right truncate">
-                                      {formatAmount(nodeBalanceSnapshot.usd)} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">USD</span>
+                                      {nodeBalanceSnapshot.loading ? '…' : nodeBalanceSnapshot.error ? t('خطا', 'Error') : formatAmount(nodeBalanceSnapshot.usd)} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold ml-0.5">USD</span>
                                     </div>
                                 </div>
                               </div>

@@ -63,28 +63,41 @@
 
     const [showGrid,       setShowGrid]       = useState(false);
     const [currencyRates,  setCurrencyRates]  = useState({});
+    const [currencies, setCurrencies] = useState([]);
+    const [rateLoad, setRateLoad] = useState({ loading: true, error: '' });
 
     // ── fetch exchange rates relative to the request date ──────────────────
     useEffect(() => {
       if (!isOpen || !record || !supabase) return;
+      let cancelled = false;
       const fetchRates = async () => {
+        setRateLoad({ loading: true, error: '' });
         try {
           const dateStr     = record.need_date || record.created_at || new Date().toISOString();
           const formattedDate = dateStr.replace(/\//g, '-').split('T')[0];
-          const { data } = await supabase
-            .from('fm_currency_rates')
-            .select('base_currency, target_currency, rate, rate_date')
-            .lte('rate_date', formattedDate)
-            .order('rate_date', { ascending: false });
+          const [ratesResult, currenciesResult] = await Promise.all([
+            supabase.from('fm_currency_rates').select('base_currency, target_currency, rate, rate_date')
+              .lte('rate_date', formattedDate).order('rate_date', { ascending: false }),
+            record.request_type === 'EXCHANGE' ? supabase.from('fm_currencies').select('code, decimal_places') : Promise.resolve({ data: [] }),
+          ]);
+          if (ratesResult.error) throw ratesResult.error;
+          if (currenciesResult.error) throw currenciesResult.error;
           const latest = {};
-          (data || []).forEach(r => {
+          (ratesResult.data || []).forEach(r => {
             const key = `${r.base_currency}_${r.target_currency}`;
             if (!latest[key]) latest[key] = r.rate;
           });
-          setCurrencyRates(latest);
-        } catch {}
+          if (!cancelled) {
+            setCurrencyRates(latest);
+            setCurrencies(currenciesResult.data || []);
+            setRateLoad({ loading: false, error: '' });
+          }
+        } catch (error) {
+          if (!cancelled) setRateLoad({ loading: false, error: error.message });
+        }
       };
       fetchRates();
+      return () => { cancelled = true; };
     }, [isOpen, record, supabase]);
 
     // ── rate resolver ──────────────────────────────────────────────────────
@@ -109,7 +122,9 @@
       depAppUsd, widAppUsd, depAppIrr, widAppIrr,
       depRemUsd, widRemUsd, depRemIrr, widRemIrr,
     } = useMemo(() => {
-      const rawItems = record?.req_request_items || [];
+      const rawItems = record?.request_type === 'EXCHANGE'
+        ? window.RequestExchangeLogic.summaryItems(record.req_request_items || [], currencies)
+        : record?.req_request_items || [];
       let dRqU = 0, wRqU = 0, dRqI = 0, wRqI = 0;
       let dApU = 0, wApU = 0, dApI = 0, wApI = 0;
       let dReU = 0, wReU = 0, dReI = 0, wReI = 0;
@@ -166,11 +181,28 @@
         depAppUsd: dApU, widAppUsd: wApU, depAppIrr: dApI, widAppIrr: wApI,
         depRemUsd: dReU, widRemUsd: wReU, depRemIrr: dReI, widRemIrr: wReI,
       };
-    }, [record, resolveRates]);
+    }, [record, resolveRates, currencies]);
 
     if (!isOpen || !record) return null;
 
     const handleClose = () => { setShowGrid(false); onClose(); };
+
+    const incompleteReceipt = record.request_type === 'EXCHANGE' && (record.req_request_items || [])
+      .some(item => item.destination_currency && !(Number(item.deposit_amount) > 0));
+    const requiredCurrencies = new Set(mappedItems.map(item => item.currency));
+    requiredCurrencies.add('IRR');
+    const missingRates = record.request_type === 'EXCHANGE' && [...requiredCurrencies].some(currency =>
+      currency !== 'USD' && !(Number(currencyRates[`${currency}_USD`]) > 0) && !(Number(currencyRates[`USD_${currency}`]) > 0));
+    if (rateLoad.loading || rateLoad.error || incompleteReceipt || missingRates) {
+      const message = rateLoad.loading ? t('در حال بارگذاری...', 'Loading...')
+        : rateLoad.error ? t('خطا در دریافت اطلاعات خلاصه: ', 'Error loading summary: ') + rateLoad.error
+        : incompleteReceipt ? t('مبلغ دریافتی برخی تبدیل‌ها هنوز مشخص نیست؛ پس از تکمیل، خلاصه قابل محاسبه است.', 'Some receipt amounts are still unknown. Complete them to calculate the summary.')
+        : t('نرخ مرجع تبدیل ارز برای تاریخ درخواست کامل نیست؛ خلاصه معادل‌ها قابل محاسبه نیست.', 'Reference currency rates are incomplete for the request date; equivalent totals cannot be calculated.');
+      return <Modal isOpen={isOpen} onClose={handleClose} language={language}
+        title={t('خلاصه ارزی درخواست', 'Request Currency Summary')} width="max-w-lg">
+        <div className="p-4 text-sm text-slate-600 dark:text-slate-300" dir={isRtl ? 'rtl' : 'ltr'}>{message}</div>
+      </Modal>;
+    }
 
     // ── SummaryCard: compact, designed to fill flex-1 height ──────────────
     const SummaryCard = ({ title, Icon, iconColor, usdDep, usdWid, irrDep, irrWid }) => (

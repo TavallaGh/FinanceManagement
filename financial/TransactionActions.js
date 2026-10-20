@@ -114,9 +114,13 @@
     dateLocale,
     setIsLoading,
     fetchData,
+    onTransactionsUpdated,
     showToast,
     logAction,
     setDeleteConfirm,
+    requestApprovalDate,
+    securityCtx,
+    formCode,
   }) => {
     const t = (fa, en) => isRtl ? fa : en;
 
@@ -140,8 +144,7 @@
             setIsLoading(false);
             return;
           }
-          const { error } = await supabase.from('fm_transactions').delete().eq('id', deleteConfirm.data.id);
-          if (error) throw error;
+          await window.RequestTransactionLogic.deleteTransaction(supabase, deleteConfirm.data, t);
           await logAction('delete_transaction', deleteConfirm.data.id, `حذف تراکنش: ${deleteConfirm.data.document_code}`);
         } else if (deleteConfirm.type === 'bulk') {
           const deletable = transactions.filter(tx => deleteConfirm.data.includes(tx.id) && !isLocked(tx));
@@ -156,8 +159,12 @@
             return;
           }
           const deletableIds = deletable.map(tx => tx.id);
-          const { error } = await supabase.from('fm_transactions').delete().in('id', deletableIds);
-          if (error) throw error;
+          for (const transaction of deletable) {
+            await window.RequestTransactionLogic.assertMutable(supabase, transaction, t);
+          }
+          for (const transaction of deletable) {
+            await window.RequestTransactionLogic.deleteTransaction(supabase, transaction, t);
+          }
           await logAction(
             'bulk_delete_transactions', 'BULK_DELETE',
             `حذف گروهی ${deletableIds.length} تراکنش${skipped > 0 ? ` (${skipped} سند قفل شده نادیده گرفته شد)` : ''}`
@@ -177,7 +184,8 @@
         fetchData();
         setDeleteConfirm({ isOpen: false, type: null, data: null });
       } catch (error) {
-        showToast(t('خطا در حذف.', 'Error deleting.'), 'error');
+        showToast(error.message || t('خطا در حذف.', 'Error deleting.'), 'error');
+        fetchData();
       } finally {
         setIsLoading(false);
       }
@@ -185,9 +193,12 @@
 
     /* ── تغییر وضعیت گروهی ───────────────────────── */
     const handleBulkStatusChange = async (newStatus, ids) => {
-      setIsLoading(true);
       try {
-        const eligible = transactions.filter(tx => ids.includes(tx.id) && canTransitionTo(tx.status, newStatus));
+        if (!securityCtx?.getActions(formCode)?.canEdit) {
+          throw new Error(t('مجوز ویرایش تراکنش ندارید.', 'Transaction edit access is required.'));
+        }
+        const live = await window.FinancialApprovalLogic.readAll(() => supabase.from('fm_transactions').select('*', { count: 'exact' }).in('id', ids));
+        const eligible = live.filter(tx => canTransitionTo(tx.status, newStatus));
         const skipped  = ids.length - eligible.length;
         if (eligible.length === 0) {
           showToast(t(
@@ -197,10 +208,16 @@
           setIsLoading(false);
           return;
         }
+        const approvalDate = newStatus === 'APPROVED' ? await requestApprovalDate(eligible.length) : null;
+        if (newStatus === 'APPROVED' && !approvalDate) return;
+        setIsLoading(true);
         const eligibleIds = eligible.map(tx => tx.id);
+        for (const transaction of eligible) {
+          window.RequestTransactionLogic.assertScope(transaction, securityCtx, formCode, currentUserId, t);
+          await window.RequestTransactionLogic.assertMutable(supabase, transaction, t, true);
+        }
+        if (newStatus === 'APPROVED') await window.FinancialApprovalLogic.checkApproval(supabase, approvalDate, t);
         const now = new Date().toISOString();
-        const { error } = await supabase.from('fm_transactions').update({ status: newStatus }).in('id', eligibleIds);
-        if (error) throw error;
 
         const actorName = (currentUserId && usersMap[currentUserId]) ? usersMap[currentUserId] : currentUserName;
         const metaPayload = {};
@@ -212,15 +229,23 @@
           metaPayload.approved_by = currentUserId || null;
           metaPayload.approved_at = now;
           metaPayload.approved_by_name = actorName;
+          metaPayload.approval_date = approvalDate;
         } else if (newStatus === 'TEMPORARY') {
           metaPayload.reviewed_by = null;
           metaPayload.reviewed_at = null;
           metaPayload.reviewed_by_name = null;
         }
-        if (Object.keys(metaPayload).length > 0) {
-          const { error: metaError } = await supabase.from('fm_transactions').update(metaPayload).in('id', eligibleIds);
-          if (metaError) console.warn('متادیتای بررسی/تایید ذخیره نشد:', metaError.message);
+        const { data: updated, error } = await supabase.from('fm_transactions')
+          .update({ status: newStatus, ...metaPayload }).in('id', eligibleIds)
+          .in('status', [...new Set(eligible.map(tx => tx.status))])
+          .select('id, status, reviewed_by, reviewed_at, reviewed_by_name, approved_by, approved_at, approved_by_name, approval_date');
+        if (error) throw error;
+        onTransactionsUpdated(updated || []);
+        if (updated?.length !== eligibleIds.length) {
+          throw new Error(t('بخشی از تراکنش‌ها تغییر کرده یا دسترسی آن‌ها محدود شده است؛ فهرست را بررسی کنید.',
+            'Some transactions changed or access was denied. Review the refreshed list.'));
         }
+        setIsLoading(false);
         const statusLabels = { DRAFT: 'یادداشت', TEMPORARY: 'موقت', FINAL: 'بررسی شده', APPROVED: 'تایید شده' };
         showToast(
           skipped > 0
@@ -230,11 +255,12 @@
           skipped > 0 ? 'warning' : 'success'
         );
         await logAction('bulk_status_update', 'BULK_UPDATE',
-          `تغییر وضعیت ${eligible.length} سند به ${statusLabels[newStatus] || newStatus} توسط ${currentUserName}`
+          `تغییر وضعیت ${eligible.length} سند به ${statusLabels[newStatus] || newStatus} توسط ${currentUserName}` +
+            (approvalDate ? ` / ${approvalDate}` : '')
         );
-        fetchData();
       } catch (error) {
-        showToast(t('خطا در تغییر وضعیت.', 'Error updating status.'), 'error');
+        showToast(error.message || t('خطا در تغییر وضعیت.', 'Error updating status.'), 'error');
+        fetchData();
       } finally {
         setIsLoading(false);
       }
@@ -275,6 +301,7 @@
         }
         let updatedCount = 0;
         for (const tx of selectedTxs) {
+          await window.RequestTransactionLogic.assertMutable(supabase, tx, t);
           const ratesMap = ratesByDate[tx.document_date] || {};
           for (const item of (tx.fm_transaction_items || [])) {
             const cur = item.currency || 'IRR';
@@ -300,7 +327,7 @@
         );
         fetchData();
       } catch (error) {
-        showToast(t('خطا در بروزرسانی نرخ ارزها.', 'Error updating exchange rates.'), 'error');
+        showToast(error.message || t('خطا در بروزرسانی نرخ ارزها.', 'Error updating exchange rates.'), 'error');
       } finally {
         setIsLoading(false);
       }

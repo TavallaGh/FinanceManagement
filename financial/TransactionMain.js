@@ -1,7 +1,7 @@
 /* Filename: financial/TransactionMain.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect, useMemo, useCallback } = React;
+  const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
   const FallbackComponent = () => null;
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
@@ -38,6 +38,8 @@
         ? safeComp(Forms, 'AttachmentManager')
         : safeComp(window, 'AttachmentManager');
     const FileText = safeIcon(LucideIcons, 'FileText');
+    const FilePlus = safeIcon(LucideIcons, 'FilePlus');
+    const FileSearch = safeIcon(LucideIcons, 'FileSearch');
     const AlertTriangle = safeIcon(LucideIcons, 'AlertTriangle');
     const MessageSquare = safeIcon(LucideIcons, 'MessageSquare');
     const Printer = safeIcon(LucideIcons, 'Printer');
@@ -122,6 +124,8 @@
         const [currentView, setCurrentView] = useState('list');
         const [formMode, setFormMode] = useState('CREATE');
         const [currentRecord, setCurrentRecord] = useState(null);
+        const [sourceRequest, setSourceRequest] = useState(null);
+        const dataLoad = useRef(0);
         const [commentModalState, setCommentModalState] = useState({ isOpen: false, record: null });
         const [commentedIds, setCommentedIds] = useState(new Set());
         const [filteredRecordId, setFilteredRecordId] = useState(null);
@@ -280,8 +284,14 @@
         }, [supabase, isRtl, currentUserId]);
 
         const fetchData = useCallback(async () => {
+            const generation = ++dataLoad.current;
             setIsLoading(true);
             try {
+                const chunkArray = (values, size) => {
+                    const chunks = [];
+                    for (let index = 0; index < values.length; index += size) chunks.push(values.slice(index, index + size));
+                    return chunks;
+                };
                 const [{ data: txData, error: txError }, { data: attData }] = await Promise.all([
                     supabase.from('fm_transactions').select('*').order('created_at', { ascending: false }),
                     supabase.from('fm_attachments').select('entity_id').eq('entity_type', 'TRANSACTION')
@@ -289,18 +299,11 @@
 
                 if (txError) throw txError;
 
-                const transactionsWithItems = (txData || []).map(tx => ({ ...tx, fm_transaction_items: [] }));
+                const referenced = await window.TransactionRequestReference.addReferenceCodes(supabase, txData || [], securityCtx, currentUserId);
+                const transactionsWithItems = referenced.map(tx => ({ ...tx, fm_transaction_items: [] }));
                 const txIds = transactionsWithItems.map(tx => String(tx.id));
 
                 if (txIds.length > 0) {
-                    const chunkArray = (values, size) => {
-                        const chunks = [];
-                        for (let index = 0; index < values.length; index += size) {
-                            chunks.push(values.slice(index, index + size));
-                        }
-                        return chunks;
-                    };
-
                     const loadInBatches = async (table, selectColumns, filterColumn, values, extraBuilder = null) => {
                         const batches = chunkArray(values, 100);
                         const rows = [];
@@ -350,6 +353,7 @@
                     }
                 }
 
+                if (generation !== dataLoad.current) return;
                 setTransactions(transactionsWithItems);
 
                 const counts = {};
@@ -367,22 +371,27 @@
                             .in('entity_id', batch);
                         if (data && data.length) commentRows.push(...data);
                     }
-                    if (commentRows) setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
+                    if (generation === dataLoad.current) setCommentedIds(new Set(commentRows.map(r => r.entity_id)));
                 }
             } catch (error) {
-                showToast(t('خطا در دریافت لیست تراکنش‌ها', 'Error fetching transactions'), 'error');
+                if (generation === dataLoad.current) showToast(t('خطا در دریافت لیست تراکنش‌ها: ', 'Error fetching transactions: ') + error.message, 'error');
             } finally {
-                setIsLoading(false);
+                if (generation === dataLoad.current) setIsLoading(false);
             }
-        }, [supabase, showToast, t]);
+        }, [supabase, showToast, t, securityCtx, currentUserId]);
 
-        useEffect(() => {
-                if (access.canView) {
-                        fetchUsersAndResolveDepartment();
-                        fetchLookups();
-                        fetchData();
-                }
-        }, [fetchUsersAndResolveDepartment, fetchLookups, fetchData, access.canView]);
+        const applyTransactionUpdates = useCallback((updatedRows) => {
+            if (!updatedRows?.length) return;
+            // An older list request must not overwrite the confirmed write.
+            dataLoad.current++;
+            const byId = new Map(updatedRows.map(row => [String(row.id), row]));
+            setTransactions(current => current.map(row => {
+                const updated = byId.get(String(row.id));
+                return updated ? { ...row, ...updated } : row;
+            }));
+        }, []);
+
+        useEffect(() => () => { dataLoad.current++; }, [supabase, securityCtx, currentUserId]);
 
     useEffect(() => {
         if (access.canView) {
@@ -403,6 +412,7 @@
     }, []);
 
     const handleOpenForm = (mode, record = null) => {
+        setSourceRequest(null);
         setFormMode(mode);
         if (mode === 'CREATE') {
             setCurrentRecord({
@@ -420,9 +430,21 @@
     };
 
     const handleModalSuccess = () => {
+        setSourceRequest(null);
         setCurrentView('list');
         fetchData();
     };
+
+    const requestReference = window.TransactionRequestReference.useReference({
+        supabase, security: securityCtx, userId: currentUserId, formCode, language, t, showToast,
+        onTransaction: ({ mode, record, request }) => {
+            setSourceRequest(request);
+            setFormMode(mode);
+            setCurrentRecord(record || {});
+            setCurrentView('form');
+        },
+        onRequest: () => setCurrentView('request'),
+    });
 
     const loadAttachments = async (recordId) => {
         try {
@@ -442,10 +464,12 @@
 
     const handleFileUpload = async (files) => {
         if (!files || files.length === 0 || !attachModal.record) return;
+        if (!access.canEdit) return;
         const file = files[0];
 
         setIsUploading(true);
         try {
+            await window.RequestTransactionLogic.assertMutable(supabase, attachModal.record, t);
             const fileExt = file.name.split('.').pop();
             const fileName = `${attachModal.record.id}_${Date.now()}.${fileExt}`;
             const filePath = `transactions/${fileName}`;
@@ -485,7 +509,9 @@
     };
 
     const handleDeleteAttachment = async (fileId) => {
+        if (!access.canEdit) return;
         try {
+            await window.RequestTransactionLogic.assertMutable(supabase, attachModal.record, t);
             const { error } = await supabase.from('fm_attachments').delete().eq('id', fileId);
             if (error) throw error;
             showToast(t('پیوست حذف شد.', 'Attachment deleted.'));
@@ -546,6 +572,7 @@
         : { handleDownloadSample: null, handleImportTransactions: null, onExport: null, importErrorsModal: null };
 
     /* ── عملیات گروهی و اکسپورت ─ از TransactionActions.js ── */
+    const approvalDateControl = window.FinancialApprovalControls.useApprovalDate(language);
     const _txActions = window.makeTransactionActions ? window.makeTransactionActions({
         transactions, filteredTransactions, filteredRecordId,
         usersMap, deptsMap, lookups,
@@ -553,7 +580,9 @@
         currentUserId, currentUserName,
         isRtl, dateLocale,
         setIsLoading, fetchData, showToast, logAction,
+        onTransactionsUpdated: applyTransactionUpdates,
         setDeleteConfirm,
+        requestApprovalDate: approvalDateControl.request, securityCtx, formCode,
     }) : {};
     const executeDelete      = _txActions.executeDelete      || (() => {});
     const bulkActions        = _txActions.bulkActions        || [];
@@ -564,6 +593,8 @@
     const columns = useMemo(() => [
         { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => React.createElement('span', { className: "font-bold text-slate-700 dark:text-slate-300" }, val || '-') },
         { field: 'document_code', header_fa: 'کد تراکنش', header_en: 'Doc Code', width: '120px', render: (val) => React.createElement('span', { className: "text-indigo-600 dark:text-indigo-400 font-bold" }, val) },
+        { field: 'request_reference_code', header_fa: 'مرجع تراکنش', header_en: 'Transaction Reference', width: '150px',
+            render: (value, row) => React.createElement('span', { dir: value ? 'ltr' : undefined }, value || (row.request_id ? t('خارج از دسترس', 'Unavailable') : '-')) },
         { field: 'daily_number', header_fa: 'روزانه', header_en: 'Daily', width: '70px' },
         { field: 'document_date', header_fa: 'تاریخ تراکنش', header_en: 'Date', width: '90px', type: 'date' },
         { field: 'created_at', header_fa: 'زمان ثبت', header_en: 'Registered At', width: '100px', render: (val) => {
@@ -591,7 +622,7 @@
         { field: 'department_id', header_fa: 'دپارتمان', header_en: 'Department', width: '120px', render: (val) => {
             return React.createElement('span', { className: "text-[12px] truncate font-medium text-slate-600 dark:text-slate-400 block" }, deptsMap[val] || val || '-');
         }},
-        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: '160px', render: (val) => React.createElement('span', { className: "text-[12px] truncate block max-w-xs", title: val }, val || '-') },
+        { field: 'description', header_fa: 'شرح سربرگ', header_en: 'Description', width: '150px', render: (val) => React.createElement('span', { className: "text-[12px] truncate block max-w-xs", title: val }, val || '-') },
         { field: 'reviewed_by_name', header_fa: 'بررسی‌کننده', header_en: 'Reviewed By', width: '110px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block font-medium text-slate-700 dark:text-slate-300' }, val || '-') },
         { field: 'reviewed_at', header_fa: 'تاریخ بررسی', header_en: 'Reviewed At', width: '115px', render: (val) => {
             if (!val) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
@@ -640,7 +671,8 @@
                 depIrr > 0 ? React.createElement('span', { className: 'text-[12px] font-medium text-emerald-600 dark:text-emerald-500' }, formatNumber(depIrr)) : null,
                 widIrr > 0 ? React.createElement('span', { className: 'text-[12px] font-medium text-rose-500 dark:text-rose-400' }, formatNumber(widIrr)) : null
             );
-        }}
+        }},
+        { field: 'approval_date', header_fa: 'تاریخ موثر گزارشدهی', header_en: 'Effective Reporting Date', width: '150px', type: 'date' }
     ], [usersMap, deptsMap, t, dateLocale]);
 
     const accountLovColumns = [
@@ -698,6 +730,7 @@
         { name: 'center_id', label: t('مرکز هزینه/درآمد', 'Cost/Income Center'), type: 'lov', lovData: lookups.costBenefitCenters, lovColumns: centerLovColumns, dropdownWidth: 'min-w-[620px]' },
         { name: 'date_type', label: t('نوع تاریخ', 'Date Field'), type: 'select', options: [
             { value: 'document_date', label: t('تاریخ تراکنش', 'Transaction Date') },
+            { value: 'approval_date', label: t('تاریخ موثر گزارشدهی', 'Effective Reporting Date') },
             { value: 'created_at', label: t('تاریخ ثبت', 'Registration Date') }
         ]},
         { name: 'date_from', label: t('از تاریخ', 'From Date'), type: 'date' },
@@ -706,6 +739,9 @@
     ];
 
     const gridActions = [
+        { id: 'view_request', icon: FileSearch, tooltip: t('مشاهده درخواست مرجع', 'View Reference Request'),
+            hidden: row => !row.request_id || !requestReference.canViewRequest,
+            onClick: requestReference.openRequest, requiredAccess: 'view' },
         { 
             id: 'comment',
             icon: MessageSquare,
@@ -730,17 +766,29 @@
 
     const viewConfig = useMemo(() => ({
       pageId: 'transactions_main_list',
-      currentState: () => ({ filters, gridState }),
+      currentState: () => ({ filters, gridState, reportingDateColumnVersion: 1 }),
       onApplyState: (state) => {
         if (state) {
           if (state.filters) setFilters(state.filters);
-          if (state.gridState) setGridState(state.gridState);
+          if (state.gridState) {
+            const restored = state.gridState;
+            if (state.reportingDateColumnVersion === 1) {
+              setGridState(restored);
+            } else {
+              setGridState({
+                ...restored,
+                columnOrder: [...(restored.columnOrder || columns.map(column => column.field))
+                  .filter(field => field !== 'approval_date'), 'approval_date'],
+                pinnedCols: (restored.pinnedCols || []).filter(field => field !== 'approval_date')
+              });
+            }
+          }
         } else {
           setFilters({});
           setGridState(null);
         }
       }
-    }), [filters, gridState]);
+    }), [filters, gridState, columns]);
 
     const DetailsModal = safeComp(window, 'TransactionMainDetails');
     const TransactionSummaryModal = safeComp(window, 'TransactionSummary');
@@ -778,6 +826,11 @@
                         gridState: gridState,
                         onGridStateChange: setGridState,
                         onAdd: access.canCreate ? () => handleOpenForm('CREATE') : undefined,
+                        toolbarContent: requestReference.canCreate ? React.createElement(Button, {
+                            variant: 'outline', size: 'sm', icon: FilePlus, disabled: requestReference.busy || isLoading,
+                            onClick: requestReference.openPicker,
+                        }, t('ثبت با مرجع', 'Create with Reference')) : null,
+                        compactBulkToolbar: true,
                         onRowDoubleClick: (row) => handleOpenForm('EDIT', row),
                         selectable: true,
                         actions: gridActions,
@@ -787,22 +840,30 @@
                         onImport: access.canCreate ? handleImportTransactions : undefined,
                         onExport: handleCustomExport,
                         defaultHiddenCols: ['reference_code', 'daily_number', 'department_id', 'reviewed_by_name', 'reviewed_at', 'approved_by_name', 'approved_at'],
-                        actionWidth: '220px'
+                        actionWidth: '250px'
                     })
                 )
             )
         ),
 
         currentView === 'form' && currentRecord && React.createElement(DetailsModal, {
-            key: `${formMode}-${currentRecord?.id || 'new'}`,
+            key: `${formMode}-${currentRecord?.id || sourceRequest?.id || 'new'}`,
             isOpen: true,
-            onClose: () => setCurrentView('list'),
+            onClose: () => { setSourceRequest(null); setCurrentView('list'); },
             onSuccess: handleModalSuccess,
             formMode: formMode,
             initialRecord: currentRecord,
+            sourceRequest: sourceRequest,
             language: language,
             formCode: formCode
         }),
+
+        currentView === 'request' && requestReference.requestRecord && React.createElement(window.RequestFormModal, {
+            key: requestReference.requestRecord.id, isOpen: true, formMode: 'EDIT', readOnly: true,
+            initialRecord: requestReference.requestRecord, language, formCode: 'REQ_REQUEST_MNGMT',
+            onClose: () => setCurrentView('list'),
+        }),
+        requestReference.modal,
 
         React.createElement(Modal, {
             isOpen: deleteConfirm.isOpen,
@@ -880,6 +941,7 @@
             language: language
         }) : null,
 
+        approvalDateControl.modal,
         React.createElement(Toast, {
             isVisible: toast.isVisible,
             message: toast.message,

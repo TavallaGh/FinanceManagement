@@ -30,7 +30,9 @@
 
   const DSForms     = window.DSForms || DS;
   const TextField         = safeComp(DSForms, 'TextField');
+  const TextAreaField     = safeComp(DSForms, 'TextAreaField');
   const SelectField       = safeComp(DSForms, 'SelectField');
+  const RadioGroup        = safeComp(DSForms, 'RadioGroup');
   const DatePicker        = safeComp(DSForms, 'DatePicker');
 
   const DSGrid      = window.DSGrid || DS;
@@ -84,12 +86,8 @@
     { value: 'CLOSED',      fa: 'بسته شده',     en: 'Closed',       color: 'gray'    },
   ];
 
-  const BALANCED_REQUEST_TYPES = ['TRANSFER', 'EXCHANGE'];
+  const BALANCED_REQUEST_TYPES = ['TRANSFER'];
   const getStatus = (v) => STATUS_LIST.find(s => s.value === v) || STATUS_LIST[0];
-  const workflowNotificationUtils = window.WorkflowNotificationUtils || {};
-  const sendWorkflowAssignmentNotifications = workflowNotificationUtils.sendWorkflowAssignmentNotifications
-    || (async () => 0);
-
   const getSessionUserId = () => {
     try {
       const s = sessionStorage.getItem('fm_user_session') || localStorage.getItem('fm_user_session') || '{}';
@@ -102,7 +100,7 @@
   // ════════════════════════════════════════════════════════════════════════════
   const RequestFormModal = ({
     isOpen, onClose, onSuccess, formMode = 'CREATE', initialRecord = null,
-    language = 'fa', formCode = 'REQ_REQUEST_MNGMT'
+    language = 'fa', formCode = 'REQ_REQUEST_MNGMT', initialStatusAction = null, readOnly = false
   }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
@@ -118,9 +116,9 @@
     const RequestItemsGrid = safeComp(window, 'RequestItemsGrid');
 
     const secCtx = window.SecurityManager?.useSecurity ? window.SecurityManager.useSecurity() : null;
-    const access = useMemo(() => {
+    const formAccess = useMemo(() => {
       const a = secCtx ? secCtx.getActions(formCode) : null;
-      return a || { canView: true, canCreate: true, canEdit: true, canDelete: true };
+      return a || { canView: false, canCreate: false, canEdit: false, canDelete: false, raw_actions: [] };
     }, [secCtx, formCode]);
 
     const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' });
@@ -134,6 +132,9 @@
     const [hasSaved,    setHasSaved]    = useState(false);
     const [copyWarning, setCopyWarning] = useState(null);
     const [header,      setHeader]      = useState({});
+    const dataScope = secCtx?.getDataScope(formCode) || {};
+    const scopedAccess = window.RequestStatusActions.recordAccess(header, formAccess, dataScope, currentUserId);
+    const access = readOnly ? { ...scopedAccess, canCreate: false, canEdit: false, canDelete: false, raw_actions: [] } : scopedAccess;
     const [items,       setItems]       = useState([]);
     const [lookups,     setLookups]     = useState({
       leafAccounts: [], allAccounts: [], costTypes: [], incomeTypes: [],
@@ -141,23 +142,9 @@
       currencies: [], usersMap: {}, usersList: [], partiesMap: {}, partiesList: [],
       nodesMap: {}, orgNodes: [], personnelRows: [], rolesMap: {}, currentUserDeptId: null, currentUserDeptTitle: '',
       currentUserPartyId: null, currentUserPartyName: '',
-      projects: [],
     });
 
   const gridRef     = useRef(null);
-
-    const isMissingWorkflowSchemaError = useCallback((error, status) => {
-      const msg = String(error?.message || '').toLowerCase();
-      const details = String(error?.details || '').toLowerCase();
-      const hint = String(error?.hint || '').toLowerCase();
-      return (
-        status === 404 ||
-        error?.code === '42P01' ||
-        msg.includes('wf_state_machines') ||
-        details.includes('wf_state_machines') ||
-        hint.includes('wf_state_machines')
-      );
-    }, []);
 
     const parseAmount = useCallback((value) => {
       return parseFloat(String(value || '0').replace(/,/g, '')) || 0;
@@ -171,8 +158,8 @@
     const getRequestedAmount = useCallback((item) => {
       const dep = parseAmount(item?.deposit_amount);
       const wid = parseAmount(item?.withdrawal_amount);
-      return Math.max(dep, wid);
-    }, [parseAmount]);
+      return header.request_type === 'EXCHANGE' ? wid : Math.max(dep, wid);
+    }, [parseAmount, header.request_type]);
 
     const getCurrencyDecimals = useCallback((currencyCode) => {
       const currency = (lookups.currencies || []).find(item => item.code === currencyCode);
@@ -202,76 +189,22 @@
       Modal,
       DataGrid,
       TextField,
+      TextAreaField,
+      RadioGroup,
       LOVField,
     }), []);
 
-    const useRequestWorkFlow = window.useRequestWorkFlow || (() => ({
-      dynamicActions: [],
-      workflowGraph: { nodes: [], edges: [] },
-      workflowLoading: false,
-      workflowPermissions: {},
-      renderStatusActions: () => null,
-      renderWorkflowModals: () => null,
-      resolveNextAssignees: async () => ({ users: [], labels: [] }),
-      resolveDataEntryFormsForStatus: () => [],
-      selectedMachineMeta: { id: null, machine_code: '' },
-    }));
-    const workflowModule = useRequestWorkFlow({
-      isOpen,
-      language,
-      isRtl,
-      t,
-      supabase,
-      header,
-      items,
-      lookups,
-      currentUserId,
-      isLoading,
-      access,
-      formCode,
-      parseAmount,
-      formatNumberSafe,
-      getRequestedAmount,
-      showToast,
-      setItems,
-      setIsDirty,
-      safeIcon,
-      LucideIcons,
-      getStatus,
-      isMissingWorkflowSchemaError,
-      dataEntryComponents,
+    const { renderStatusActions, renderStatusModals, openStatusAction } = window.useRequestStatusActions({
+      isOpen, language, isRtl, t, header, items, lookups, access, isLoading, isDirty,
+      showToast, formatNumberSafe, getRequestedAmount, dataEntryComponents,
+      onCancel: initialStatusAction ? onClose : null,
     });
 
-    const {
-      workflowPermissions,
-      renderStatusActions,
-      renderWorkflowModals,
-      resolveNextAssignees,
-      resolveDataEntryFormsForStatus,
-      selectedMachineMeta,
-    } = workflowModule;
-
-    const isMissingWorkItemsTableError = useCallback((error) => {
-      const msg = String(error?.message || '').toLowerCase();
-      const details = String(error?.details || '').toLowerCase();
-      const hint = String(error?.hint || '').toLowerCase();
-      return error?.code === '42P01'
-        || error?.code === 'PGRST205'
-        || msg.includes('wf_work_items')
-        || msg.includes('could not find the table')
-        || details.includes('wf_work_items')
-        || hint.includes('wf_work_items');
-    }, []);
-
-    const canEditField = useCallback((field) => {
-      if (formMode === 'CREATE' || formMode === 'COPY') return true;
-      return ['EDITABLE', 'REQUIRED'].includes(workflowPermissions[field]);
-    }, [formMode, workflowPermissions]);
-
-    const isReadOnly = formMode !== 'CREATE' && formMode !== 'COPY' &&
-      !Object.values(workflowPermissions).some(permission => permission === 'EDITABLE' || permission === 'REQUIRED');
-    const areItemsReadOnly = formMode !== 'CREATE' && formMode !== 'COPY' &&
-      !Object.entries(workflowPermissions).some(([field, permission]) => field.startsWith('items.') && ['EDITABLE', 'REQUIRED'].includes(permission));
+    const isReadOnly = readOnly || (header.id
+      ? !access.canEdit || header.status !== 'DRAFT'
+      : !access.canCreate);
+    const canEditField = () => !isReadOnly;
+    const areItemsReadOnly = isReadOnly;
     const useRequestDetailsPersistence = window.useRequestDetailsPersistence || (() => ({
       currencyRates: {},
       handleSave: async () => {},
@@ -297,26 +230,38 @@
       setCopyWarning,
       showToast,
       setLookups,
-      resolveNextAssignees,
-      resolveDataEntryFormsForStatus,
-      selectedMachineMeta,
       parseAmount,
-      resolveRates,
-      isMissingWorkItemsTableError,
-      getStatus,
       lookups,
-      sendWorkflowAssignmentNotifications,
+      access,
+      dataScope,
+      readOnly,
     });
 
+    const openedInitialAction = useRef(false);
+    const handleStatusSave = async (action, input) => {
+      const saved = await handleSave(action, input);
+      if (saved && initialStatusAction) onSuccess();
+      return saved;
+    };
+    useEffect(() => {
+      if (!initialStatusAction || openedInitialAction.current || header.id !== initialRecord?.id) return;
+      openedInitialAction.current = true;
+      const allowed = window.RequestStatusActions.getActions(header.status, access)
+        .find(action => action.id === initialStatusAction.id);
+      if (allowed) openStatusAction(allowed, handleStatusSave);
+      else showToast(t('اجازه این تغییر وضعیت را ندارید.', 'This status transition is not permitted.'), 'error');
+    }, [initialStatusAction, initialRecord, header.id, header.status, access, openStatusAction, handleStatusSave, showToast, t]);
+
     const updateHeader = useCallback((field, value) => {
+      if (readOnly) return;
       setHeader(p => ({ ...p, [field]: value }));
       setIsDirty(true);
-    }, []);
+    }, [readOnly]);
 
 
-    const handleClose = () => { if (hasSaved && onSuccess) onSuccess(); else onClose(); };
+    const handleClose = () => { if (isLoading) return; if (hasSaved && onSuccess) onSuccess(); else onClose(); };
     
-    // ── balance check for TRANSFER and EXCHANGE ───────────────────────────────────
+    // ── balance check for transfers ──────────────────────────────────────────────
     const balanceInfo = useMemo(() => {
       if (!BALANCED_REQUEST_TYPES.includes(header.request_type) || items.length === 0) return { isUnbalanced: false, diffUsd: 0 };
 
@@ -358,7 +303,7 @@
       } catch { return v; }
     };
 
-    const statusActions = renderStatusActions(handleSave);
+    const statusActions = readOnly ? null : renderStatusActions(handleStatusSave);
 
     const headerCardTitle = (
       <div className="flex items-center gap-3 w-full">
@@ -389,7 +334,7 @@
           </div>
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="sm" className="!px-5" onClick={handleClose}>{t('انصراف', 'Cancel')}</Button>
-            {!isReadOnly && access.canEdit && (
+            {!isReadOnly && (
               <Button variant="primary" size="sm" className="!px-5" icon={Save}
                 onClick={() => handleSave()} isLoading={isLoading} disabled={!isDirty}>
                 {t('ذخیره', 'Save')}
@@ -427,7 +372,7 @@
                   value={fmtDT(header.created_at)} disabled isRtl={isRtl} />
 
                 <div className="relative z-[90]">
-                  <DatePicker size="sm" label={t('تاریخ نیاز', 'Need Date')}
+                  <DatePicker size="sm" label={t('تاریخ نیاز', 'Need Date')} required
                     value={header.need_date || ''} onChange={v => updateHeader('need_date', v)}
                     isRtl={isRtl} calendarMode={calendarMode} disabled={!canEditField('need_date')} />
                 </div>
@@ -471,7 +416,7 @@
                 <div className="lg:col-span-2 md:col-span-2 relative z-[70]">
                   <TextField size="sm" label={t('شرح درخواست', 'Description')}
                     value={header.description || ''} onChange={e => updateHeader('description', e.target.value)}
-                    isRtl={isRtl} disabled={!canEditField('description')} required={workflowPermissions.description === 'REQUIRED' || formMode === 'CREATE' || formMode === 'COPY'} />
+                    isRtl={isRtl} disabled={!canEditField('description')} required />
                 </div>
               </div>
             </Card>
@@ -517,10 +462,17 @@
               headerClassName="flex justify-between items-center px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
               language={language}>
               <div className="flex-1 w-full flex flex-col relative min-h-[260px]">
+                {header.request_type === 'EXCHANGE' && items.some(item => !item.destination_currency) && (
+                  <p className="p-3 text-[12px] text-amber-700 dark:text-amber-400">
+                    {t('این درخواست اقلام تبدیل ارز قدیمی دارد. پیش از ادامه تأیید، در وضعیت یادداشت اقلام را به یک ردیف برای هر تبدیل اصلاح کنید؛ مبالغ قدیمی خودکار جفت نمی‌شوند.',
+                      'This request contains legacy exchange items. Before continuing approval, revise them in Draft to one row per exchange; old amounts are not paired automatically.')}
+                  </p>
+                )}
                 <RequestItemsGrid
+                  key={header.request_type || 'GENERAL'}
                   ref={gridRef}
                   itemsData={items}
-                  onItemsChange={(newItems) => { setItems(newItems); setIsDirty(true); }}
+                  onItemsChange={(newItems) => { if (!readOnly) { setItems(newItems); setIsDirty(true); } }}
                   lookups={lookups}
                   requestType={header.request_type || 'GENERAL'}
                   isReadOnly={areItemsReadOnly}
@@ -533,7 +485,7 @@
 
         </div>
 
-        {renderWorkflowModals(handleSave)}
+        {!readOnly && renderStatusModals(handleStatusSave)}
 
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type}
           onClose={() => setToast(p => ({ ...p, isVisible: false }))} />

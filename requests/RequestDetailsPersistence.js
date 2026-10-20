@@ -3,7 +3,7 @@
   const React = window.React;
   const { useState, useRef, useEffect, useCallback } = React;
 
-  const BALANCED_REQUEST_TYPES = ['TRANSFER', 'EXCHANGE'];
+  const BALANCED_REQUEST_TYPES = ['TRANSFER'];
 
   const useRequestDetailsPersistence = (params) => {
     const {
@@ -26,67 +26,29 @@
       setCopyWarning,
       showToast,
       setLookups,
-      resolveNextAssignees,
-      resolveDataEntryFormsForStatus,
-      selectedMachineMeta,
       parseAmount,
-      resolveRates,
-      isMissingWorkItemsTableError,
-      getStatus,
       lookups,
-      sendWorkflowAssignmentNotifications,
+      access,
+      dataScope,
+      readOnly = false,
     } = params;
 
     const [currencyRates, setCurrencyRates] = useState({});
     const initialized = useRef(false);
+    const saving = useRef(false);
 
-    const getRatesForDate = useCallback(async (dateRaw) => {
-      const dateKey = (dateRaw || new Date().toISOString()).replace(/\//g, '-').split('T')[0];
-      const { data, error } = await supabase
-        .from('fm_currency_rates')
-        .select('base_currency, target_currency, rate, rate_date')
-        .lte('rate_date', dateKey)
-        .order('rate_date', { ascending: false });
-
-      if (error) throw error;
-
-      const latest = {};
-      (data || []).forEach(rate => {
-        const key = `${rate.base_currency}_${rate.target_currency}`;
-        if (!latest[key]) latest[key] = rate.rate;
-      });
-
-      return latest;
-    }, [supabase]);
+    const getRatesForDate = useCallback((dateRaw) =>
+      window.RequestStatusActions.getRatesForDate(supabase, dateRaw), [supabase]);
 
     const validateTransferBalance = useCallback(async (itemsInput = items) => {
-      if (!BALANCED_REQUEST_TYPES.includes(header.request_type) || !itemsInput.length) return true;
-
-      const ratesMap = await getRatesForDate(header.need_date || header.created_at || new Date().toISOString());
-      let diffUsd = 0;
-
-      itemsInput.forEach(item => {
-        const dep = parseAmount(item.deposit_amount);
-        const wid = parseAmount(item.withdrawal_amount);
-        const cur = item.currency || 'IRR';
-        const { toUsd } = resolveRates(ratesMap, cur);
-        diffUsd += (dep - wid) * toUsd;
-      });
-
-      const tolerance = 0.01;
-      if (Math.abs(diffUsd) > tolerance) {
-        showToast(
-          t(
-            `بالانس درخواست صحیح نیست. اختلاف معادل دلار: ${diffUsd.toFixed(2)}`,
-            `Request balance mismatch. USD difference: ${diffUsd.toFixed(2)}`
-          ),
-          'error'
-        );
+      try {
+        await window.RequestStatusActions.validateBalance(supabase, header, itemsInput, t);
+        return true;
+      } catch (error) {
+        showToast(error.message, 'error');
         return false;
       }
-
-      return true;
-    }, [getRatesForDate, header.created_at, header.need_date, header.request_type, items, parseAmount, resolveRates, showToast, t]);
+    }, [supabase, header, items, showToast, t]);
 
     useEffect(() => {
       let cancelled = false;
@@ -113,7 +75,7 @@
     const fetchDeps = useCallback(async () => {
       if (!supabase) return null;
       try {
-        const [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, rolesRes, currRes, cbcRes, projectsRes] =
+        const [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, currRes, cbcRes] =
           await Promise.all([
             supabase.from('fm_coa_accounts').select('id, title_fa, title_en, code, currency_id, parent_id, chart_id').eq('is_active', true),
             supabase.from('fm_coa_charts').select('id, title').eq('is_active', true),
@@ -123,12 +85,13 @@
             supabase.from('parties').select('id, first_name, last_name, company_name, party_type, code, mobile').eq('is_active', true),
             supabase.from('fm_org_chart_personnel').select('node_id, person_id'),
             supabase.from('fm_org_chart_nodes').select('id, title, parent_id'),
-            supabase.from('sec_roles').select('id, title, code').eq('is_active', true),
-            supabase.from('fm_currencies').select('id, code, title'),
+            supabase.from('fm_currencies').select('id, code, title, decimal_places'),
             supabase.from('fm_cost_benefit_centers').select('id, title_fa, title_en, center_kind, is_cost_center, is_benefit_center, is_active, manager:parties(id, first_name, last_name), office:fm_org_offices(id, title)'),
-            supabase.from('gen_projects').select('id, code, title, status, manager_party_id').eq('is_active', true).order('code'),
           ]);
 
+        for (const result of [accRes, chartRes, costRes, incRes, usersRes, partiesRes, personnelRes, nodesRes, currRes, cbcRes]) {
+          if (result.error) throw result.error;
+        }
         const activeCharts = chartRes.data || [];
         const activeChartIds = new Set(activeCharts.map(c => c.id));
 
@@ -179,9 +142,6 @@
         const nodesMap = {};
         (nodesRes.data || []).forEach(n => { nodesMap[n.id] = n.title; });
 
-        const rolesMap = {};
-        (rolesRes.data || []).forEach(r => { rolesMap[r.id] = r.title || r.code || ''; });
-
         let myDeptId = null;
         let myDeptTitle = '';
         let myPartyId = null;
@@ -231,19 +191,10 @@
           nodesMap,
           orgNodes: nodesRes.data || [],
           personnelRows: personnelRes.data || [],
-          rolesMap,
           currentUserDeptId: myDeptId,
           currentUserDeptTitle: myDeptTitle,
           currentUserPartyId: myPartyId,
           currentUserPartyName: myPartyName,
-          projects: (projectsRes.data || []).map(p => ({
-            id: p.id,
-            code: p.code || '',
-            title: p.title || '',
-            status: p.status || '',
-            managerName: partiesMap[p.manager_party_id] || '',
-            displayLabel: p.title || '',
-          })),
         };
 
         setLookups(lk);
@@ -307,6 +258,9 @@
           ));
           setHeader({
             ...initialRecord,
+            transaction_id: null,
+            transaction_assignee_user_id: null,
+            transaction_assignee_group_id: null,
             id: undefined,
             request_code: code,
             status: 'DRAFT',
@@ -363,54 +317,68 @@
       });
     }, [isOpen, formMode, initialRecord, currentUserId, currentUserName, fetchDeps, parseAmount, setCopyWarning, setHasSaved, setHeader, setIsDirty, setItems, t]);
 
-    const getPermissionValue = useCallback((field, sourceItems = items, sourceHeader = header) => {
-      if (field.startsWith('items.')) {
-        const itemField = field.slice(6);
-        if (itemField === 'amount') return sourceItems.some(item => parseAmount(item.deposit_amount) > 0 || parseAmount(item.withdrawal_amount) > 0);
-        return sourceItems.length > 0 && sourceItems.every(item => item[itemField] !== null && item[itemField] !== undefined && String(item[itemField]).trim() !== '');
-      }
-      const value = sourceHeader[field];
-      return value !== null && value !== undefined && String(value).trim() !== '';
-    }, [header, items, parseAmount]);
-
-    const toUuidOrNull = useCallback((value) => {
-      const v = String(value || '').trim();
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v) ? v : null;
-    }, []);
-
     const handleSave = useCallback(async (actionOrStatus, actionInput = {}) => {
-      const selectedAction = actionOrStatus && typeof actionOrStatus === 'object' ? actionOrStatus : null;
-      const statusToSave = selectedAction?.to_status || (typeof actionOrStatus === 'string' ? actionOrStatus : header.status);
-      const overrideItems = Array.isArray(actionInput?.overrideItems) ? actionInput.overrideItems : null;
-      const itemsForSave = overrideItems || items;
-
-      if (selectedAction) {
-        const missingField = Object.entries(selectedAction.field_permissions || {})
-          .find(([field, permission]) => permission === 'REQUIRED' && !getPermissionValue(field, itemsForSave, header));
-        if (missingField) {
-          const labels = {
-            need_date: t('تاریخ نیاز', 'Need Date'), request_type: t('نوع درخواست', 'Request Type'),
-            payment_type: t('نوع پرداخت', 'Payment Type'), description: t('شرح درخواست', 'Description'),
-            'items.description': t('شرح اقلام', 'Item Description'), 'items.amount': t('مبلغ اقلام', 'Item Amount'),
-            'items.approved_amount': t('مبلغ تاییدشده', 'Approved Amount'),
-          };
-          const fieldLabel = labels[missingField[0]] || missingField[0];
-          return showToast(t(`پر کردن فیلد ${fieldLabel} برای این عملیات الزامی است.`, `${fieldLabel} is required for this action.`), 'error');
+      if (readOnly || saving.current) return false;
+      const action = actionOrStatus && typeof actionOrStatus === 'object' ? actionOrStatus : null;
+      const targetStatus = action?.to_status || (typeof actionOrStatus === 'string' ? actionOrStatus : header.status);
+      if (targetStatus !== header.status) {
+        if (!action || isDirty) {
+          showToast(t('ابتدا تغییرات درخواست را ذخیره کنید.', 'Save request changes first.'), 'warning');
+          return false;
+        }
+        saving.current = true;
+        setIsLoading(true);
+        try {
+          const savedItems = await window.RequestStatusActions.changeStatus({
+            supabase, header, action, access, dataScope, currentUserId,
+            currentUserName: lookups.usersMap[currentUserId] || currentUserName,
+            items, input: actionInput, accounts: lookups.leafAccounts, currencies: lookups.currencies, t,
+          });
+          setItems(savedItems.map(item => ({ ...item, _tempId: item._tempId || crypto.randomUUID() })));
+          setHeader(previous => ({ ...previous, status: action.to_status,
+            ...(action.data_entry_form === 'ACCOUNTS_AMOUNTS' ? {
+              transaction_assignee_user_id: actionInput.assignee?.kind === 'USER' ? actionInput.assignee.id : null,
+              transaction_assignee_group_id: actionInput.assignee?.kind === 'GROUP' ? actionInput.assignee.id : null,
+            } : {}) }));
+          setHasSaved(true);
+          showToast(t('وضعیت درخواست تغییر کرد.', 'Request status updated.'));
+          return true;
+        } catch (error) {
+          showToast(t('تغییر وضعیت انجام نشد: ', 'Status change failed: ') + error.message, 'error');
+          return false;
+        } finally {
+          saving.current = false;
+          setIsLoading(false);
         }
       }
-
+      if (action || (header.id ? !access.canEdit || header.status !== 'DRAFT' : !access.canCreate)) {
+        showToast(t('اجازه ذخیره این درخواست را ندارید.', 'You cannot save this request.'), 'error');
+        return false;
+      }
+      const itemsForSave = items;
       if (document.getElementById('grid-inline-edit-marker')) {
         return showToast(t('لطفاً ابتدا سطر باز اقلام را با Enter ذخیره کنید.', 'Please save the open items row first.'), 'warning');
       }
 
-      if (!selectedAction && !header.description?.trim()) {
+      if (!header.description?.trim()) {
         return showToast(t('شرح درخواست الزامی است.', 'Request description is required.'), 'warning');
       }
+      const needDate = window.RequestStatusActions.normalizeNeedDate(header.need_date);
+      if (!needDate) {
+        return showToast(t('تاریخ نیاز معتبر الزامی است.', 'A valid need date is required.'), 'warning');
+      }
 
+      saving.current = true;
       setIsLoading(true);
       try {
         const now = new Date().toISOString();
-        const fromStatus = header.status || 'DRAFT';
+
+        if (header.request_type === 'EXCHANGE') {
+          window.RequestExchangeLogic.validate(itemsForSave, t, { accounts: lookups.leafAccounts });
+          const schemaCheck = await supabase.from('req_request_items')
+            .select('destination_account_id, destination_currency, exchange_rate').limit(0);
+          if (schemaCheck.error) throw schemaCheck.error;
+        }
 
         if (!(await validateTransferBalance(itemsForSave))) {
           return;
@@ -421,11 +389,11 @@
           registrar_id: header.registrar_id || currentUserId || null,
           requester_party_id: header.requester_party_id || null,
           department_id: header.department_id || null,
-          need_date: header.need_date || null,
+          need_date: needDate,
           request_type: header.request_type || 'GENERAL',
           payment_type: header.payment_type || null,
           description: header.description || '',
-          status: statusToSave,
+          status: 'DRAFT',
         };
 
         let reqId = header.id;
@@ -439,12 +407,15 @@
             try { await window.AutoNumberingService.consumeNext('REQUESTS'); } catch {}
           }
         } else {
-          const { error } = await supabase.from('req_requests').update(payload).eq('id', reqId);
+          const { data, error } = await supabase.from('req_requests').update(payload)
+            .eq('id', reqId).eq('status', 'DRAFT').select('id');
           if (error) throw error;
+          if (data?.length !== 1) throw new Error(t('درخواست تغییر کرده یا دسترسی ندارید.', 'Request changed or access denied.'));
         }
 
-        if (isDirty || !header.id || !!overrideItems) {
-          await supabase.from('req_request_items').delete().eq('request_id', reqId);
+        if (isDirty || !header.id) {
+          const { error: deleteError } = await supabase.from('req_request_items').delete().eq('request_id', reqId);
+          if (deleteError) throw deleteError;
           if (itemsForSave.length > 0) {
             const itemsPayload = itemsForSave.map((item, idx) => ({
               request_id: reqId,
@@ -456,12 +427,17 @@
               income_type_id: item.income_type_id || null,
               party_id: item.party_id || null,
               center_id: item.center_id || null,
-              project_id: item.project_id || null,
+              project_id: item.project_id || null, // Preserve legacy values when items are reinserted.
               deposit_amount: parseAmount(item.deposit_amount),
               withdrawal_amount: parseAmount(item.withdrawal_amount),
               approved_amount: parseAmount(item.approved_amount),
               remaining_amount: parseAmount(item.remaining_amount),
               related_account_id: item.related_account_id || item.account_id || null,
+              ...(header.request_type === 'EXCHANGE' ? {
+                destination_account_id: item.destination_account_id || null,
+                destination_currency: item.destination_currency || null,
+                exchange_rate: window.RequestExchangeLogic.hasValue(item.exchange_rate) ? Number(item.exchange_rate) : null,
+              } : {}),
               description: item.description || null,
             }));
             const { data: savedItems, error: iErr } = await supabase.from('req_request_items').insert(itemsPayload).select();
@@ -477,248 +453,28 @@
           }
         }
 
-        const statusChanged = String(fromStatus || '') !== String(statusToSave || '');
-        if (statusChanged && reqId) {
-          const actorName = lookups.usersMap?.[currentUserId] || currentUserName || '';
-          const nextAssigneeResult = await resolveNextAssignees(statusToSave);
-          const nextAssignee = nextAssigneeResult.labels.length
-            ? nextAssigneeResult.labels.join(' | ')
-            : '-';
-          const actorUserId = toUuidOrNull(currentUserId);
-          const statusLogDescription = (actionInput?.approver_note || '').trim() || null;
-          const logPayload = {
-            request_id: reqId,
-            from_status: fromStatus,
-            to_status: statusToSave,
-            actor_user_id: actorUserId,
-            actor_name: actorName || 'Unknown',
-            next_assignee: nextAssignee,
-            description: statusLogDescription,
-            metadata: {
-              actor_user_id_raw: currentUserId || null,
-              action_id: selectedAction?.id || null,
-              action_label_fa: selectedAction?.action_label_fa || null,
-              action_label_en: selectedAction?.action_label_en || null,
-              data_entry_form: selectedAction?.data_entry_form || null,
-              approver_note: statusLogDescription,
-              workflow_source: selectedAction?.workflow_source || 'VISUAL',
-            },
-          };
-
-          const { error: logError } = await supabase.from('req_request_status_logs').insert([logPayload]);
-          if (logError) {
-            console.error('Request status log insert error:', logError);
-            showToast(
-              t(
-                `ثبت لاگ تغییر وضعیت انجام نشد: ${logError.message || 'خطای نامشخص'}`,
-                `Status log was not saved: ${logError.message || 'Unknown error'}`
-              ),
-              'warning'
-            );
-          }
-
-          try {
-            const closePayload = {
-              is_closed: true,
-              closed_at: now,
-              closed_by_user_id: actorUserId,
-              close_action: selectedAction?.id || statusToSave,
-              close_note: statusLogDescription,
-              current_status: statusToSave,
-            };
-
-            const { error: closeWorkItemsError } = await supabase
-              .from('wf_work_items')
-              .update(closePayload)
-              .eq('source_type', 'STATE_MACHINE')
-              .eq('entity_type', 'req_requests')
-              .eq('entity_id', String(reqId))
-              .eq('is_closed', false);
-            if (closeWorkItemsError && !isMissingWorkItemsTableError(closeWorkItemsError)) throw closeWorkItemsError;
-
-            const recipients = (nextAssigneeResult.users || []).map(item => ({
-              userId: String(item.userId || '').trim(),
-              label: String(item.label || '').trim(),
-            })).filter(item => item.userId);
-
-            const roleRecipients = (nextAssigneeResult.roles || []).map(item => ({
-              roleId: String(item.roleId || '').trim(),
-              label: String(item.label || '').trim(),
-            })).filter(item => item.roleId);
-
-            console.log('WF_WORK_ITEMS_DEBUG assignees', {
-              request_id: String(reqId),
-              from_status: fromStatus,
-              to_status: statusToSave,
-              users_count: recipients.length,
-              roles_count: roleRecipients.length,
-              machine_id: selectedMachineMeta?.id || null,
-              machine_code: selectedMachineMeta?.machine_code || null,
-            });
-
-            const machineUuid = toUuidOrNull(selectedMachineMeta?.id);
-
-            if (recipients.length > 0) {
-              const requestCaption = `${header.request_code || ''}${header.description ? ` | ${header.description}` : ''}`.trim() || String(reqId);
-              const nextDataEntryForms = resolveDataEntryFormsForStatus(statusToSave);
-              const insertRows = recipients.map(recipient => ({
-                source_type: 'STATE_MACHINE',
-                source_ref_schema: 'public',
-                source_ref_table: 'wf_state_machines',
-                source_ref_id: selectedMachineMeta?.id ? String(selectedMachineMeta.id) : null,
-                state_machine_id: machineUuid,
-                entity_code: 'REQ_REQUESTS',
-                entity_type: 'req_requests',
-                entity_id: String(reqId),
-                record_code: header.request_code || null,
-                record_title: requestCaption,
-                form_component: 'RequestManagement',
-                data_entry_forms: nextDataEntryForms,
-                from_status: fromStatus,
-                to_status: statusToSave,
-                current_status: statusToSave,
-                assigned_to_user_id: toUuidOrNull(recipient.userId),
-                assigned_to_label: recipient.label || null,
-                assigned_by_user_id: actorUserId,
-                assigned_at: now,
-                priority: 2,
-                metadata: {
-                  machine_code: selectedMachineMeta?.machine_code || null,
-                  machine_id: selectedMachineMeta?.id || null,
-                  assigned_to_user_raw: recipient.userId || null,
-                  action_id: selectedAction?.id || null,
-                  action_label_fa: selectedAction?.action_label_fa || null,
-                  action_label_en: selectedAction?.action_label_en || null,
-                  workflow_source: selectedAction?.workflow_source || 'VISUAL',
-                },
-              }));
-
-              const { error: insertWorkItemsError } = await supabase.from('wf_work_items').insert(insertRows);
-              if (!insertWorkItemsError) {
-                console.log('WF_WORK_ITEMS_DEBUG inserted user rows', insertRows.length);
-              }
-              if (insertWorkItemsError && !isMissingWorkItemsTableError(insertWorkItemsError)) throw insertWorkItemsError;
-            } else if (roleRecipients.length > 0) {
-              const requestCaption = `${header.request_code || ''}${header.description ? ` | ${header.description}` : ''}`.trim() || String(reqId);
-              const nextDataEntryForms = resolveDataEntryFormsForStatus(statusToSave);
-              const insertRows = roleRecipients.map(recipient => ({
-                source_type: 'STATE_MACHINE',
-                source_ref_schema: 'public',
-                source_ref_table: 'wf_state_machines',
-                source_ref_id: selectedMachineMeta?.id ? String(selectedMachineMeta.id) : null,
-                state_machine_id: machineUuid,
-                entity_code: 'REQ_REQUESTS',
-                entity_type: 'req_requests',
-                entity_id: String(reqId),
-                record_code: header.request_code || null,
-                record_title: requestCaption,
-                form_component: 'RequestManagement',
-                data_entry_forms: nextDataEntryForms,
-                from_status: fromStatus,
-                to_status: statusToSave,
-                current_status: statusToSave,
-                assigned_to_role_id: toUuidOrNull(recipient.roleId),
-                assigned_to_label: recipient.label || null,
-                assigned_by_user_id: actorUserId,
-                assigned_at: now,
-                priority: 2,
-                metadata: {
-                  machine_code: selectedMachineMeta?.machine_code || null,
-                  machine_id: selectedMachineMeta?.id || null,
-                  assigned_to_role_raw: recipient.roleId || null,
-                  action_id: selectedAction?.id || null,
-                  action_label_fa: selectedAction?.action_label_fa || null,
-                  action_label_en: selectedAction?.action_label_en || null,
-                  workflow_source: selectedAction?.workflow_source || 'VISUAL',
-                },
-              }));
-
-              if (insertRows.length > 0) {
-                const { error: insertRoleWorkItemsError } = await supabase.from('wf_work_items').insert(insertRows);
-                if (!insertRoleWorkItemsError) {
-                  console.log('WF_WORK_ITEMS_DEBUG inserted role rows', insertRows.length);
-                }
-                if (insertRoleWorkItemsError && !isMissingWorkItemsTableError(insertRoleWorkItemsError)) throw insertRoleWorkItemsError;
-              }
-            } else {
-              showToast(
-                t('برای وضعیت بعدی، انجام‌دهنده‌ای از روال تاییدات پیدا نشد؛ آیتمی در کارتابل ایجاد نشد.', 'No assignee was resolved for the next status, so no cartable item was created.'),
-                'warning'
-              );
-            }
-          } catch (workItemError) {
-            console.error('Request state-machine work-item sync error:', workItemError);
-            showToast(
-              t('تغییر وضعیت انجام شد اما ثبت آیتم کارتابل با خطا مواجه شد.', 'Status changed but syncing cartable work items failed.'),
-              'warning'
-            );
-          }
-
-          try {
-            const recipients = (nextAssigneeResult.users || []).map(item => ({
-              userId: item.userId,
-              label: item.label,
-            }));
-            const statusInfo = getStatus(statusToSave);
-            const fromStatusInfo = getStatus(fromStatus);
-            const requestCaption = `${header.request_code || ''}${header.description ? ` | ${header.description}` : ''}`.trim() || String(reqId);
-            const noteTextFa = statusLogDescription ? `\nتوضیحات: ${statusLogDescription}` : '';
-            const noteTextEn = statusLogDescription ? `\nNote: ${statusLogDescription}` : '';
-
-            await sendWorkflowAssignmentNotifications({
-              supabase,
-              recipients,
-              actorUserId: currentUserId,
-              titleFa: 'ارجاع مرحله تایید',
-              titleEn: 'Approval Assignment',
-              messageFa: `درخواست ${requestCaption} از وضعیت ${fromStatusInfo.fa || fromStatus} به وضعیت ${statusInfo.fa || statusToSave} تغییر کرد و برای شما ارجاع شد.${noteTextFa}`,
-              messageEn: `Request ${requestCaption} moved from ${fromStatusInfo.en || fromStatus} to ${statusInfo.en || statusToSave} and was assigned to you.${noteTextEn}`,
-              type: 'info',
-              entityType: 'req_requests',
-              entityId: String(reqId),
-              entityTitle: requestCaption,
-              formComponent: 'RequestManagement',
-              action: 'open_record',
-              actionPayloadExtra: {
-                workflow_entity_code: 'REQ_REQUESTS',
-                from_status: fromStatus,
-                to_status: statusToSave,
-                action_id: selectedAction?.id || null,
-              },
-            });
-          } catch (notificationError) {
-            console.error('Request workflow assignment notification error:', notificationError);
-            showToast(t('ارجاع انجام شد اما ارسال نوتیفیکیشن با خطا مواجه شد.', 'Assignment was done but sending notification failed.'), 'warning');
-          }
-        }
-
-        setHeader(p => ({ ...p, status: statusToSave }));
         setIsDirty(false);
         setHasSaved(true);
-        showToast(selectedAction || typeof actionOrStatus === 'string'
-          ? t('وضعیت درخواست تغییر کرد.', 'Request status updated.')
-          : t('درخواست با موفقیت ذخیره شد.', 'Request saved successfully.'));
+        showToast(t('درخواست با موفقیت ذخیره شد.', 'Request saved successfully.'));
+        return true;
       } catch (err) {
         console.error('RequestFormModal save error:', err?.message || err, '| code:', err?.code, '| details:', err?.details, '| hint:', err?.hint);
         showToast(t('خطا در ذخیره درخواست.', 'Error saving request.'), 'error');
       } finally {
+        saving.current = false;
         setIsLoading(false);
       }
     }, [
+      readOnly,
+      access,
+      dataScope,
       currentUserId,
       currentUserName,
-      getPermissionValue,
-      getStatus,
       header,
-      isMissingWorkItemsTableError,
       isDirty,
       items,
       lookups,
       parseAmount,
-      resolveDataEntryFormsForStatus,
-      resolveNextAssignees,
-      selectedMachineMeta,
-      sendWorkflowAssignmentNotifications,
       setHeader,
       setIsDirty,
       setItems,
@@ -726,7 +482,6 @@
       showToast,
       supabase,
       t,
-      toUuidOrNull,
       validateTransferBalance,
     ]);
 

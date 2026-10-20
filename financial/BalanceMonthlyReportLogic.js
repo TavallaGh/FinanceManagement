@@ -593,30 +593,29 @@
     const rateLookup = buildRateLookup(allRates);
     const rateCache = new Map();
 
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('sec_users')
       .select('id, full_name, username');
+    if (userError) throw userError;
     const userNameMap = {};
     (userData || []).forEach((user) => {
       const label = `${user.full_name || user.username || ''}`.trim();
       if (label) userNameMap[String(user.id)] = label;
     });
 
-    const { data: txData } = await supabase.from('fm_transactions')
-      .select('id, document_code, document_date, status, transaction_type, reference_code, description, created_at, registrar_id, reviewed_at, approved_at, department_id, reviewed_by_name, approved_by_name')
-      .in('status', ['TEMPORARY', 'FINAL', 'APPROVED'])
-      .lte('document_date', maxTxDate);
+    const txData = await window.FinancialApprovalLogic.readApprovedTransactions(supabase, maxTxDate);
 
     const txDateMap = new Map();
     const txMetaMap = new Map();
     (txData || []).forEach((tx) => {
       const txId = String(tx.id || '');
       if (!txId) return;
-      txDateMap.set(txId, normalizeSlashDate(tx.document_date));
+      txDateMap.set(txId, normalizeSlashDate(tx.approval_date));
       txMetaMap.set(txId, {
         id: tx.id,
         document_code: tx.document_code || '',
         document_date: normalizeSlashDate(tx.document_date),
+        approval_date: normalizeSlashDate(tx.approval_date),
         status: tx.status || '',
         transaction_type: tx.transaction_type || '',
         reference_code: tx.reference_code || '',
@@ -637,9 +636,7 @@
     const BATCH = 400;
     for (let i = 0; i < accIds.length; i += BATCH) {
       const batch = accIds.slice(i, i + BATCH);
-      const { data: items } = await supabase.from('fm_transaction_items')
-        .select('*')
-        .in('account_id', batch);
+      const items = await window.FinancialApprovalLogic.readApprovedItems(supabase, batch, maxTxDate);
       (items || []).forEach((item) => {
         const txId = String(item.transaction_id || '');
         if (!validTxIds.has(txId)) return;
@@ -683,6 +680,7 @@
           _doc_id: txMeta.id || item.transaction_id,
           _doc_code: txMeta.document_code || '',
           _doc_date: normalizeSlashDate(txMeta.document_date || txDate || ''),
+          _approval_date: txDate,
           _tx_type: txMeta.transaction_type || '',
           _tx_status: txMeta.status || '',
           _tx_reference_code: txMeta.reference_code || '',
@@ -752,7 +750,7 @@
         accountPaths: buildMonthlyAccountPaths(accountTree),
         grandTotal,
         leafCount: baseAccounts.length,
-        detailItems,
+        detailItems: window.FinancialApprovalLogic.withApprovalBalances(detailItems),
         rateLookup,
         reportAccountLookup: accById,
         showMovements,

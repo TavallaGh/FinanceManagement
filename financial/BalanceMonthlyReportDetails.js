@@ -84,7 +84,7 @@
 
     const items = (reportData.detailItems || [])
       .filter((item) => {
-        const docDate = normalizeSlashDate(item._doc_date);
+        const docDate = normalizeSlashDate(item._approval_date);
         if (!docDate || docDate < periodFrom || docDate > periodTo) return false;
         if (row._type === 'grand_total') return true;
         if (leafSet.size === 0) return false;
@@ -93,7 +93,7 @@
       .sort((a, b) => {
         const accCmp = String(a._account_code || '').localeCompare(String(b._account_code || ''));
         if (accCmp !== 0) return accCmp;
-        const dateCmp = String(a._doc_date || '').localeCompare(String(b._doc_date || ''));
+        const dateCmp = String(a._approval_date || '').localeCompare(String(b._approval_date || ''));
         if (dateCmp !== 0) return dateCmp;
         const docCmp = String(a._doc_code || '').localeCompare(String(b._doc_code || ''));
         if (docCmp !== 0) return docCmp;
@@ -239,6 +239,7 @@
       : ((cellBalance === null || cellBalance === undefined) ? null : (parseFloat(cellBalance || 0) || 0) * balanceToIrrRate);
 
     const modalColumns = [
+      { field: '_approval_date', header_fa: 'تاریخ تأیید', header_en: 'Approval Date', width: '110px', type: 'date' },
       { field: '_doc_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '90px', render: (val) => React.createElement('span', { className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px]' }, val || '-') },
       { field: '_tx_status', header_fa: 'وضعیت سند', header_en: 'Document Status', width: '95px', render: (val) => React.createElement(Badge, { variant: effectiveStatusColors[val] || 'gray', size: 'sm' }, effectiveStatusLabels[val] || val || '-') },
       { field: '_tx_type', header_fa: 'نوع سند', header_en: 'Document Type', width: '100px', render: (val) => React.createElement('span', { className: 'text-[12px] truncate block', title: val }, effectiveTxTypes[val] || val || '-') },

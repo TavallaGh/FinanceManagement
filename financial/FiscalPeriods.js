@@ -201,10 +201,10 @@
       createdAt: r.created_at
     }));
 
-    const logAction = useCallback(async (recordId, action, details = '', oldData = null, newData = null) => {
+    const logAction = useCallback(async (recordId, action, details = '', oldData = null, newData = null, strict = false) => {
       try {
         if (!supabase) return;
-        await supabase.from('fm_record_logs').insert([{
+        const { error } = await supabase.from('fm_record_logs').insert([{
           entity_type: 'FISCAL_PERIODS',
           record_id: String(recordId || ''),
           action,
@@ -213,8 +213,10 @@
           old_data: oldData,
           new_data: newData
         }]);
+        if (error) throw error;
       } catch (err) {
         console.error('FiscalPeriods logAction failed:', err);
+        if (strict) throw err;
       }
     }, [currentUser]);
 
@@ -538,6 +540,8 @@
           title={t('دوره‌های مالی', 'Fiscal Periods')}
           icon={CalendarDays}
           language={language}
+          actions={<window.FinancialApprovalControls.FiscalApprovalSetting
+            language={language} securityCtx={securityCtx} formCode={formCode} onLog={logAction} showToast={showToast} />}
           breadcrumbs={[
             { label: t('مالی', 'Financial') },
             { label: t('دوره‌های مالی', 'Fiscal Periods') }
