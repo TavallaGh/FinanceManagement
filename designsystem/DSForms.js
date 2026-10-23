@@ -288,8 +288,11 @@
     );
   };
 
-  const DatePicker = ({ label, value, onChange, isRtl = true, language = 'fa', required = false, size = 'md', disabled = false, id, wrapperClassName = '', formCode }) => {
+  const DatePicker = ({ label, value, onChange, isRtl = true, language = 'fa', required = false, size = 'md', disabled = false, id, wrapperClassName = '', formCode, minDate, maxDate }) => {
     const isDisabled = useSecureField(formCode, disabled);
+    const normalizeLimit = date => String(date || '').replace(/\//g, '-');
+    const isDateAllowed = date => (!minDate || normalizeLimit(date) >= normalizeLimit(minDate)) &&
+      (!maxDate || normalizeLimit(date) <= normalizeLimit(maxDate));
     const getTodayInfo = useCallback((mode) => {
       const today = new Date();
       const gy = today.getFullYear();
@@ -351,7 +354,7 @@
 
     useEffect(() => {
       if (value && value.length === 10) {
-        const parts = value.split('/');
+        const parts = value.replace(/-/g, '/').split('/');
         if (parts.length === 3) {
           const gy = parseInt(parts[0], 10);
           const gm = parseInt(parts[1], 10);
@@ -373,14 +376,17 @@
     }, [value, calendarMode, formatGlobalDate]);
 
     const handleDayClick = (day) => {
+      let selectedDate;
       if (calendarMode === 'jalali' && j2g) {
         const [gy, gm, gd] = j2g(currentYear, currentMonth, day);
-        onChange(`${gy}/${gm < 10 ? '0'+gm : gm}/${gd < 10 ? '0'+gd : gd}`);
+        selectedDate = `${gy}/${gm < 10 ? '0'+gm : gm}/${gd < 10 ? '0'+gd : gd}`;
       } else {
         const m = currentMonth < 10 ? `0${currentMonth}` : currentMonth;
         const d = day < 10 ? `0${day}` : day;
-        onChange(`${currentYear}/${m}/${d}`);
+        selectedDate = `${currentYear}/${m}/${d}`;
       }
+      if (isDisabled || !isDateAllowed(selectedDate)) return;
+      onChange(selectedDate);
       setIsOpen(false);
     };
 
@@ -389,13 +395,21 @@
       const gy = d.getFullYear();
       const gm = d.getMonth() + 1;
       const gd = d.getDate();
-      onChange(`${gy}/${gm < 10 ? '0'+gm : gm}/${gd < 10 ? '0'+gd : gd}`);
+      const selectedDate = `${gy}/${gm < 10 ? '0'+gm : gm}/${gd < 10 ? '0'+gd : gd}`;
+      if (isDisabled || !isDateAllowed(selectedDate)) return;
+      onChange(selectedDate);
       setIsOpen(false);
     };
 
     const handleOpen = () => {
       if (!isDisabled) {
-        if (!value || value.length !== 10) {
+        if (value && !isDateAllowed(value)) {
+          const bound = minDate && normalizeLimit(value) < normalizeLimit(minDate) ? minDate : maxDate;
+          const [gy, gm, gd] = normalizeLimit(bound).split('-').map(Number);
+          const [year, month] = calendarMode === 'jalali' && g2j ? g2j(gy, gm, gd) : [gy, gm];
+          setCurrentYear(year);
+          setCurrentMonth(month);
+        } else if (!value || value.length !== 10) {
           const ti = getTodayInfo(calendarMode);
           setCurrentYear(ti.y);
           setCurrentMonth(ti.m);
@@ -413,6 +427,18 @@
       }
       setCalendarMode(newMode);
     };
+
+    useEffect(() => {
+      if (!isOpen) return;
+      const onEscape = event => {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        setIsOpen(false);
+        containerRef.current?.querySelector('input')?.focus();
+      };
+      document.addEventListener('keydown', onEscape, true);
+      return () => document.removeEventListener('keydown', onEscape, true);
+    }, [isOpen]);
 
     let daysInMonth, firstDayOffset;
     if (calendarMode === 'jalali' && j2g) {
@@ -463,7 +489,8 @@
             const currentIterDate = calendarMode === 'jalali' && j2g
               ? (() => { const [gy,gm,gd] = j2g(currentYear, currentMonth, day); return `${gy}/${gm<10?'0'+gm:gm}/${gd<10?'0'+gd:gd}`; })()
               : `${currentYear}/${mStr}/${dStr}`;
-            const isSelected = value === currentIterDate;
+            const isSelected = normalizeLimit(value) === normalizeLimit(currentIterDate);
+            const dayDisabled = !isDateAllowed(currentIterDate);
             const isToday = (() => { const d=new Date(); return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`})() === currentIterDate;
             
             let btnClass = 'h-7 w-full rounded flex items-center justify-center text-[12px] font-bold transition-all ';
@@ -478,7 +505,8 @@
             return (
               <button 
                 key={day} type="button" onClick={() => handleDayClick(day)}
-                className={btnClass}
+                disabled={dayDisabled}
+                className={`${btnClass} ${dayDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
               >
                 {day}
               </button>
@@ -490,7 +518,8 @@
           <button 
             type="button" 
             onClick={(e) => { e.stopPropagation(); handleTodayClick(); }}
-            className="text-[12px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-1.5 rounded transition-colors w-full border border-indigo-100 dark:border-indigo-800"
+            disabled={!isDateAllowed(new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0'))}
+            className="text-[12px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-4 py-1.5 rounded transition-colors w-full border border-indigo-100 dark:border-indigo-800 disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {t('امروز', 'Today')}
           </button>
@@ -508,6 +537,12 @@
           <input 
             id={inputId} type="text" value={displayValue} readOnly disabled={isDisabled}
             onClick={handleOpen}
+            onKeyDown={event => {
+              if (['Enter', ' ', 'ArrowDown'].includes(event.key)) {
+                event.preventDefault();
+                handleOpen();
+              }
+            }}
             placeholder={todayStr}
             className={`w-full ${inputHeights[size] || inputHeights.md} bg-white dark:bg-slate-700/40 border rounded-lg text-slate-800 dark:text-slate-100 transition-all outline-none cursor-pointer focus:bg-white dark:focus:bg-slate-700/60 focus:ring-2 ${isDisabled ? 'bg-slate-100/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-500 border-slate-200 dark:border-slate-700 cursor-not-allowed' : 'border-slate-300 dark:border-slate-500 focus:border-indigo-400 dark:focus:border-indigo-400 focus:ring-indigo-100 dark:focus:ring-indigo-400/20 hover:border-slate-400 dark:hover:border-slate-400'} ${isRtl ? (isXs ? 'pr-6 pl-[38px]' : 'pr-8 pl-[60px]') : (isXs ? 'pl-6 pr-[38px]' : 'pl-8 pr-[60px]')} font-sans`}
             dir="ltr"

@@ -1,7 +1,7 @@
 /* Filename: designsystem/DSFeedback.js */
 (() => {
   const React = window.React;
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef } = React;
   
   const FallbackIcon = ({ size = 16 }) => React.createElement('span', { style: { display: 'inline-block', width: size, height: size } });
   const LucideIcons = window.LucideIcons || {};
@@ -29,14 +29,31 @@
   
   const { Button } = window.DSCore || window.DesignSystem || {};
 
+  const openModalStack = [];
+  let modalSequence = 0;
+
   const Modal = ({ isOpen, onClose, title, children, showMaximize = true, width = 'max-w-2xl', language = 'fa', headerActions = null }) => {
     const isRtl = language === 'fa';
     const [isMaximized, setIsMaximized] = useState(false);
+    const modalIdRef = useRef(null);
+    if (!modalIdRef.current) modalIdRef.current = `ds-modal-${++modalSequence}`;
 
     useEffect(() => {
-      const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
-      if (isOpen) document.addEventListener('keydown', handleEsc);
-      return () => document.removeEventListener('keydown', handleEsc);
+      if (!isOpen) return undefined;
+      const modalId = modalIdRef.current;
+      if (!openModalStack.includes(modalId)) openModalStack.push(modalId);
+      const handleEsc = (e) => {
+        if (e.key === 'Escape' && openModalStack[openModalStack.length - 1] === modalId) {
+          e.stopImmediatePropagation();
+          onClose();
+        }
+      };
+      document.addEventListener('keydown', handleEsc);
+      return () => {
+        document.removeEventListener('keydown', handleEsc);
+        const index = openModalStack.lastIndexOf(modalId);
+        if (index >= 0) openModalStack.splice(index, 1);
+      };
     }, [isOpen, onClose]);
 
     if (!isOpen) return null;
@@ -67,19 +84,27 @@
     );
   };
 
-  const Tooltip = ({ children, text, position = 'top' }) => {
+  const Tooltip = ({ children, text, position = 'top', multiline = false, align = 'center' }) => {
     const [show, setShow] = useState(false);
+    const tooltipId = React.useId();
+    const horizontal = align === 'left' ? 'left-0' : align === 'right' ? 'right-0' : 'left-1/2 -translate-x-1/2';
     const posClasses = {
-      top: "bottom-full left-1/2 -translate-x-1/2 mb-1.5",
-      bottom: "top-full left-1/2 -translate-x-1/2 mt-1.5",
+      top: `bottom-full ${horizontal} mb-1.5`,
+      bottom: `top-full ${horizontal} mt-1.5`,
       left: "right-full top-1/2 -translate-y-1/2 mr-1.5",
       right: "left-full top-1/2 -translate-y-1/2 ml-1.5"
     };
     return (
-      <div className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
-        {children}
+      <div className="relative inline-block" onMouseEnter={() => setShow(true)}
+        onMouseLeave={event => { if (!event.currentTarget.contains(document.activeElement)) setShow(false); }}
+        onFocus={() => setShow(true)}
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setShow(false); }}
+        onKeyDown={event => { if (event.key === 'Escape' && show) { event.stopPropagation(); setShow(false); } }}>
+        {React.isValidElement(children) ? React.cloneElement(children, {
+          'aria-describedby': [children.props['aria-describedby'], show ? tooltipId : null].filter(Boolean).join(' ') || undefined
+        }) : children}
         {show && (
-          <div className={`absolute z-[200] px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded-md whitespace-nowrap shadow-lg animate-in fade-in zoom-in-95 duration-150 ${posClasses[position]}`}>
+          <div id={tooltipId} role="tooltip" className={`absolute z-[200] px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded-md ${multiline ? 'w-72 max-w-[calc(100vw-2rem)] whitespace-normal leading-relaxed' : 'whitespace-nowrap'} shadow-lg animate-in fade-in zoom-in-95 duration-150 ${posClasses[position]}`}>
             {text}
           </div>
         )}
@@ -330,7 +355,7 @@
     return null;
   };
 
-  const LogTimeline = ({ logs = [], isLoading = false, language = 'fa' }) => {
+  const LogTimeline = ({ logs = [], isLoading = false, language = 'fa', fieldLabels = {} }) => {
     const [expandedLogs, setExpandedLogs] = useState([]);
     
     const isRtl = language === 'fa';
@@ -362,7 +387,7 @@
         updated_at: t('تاریخ ویرایش', 'Updated At'),
         id: t('شناسه رکورد', 'Record ID')
       };
-      return labels[key] || key;
+      return fieldLabels[key] || labels[key] || key;
     };
 
     const formatValue = (val) => {

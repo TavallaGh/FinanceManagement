@@ -37,7 +37,7 @@
     }
   };
 
-  const LOVField = ({ label, displayValue, onChange, data = [], columns = [], multiple = false, selectedValues = [], disabled = false, required = false, wrapperClassName = '', size = 'md', isRtl = true, placeholder = '', formCode, dropdownWidth = 'min-w-[300px] max-w-[500px]' }) => {
+  const LOVField = ({ label, displayValue, onChange, data = [], columns = [], multiple = false, selectedValues = [], disabled = false, required = false, wrapperClassName = '', size = 'md', isRtl = true, placeholder = '', formCode, dropdownWidth = 'min-w-[300px] max-w-[500px]', dropdownPlacement = 'bottom' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef(null);
@@ -105,8 +105,12 @@
       }
     };
 
+    const autoPlacement = dropdownPlacement === 'auto' && rect;
+    const openAbove = autoPlacement && window.innerHeight - rect.bottom < 268 && rect.top > window.innerHeight - rect.bottom;
+    const dropdownMaxHeight = autoPlacement
+      ? Math.max(0, Math.min(256, (openAbove ? rect.top : window.innerHeight - rect.bottom) - 12)) : undefined;
     const dropdownContentBox = (
-      <div ref={dropdownRef} className="max-h-64 overflow-y-auto custom-scrollbar">
+      <div ref={dropdownRef} className="max-h-64 overflow-y-auto custom-scrollbar" style={{ maxHeight: dropdownMaxHeight }}>
         {multiple && <div className="flex justify-between p-2 border-b border-slate-200 dark:border-slate-700">
           <button type="button" className="text-[12px] text-indigo-600" onClick={() => onChange([...selectedValues, ...filteredData.filter(row => !selectedIds.has(String(row.id)))])}>{t('انتخاب همه نتایج', 'Select all results')}</button>
           <button type="button" className="text-[12px] text-rose-500" onClick={() => onChange([])}>{t('پاک کردن', 'Clear')}</button>
@@ -206,14 +210,14 @@
           }
           const portalNode = (
             <div
-              style={{ position: 'fixed', top: rect.bottom + 4, ...posH, width: inputWidth || 'auto', zIndex: 999999 }}
+              style={{ position: 'fixed', ...(openAbove ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }), ...posH, width: inputWidth || 'auto', zIndex: 999999 }}
               className={`w-full ${dropdownWidth} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg flex flex-col animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}
             >
               {dropdownContentBox}
             </div>
           );
           return ReactDOM ? ReactDOM.createPortal(portalNode, document.body) : (
-            <div className={`absolute top-full mt-1 ${isRtl ? 'right-0' : 'left-0'} w-full ${dropdownWidth} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150`}>
+            <div className={`absolute ${openAbove ? 'bottom-full mb-1' : 'top-full mt-1'} ${isRtl ? 'right-0' : 'left-0'} w-full ${dropdownWidth} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-lg z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150`}>
               {dropdownContentBox}
             </div>
           );
@@ -722,11 +726,13 @@
           )}
 
           {selectedRows.length > 0 && filteredBulkActions.length > 0 ? (
-            <div className="flex-1 min-w-0 flex items-center gap-3 px-4 py-1 border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/30 rounded-md transition-all animate-in fade-in overflow-hidden">
+            <div className="flex-1 min-w-0 flex items-center gap-3 px-4 py-1 border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/30 rounded-md transition-all animate-in fade-in overflow-x-auto custom-scrollbar">
               <span className="text-[12px] font-black text-indigo-800 dark:text-indigo-300 whitespace-nowrap shrink-0">{selectedRows.length} {t('مورد انتخاب شده', 'Items selected')}</span>
               <div className="w-px h-4 bg-indigo-200 dark:bg-indigo-800/50 mx-1"></div>
               {filteredBulkActions.map((act, i) => (
-                <Button key={i} size="sm" variant={act.variant || 'outline'} icon={act.icon} onClick={() => {act.onClick(selectedRows); setSelectedRows([]);}} className={`!h-7 text-[10px] ${act.className || ''}`}>
+                <Button key={i} size="sm" variant={act.variant || 'outline'} icon={act.icon} disabled={act.disabled}
+                  onClick={() => {act.onClick(selectedRows); if (act.clearSelectionOnClick !== false) setSelectedRows([]);}}
+                  className={`!h-7 shrink-0 text-[10px] ${act.className || ''}`}>
                   {act.label}
                 </Button>
               ))}
