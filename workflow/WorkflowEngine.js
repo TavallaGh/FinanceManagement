@@ -30,6 +30,9 @@
      */
     static async startProcess(entityType, recordId, recordData = {}, currentUser = 'SYSTEM') {
       try {
+        if (String(entityType).toLowerCase() === 'req_requests') {
+          return { success: false, message: 'وضعیت درخواست از فرم مدیریت درخواست‌ها تغییر می‌کند.' };
+        }
         if (!supabase) throw new Error("Supabase is required.");
 
         // 1. جستجوی آخرین نسخه گردش کار فعال برای این موجودیت
@@ -242,6 +245,9 @@
             // 1. واکشی اطلاعات وظیفه و اینستنس متصل
             const { data: task, error: taskErr } = await supabase.schema('wf').from('wf_tasks').select('*, wf_instances(*)').eq('id', taskId).single();
             if (taskErr || !task) throw new Error('وظیفه مورد نظر یافت نشد.');
+            if (String(task.wf_instances?.entity_type).toLowerCase() === 'req_requests') {
+              throw new Error('وضعیت درخواست از فرم مدیریت درخواست‌ها تغییر می‌کند.');
+            }
             
             // 2. تغییر وضعیت وظیفه به تکمیل شده
             await supabase.schema('wf').from('wf_tasks').update({
