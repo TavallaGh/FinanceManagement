@@ -59,6 +59,8 @@
     });
 
     const ENTITY_OPTIONS = [
+      { value: 'EMPLOYEE', label: t('اطلاعات کارکنان', 'Employee') },
+      { value: 'PARTY', label: t('اشخاص و شرکت‌ها', 'Parties') },
       { value: 'COST_TYPE', label: t('انواع هزینه', 'Cost Types') },
       { value: 'INCOME_TYPE', label: t('انواع درآمد', 'Income Types') },
       { value: 'GATEWAY_TYPE', label: t('درگاه‌های پرداخت', 'Gateway Types') },
