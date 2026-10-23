@@ -520,7 +520,7 @@
     const handleSearch = useCallback(async (formValues) => {
       const { date_type, date_from, date_to, account_filter_type, filter_value, transaction_types, document_statuses } = formValues;
 
-      if (!['registered_at', 'created_at'].includes(date_type)) {
+      if (!['registered_at', 'approval_date', 'created_at'].includes(date_type)) {
         showToast(t('لطفاً نوع تاریخ را مشخص کنید.', 'Please select a date type.'), 'warning');
         return;
       }
@@ -555,8 +555,11 @@
           .select('*, fm_transaction_items(*)')
           .order('created_at', { ascending: false });
 
-        // Append 'Z' so PostgreSQL treats the string as UTC timestamptz
-        if (date_type === 'registered_at') {
+        // Reporting dates are calendar dates; timestamp fields retain UTC bounds.
+        if (date_type === 'approval_date') {
+          if (isoFrom) query = query.gte('approval_date', isoFrom);
+          if (isoTo)   query = query.lte('approval_date', isoTo);
+        } else if (date_type === 'registered_at') {
           if (isoFrom) query = query.gte('registered_at', isoFrom + 'T00:00:00Z');
           if (isoTo)   query = query.lte('registered_at', isoTo   + 'T23:59:59Z');
         } else {
@@ -682,6 +685,7 @@
         required: true,
         options: [
           { value: 'registered_at', label: t('تاریخ تراکنش', 'Transaction Date') },
+          { value: 'approval_date', label: t('تاریخ موثر گزارشدهی', 'Effective Reporting Date') },
           { value: 'created_at', label: t('تاریخ ایجاد', 'Creation Date') },
         ],
       },

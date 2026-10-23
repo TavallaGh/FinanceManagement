@@ -245,7 +245,16 @@
         }
         if (state.filterState) setFilterState(state.filterState);
         if (state.activeTab) setActiveTab(state.activeTab);
-        if (state.documentsGridState) setDocumentsGridState(state.documentsGridState);
+        if (state.documentsGridState) {
+          const restored = state.documentsGridState;
+          const order = restored.columnOrder;
+          setDocumentsGridState(order && !order.includes('approval_date') ? {
+            ...restored,
+            columnOrder: order.includes('document_date')
+              ? order.flatMap(field => field === 'document_date' ? [field, 'approval_date'] : [field])
+              : [...order, 'approval_date'],
+          } : restored);
+        }
         if (state.itemsGridState) setItemsGridState(state.itemsGridState);
         if (state.costsGridState) setCostsGridState(state.costsGridState);
         if (state.incomesGridState) setIncomesGridState(state.incomesGridState);
@@ -262,6 +271,7 @@
       { field: 'reference_code', header_fa: 'عطف', header_en: 'Ref', width: '70px', render: (val) => React.createElement('span', { className: 'font-bold text-slate-700 dark:text-slate-300' }, val || '-') },
       { field: 'document_code', header_fa: 'کد سند', header_en: 'Doc Code', width: '120px', render: (val, row) => React.createElement('button', { type: 'button', className: 'text-indigo-600 dark:text-indigo-400 font-bold text-[12px] hover:underline cursor-pointer', onClick: () => setDrillDoc(row), title: t('کلیک کنید تا اقلام این سند نمایش داده شود', 'Click to view items of this document') }, val || '-') },
       { field: 'document_date', header_fa: 'تاریخ سند', header_en: 'Date', width: '90px', type: 'date', render: (val) => React.createElement('span', { className: 'text-[12px]' }, fmtDate(val) || '-') },
+      { field: 'approval_date', header_fa: 'تاریخ موثر گزارشدهی', header_en: 'Effective Reporting Date', width: '150px', type: 'date', render: (val) => React.createElement('span', { className: 'text-[12px]' }, fmtDate(val) || '-') },
       { field: 'created_at', header_fa: 'زمان ثبت', header_en: 'Registered At', width: '100px', render: (val) => {
         if (!val) return React.createElement('span', { className: 'text-slate-400 text-[12px]' }, '-');
         try {
