@@ -204,8 +204,8 @@
     },
     {
       field: 'title',
-      header_fa: 'عنوان باگ',
-      header_en: 'Bug Title',
+      header_fa: 'عنوان',
+      header_en: 'Title',
       width: '220px',
       render: (val) => <span className="font-bold text-[12px] text-slate-700 dark:text-slate-200">{val || '-'}</span>,
       searchAccessor: (val) => val || ''
@@ -427,13 +427,13 @@
       >
         <div className="p-3 max-h-[72vh] overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900">
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-3">
-            <Card title={t('مشخصات باگ', 'Bug Details')} className="xl:col-span-6 border border-slate-200 dark:border-slate-700" noPadding={false}>
+            <Card title={t('مشخصات', 'Details')} className="xl:col-span-6 border border-slate-200 dark:border-slate-700" noPadding={false}>
               <div className="space-y-2">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <div className="md:col-span-2">
                     <TextField
                       size="sm"
-                      label={t('عنوان باگ', 'Bug Title')}
+                      label={t('عنوان', 'Title')}
                       value={bugForm.title}
                       onChange={e => setBugForm(prev => ({ ...prev, title: e.target.value }))}
                       required
