@@ -11,6 +11,11 @@
     Search = FallbackIcon
   } = LucideIcons;
 
+  const ISSUE_TYPE_OPTIONS = [
+    { value: 'BUG', fa: 'باگ', en: 'Bug' },
+    { value: 'IMPROVEMENT', fa: 'بهبود', en: 'Improvement' }
+  ];
+
   const PRIORITY_OPTIONS = [
     { value: 'LOW', fa: 'کم', en: 'Low' },
     { value: 'MEDIUM', fa: 'متوسط', en: 'Medium' },
@@ -42,6 +47,7 @@
     id: null,
     bug_code: '',
     title: '',
+    issue_type: 'BUG',
     form_name: '',
     is_general: false,
     priority: 'MEDIUM',
@@ -203,6 +209,14 @@
       width: '220px',
       render: (val) => <span className="font-bold text-[12px] text-slate-700 dark:text-slate-200">{val || '-'}</span>,
       searchAccessor: (val) => val || ''
+    },
+    {
+      field: 'issue_type',
+      header_fa: 'نوع',
+      header_en: 'Type',
+      width: '100px',
+      render: val => getLabel(ISSUE_TYPE_OPTIONS, val || 'BUG'),
+      searchAccessor: val => `${val || 'BUG'} ${getLabel(ISSUE_TYPE_OPTIONS, val || 'BUG')}`
     },
     {
       field: 'form_name',
@@ -415,14 +429,28 @@
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-3">
             <Card title={t('مشخصات باگ', 'Bug Details')} className="xl:col-span-6 border border-slate-200 dark:border-slate-700" noPadding={false}>
               <div className="space-y-2">
-                <TextField
-                  size="sm"
-                  label={t('عنوان باگ', 'Bug Title')}
-                  value={bugForm.title}
-                  onChange={e => setBugForm(prev => ({ ...prev, title: e.target.value }))}
-                  required
-                  formCode={formCode}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="md:col-span-2">
+                    <TextField
+                      size="sm"
+                      label={t('عنوان باگ', 'Bug Title')}
+                      value={bugForm.title}
+                      onChange={e => setBugForm(prev => ({ ...prev, title: e.target.value }))}
+                      required
+                      formCode={formCode}
+                    />
+                  </div>
+                  <SelectField
+                    size="sm"
+                    label={t('نوع', 'Type')}
+                    value={bugForm.issue_type || 'BUG'}
+                    onChange={e => setBugForm(prev => ({ ...prev, issue_type: e.target.value }))}
+                    options={ISSUE_TYPE_OPTIONS.map(x => ({ value: x.value, label: t(x.fa, x.en) }))}
+                    required
+                    isRtl={isRtl}
+                    formCode={formCode}
+                  />
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
                   <div className="md:col-span-10">
@@ -938,6 +966,7 @@
   };
 
   window.BugTrackerPanels = {
+    ISSUE_TYPE_OPTIONS,
     PRIORITY_OPTIONS,
     OVERALL_STATUS_OPTIONS,
     FIX_STATUS_OPTIONS,

@@ -97,6 +97,7 @@
     id: null,
     bug_code: '',
     title: '',
+    issue_type: 'BUG',
     form_name: '',
     is_general: false,
     priority: 'MEDIUM',
@@ -345,6 +346,7 @@
           id: row.id,
           bug_code: row.bug_code || '',
           title: row.title || '',
+          issue_type: row.issue_type || 'BUG',
           form_name: row.form_name || '',
           is_general: !!row.is_general,
           priority: row.priority || 'MEDIUM',
@@ -371,6 +373,7 @@
         id: null,
         bug_code: '',
         title: row.title ? `${row.title} ${t('(کپی)', '(Copy)')}` : '',
+        issue_type: row.issue_type || 'BUG',
         form_name: row.form_name || '',
         is_general: !!row.is_general,
         priority: row.priority || 'MEDIUM',
@@ -461,9 +464,15 @@
       const title = (bugForm.title || '').trim();
       const formName = (bugForm.form_name || '').trim();
       const isGeneral = !!bugForm.is_general;
+      const issueType = bugForm.issue_type || 'BUG';
 
       if (!title || (!isGeneral && !formName)) {
         showToast(t('عنوان باگ الزامی است و در حالت غیرعمومی باید نام فرم هم وارد شود.', 'Bug title is required, and form is required for non-general bugs.'), 'warning');
+        return;
+      }
+
+      if (!(bugPanels.ISSUE_TYPE_OPTIONS || []).some(option => option.value === issueType)) {
+        showToast(t('نوع نامعتبر است؛ باگ یا بهبود را انتخاب کنید.', 'Invalid type; select Bug or Improvement.'), 'warning');
         return;
       }
 
@@ -473,6 +482,7 @@
         const payload = {
           bug_code: bugForm.bug_code || null,
           title,
+          issue_type: issueType,
           form_name: isGeneral ? null : formName,
           is_general: isGeneral,
           priority: bugForm.priority,
