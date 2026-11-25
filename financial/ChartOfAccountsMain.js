@@ -49,11 +49,13 @@
     const [rawAccounts, setRawAccounts] = useState([]);
     const [selectedNodeId, setSelectedNodeId] = useState(null);
     const [isCreatingNode, setIsCreatingNode] = useState(false);
+    const [movingNode, setMovingNode] = useState(null);
     const [nodeFormData, setNodeFormData] = useState({});
     const [nodeDepth, setNodeDepth] = useState(1);
     const [currencyRates, setCurrencyRates] = useState([]);
     const [nodeBalanceSnapshot, setNodeBalanceSnapshot] = useState({ balance: 0, usd: 0, balanceDate: '' });
     const balanceRequest = React.useRef(0);
+    const designerRequest = React.useRef(0);
 
     const [lookups, setLookups] = useState({
       currencies: [],
@@ -208,56 +210,15 @@
       }
     }, [supabase]);
 
-    const getNewNodeDepth = useCallback((nodes, parentId) => {
-      let depth = 1;
-      let currentParentId = parentId;
-      while (currentParentId) {
-        const pNode = nodes.find(n => String(n.id) === String(currentParentId));
-        if (pNode) {
-          depth += 1;
-          currentParentId = pNode.parentId;
-        } else {
-          break;
-        }
-      }
-      return depth;
-    }, []);
-
-    const suggestNextCode = useCallback((nodes, parentId, depth, currentChart) => {
-      const siblings = nodes.filter(n => String(n.parentId || '') === String(parentId || ''));
-      let parentPrefix = '';
-      if (parentId) {
-        const pNode = nodes.find(n => String(n.id) === String(parentId));
-        if (pNode) parentPrefix = pNode.code || '';
-      }
-
-      let segmentLength = parseInt(currentChart.len_group || 1, 10);
-      if (depth === 2) segmentLength = parseInt(currentChart.len_general || 2, 10);
-      if (depth === 3) segmentLength = parseInt(currentChart.len_subsidiary || 3, 10);
-      if (depth === 4) segmentLength = parseInt(currentChart.len_detail || 4, 10);
-
-      let maxSuffixNum = 0;
-      siblings.forEach(s => {
-        const sCode = s.code || '';
-        if (sCode.startsWith(parentPrefix)) {
-          const suffix = sCode.substring(parentPrefix.length);
-          const num = parseInt(suffix, 10);
-          if (!isNaN(num) && num > maxSuffixNum) {
-            maxSuffixNum = num;
-          }
-        }
-      });
-
-      const nextNumStr = String(maxSuffixNum + 1).padStart(segmentLength, '0');
-      return parentPrefix + nextNumStr;
-    }, []);
+    const { getNewNodeDepth, suggestNextCode } = window.ChartOfAccountsLogic;
 
     const fetchDesignerData = useCallback(async (retainNodeId = null) => {
-      if (!chart) return;
+      if (!chart) return false;
+      const requestId = ++designerRequest.current;
       try {
-        if (!supabase) return;
-        const { data, error } = await supabase.from('fm_coa_accounts').select('*').eq('chart_id', chart.id).order('code', { ascending: true });
-        if (error) throw error;
+        const data = await window.ChartOfAccountsLogic.fetchAccounts(supabase, chart.id);
+        if (requestId !== designerRequest.current) return false;
+        data.sort((a, b) => String(a.code).localeCompare(String(b.code)));
 
         const mapped = (data || []).map(a => ({
           id: a.id,
@@ -297,6 +258,8 @@
             safeFetch(supabase.from('fm_coa_permissions').select('account_id, grantee_type, grantee_id').in('account_id', accountIds)),
             safeFetch(supabase.from('fm_balance_group_accounts').select('account_id, group_id').in('account_id', accountIds))
           ]);
+          if (requestId !== designerRequest.current) return false;
+          if (permRes.error || bgRes.error) throw permRes.error || bgRes.error;
           setAllPermissions(permRes.data || []);
           setAllAccountBalanceGroups(bgRes.data || []);
         } else {
@@ -313,8 +276,11 @@
             setIsCreatingNode(false);
           }
         }
+        return true;
       } catch (err) {
+        if (requestId !== designerRequest.current) return false;
         showToast(t('خطا در بارگذاری ساختار کدینگ', 'Error loading account codes'), 'error');
+        return false;
       }
     }, [chart, supabase, getNewNodeDepth, showToast, t, isRtl]);
 
@@ -361,40 +327,16 @@
       setActiveTab('details');
     };
 
-    const validateNodeUniqueness = () => {
-      const pId = nodeFormData.parentId || null;
-      const siblings = rawAccounts.filter(n => String(n.parentId || '') === String(pId || '') && String(n.id) !== String(nodeFormData.id));
-
-      const dupFa = siblings.some(s => (s.titleFa || '').trim() === (nodeFormData.titleFa || '').trim());
-      if (dupFa) {
-        showToast(t('عنوان فارسی در این سطح تکراری است', 'Duplicate Persian title at this level'), 'error');
-        return false;
-      }
-
-      const enVal = (nodeFormData.titleEn || '').trim();
-      if (enVal !== '') {
-        const dupEn = siblings.some(s => (s.titleEn || '').trim() === enVal);
-        if (dupEn) {
-          showToast(t('عنوان انگلیسی در این سطح تکراری است', 'Duplicate English title at this level'), 'error');
-          return false;
-        }
-      }
-
-      const codeDup = rawAccounts.some(n => String(n.id) !== String(nodeFormData.id) && String(n.code) === String(nodeFormData.code));
-      if (codeDup) {
-        showToast(t('کد حساب وارد شده در کل ساختار تکراری است', 'Account code must be unique globally'), 'error');
-        return false;
-      }
-
-      return true;
-    };
-
     const handleSaveNodeForm = async () => {
       if (!nodeFormData.titleFa || !nodeFormData.code) {
         return showToast(t('فیلدهای کد و عنوان فارسی الزامی هستند', 'Code and Persian title are required'), 'error');
       }
 
-      if (!validateNodeUniqueness()) return;
+      try {
+        window.ChartOfAccountsLogic.validateUniqueness(rawAccounts, nodeFormData);
+      } catch (error) {
+        return showToast(t(error.fa, error.en), 'error');
+      }
 
       try {
         let safeCurrencyId = nodeFormData.currencyId;
@@ -877,6 +819,7 @@
                 onAddRoot={access.canCreate ? handleAddTreeRoot : undefined}
                 onAddChild={access.canCreate ? handleAddTreeChild : undefined}
                 onDelete={access.canDelete ? handleDeleteNode : undefined}
+                onMove={access.canEdit ? setMovingNode : undefined}
                 onImport={handleImportTree}
                 onExport={handleExportTree}
                 onDownloadSample={handleDownloadSample}
@@ -1034,6 +977,18 @@
           />
         </Modal>
 
+        {movingNode && <window.ChartOfAccountsMove node={movingNode} chart={chart} language={language} formCode={formCode}
+          onClose={() => setMovingNode(null)} onSaved={async (nodeId, logError) => {
+            setMovingNode(null);
+            setSelectedNodeId(null);
+            setIsCreatingNode(false);
+            setNodeFormData({});
+            const refreshed = await fetchDesignerData(nodeId);
+            if (!refreshed) return showToast(t('انتقال ثبت شد؛ بازخوانی فرم ناموفق بود. صفحه را دوباره باز کنید.', 'Move saved; refresh failed. Reopen the page.'), 'warning');
+            showToast(logError
+              ? t('شاخه و کدها تغییر کردند، ولی ثبت تاریخچه ناموفق بود.', 'Branch and codes changed, but audit logging failed.')
+              : t('شاخه و کد تمام زیرمجموعه‌ها تغییر کردند.', 'Branch and all descendant codes updated.'), logError ? 'warning' : 'success');
+          }} />}
         <Toast isVisible={toast.isVisible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, isVisible: false }))} />
       </div>
     );

@@ -8,7 +8,7 @@
   const { 
     ChevronDown = FallbackIcon, ChevronRight = FallbackIcon, ChevronLeft = FallbackIcon, Folder = FallbackIcon, FolderOpen = FallbackIcon, FileText = FallbackIcon, 
     Plus = FallbackIcon, Trash2 = FallbackIcon, Maximize2 = FallbackIcon, Minimize2 = FallbackIcon, Search = FallbackIcon, FileDown = FallbackIcon, Upload = FallbackIcon, FileSpreadsheet = FallbackIcon, 
-    Check = FallbackIcon, X = FallbackIcon, Layers = FallbackIcon, Settings = FallbackIcon, Pin = FallbackIcon, PinOff = FallbackIcon
+    Check = FallbackIcon, X = FallbackIcon, Layers = FallbackIcon, Settings = FallbackIcon, Pin = FallbackIcon, PinOff = FallbackIcon, FolderInput = FallbackIcon
   } = LucideIcons;
 
   const FallbackComponent = () => null;
@@ -52,7 +52,7 @@
     );
   };
 
-  const Tree = ({ data = [], idField = 'id', parentField = 'parentId', displayField = 'title', secondaryField, activeField = 'isActive', selectedId, onSelect, onAddChild, onAddRoot, onDelete, onExport, onImport, onDownloadSample, language = 'fa', formCode }) => {
+  const Tree = ({ data = [], idField = 'id', parentField = 'parentId', displayField = 'title', secondaryField, activeField = 'isActive', selectedId, onSelect, onAddChild, onAddRoot, onDelete, onMove, onExport, onImport, onDownloadSample, language = 'fa', formCode }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const access = useSecureAccess(formCode);
@@ -223,7 +223,8 @@
               )}
             </div>
 
-            <div className={`flex items-center gap-0.5 shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+            <div className={`flex items-center gap-0.5 shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
+              {onMove && access.canEdit && <button type="button" onClick={(e) => { e.stopPropagation(); onMove(node); }} title={t('تغییر شاخه', 'Move branch')} aria-label={t('تغییر شاخه', 'Move branch')} className="p-1 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"><FolderInput size={14}/></button>}
               {onAddChild && access.canCreate && <button onClick={(e) => { 
                 e.stopPropagation(); 
                 const nExp = new Set(expandedIds);
