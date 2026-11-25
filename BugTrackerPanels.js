@@ -12,7 +12,7 @@
   } = LucideIcons;
 
   const ISSUE_TYPE_OPTIONS = [
-    { value: 'NEW_FEATURE', fa: 'فیچر جدید', en: 'New Feature', badge: 'blue' },
+    { value: 'NEW_FEATURE', fa: 'فیچر', en: 'Feature', badge: 'blue' },
     { value: 'BUG', fa: 'باگ', en: 'Bug', badge: 'red' },
     { value: 'IMPROVEMENT', fa: 'بهبود', en: 'Improvement', badge: 'success' }
   ];
