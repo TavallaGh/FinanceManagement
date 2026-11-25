@@ -205,8 +205,8 @@
     },
     {
       field: 'title',
-      header_fa: 'عنوان باگ',
-      header_en: 'Bug Title',
+      header_fa: 'عنوان',
+      header_en: 'Title',
       width: '220px',
       render: (val) => <span className="font-bold text-[12px] text-slate-700 dark:text-slate-200">{val || '-'}</span>,
       searchAccessor: (val) => val || ''
@@ -441,7 +441,7 @@
                   <div className="md:col-span-2">
                     <TextField
                       size="sm"
-                      label={t('عنوان باگ', 'Bug Title')}
+                      label={t('عنوان', 'Title')}
                       value={bugForm.title}
                       onChange={e => setBugForm(prev => ({ ...prev, title: e.target.value }))}
                       required

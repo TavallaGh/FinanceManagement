@@ -468,7 +468,7 @@
       const issueType = bugForm.issue_type || 'BUG';
 
       if (!title || (!isGeneral && !formName)) {
-        showToast(t('عنوان باگ الزامی است و در حالت غیرعمومی باید نام فرم هم وارد شود.', 'Bug title is required, and form is required for non-general bugs.'), 'warning');
+        showToast(t('عنوان الزامی است و در حالت غیرعمومی باید نام فرم هم وارد شود.', 'Title is required, and form is required for non-general bugs.'), 'warning');
         return;
       }
 
