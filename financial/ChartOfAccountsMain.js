@@ -50,6 +50,7 @@
     const [selectedNodeId, setSelectedNodeId] = useState(null);
     const [isCreatingNode, setIsCreatingNode] = useState(false);
     const [movingNode, setMovingNode] = useState(null);
+    const [revealSelectedKey, setRevealSelectedKey] = useState(0);
     const [nodeFormData, setNodeFormData] = useState({});
     const [nodeDepth, setNodeDepth] = useState(1);
     const [currencyRates, setCurrencyRates] = useState([]);
@@ -220,34 +221,7 @@
         if (requestId !== designerRequest.current) return false;
         data.sort((a, b) => String(a.code).localeCompare(String(b.code)));
 
-        const mapped = (data || []).map(a => ({
-          id: a.id,
-          parentId: a.parent_id,
-          code: a.code,
-          titleFa: a.title_fa,
-          titleEn: a.title_en,
-          title: isRtl ? a.title_fa : (a.title_en || a.title_fa),
-          currencyId: a.currency_id,
-          isActive: a.is_active,
-          accountType: a.account_type,
-          controlInventory: a.control_inventory
-        }));
-
-        const isChainInactive = (pId, list) => {
-          if (!pId) return false;
-          const parent = list.find(l => String(l.id) === String(pId));
-          if (!parent) return false;
-          if (!parent.isActive) return true;
-          return isChainInactive(parent.parentId, list);
-        };
-
-        mapped.forEach(m => {
-          const base = isRtl ? `${m.code} - ${m.titleFa}` : `${m.code} - ${m.titleEn || m.titleFa}`;
-          const isParentDead = isChainInactive(m.parentId, mapped);
-          if (!m.isActive || isParentDead) {
-            m.title = `${base} ${t('(غیرفعال)', '(Inactive)')}`;
-          }
-        });
+        const mapped = window.ChartOfAccountsLogic.mapAccounts(data, isRtl, t);
 
         setRawAccounts(mapped);
 
@@ -815,6 +789,7 @@
                 data={filteredAccounts} language={language} formCode={formCode}
                 idField="id" parentField="parentId" displayField="title" secondaryField="code" activeField="isActive"
                 selectedId={selectedNodeId}
+                revealSelectedKey={revealSelectedKey}
                 onSelect={handleSelectTreeNode}
                 onAddRoot={access.canCreate ? handleAddTreeRoot : undefined}
                 onAddChild={access.canCreate ? handleAddTreeChild : undefined}
@@ -978,13 +953,16 @@
         </Modal>
 
         {movingNode && <window.ChartOfAccountsMove node={movingNode} chart={chart} language={language} formCode={formCode}
-          onClose={() => setMovingNode(null)} onSaved={async (nodeId, logError) => {
+          onClose={() => setMovingNode(null)} onSaved={async (nodeId, logError, accounts) => {
+            const updated = window.ChartOfAccountsLogic.mapAccounts(accounts, isRtl, t);
+            const selected = updated.find(account => String(account.id) === String(nodeId));
+            setRawAccounts(updated);
+            handleSelectTreeNode(selected);
+            setRevealSelectedKey(value => value + 1);
             setMovingNode(null);
-            setSelectedNodeId(null);
-            setIsCreatingNode(false);
-            setNodeFormData({});
             const refreshed = await fetchDesignerData(nodeId);
-            if (!refreshed) return showToast(t('انتقال ثبت شد؛ بازخوانی فرم ناموفق بود. صفحه را دوباره باز کنید.', 'Move saved; refresh failed. Reopen the page.'), 'warning');
+            setRevealSelectedKey(value => value + 1);
+            if (!refreshed) return showToast(t('انتقال ثبت شد؛ بازخوانی اطلاعات ناموفق بود.', 'Move saved; refreshing account data failed.'), 'warning');
             showToast(logError
               ? t('شاخه و کدها تغییر کردند، ولی ثبت تاریخچه ناموفق بود.', 'Branch and codes changed, but audit logging failed.')
               : t('شاخه و کد تمام زیرمجموعه‌ها تغییر کردند.', 'Branch and all descendant codes updated.'), logError ? 'warning' : 'success');

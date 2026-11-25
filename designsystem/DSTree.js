@@ -52,13 +52,19 @@
     );
   };
 
-  const Tree = ({ data = [], idField = 'id', parentField = 'parentId', displayField = 'title', secondaryField, activeField = 'isActive', selectedId, onSelect, onAddChild, onAddRoot, onDelete, onMove, onExport, onImport, onDownloadSample, language = 'fa', formCode }) => {
+  const Tree = ({ data = [], idField = 'id', parentField = 'parentId', displayField = 'title', secondaryField, activeField = 'isActive', selectedId, revealSelectedKey = 0, onSelect, onAddChild, onAddRoot, onDelete, onMove, onExport, onImport, onDownloadSample, language = 'fa', formCode }) => {
     const isRtl = language === 'fa';
     const t = useCallback((fa, en) => isRtl ? fa : en, [isRtl]);
     const access = useSecureAccess(formCode);
 
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [searchTerm, setSearchTerm] = useState('');
+    const selectedRowRef = useRef(null);
+    const revealedKey = useRef(0);
+
+    useEffect(() => {
+      if (revealSelectedKey) setSearchTerm('');
+    }, [revealSelectedKey]);
 
     useEffect(() => {
       if (selectedId && data && data.length > 0) {
@@ -128,6 +134,16 @@
     }, [data, searchTerm, idField, parentField, displayField, secondaryField]);
 
     useEffect(() => {
+      if (!revealSelectedKey || revealedKey.current === revealSelectedKey) return;
+      const frame = requestAnimationFrame(() => {
+        if (!selectedRowRef.current) return;
+        selectedRowRef.current.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        revealedKey.current = revealSelectedKey;
+      });
+      return () => cancelAnimationFrame(frame);
+    }, [revealSelectedKey, treeData, expandedIds]);
+
+    useEffect(() => {
       if (searchTerm) {
         const extractIds = (nodes, acc) => {
           nodes.forEach(n => { if (n.children.length > 0) { acc.add(String(n[idField])); extractIds(n.children, acc); } });
@@ -179,7 +195,7 @@
 
       return (
         <div key={strId} className="select-none relative">
-          <div 
+          <div ref={isSelected ? selectedRowRef : null}
             onClick={() => onSelect && onSelect(node)}
             className={`flex items-center gap-2 py-1 px-2 my-0.5 cursor-pointer rounded-lg transition-all border border-transparent group
               ${isSelected ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold border-indigo-200 dark:border-indigo-800 shadow-sm' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-200 dark:hover:border-slate-700'}`}

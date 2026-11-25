@@ -76,6 +76,31 @@
     titleFa: row.title_fa, titleEn: row.title_en
   }));
 
+  const mapAccounts = (rows, isRtl, t) => {
+    const byId = new Map(rows.map(row => [key(row.id), row]));
+    return rows.map(row => {
+      let inactive = !row.is_active;
+      let parentId = row.parent_id;
+      const visited = new Set([key(row.id)]);
+      while (parentId != null) {
+        if (visited.has(key(parentId))) fail('ساختار حساب دارای چرخه است.', 'The account tree contains a cycle.');
+        visited.add(key(parentId));
+        const parent = byId.get(key(parentId));
+        if (!parent) break;
+        inactive = inactive || !parent.is_active;
+        parentId = parent.parent_id;
+      }
+      const title = isRtl ? row.title_fa : row.title_en || row.title_fa;
+      return {
+        id: row.id, parentId: row.parent_id, code: row.code,
+        titleFa: row.title_fa, titleEn: row.title_en,
+        title: inactive ? `${row.code} - ${title} ${t('(غیرفعال)', '(Inactive)')}` : title,
+        currencyId: row.currency_id, isActive: row.is_active,
+        accountType: row.account_type, controlInventory: row.control_inventory
+      };
+    });
+  };
+
   const subtree = (nodes, nodeId) => {
     const root = nodes.find(n => key(n.id) === key(nodeId));
     if (!root) fail('حساب انتخاب‌شده در دسترس نیست.', 'The selected account is unavailable.');
@@ -96,9 +121,29 @@
     const excluded = new Set(branch.map(n => key(n.id)));
     const height = Math.max(...branch.map(n => n.relativeDepth));
     const currentParent = key(branch[0].parentId);
-    const candidates = nodes.filter(n => !excluded.has(key(n.id)) && key(n.id) !== currentParent &&
-      getNewNodeDepth(nodes, n.id) + height <= 4);
-    if (currentParent !== '' && height < 4) candidates.unshift({ id: null, code: '', isRoot: true });
+    const eligible = nodes.filter(n => !excluded.has(key(n.id)) && key(n.id) !== currentParent)
+      .map(n => ({ ...n, level: getNewNodeDepth(nodes, n.parentId) }))
+      .filter(n => n.level <= 3 && n.level + 1 + height <= 4);
+    const eligibleById = new Map(eligible.map(n => [key(n.id), n]));
+    const childrenByParent = new Map();
+    const sorted = [...nodes].sort((a, b) => key(a.code).localeCompare(key(b.code)) ||
+      key(a.id).localeCompare(key(b.id), 'en', { numeric: true }));
+    sorted.forEach(node => {
+      const parentId = key(node.parentId);
+      if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+      childrenByParent.get(parentId).push(node);
+    });
+    const candidates = [];
+    const visit = parentId => {
+      (childrenByParent.get(parentId) || []).forEach(node => {
+        const id = key(node.id);
+        if (eligibleById.has(id)) candidates.push(eligibleById.get(id));
+        // Traverse excluded parents too: their other children can be valid destinations.
+        if (!excluded.has(id)) visit(id);
+      });
+    };
+    visit('');
+    if (currentParent !== '' && height < 4) candidates.unshift({ id: null, code: '', isRoot: true, level: 0 });
     return candidates;
   };
 
@@ -168,11 +213,12 @@
       })));
       logError = result.error;
     } catch (error) { logError = error; }
-    return { changes, logError };
+    const updatedById = new Map(payload.map(row => [key(row.id), row]));
+    return { changes, logError, accounts: fresh.map(row => updatedById.get(key(row.id)) || row) };
   };
 
   window.ChartOfAccountsLogic = {
     getNewNodeDepth, suggestNextCode, validateUniqueness, fetchAccounts,
-    asNodes, parentOptions, planMove, saveMove
+    asNodes, mapAccounts, parentOptions, planMove, saveMove
   };
 })();

@@ -51,6 +51,7 @@
           ...account,
           // LOV rows need a stable ID, including the virtual root destination.
           id: account.isRoot ? '__root__' : account.id,
+          levelLabel: [t('بدون پدر', 'No parent'), t('گروه', 'Group'), t('کل', 'General ledger'), t('معین', 'Subsidiary')][account.level],
           title: account.isRoot ? t('ریشه درخت (بدون پدر)', 'Tree root (no parent)') :
             (isRtl ? account.titleFa : account.titleEn || account.titleFa)
         }));
@@ -85,7 +86,7 @@
           canEdit: securityCtx ? !!securityCtx.getActions(formCode)?.canEdit : canEdit,
           userName: window.NavigationSystem?.currentUser?.name || 'مدیر سیستم'
         });
-        await onSaved(node.id, result.logError);
+        await onSaved(node.id, result.logError, result.accounts);
       } catch (error) {
         setSaveError(error);
       } finally {
@@ -112,6 +113,7 @@
             <Alert type="info" message={t('پدر دیگری با رعایت سقف چهار سطح برای این شاخه وجود ندارد.', 'No alternative parent fits this branch within four levels.')} />}
           <LOVField size="sm" formCode={formCode} label={t('حساب پدر جدید', 'New parent account')}
             data={candidates.data} columns={[
+              { field: 'levelLabel', header_fa: 'سطح حساب', header_en: 'Account level', width: '120px' },
               { field: 'code', header_fa: 'کد', header_en: 'Code', width: '120px' },
               { field: 'title', header_fa: 'عنوان', header_en: 'Title', width: '250px' }
             ]} displayValue={parent ? `${parent.code ? parent.code + ' - ' : ''}${parent.title}` : ''}
