@@ -78,6 +78,7 @@
     qa_status: 'PENDING'
   };
   const DEFAULT_FILTERS = {
+    issue_type: '',
     show_done: false,
     assignee_id: '',
     has_attachment: false,
@@ -467,12 +468,12 @@
       const issueType = bugForm.issue_type || 'BUG';
 
       if (!title || (!isGeneral && !formName)) {
-        showToast(t('عنوان الزامی است و در حالت غیرعمومی باید نام فرم هم وارد شود.', 'Bug title is required, and form is required for non-general bugs.'), 'warning');
+        showToast(t('عنوان باگ الزامی است و در حالت غیرعمومی باید نام فرم هم وارد شود.', 'Bug title is required, and form is required for non-general bugs.'), 'warning');
         return;
       }
 
       if (!(bugPanels.ISSUE_TYPE_OPTIONS || []).some(option => option.value === issueType)) {
-        showToast(t('نوع نامعتبر است؛ باگ یا بهبود را انتخاب کنید.', 'Invalid type; select Bug or Improvement.'), 'warning');
+        showToast(t('نوع نامعتبر است؛ فیچر جدید، باگ یا بهبود را انتخاب کنید.', 'Invalid type; select New Feature, Bug or Improvement.'), 'warning');
         return;
       }
 

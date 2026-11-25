@@ -12,8 +12,9 @@
   } = LucideIcons;
 
   const ISSUE_TYPE_OPTIONS = [
-    { value: 'BUG', fa: 'باگ', en: 'Bug' },
-    { value: 'IMPROVEMENT', fa: 'بهبود', en: 'Improvement' }
+    { value: 'NEW_FEATURE', fa: 'فیچر جدید', en: 'New Feature', badge: 'blue' },
+    { value: 'BUG', fa: 'باگ', en: 'Bug', badge: 'red' },
+    { value: 'IMPROVEMENT', fa: 'بهبود', en: 'Improvement', badge: 'success' }
   ];
 
   const PRIORITY_OPTIONS = [
@@ -204,8 +205,8 @@
     },
     {
       field: 'title',
-      header_fa: 'عنوان',
-      header_en: 'Title',
+      header_fa: 'عنوان باگ',
+      header_en: 'Bug Title',
       width: '220px',
       render: (val) => <span className="font-bold text-[12px] text-slate-700 dark:text-slate-200">{val || '-'}</span>,
       searchAccessor: (val) => val || ''
@@ -215,7 +216,7 @@
       header_fa: 'نوع',
       header_en: 'Type',
       width: '100px',
-      render: val => getLabel(ISSUE_TYPE_OPTIONS, val || 'BUG'),
+      render: val => <Badge variant={getBadgeVariant(ISSUE_TYPE_OPTIONS, val || 'BUG')}>{getLabel(ISSUE_TYPE_OPTIONS, val || 'BUG')}</Badge>,
       searchAccessor: val => `${val || 'BUG'} ${getLabel(ISSUE_TYPE_OPTIONS, val || 'BUG')}`
     },
     {
@@ -331,6 +332,7 @@
 
       if (filters.show_done && !isDone) return false;
       if (!filters.show_done && isDone) return false;
+      if (filters.issue_type && (bug.issue_type || 'BUG') !== filters.issue_type) return false;
 
       if (filters.assignee_id) {
         const targetId = filters.assignee_id;
@@ -346,6 +348,12 @@
   };
 
   const getFilterFields = (t, specialistOptions) => ([
+    {
+      name: 'issue_type',
+      label: t('نوع مشکل', 'Issue Type'),
+      type: 'select',
+      options: [{ value: '', label: t('همه', 'All') }, ...ISSUE_TYPE_OPTIONS.map(x => ({ value: x.value, label: t(x.fa, x.en) }))]
+    },
     { name: 'assignee_id', label: t('مسئول انجام تسک', 'Task assignee'), type: 'select', options: [{ value: '', label: t('همه', 'All') }, ...specialistOptions] },
     { name: 'show_done', label: t('مشاهده موارد تکمیل شده', 'Show completed items'), type: 'toggle' },
     { name: 'has_attachment', label: t('دارای فایل ضمیمه', 'Has attachment'), type: 'toggle' },
@@ -427,13 +435,13 @@
       >
         <div className="p-3 max-h-[72vh] overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900">
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-3">
-            <Card title={t('مشخصات', 'Details')} className="xl:col-span-6 border border-slate-200 dark:border-slate-700" noPadding={false}>
+            <Card title={t('مشخصات باگ', 'Bug Details')} className="xl:col-span-6 border border-slate-200 dark:border-slate-700" noPadding={false}>
               <div className="space-y-2">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <div className="md:col-span-2">
                     <TextField
                       size="sm"
-                      label={t('عنوان', 'Title')}
+                      label={t('عنوان باگ', 'Bug Title')}
                       value={bugForm.title}
                       onChange={e => setBugForm(prev => ({ ...prev, title: e.target.value }))}
                       required
