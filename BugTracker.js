@@ -473,7 +473,7 @@
       }
 
       if (!(bugPanels.ISSUE_TYPE_OPTIONS || []).some(option => option.value === issueType)) {
-        showToast(t('نوع نامعتبر است؛ فیچر ، باگ یا بهبود را انتخاب کنید.', 'Invalid type; select New Feature, Bug or Improvement.'), 'warning');
+        showToast(t('نوع نامعتبر است؛ فیچر، باگ یا بهبود را انتخاب کنید.', 'Invalid type; select New Feature, Bug or Improvement.'), 'warning');
         return;
       }
 
