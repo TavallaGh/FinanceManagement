@@ -417,6 +417,7 @@
       OPENING: t('افتتاحیه', 'Opening'),
       CLOSING: t('اختتامیه', 'Closing'),
       GENERAL: t('عمومی', 'General'),
+      ADJUSTMENT: t('اصلاحی', 'Adjustment'),
       TRANSFER: t('انتقال', 'Transfer'),
     }), [t]);
     const txActions = useMemo(() => ({

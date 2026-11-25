@@ -86,6 +86,7 @@
             { value: 'OPENING', label: t('تراکنش افتتاحیه', 'Opening') },
             { value: 'CLOSING', label: t('تراکنش اختتامیه', 'Closing') },
             { value: 'GENERAL', label: t('عمومی', 'General') },
+            { value: 'ADJUSTMENT', label: t('اصلاحی', 'Adjustment') },
             { value: 'TRANSFER', label: t('تراکنش انتقال', 'Transfer') }
         ];
 

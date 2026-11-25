@@ -302,6 +302,7 @@
         ['opening', 'OPENING'], ['افتتاحیه', 'OPENING'],
         ['closing', 'CLOSING'], ['اختتامیه', 'CLOSING'],
         ['general', 'GENERAL'], ['عمومی', 'GENERAL'],
+        ['adjustment', 'ADJUSTMENT'], ['اصلاحی', 'ADJUSTMENT'],
         ['transfer', 'TRANSFER'], ['انتقال', 'TRANSFER'],
       ].map(([k, v]) => [normalizeImportToken(k), v])),
       status: new Map([
@@ -705,7 +706,7 @@
         return;
       }
 
-      const TX_TYPE = { OPENING: t('افتتاحیه', 'Opening'), CLOSING: t('اختتامیه', 'Closing'), GENERAL: t('عمومی', 'General'), TRANSFER: t('انتقال', 'Transfer') };
+      const TX_TYPE = { OPENING: t('افتتاحیه', 'Opening'), CLOSING: t('اختتامیه', 'Closing'), GENERAL: t('عمومی', 'General'), ADJUSTMENT: t('اصلاحی', 'Adjustment'), TRANSFER: t('انتقال', 'Transfer') };
       const TX_STATUS = { DRAFT: t('یادداشت', 'Draft'), TEMPORARY: t('موقت', 'Temporary'), FINAL: t('بررسی شده', 'Final'), APPROVED: t('تایید شده', 'Approved') };
       const TX_ACTION = { DEPOSIT: t('واریز', 'Deposit'), WITHDRAWAL: t('برداشت', 'Withdrawal') };
       const TX_GROUP = { COST: t('هزینه', 'Cost'), INCOME: t('درآمد', 'Income'), BALANCE: t('بالانس', 'Balance'), OTHER: t('سایر', 'Other') };

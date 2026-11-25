@@ -640,6 +640,7 @@
       { value: 'OPENING', label: t('افتتاحیه', 'Opening') },
       { value: 'CLOSING', label: t('اختتامیه', 'Closing') },
       { value: 'GENERAL', label: t('عمومی', 'General') },
+      { value: 'ADJUSTMENT', label: t('اصلاحی', 'Adjustment') },
       { value: 'TRANSFER', label: t('انتقال', 'Transfer') },
     ]), [t]);
 
@@ -795,6 +796,7 @@
       OPENING: t('افتتاحیه', 'Opening'),
       CLOSING: t('اختتامیه', 'Closing'),
       GENERAL: t('عمومی', 'General'),
+      ADJUSTMENT: t('اصلاحی', 'Adjustment'),
       TRANSFER: t('انتقال', 'Transfer'),
     };
 
